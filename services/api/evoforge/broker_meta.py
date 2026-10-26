@@ -24,6 +24,20 @@ BUILDER_SYSTEM = (
 )
 
 
+CRITIC_SYSTEM = (
+    "You are EvoForge Critic (independent verifier). You NEVER see builder rationale. "
+    "Write acceptance tests from the SPEC only, then review diff+CI. "
+    'Output JSON: {"sealed_tests": [{"code": "..."}], "review": {...}}'
+)
+
+
+def call_critic(goal: str, diff: str) -> dict:
+    """Spec-first critic via Muse Spark. Stub without key (deterministic)."""
+    from evoforge.critic import call_critic as _c
+
+    return _c(goal, diff)
+
+
 def call_builder(goal: str, repo_sha: str) -> dict:
     """Call Muse Spark builder. Raises RuntimeError without key (fail-closed)."""
     if not os.getenv("MODEL_API_KEY"):

@@ -1,0 +1,108 @@
+# EvoForge CI/CD — build context root = repo root C:\evo_forge (see Dockerfiles).
+# Substitutions: _PROJECT (required), _REGION (default asia-northeast3),
+# _ENV (default hackathon). Images tagged :$COMMIT_SHA + :latest.
+substitutions:
+  _REGION: asia-northeast3
+  _ENV: hackathon
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  # 0) Contract freeze check (no CHECK/trigger edits) + package validation.
+  - name: python:3.12-slim
+    id: validate
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        pip install -q pyyaml &&
+        python docs/evoforge-v4.2/tools/validate_package.py --pg
+
+  # 1) API unit tests.
+  - name: python:3.12-slim
+    id: pytest
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        pip install -q -r services/api/requirements.txt &&
+        python -m pytest services/api -q
+
+  # 2) Build + push images to Artifact Registry.
+  - name: gcr.io/cloud-builders/docker
+    id: build-api
+    args:
+      - build
+      - -f
+      - services/api/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:latest
+      - .
+  - name: gcr.io/cloud-builders/docker
+    id: build-web
+    args:
+      - build
+      - -f
+      - apps/web/Dockerfile
+      - --build-arg
+      - NEXT_PUBLIC_API_BASE=
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:latest
+      - .
+  - name: gcr.io/cloud-builders/docker
+    id: push
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:$COMMIT_SHA &&
+        docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:latest &&
+        docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA &&
+        docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:latest
+
+  # 3) Apply SQL migrations via private-IP proxy sidecar (core + context plane).
+  # Contract freeze: files applied verbatim; any CHECK/trigger diff fails the build.
+  - name: gcr.io/cloud-builders/gcloud
+    id: migrate
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        CONN=$$(gcloud sql instances describe evoforge-pg-${_ENV} --project=$PROJECT_ID --format='value(connectionName)')
+        echo "Migrating via $$CONN"
+        gcloud sql connect evoforge-pg-${_ENV} --project=$PROJECT_ID --user=evoforge --quiet < /dev/null || true
+        # Real migration runs on a GCE/cloud-build-private-pool with psql:
+        #   psql "$$DB_URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql
+        #   psql "$$DB_URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql
+        # DB_URL is fetched from Secret Manager at build time (never logged):
+        URL=$$(gcloud secrets versions access latest --secret=DB_URL --project=$PROJECT_ID)
+        apt-get update -qq && apt-get install -y -qq postgresql-client > /dev/null
+        psql "$$URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql
+        psql "$$URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql
+    secretEnv: []
+
+  # 4) Terraform apply (infra) — deploys Cloud Run pointing at fresh digests.
+  - name: hashicorp/terraform:1.9
+    id: tf-apply
+    entrypoint: sh
+    args:
+      - -c
+      - |
+        cd infra/gcp
+        terraform init -input=false
+        terraform apply -input=false -auto-approve \
+          -var="project=$PROJECT_ID" \
+          -var="region=${_REGION}" \
+          -var="env=${_ENV}" \
+          -var="api_image=${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:$COMMIT_SHA" \
+          -var="web_image=${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA"
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:$COMMIT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA

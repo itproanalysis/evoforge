@@ -1,0 +1,20 @@
+name: evoforge-ci
+on: [push, pull_request]
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: python3 -I docs/evoforge-v4.2/tools/validate_package.py
+  api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - run: pip install -r services/api/requirements.txt
+      - run: pytest -q services/api/tests
+      - run: python -c "from main import app; from fastapi.testclient import TestClient; c=TestClient(app); assert c.get('/healthz').status_code==200" 
+        working-directory: services/api
