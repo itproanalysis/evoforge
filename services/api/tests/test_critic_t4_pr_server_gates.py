@@ -21,10 +21,29 @@ STRONG = [{"code": "def test_value():\n    assert result == 3\n"}]
 DIFF = "--- a/src/v.py\n+++ b/src/v.py\n@@ -1 +1 @@\n-result = 2\n+result = 3\n"
 
 
-def _evaluate(diff=DIFF, **kw):
-    body = {"diff": diff, "tests": STRONG, "heldout_kinds": HELDOUT,
-            "vis_pass": 9, "vis_n": 10, "held_pass": 9, "held_n": 10, **kw}
-    r = c.post("/v1/gates/evaluate", json=body)
+RUN: dict = {}
+
+
+@pytest.fixture(autouse=True)
+def fake_runner(monkeypatch):
+    """T5: PR evidence must come from a server run; stub the Runner with the requested counts."""
+    from evoforge import runner
+
+    def fake(source_repo, base_sha, diff, visible_tests, heldout_tests, timeout_s=120, future_shas=None):
+        return {"base": "b" * 40, "hygiene": [],
+                "visible": {"pass": RUN["vis_pass"], "n": RUN["vis_n"], "timed_out": False, "exit_code": 0},
+                "heldout": {"pass": RUN["held_pass"], "n": RUN["held_n"], "timed_out": False, "exit_code": 0},
+                "heldout_kinds": [str(t.get("kind", "")) for t in heldout_tests]}
+
+    monkeypatch.setattr(runner, "run_candidate", fake)
+
+
+def _evaluate(diff=DIFF, heldout_kinds=HELDOUT, **kw):
+    RUN.clear()
+    RUN.update({"vis_pass": 9, "vis_n": 10, "held_pass": 9, "held_n": 10, **kw})
+    heldout = [{"kind": k, "code": "def test_h():\n    assert 1 == 1\n"} for k in heldout_kinds]
+    r = c.post("/v1/runs", json={"source_repo": "C:/repos/proj", "base_sha": "b" * 40, "diff": diff,
+                                 "tests": STRONG, "heldout_tests": heldout})
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -44,10 +63,19 @@ def captured(monkeypatch):
 
 
 def test_evaluate_stores_diff_tests_gates():
-    out = _evaluate()
+    out = c.post("/v1/gates/evaluate", json={
+        "diff": DIFF, "tests": STRONG, "heldout_kinds": HELDOUT,
+        "vis_pass": 9, "vis_n": 10, "held_pass": 9, "held_n": 10}).json()
     ev = c.get(f"/v1/evidence/{out['evidence_id']}").json()
     assert ev["diff"] == DIFF and ev["tests"] == STRONG
     assert ev["gates"] == out["gates"]
+
+
+def test_run_evidence_stores_diff_tests_gates_run():
+    out = _evaluate()
+    ev = c.get(f"/v1/evidence/{out['evidence_id']}").json()
+    assert ev["diff"] == DIFF and ev["tests"] == STRONG
+    assert ev["gates"] == out["gates"] and ev["run"]["heldout"]["n"] == 10
 
 
 def test_pr_from_all_pass_evidence_uses_stored_diff(captured):
