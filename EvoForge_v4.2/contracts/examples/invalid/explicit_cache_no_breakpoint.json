@@ -1,0 +1,228 @@
+{
+  "schema_version": "context-packet/v2",
+  "packet_id": "0b7e1f00-1111-4c22-8d33-0000000000e4",
+  "tenant_id": "6f1d2c3b-0a00-4b1e-9c2d-0000000000a1",
+  "project_id": "6f1d2c3b-0a00-4b1e-9c2d-0000000000b1",
+  "run_id": "0b7e1f00-1111-4c22-8d33-000000000001",
+  "task_id": "0b7e1f00-1111-4c22-8d33-000000000002",
+  "task_attempt_id": "0b7e1f00-1111-4c22-8d33-000000000003",
+  "idempotency_key": "task-0002:attempt-0003:seat-4:ctx-v1",
+  "issued_at": "2026-10-25T09:00:00Z",
+  "expires_at": "2026-10-25T10:00:00Z",
+  "supersedes_packet_id": null,
+  "profile": "SAFE",
+  "experiment_arm": null,
+  "recipient": {
+    "seat_id": 4,
+    "seat_label": "Critic",
+    "function_role": "critic",
+    "agent_id": "0b7e1f00-1111-4c22-8d33-0000000000a4",
+    "candidate_id": "0b7e1f00-1111-4c22-8d33-0000000000c1",
+    "is_author_of_candidate": false,
+    "channel": "mcp"
+  },
+  "fencing": {
+    "repo_sha": "3f9a3f9a3f9a3f9a3f9a3f9a3f9a3f9a3f9a3f9a",
+    "contract_version": 3,
+    "policy_version": "policy-7",
+    "policy_hash": "77086ded74c579d0fcb347dbd8485bb804788869b45cbf4eb53555256dfc6cd5",
+    "tool_schema_hash": "d9a4a55f60ac7dfc9da718768d581e80eddb5e3fba6e9c4182257ea955a6b93b",
+    "evidence_manifest_hash": "c1bd001806bebac66b6e1c42e91591cd7acdf892b4a1f8959e33e8112980cbf5",
+    "lease_epoch": 12
+  },
+  "items": [
+    {
+      "item_id": "it_goal",
+      "source_kind": "contract.goal",
+      "ref": "evr_0q3m8k2v7c4t1n6h9w5r2x8z3b",
+      "sha256": "eaba58ec2d089dfbdfa6bffc73390980c578d346bbde193b50485da0cdf76648",
+      "size_bytes": 100,
+      "trust": "trusted_contract",
+      "classification": "internal",
+      "requires_original": true,
+      "fidelity": "RAW",
+      "raw_reason": "POLICY_REQUIRED",
+      "segment_index": 1,
+      "view_sha256": "eaba58ec2d089dfbdfa6bffc73390980c578d346bbde193b50485da0cdf76648",
+      "view_tokens_est": 25
+    },
+    {
+      "item_id": "it_policy",
+      "source_kind": "contract.policy",
+      "ref": "evr_1a2b3c4d5e6f7g8h9j0k1m2n3p",
+      "sha256": "77086ded74c579d0fcb347dbd8485bb804788869b45cbf4eb53555256dfc6cd5",
+      "size_bytes": 73,
+      "trust": "trusted_contract",
+      "classification": "internal",
+      "requires_original": true,
+      "fidelity": "RAW",
+      "raw_reason": "POLICY_REQUIRED",
+      "segment_index": 1,
+      "view_sha256": "77086ded74c579d0fcb347dbd8485bb804788869b45cbf4eb53555256dfc6cd5",
+      "view_tokens_est": 19
+    },
+    {
+      "item_id": "it_diff",
+      "source_kind": "git.diff",
+      "ref": "evr_7y6x5w4v3t2s1r0q9p8n7m6k5j",
+      "sha256": "4fd83782873ef9e63e659fe71b4a97b8d11fd8892ec32825f88ef31d2ed6ca74",
+      "size_bytes": 2051,
+      "trust": "verified_tool_output",
+      "classification": "restricted",
+      "requires_original": true,
+      "fidelity": "REF_ONLY",
+      "segment_index": 3,
+      "view_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "view_tokens_est": 0
+    },
+    {
+      "item_id": "it_junit",
+      "source_kind": "test.junit",
+      "ref": "evr_9h8g7f6e5d4c3b2a1z0y9x8w7v",
+      "sha256": "bcaa931fefdfa561380c36547754c0395d7cff63f4136701e9993dffa3610e78",
+      "size_bytes": 59232,
+      "trust": "verified_tool_output",
+      "classification": "internal",
+      "requires_original": true,
+      "fidelity": "STRUCTURAL",
+      "codec": {
+        "name": "junit.structural",
+        "version": "1.1.0",
+        "deterministic": true
+      },
+      "fidelity_checks": [
+        {
+          "invariant_id": "U1",
+          "passed": true
+        },
+        {
+          "invariant_id": "U2",
+          "passed": true
+        },
+        {
+          "invariant_id": "U3",
+          "passed": true
+        },
+        {
+          "invariant_id": "U4",
+          "passed": true
+        },
+        {
+          "invariant_id": "T1",
+          "passed": true
+        },
+        {
+          "invariant_id": "T2",
+          "passed": true
+        },
+        {
+          "invariant_id": "T3",
+          "passed": true
+        },
+        {
+          "invariant_id": "T4",
+          "passed": true
+        },
+        {
+          "invariant_id": "T5",
+          "passed": true
+        }
+      ],
+      "omitted": [
+        {
+          "selector": "all",
+          "count": 117,
+          "unit": "testcases"
+        }
+      ],
+      "segment_index": 3,
+      "view_sha256": "5e2acc2d51b5cba82cfc2775bc76e82004e8817257b5ec1d194294541aff8552",
+      "view_tokens_est": 221
+    }
+  ],
+  "critical_assertions": [
+    {
+      "assertion_id": "ca_t017",
+      "kind": "failing_test",
+      "item_id": "it_junit",
+      "selector": "junit:api::app.api.test_orders_0.test_case_017",
+      "origin": "parser",
+      "label": "expected 200 but was 500"
+    },
+    {
+      "assertion_id": "ca_t063",
+      "kind": "failing_test",
+      "item_id": "it_junit",
+      "selector": "junit:api::app.api.test_orders_3.test_case_063",
+      "origin": "parser"
+    },
+    {
+      "assertion_id": "ca_t099",
+      "kind": "failing_test",
+      "item_id": "it_junit",
+      "selector": "junit:api::app.api.test_orders_4.test_case_099",
+      "origin": "parser"
+    },
+    {
+      "assertion_id": "ca_goal",
+      "kind": "goal_clause",
+      "item_id": "it_goal",
+      "selector": "all",
+      "origin": "user"
+    }
+  ],
+  "layout": {
+    "prefix_layout": "STABLE_PREFIX",
+    "serialization": "evoforge-canonical/v1",
+    "cache_namespace_id": "cns_01jb7m3k9q2w4e6r8t0y1v3j5p",
+    "segments": [
+      {
+        "index": 0,
+        "layer": "L0_PLATFORM",
+        "sha256": "54d84b687d81def13a7eb5569490806e526b10d71ff5b14071f9d0a08d80701d",
+        "tokens_est": 10,
+        "cache_breakpoint": false,
+        "ttl": "1h"
+      },
+      {
+        "index": 1,
+        "layer": "L1_TENANT_CONTRACT",
+        "sha256": "9f5231e688d48f3976b014661ef4d800fd5b60607e7c30bcfbd59a0e9e199ef9",
+        "tokens_est": 44,
+        "cache_breakpoint": false,
+        "ttl": "1h"
+      },
+      {
+        "index": 2,
+        "layer": "L2_ROLE_SCOPE",
+        "sha256": "2b5ac65832ec84fe532895a71983276222d3c40e1e72fdb709886e3e91cc045c",
+        "tokens_est": 5,
+        "cache_breakpoint": false,
+        "ttl": "5m"
+      },
+      {
+        "index": 3,
+        "layer": "L3_TASK_DELTA",
+        "sha256": "5e2acc2d51b5cba82cfc2775bc76e82004e8817257b5ec1d194294541aff8552",
+        "tokens_est": 221,
+        "cache_breakpoint": false
+      }
+    ]
+  },
+  "cache_plan": {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5",
+    "cache_mode": "PROVIDER_EXPLICIT",
+    "registry_entry_id": "anthropic.claude-current",
+    "registry_verified_at": "2026-10-25"
+  },
+  "recovery": {
+    "channels": [
+      "mcp",
+      "rest"
+    ],
+    "max_bytes_per_call": 262144,
+    "max_calls": 40,
+    "refs_expire_at": "2026-10-25T10:00:00Z"
+  }
+}

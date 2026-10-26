@@ -1,0 +1,146 @@
+{
+ "version": "oracle-holdout/1",
+ "note": "Written after the classifier was finalized and NOT used to tune it. Misses are reported, not fixed in place.",
+ "cases": [
+  {
+   "id": "ho001",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_dict():\n    assert parse('a=1') == {'a': 1}\n",
+   "note": ""
+  },
+  {
+   "id": "ho002",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_neq():\n    assert hash(a) != hash(b)\n",
+   "note": ""
+  },
+  {
+   "id": "ho003",
+   "lang": "py",
+   "label": "existence",
+   "src": "def test_is_none():\n    assert find('zz') is None\n",
+   "note": ""
+  },
+  {
+   "id": "ho004",
+   "lang": "py",
+   "label": "exception",
+   "src": "def test_ctx_multi():\n    with open_db() as db, pytest.raises(IntegrityError):\n        db.insert(dup)\n",
+   "note": ""
+  },
+  {
+   "id": "ho005",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "class T(unittest.TestCase):\n    def test_greater(self):\n        self.assertGreater(score(), 0.5)\n",
+   "note": ""
+  },
+  {
+   "id": "ho006",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_bool_attr():\n    assert result.ok\n",
+   "note": ""
+  },
+  {
+   "id": "ho007",
+   "lang": "py",
+   "label": "mock_only",
+   "src": "def test_has_calls():\n    m = Mock()\n    run(m)\n    m.assert_has_calls([call(1), call(2)])\n",
+   "note": ""
+  },
+  {
+   "id": "ho008",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_call_args():\n    m = Mock()\n    run(m)\n    assert m.call_args == call(1)\n",
+   "note": "call_args compare is mock-only by our rule"
+  },
+  {
+   "id": "ho009",
+   "lang": "py",
+   "label": "none",
+   "src": "def test_try_except():\n    try:\n        run()\n    except Exception:\n        pass\n",
+   "note": ""
+  },
+  {
+   "id": "ho010",
+   "lang": "py",
+   "label": "exception",
+   "src": "def test_manual_raise_check():\n    try:\n        run(-1)\n        pytest.fail('no error')\n    except ValueError:\n        pass\n",
+   "note": "manual try/fail pattern"
+  },
+  {
+   "id": "ho011",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "async def test_async_value():\n    assert await fetch() == 200\n",
+   "note": ""
+  },
+  {
+   "id": "ho012",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_startswith():\n    assert name().startswith('ev')\n",
+   "note": ""
+  },
+  {
+   "id": "ho013",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_set():\n    assert set(tags()) >= {'a', 'b'}\n",
+   "note": ""
+  },
+  {
+   "id": "ho014",
+   "lang": "py",
+   "label": "tautology",
+   "src": "def test_empty_assert_true_call():\n    run()\n    assert 1\n",
+   "note": ""
+  },
+  {
+   "id": "ho015",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_parametrized(x, expected):\n    assert f(x) == expected\n",
+   "note": ""
+  },
+  {
+   "id": "ho016",
+   "lang": "py",
+   "label": "existence",
+   "src": "def test_type_is():\n    assert type(make()) is not type(None)\n",
+   "note": ""
+  },
+  {
+   "id": "ho017",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_unittest_in(self):\n    self.assertIn('k', d)\n",
+   "note": ""
+  },
+  {
+   "id": "ho018",
+   "lang": "py",
+   "label": "snapshot",
+   "src": "def test_snapshot_fixture(snapshot):\n    snapshot.assert_match(render())\n",
+   "note": ""
+  },
+  {
+   "id": "ho019",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_re_match():\n    assert re.match(r'\\d+', out())\n",
+   "note": ""
+  },
+  {
+   "id": "ho020",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_sorted_eq():\n    xs = sort([3, 1, 2])\n    assert xs == [1, 2, 3]\n",
+   "note": ""
+  }
+ ]
+}

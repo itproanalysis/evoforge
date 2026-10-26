@@ -1,0 +1,11 @@
+{
+  "kind": "retrieve_evidence.request",
+  "request_id": "rq-0002-0003-seat4-000001",
+  "ref": "evr_7y6x5w4v3t2s1r0q9p8n7m6k5j",
+  "packet_id": "0b7e1f00-1111-4c22-8d33-0000000000e4",
+  "task_attempt_id": "0b7e1f00-1111-4c22-8d33-000000000003",
+  "selector": "hunk:app/api/orders.py#1",
+  "reason": "review_coverage",
+  "expected_sha256": "4fd83782873ef9e63e659fe71b4a97b8d11fd8892ec32825f88ef31d2ed6ca74",
+  "max_bytes": 65536
+}

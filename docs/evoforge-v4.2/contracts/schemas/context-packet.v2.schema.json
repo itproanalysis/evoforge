@@ -1,0 +1,813 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evoforge.example/schemas/context-packet-v2.json",
+  "title": "EvoForge Context Packet v2",
+  "description": "Issued before a model call. Fidelity is decided per item (not per packet); cache behaviour is a separate axis. Usage/cost is never stored here — see provider-usage-receipt.v1. Volatile metadata (issued_at, expires_at, packet_id) is NOT rendered into the prompt prefix.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "packet_id",
+    "tenant_id",
+    "project_id",
+    "run_id",
+    "task_id",
+    "task_attempt_id",
+    "idempotency_key",
+    "issued_at",
+    "expires_at",
+    "profile",
+    "recipient",
+    "fencing",
+    "items",
+    "critical_assertions",
+    "layout",
+    "cache_plan",
+    "recovery"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "context-packet/v2"
+    },
+    "packet_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "tenant_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "project_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "run_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "task_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "task_attempt_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "minLength": 16,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "issued_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "expires_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "supersedes_packet_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "profile": {
+      "enum": [
+        "SAFE",
+        "BALANCED",
+        "MAXIMUM"
+      ]
+    },
+    "experiment_arm": {
+      "enum": [
+        "A0_RAW_NOCACHE",
+        "A_RAW",
+        "B_STRUCTURAL",
+        "C_RECOVERABLE",
+        "D_RAW_EXPLICIT_CACHE",
+        "E_CACHE_AWARE",
+        null
+      ]
+    },
+    "recipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "seat_id",
+        "function_role",
+        "agent_id",
+        "candidate_id",
+        "is_author_of_candidate",
+        "channel"
+      ],
+      "properties": {
+        "seat_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "seat_label": {
+          "enum": [
+            "Navigator",
+            "Builder Alpha",
+            "Builder Beta",
+            "Critic",
+            "Integrator"
+          ]
+        },
+        "function_role": {
+          "enum": [
+            "planner",
+            "builder",
+            "critic",
+            "verifier",
+            "integrator",
+            "observer"
+          ]
+        },
+        "agent_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "candidate_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/uuid"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "is_author_of_candidate": {
+          "type": "boolean"
+        },
+        "channel": {
+          "enum": [
+            "api",
+            "mcp",
+            "folder",
+            "a2a",
+            "chat"
+          ]
+        }
+      }
+    },
+    "fencing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repo_sha",
+        "contract_version",
+        "policy_version",
+        "policy_hash",
+        "tool_schema_hash",
+        "evidence_manifest_hash",
+        "lease_epoch"
+      ],
+      "properties": {
+        "repo_sha": {
+          "type": "string",
+          "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+        },
+        "contract_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "policy_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "tool_schema_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "evidence_manifest_hash": {
+          "$ref": "#/$defs/sha256"
+        },
+        "lease_epoch": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/item"
+      }
+    },
+    "critical_assertions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/assertion"
+      }
+    },
+    "layout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "prefix_layout",
+        "serialization",
+        "cache_namespace_id",
+        "segments"
+      ],
+      "properties": {
+        "prefix_layout": {
+          "enum": [
+            "STABLE_PREFIX",
+            "UNORDERED"
+          ]
+        },
+        "serialization": {
+          "const": "evoforge-canonical/v1"
+        },
+        "cache_namespace_id": {
+          "type": "string",
+          "pattern": "^cns_[0-9a-z]{26}$",
+          "description": "Identifier of the tenant-scoped cache salt rendered as the first bytes of L0. The salt value itself never appears in the packet."
+        },
+        "segments": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "layer",
+              "sha256",
+              "tokens_est",
+              "cache_breakpoint"
+            ],
+            "properties": {
+              "index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "layer": {
+                "enum": [
+                  "L0_PLATFORM",
+                  "L1_TENANT_CONTRACT",
+                  "L2_ROLE_SCOPE",
+                  "L3_TASK_DELTA"
+                ]
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "tokens_est": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "cache_breakpoint": {
+                "type": "boolean"
+              },
+              "ttl": {
+                "type": "string",
+                "pattern": "^[0-9]+(m|h)$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "cache_plan": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "provider",
+        "model",
+        "cache_mode",
+        "registry_entry_id",
+        "registry_verified_at"
+      ],
+      "properties": {
+        "provider": {
+          "enum": [
+            "openai",
+            "anthropic",
+            "google",
+            "meta",
+            "other"
+          ]
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cache_mode": {
+          "enum": [
+            "NONE",
+            "PROVIDER_IMPLICIT",
+            "PROVIDER_EXPLICIT"
+          ]
+        },
+        "registry_entry_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "registry_verified_at": {
+          "type": "string",
+          "format": "date"
+        },
+        "provider_cache_key": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "e.g. OpenAI prompt_cache_key; derived from tenant/project, never raw tenant_id."
+        }
+      }
+    },
+    "recovery": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "channels",
+        "max_bytes_per_call",
+        "max_calls",
+        "refs_expire_at"
+      ],
+      "properties": {
+        "channels": {
+          "type": "array",
+          "minItems": 0,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "mcp",
+              "rest",
+              "folder"
+            ]
+          }
+        },
+        "max_bytes_per_call": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 4194304
+        },
+        "max_calls": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        },
+        "refs_expire_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "$comment": "Critic/verifier: never the author; every diff item requires the original; a recovery channel must exist (otherwise the seat cannot be an approver).",
+      "if": {
+        "properties": {
+          "recipient": {
+            "properties": {
+              "function_role": {
+                "enum": [
+                  "critic",
+                  "verifier"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "recipient": {
+            "properties": {
+              "is_author_of_candidate": {
+                "const": false
+              },
+              "candidate_id": {
+                "$ref": "#/$defs/uuid"
+              }
+            }
+          },
+          "items": {
+            "items": {
+              "if": {
+                "properties": {
+                  "source_kind": {
+                    "enum": [
+                      "git.diff",
+                      "policy.result",
+                      "test.junit",
+                      "test.jest"
+                    ]
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "requires_original": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          },
+          "recovery": {
+            "properties": {
+              "channels": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "$comment": "Explicit provider caching requires at least one breakpoint segment.",
+      "if": {
+        "properties": {
+          "cache_plan": {
+            "properties": {
+              "cache_mode": {
+                "const": "PROVIDER_EXPLICIT"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "layout": {
+            "properties": {
+              "segments": {
+                "contains": {
+                  "properties": {
+                    "cache_breakpoint": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ref": {
+      "type": "string",
+      "pattern": "^evr_[0-9a-hjkmnp-tv-z]{26}$",
+      "description": "128-bit random grant id (Crockford base32, lowercase). Per packet x blob. NOT content-addressed, NOT an access credential."
+    },
+    "selector": {
+      "type": "string",
+      "maxLength": 1024,
+      "description": "Closed grammar, no expressions. See evidence-retrieval.v1 $defs.selector.",
+      "pattern": "^(all|bytes:[0-9]+-[0-9]+|lines:[0-9]+-[0-9]+|json:(/([^~/]|~[01])*)*|junit:[^\\x00]{1,512}|hunk:(?!/)(?!(?:[^#]*/)?\\.\\.(?:/|#|$))[^\\x00#\\\\]{1,512}#[0-9]+|file:(?!/)(?!(?:[^#]*/)?\\.\\.(?:/|#|$))[^\\x00#\\\\]{1,512}(#L[0-9]+-L[0-9]+)?)$"
+    },
+    "item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "item_id",
+        "source_kind",
+        "ref",
+        "sha256",
+        "size_bytes",
+        "trust",
+        "classification",
+        "requires_original",
+        "fidelity",
+        "segment_index",
+        "view_sha256",
+        "view_tokens_est"
+      ],
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "pattern": "^it_[0-9a-z]{4,32}$"
+        },
+        "source_kind": {
+          "enum": [
+            "contract.goal",
+            "contract.policy",
+            "contract.acceptance",
+            "git.diff",
+            "git.blob",
+            "test.junit",
+            "test.jest",
+            "log.text",
+            "json.api",
+            "policy.result",
+            "html",
+            "table",
+            "search",
+            "other"
+          ]
+        },
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "trust": {
+          "enum": [
+            "trusted_contract",
+            "verified_tool_output",
+            "untrusted_content"
+          ]
+        },
+        "classification": {
+          "enum": [
+            "public",
+            "internal",
+            "restricted"
+          ]
+        },
+        "requires_original": {
+          "type": "boolean"
+        },
+        "fidelity": {
+          "enum": [
+            "RAW",
+            "STRUCTURAL",
+            "RECOVERABLE",
+            "REF_ONLY"
+          ]
+        },
+        "raw_reason": {
+          "enum": [
+            "POLICY_REQUIRED",
+            "UNSUPPORTED_TYPE",
+            "PARSE_FAILED",
+            "NO_TOKEN_GAIN",
+            "FIDELITY_FAILED",
+            "VAULT_UNAVAILABLE",
+            "NET_COST_WORSE",
+            "PROFILE_DISABLED",
+            "USER_OVERRIDE"
+          ]
+        },
+        "codec": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version",
+            "deterministic"
+          ],
+          "properties": {
+            "name": {
+              "type": "string",
+              "pattern": "^[a-z0-9_.-]+$"
+            },
+            "version": {
+              "type": "string",
+              "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+            },
+            "deterministic": {
+              "const": true
+            }
+          }
+        },
+        "fidelity_checks": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "invariant_id",
+              "passed"
+            ],
+            "properties": {
+              "invariant_id": {
+                "type": "string",
+                "pattern": "^(U|T|L|J)[0-9]+$"
+              },
+              "passed": {
+                "const": true
+              }
+            }
+          }
+        },
+        "omitted": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "selector",
+              "count"
+            ],
+            "properties": {
+              "selector": {
+                "$ref": "#/$defs/selector"
+              },
+              "count": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "unit": {
+                "enum": [
+                  "bytes",
+                  "lines",
+                  "elements",
+                  "testcases"
+                ]
+              }
+            }
+          }
+        },
+        "segment_index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "view_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "view_tokens_est": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "fidelity": {
+                "const": "RAW"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "raw_reason"
+            ],
+            "not": {
+              "required": [
+                "codec"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "fidelity": {
+                "enum": [
+                  "STRUCTURAL",
+                  "RECOVERABLE"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "codec",
+              "fidelity_checks",
+              "omitted"
+            ],
+            "not": {
+              "required": [
+                "raw_reason"
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "fidelity": {
+                "const": "REF_ONLY"
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "codec"
+                  ]
+                },
+                {
+                  "required": [
+                    "raw_reason"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "$comment": "Contracts are never summarized and never dropped.",
+          "if": {
+            "properties": {
+              "source_kind": {
+                "enum": [
+                  "contract.goal",
+                  "contract.policy",
+                  "contract.acceptance"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "fidelity": {
+                "const": "RAW"
+              },
+              "raw_reason": {
+                "const": "POLICY_REQUIRED"
+              },
+              "trust": {
+                "const": "trusted_contract"
+              }
+            }
+          }
+        },
+        {
+          "$comment": "Only contracts may carry trusted_contract.",
+          "if": {
+            "properties": {
+              "trust": {
+                "const": "trusted_contract"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "source_kind": {
+                "enum": [
+                  "contract.goal",
+                  "contract.policy",
+                  "contract.acceptance"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "assertion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assertion_id",
+        "kind",
+        "item_id",
+        "selector",
+        "origin"
+      ],
+      "properties": {
+        "assertion_id": {
+          "type": "string",
+          "pattern": "^ca_[0-9a-z]{4,32}$"
+        },
+        "kind": {
+          "enum": [
+            "failing_test",
+            "error_log_line",
+            "required_file",
+            "policy_rule",
+            "goal_clause",
+            "required_json_pointer"
+          ]
+        },
+        "item_id": {
+          "type": "string",
+          "pattern": "^it_[0-9a-z]{4,32}$"
+        },
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "origin": {
+          "enum": [
+            "parser",
+            "policy",
+            "user"
+          ],
+          "description": "parser = extracted deterministically from the ORIGINAL bytes; never produced by an LLM."
+        },
+        "label": {
+          "type": "string",
+          "maxLength": 512
+        }
+      }
+    }
+  }
+}

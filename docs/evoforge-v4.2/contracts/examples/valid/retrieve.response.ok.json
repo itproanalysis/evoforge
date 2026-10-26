@@ -1,0 +1,22 @@
+{
+  "kind": "retrieve_evidence.response",
+  "request_id": "rq-0002-0003-seat4-000001",
+  "status": "ok",
+  "trace_id": "tr_8c1e2f3a",
+  "ref": "evr_7y6x5w4v3t2s1r0q9p8n7m6k5j",
+  "sha256": "4fd83782873ef9e63e659fe71b4a97b8d11fd8892ec32825f88ef31d2ed6ca74",
+  "total_size_bytes": 2051,
+  "range": {
+    "start": 0,
+    "end": 120
+  },
+  "encoding": "utf-8",
+  "content": "diff --git a/app/api/orders.py b/app/api/orders.py\n@@ -80,7 +80,9 @@\n-    return 500\n+    return 200\n",
+  "trust": "verified_tool_output",
+  "next_selector": "hunk:app/api/orders.py#2",
+  "coverage_after": {
+    "covered_bytes": 120,
+    "total_bytes": 2051,
+    "complete": false
+  }
+}

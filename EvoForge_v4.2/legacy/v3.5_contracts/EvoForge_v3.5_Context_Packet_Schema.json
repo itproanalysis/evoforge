@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evoforge.example/schemas/context-packet-v1.json",
+  "title": "EvoForge Context Packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "tenant_id",
+    "project_id",
+    "task_id",
+    "packet_id",
+    "policy_version",
+    "repo_sha",
+    "role",
+    "strategy",
+    "manifest_hash",
+    "source_refs",
+    "critical_assertions",
+    "created_at"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "context-packet/v1"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "packet_id": {
+      "type": "string",
+      "minLength": 12
+    },
+    "policy_version": {
+      "type": "string"
+    },
+    "repo_sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{40}$"
+    },
+    "role": {
+      "enum": [
+        "navigator",
+        "builder",
+        "critic",
+        "integrator",
+        "observer"
+      ]
+    },
+    "strategy": {
+      "enum": [
+        "RAW",
+        "STRUCTURAL",
+        "RECOVERABLE",
+        "PROVIDER_CACHE_ONLY",
+        "CACHE_AWARE"
+      ]
+    },
+    "manifest_hash": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "source_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ref",
+          "sha256",
+          "source_kind",
+          "required_original"
+        ],
+        "properties": {
+          "ref": {
+            "type": "string",
+            "minLength": 16
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "source_kind": {
+            "type": "string"
+          },
+          "required_original": {
+            "type": "boolean"
+          },
+          "selector": {
+            "type": "string"
+          },
+          "classification": {
+            "enum": [
+              "public",
+              "internal",
+              "restricted"
+            ]
+          }
+        }
+      }
+    },
+    "critical_assertions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "cache_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "provider_support_verified": {
+          "type": "boolean"
+        },
+        "cache_mode": {
+          "type": "string"
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "estimated_input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider_cached_read_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider_cached_write_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "provider_cost_usd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "measured": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

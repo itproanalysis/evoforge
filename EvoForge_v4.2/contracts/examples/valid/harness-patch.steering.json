@@ -1,0 +1,31 @@
+{
+  "schema_version": "harness-patch/v1",
+  "patch_id": "hp_0c0ffee1",
+  "run_id": "opt-2027-01-a",
+  "generation": 3,
+  "parent_versions": [
+    "hv_00000007",
+    "hv_0000000a"
+  ],
+  "module": "C",
+  "category": "prompt",
+  "phase": "steering",
+  "ops": [
+    {
+      "file": "prompts/builder.md",
+      "op": "insert_after",
+      "anchor": "## Rules\n",
+      "text": "- After a compaction, re-read the failing assertion before editing.\n"
+    }
+  ],
+  "rationale": "Repeated exploration rose after compaction boundaries in D_evo traces.",
+  "minibatch": {
+    "parent_score": 0.42,
+    "child_score": 0.47,
+    "batch_hash": "b92b7e12f531bff54439406193baafb1c862fe2f7eb991b3cc0a907007b18764"
+  },
+  "evaluated_on": [
+    "minibatch",
+    "dev"
+  ]
+}

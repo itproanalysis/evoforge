@@ -1,0 +1,494 @@
+{
+  "version": "4.2",
+  "note": "모든 식별자의 단일 출처. tools/validate_package.py C4가 통합 기획서 전체·contracts/*.md·build/*.md에서 deprecated 식별자를 찾으면 실패한다. 설명 목적의 예외 줄에는 <!-- vocab:allow --> 를 붙인다.",
+  "canonical": {
+    "tenant_column": [
+      "tenant_id"
+    ],
+    "human_roles": [
+      "Owner",
+      "Admin",
+      "Operator",
+      "Developer",
+      "Reviewer",
+      "Viewer"
+    ],
+    "automation_mode": [
+      "OBSERVE",
+      "ASSISTED",
+      "AUTONOMOUS_GUARDED"
+    ],
+    "research_mode": [
+      "OFF",
+      "SUGGEST",
+      "EVALUATE",
+      "CANARY"
+    ],
+    "context_profile": [
+      "SAFE",
+      "BALANCED",
+      "MAXIMUM"
+    ],
+    "risk_level": [
+      "LOW",
+      "MEDIUM",
+      "HIGH",
+      "CRITICAL"
+    ],
+    "agent_kind": [
+      "provider_api",
+      "mcp_chat",
+      "folder_chat",
+      "a2a"
+    ],
+    "agent_join_state": [
+      "REQUESTED",
+      "PENDING_APPROVAL",
+      "AUTHORIZED",
+      "REVOKED"
+    ],
+    "agent_connection_state": [
+      "UNKNOWN",
+      "PROBING",
+      "READY",
+      "DEGRADED",
+      "OFFLINE"
+    ],
+    "agent_execution_state": [
+      "IDLE",
+      "ASSIGNED",
+      "RUNNING",
+      "WAITING_FOR_CLIENT",
+      "BLOCKED",
+      "FINISHED"
+    ],
+    "agent_credential_state": [
+      "VALID",
+      "EXPIRING",
+      "EXPIRED",
+      "REVOKED"
+    ],
+    "seat_label": [
+      "Navigator",
+      "Builder Alpha",
+      "Builder Beta",
+      "Critic",
+      "Integrator"
+    ],
+    "function_role": [
+      "planner",
+      "builder",
+      "critic",
+      "verifier",
+      "integrator",
+      "observer"
+    ],
+    "topology": [
+      "SINGLE",
+      "RACE_2",
+      "DAG_PARALLEL",
+      "PIPELINE",
+      "HIGH_RISK"
+    ],
+    "command_kind": [
+      "ASK",
+      "FEEDBACK",
+      "CHANGE_GOAL",
+      "REPRIORITIZE",
+      "PAUSE",
+      "RESUME",
+      "CANCEL",
+      "STOP_ALL",
+      "REASSIGN",
+      "BUDGET_DECREASE",
+      "BUDGET_INCREASE",
+      "REQUEST_REVIEW",
+      "APPROVE_MERGE",
+      "APPROVE_DEPLOY",
+      "ENABLE_AUTOMERGE",
+      "PERMISSION_CHANGE",
+      "CONTEXT_OVERRIDE",
+      "SEARCH_RESEARCH",
+      "PROPOSE_HARNESS_EXPERIMENT",
+      "REQUEST_PROMOTION_REVIEW",
+      "ROLLBACK_HARNESS",
+      "PAUSE_RESEARCH"
+    ],
+    "command_status": [
+      "RECEIVED",
+      "VALIDATING",
+      "AWAITING_CONFIRMATION",
+      "PLANNED",
+      "DISPATCHED",
+      "APPLYING",
+      "APPLIED",
+      "PARTIAL",
+      "BLOCKED",
+      "FAILED",
+      "REJECTED"
+    ],
+    "run_status": [
+      "CREATED",
+      "QUEUED",
+      "RUNNING",
+      "WAITING",
+      "PAUSING",
+      "PAUSED",
+      "CANCELLING",
+      "SUCCEEDED",
+      "FAILED",
+      "CANCELLED"
+    ],
+    "task_status": [
+      "READY",
+      "CLAIMED",
+      "RUNNING",
+      "WAITING_AGENT",
+      "BLOCKED",
+      "REVIEW_REQUIRED",
+      "VERIFIED",
+      "REJECTED",
+      "FAILED",
+      "CANCELLED"
+    ],
+    "candidate_status": [
+      "PROPOSED",
+      "PATCH_READY",
+      "BUILD_CHECKED",
+      "REVIEWED",
+      "QUALITY_CHECKED",
+      "PR_CREATED",
+      "MERGED",
+      "REJECTED"
+    ],
+    "feedback_status": [
+      "RECEIVED",
+      "NORMALIZED",
+      "LINKED",
+      "PLANNED",
+      "IMPLEMENTED",
+      "VERIFIED",
+      "RESOLVED",
+      "CLOSED",
+      "REOPENED",
+      "REJECTED",
+      "DEFERRED"
+    ],
+    "gate": [
+      "G0_SCOPE",
+      "G1_IMPACTED",
+      "G2_REQUIRED",
+      "GH_INTEGRITY",
+      "GC_COMPOSITION",
+      "G3_BENCHMARK",
+      "GR_REVIEW",
+      "G4_MERGE_HEAD"
+    ],
+    "gate_result": [
+      "PASS",
+      "FAIL",
+      "INCONCLUSIVE",
+      "SKIPPED_WITH_REASON"
+    ],
+    "measurement_status": [
+      "PENDING",
+      "MEASURED",
+      "VALIDATED",
+      "REJECTED",
+      "INSUFFICIENT_EVIDENCE",
+      "NO_CONFIDENT_IMPROVEMENT"
+    ],
+    "side_effect_status": [
+      "RESERVED",
+      "SENT",
+      "CONFIRMED",
+      "UNKNOWN_EXTERNAL_OUTCOME",
+      "FAILED",
+      "COMPENSATED"
+    ],
+    "product_arm": [
+      "X_SINGLE",
+      "X_NAIVE5",
+      "X_ADAPTIVE5",
+      "X_ABL_BACKPRESSURE",
+      "X_ABL_HANDOFF",
+      "X_ABL_TOPOLOGY",
+      "X_ABL_CONTEXT"
+    ],
+    "context_arm": [
+      "A0_RAW_NOCACHE",
+      "A_RAW",
+      "B_STRUCTURAL",
+      "C_RECOVERABLE",
+      "D_RAW_EXPLICIT_CACHE",
+      "E_CACHE_AWARE"
+    ],
+    "quality_tier": [
+      "A_canary",
+      "B_default"
+    ],
+    "milestone": [
+      "M0",
+      "M1",
+      "M2",
+      "M3",
+      "M4",
+      "M5",
+      "M6"
+    ],
+    "north_star": [
+      "WVI"
+    ],
+    "memory_store": [
+      "M-CONTRACT",
+      "M-EVIDENCE",
+      "M-GRAPH",
+      "M-PLAYBOOK"
+    ],
+    "prompt_layer": [
+      "L0_PLATFORM",
+      "L1_TENANT_CONTRACT",
+      "L2_ROLE_SCOPE",
+      "L3_TASK_DELTA"
+    ],
+    "fidelity": [
+      "RAW",
+      "STRUCTURAL",
+      "RECOVERABLE",
+      "REF_ONLY"
+    ],
+    "raw_reason": [
+      "POLICY_REQUIRED",
+      "UNSUPPORTED_TYPE",
+      "PARSE_FAILED",
+      "NO_TOKEN_GAIN",
+      "FIDELITY_FAILED",
+      "VAULT_UNAVAILABLE",
+      "NET_COST_WORSE",
+      "PROFILE_DISABLED",
+      "USER_OVERRIDE"
+    ],
+    "cache_mode": [
+      "NONE",
+      "PROVIDER_IMPLICIT",
+      "PROVIDER_EXPLICIT"
+    ],
+    "trust": [
+      "trusted_contract",
+      "verified_tool_output",
+      "untrusted_content"
+    ],
+    "packet_status": [
+      "ISSUED",
+      "STALE",
+      "SUPERSEDED",
+      "REVOKED"
+    ],
+    "billing_owner": [
+      "platform"
+    ],
+    "ledger_entry_kind": [
+      "credit_purchase",
+      "credit_grant",
+      "model_usage",
+      "runner_minutes",
+      "storage",
+      "subscription_fee",
+      "adjustment",
+      "refund"
+    ],
+    "context_events": [
+      "EVIDENCE_INGESTED",
+      "EVIDENCE_STORED",
+      "EVIDENCE_STORE_FAILED",
+      "CONTEXT_DECISION_MADE",
+      "CONTEXT_FIDELITY_FAILED",
+      "CONTEXT_FALLBACK_RAW",
+      "CONTEXT_PACKET_ISSUED",
+      "CONTEXT_PACKET_BLOCKED",
+      "CONTEXT_PACKET_STALE",
+      "EVIDENCE_RETRIEVAL_REQUESTED",
+      "EVIDENCE_RETRIEVED",
+      "EVIDENCE_RETRIEVAL_DENIED",
+      "REVIEW_COVERAGE_UPDATED",
+      "REVIEW_COVERAGE_COMPLETE",
+      "PROVIDER_USAGE_RECORDED",
+      "CODEC_PROFILE_DISABLED",
+      "EVIDENCE_SHREDDED"
+    ],
+    "mcp_tools": [
+      "join_collective",
+      "get_my_tasks",
+      "claim_task",
+      "post_message",
+      "submit_proposal",
+      "submit_review",
+      "acknowledge",
+      "get_project_status",
+      "leave_collective",
+      "get_task_context",
+      "list_evidence_refs",
+      "retrieve_evidence"
+    ],
+    "fields": [
+      "requires_original",
+      "ref",
+      "fidelity",
+      "raw_reason",
+      "cache_mode",
+      "function_role",
+      "seat_id",
+      "cost_micros",
+      "customer_price_micros",
+      "lease_epoch",
+      "expected_state_version"
+    ],
+    "evidence_grade": [
+      "A",
+      "A-",
+      "B",
+      "C",
+      "D"
+    ],
+    "adoption_ring": [
+      "ADOPT",
+      "TRIAL",
+      "ASSESS",
+      "HOLD"
+    ],
+    "oracle_strength": [
+      "none",
+      "tautology",
+      "existence",
+      "boolean",
+      "mock_only",
+      "snapshot",
+      "value_equality",
+      "exception",
+      "property"
+    ],
+    "selection_method": [
+      "execution_evidence",
+      "smallest_diff_tiebreak",
+      "recursive_tournament"
+    ],
+    "verifier_phase": [
+      "A_spec_first",
+      "B_review"
+    ],
+    "review_evidence_kind": [
+      "failing_test",
+      "reproducer_script",
+      "static_rule_hit",
+      "policy_violation"
+    ],
+    "reward_hack_flag": [
+      "visible_heldout_gap",
+      "lookup_table",
+      "protected_file_modified",
+      "file_deleted",
+      "skip_added",
+      "assertion_removed",
+      "forced_success_exit",
+      "exception_swallowed",
+      "timeout_raised"
+    ],
+    "memory_phase": [
+      "localize",
+      "reproduce",
+      "fix",
+      "verify"
+    ],
+    "optimizer_state": [
+      "OPEN",
+      "FROZEN",
+      "CLOSED"
+    ],
+    "harness_patch_op": [
+      "insert_after",
+      "insert_before",
+      "replace",
+      "delete",
+      "create"
+    ],
+    "harness_patch_category": [
+      "prompt",
+      "tool",
+      "middleware"
+    ],
+    "harness_patch_phase": [
+      "capability",
+      "steering"
+    ],
+    "hygiene_audit_check": [
+      "no_remote",
+      "single_base_ref",
+      "head_is_base",
+      "no_alternates",
+      "empty_reflog",
+      "future_commits_absent",
+      "all_commits_ancestors_of_base"
+    ]
+  },
+  "deprecated": {
+    "FULL": "fidelity RAW (arm A_RAW)",
+    "PRESERVE": "fidelity RAW + raw_reason POLICY_REQUIRED",
+    "SELECTIVE": "fidelity STRUCTURAL",
+    "STRUCTURAL_ONLY": "arm B_STRUCTURAL",
+    "RECOVERABLE_COMPACT": "arm C_RECOVERABLE",
+    "COMPACT": "arm C_RECOVERABLE",
+    "PROVIDER_CACHE_ONLY": "arm D_RAW_EXPLICIT_CACHE",
+    "CACHE_ONLY": "arm D_RAW_EXPLICIT_CACHE",
+    "CACHE_AWARE_COMPACT": "arm E_CACHE_AWARE",
+    "RAW_FALLBACK": "fidelity RAW + raw_reason, event CONTEXT_FALLBACK_RAW",
+    "required_original": "requires_original",
+    "original_required": "requires_original",
+    "CONTEXT_PACKET_CREATED": "CONTEXT_PACKET_ISSUED",
+    "CONTEXT_COMPRESSED": "CONTEXT_DECISION_MADE",
+    "COMPRESSION_FALLBACK": "CONTEXT_FALLBACK_RAW",
+    "CONTEXT_STALE": "CONTEXT_PACKET_STALE",
+    "CACHE_USAGE_RECORDED": "PROVIDER_USAGE_RECORDED",
+    "CONTEXT_CACHE_USAGE_UPDATED": "PROVIDER_USAGE_RECORDED",
+    "CONTEXT_STRATEGY_SELECTED": "CONTEXT_DECISION_MADE",
+    "CONTEXT_READY": "CONTEXT_PACKET_ISSUED",
+    "SOURCE_RECOVERY_REQUESTED": "EVIDENCE_RETRIEVAL_REQUESTED",
+    "SOURCE_RECOVERED": "EVIDENCE_RETRIEVED",
+    "retrieve_artifact": "retrieve_evidence",
+    "open_source_evidence": "retrieve_evidence",
+    "context_access_events": "evidence_access_log",
+    "evidence_reads_v35": "evidence_access_log",
+    "context_usage_receipts": "provider_usage_receipts",
+    "POST /v1/evidence/{id}/retrieve": "POST /v1/evidence-refs/{ref}/retrieve",
+    "PARALLEL_CANDIDATES": "topology RACE_2",
+    "HIERARCHICAL": "topology PIPELINE",
+    "PARALLEL_DAG": "topology DAG_PARALLEL",
+    "RACE": "topology RACE_2",
+    "APPROVAL_PENDING": "agent_join_state PENDING_APPROVAL",
+    "WAITING_FOR_RESPONSE": "agent_execution_state WAITING_FOR_CLIENT",
+    "command_accepted": "command_status RECEIVED",
+    "intent_validated": "command_status VALIDATING",
+    "plan_proposed": "command_status PLANNED",
+    "policy_checked": "command_status PLANNED",
+    "operation_applied": "command_status APPLIED",
+    "pending_safe_stop": "command_status APPLYING",
+    "VFI": "WVI",
+    "Weekly Verified Improvements": "WVI (Weighted Verified Improvements per week)",
+    "Weighted Verified Impact": "WVI",
+    "Verified Impact per Week": "WVI",
+    "org_id": "tenant_id",
+    "byok_customer": "billing_owner platform (ADR-047)",
+    "POST /v1/commands": "POST /v1/projects/{project_id}/commands",
+    "POST /v1/runs/{id}/commands": "POST /v1/projects/{project_id}/commands (scope.run_id)",
+    "다른 모델 계열": "자격 있는 컨텍스트 독립 검증자(spec-first, D-041)",
+    "different model family": "qualified context-independent verifier (D-041)"
+  },
+  "lint_scope": {
+    "active_docs": [
+      "EvoForge_Blueprint_50pages_v4.2.md",
+      "contracts/*.md",
+      "build/*.md",
+      "research/*.md"
+    ],
+    "allow_marker": "<!-- vocab:allow -->"
+  }
+}

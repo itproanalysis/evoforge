@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evoforge.example/schemas/evidence-retrieval-v1.json",
+  "title": "EvoForge Evidence Retrieval v1 (MCP retrieve_evidence / REST POST /v1/evidence-refs/{ref}/retrieve / Folder GET_EVIDENCE)",
+  "description": "One contract for all three channels. Caller identity comes from the authenticated channel session, never from fields in this body. A ref is not a credential.",
+  "type": "object",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/request"
+    },
+    {
+      "$ref": "#/$defs/response"
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "ref": {
+      "type": "string",
+      "pattern": "^evr_[0-9a-hjkmnp-tv-z]{26}$"
+    },
+    "selector": {
+      "type": "string",
+      "maxLength": 1024,
+      "description": "Closed grammar. all | bytes:S-E (half-open [S,E), 0-based) | lines:S-E (1-based, inclusive) | json:<RFC 6901 pointer> | junit:<suite>::<testcase> (percent-encoded) | hunk:<repo path>#<n> (1-based) | file:<repo path>[#Ls-Le]. Repo paths: no leading '/', no '..' segment, no NUL, no backslash, NFC. No JSONPath, regex, glob or expression language.",
+      "pattern": "^(all|bytes:[0-9]+-[0-9]+|lines:[0-9]+-[0-9]+|json:(/([^~/]|~[01])*)*|junit:[^\\x00]{1,512}|hunk:(?!/)(?!(?:[^#]*/)?\\.\\.(?:/|#|$))[^\\x00#\\\\]{1,512}#[0-9]+|file:(?!/)(?!(?:[^#]*/)?\\.\\.(?:/|#|$))[^\\x00#\\\\]{1,512}(#L[0-9]+-L[0-9]+)?)$"
+    },
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "request_id",
+        "ref",
+        "packet_id",
+        "task_attempt_id",
+        "selector",
+        "reason",
+        "expected_sha256"
+      ],
+      "properties": {
+        "kind": {
+          "const": "retrieve_evidence.request"
+        },
+        "request_id": {
+          "type": "string",
+          "minLength": 16,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$",
+          "description": "Idempotency key. Same request_id + same body => same response and one audit row."
+        },
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "packet_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "task_attempt_id": {
+          "$ref": "#/$defs/uuid"
+        },
+        "selector": {
+          "$ref": "#/$defs/selector"
+        },
+        "reason": {
+          "enum": [
+            "review_coverage",
+            "builder_context",
+            "verification",
+            "user_request"
+          ]
+        },
+        "expected_sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4194304
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "request_id",
+        "status",
+        "trace_id"
+      ],
+      "properties": {
+        "kind": {
+          "const": "retrieve_evidence.response"
+        },
+        "request_id": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "ok",
+            "not_found",
+            "forbidden",
+            "expired",
+            "stale",
+            "digest_mismatch",
+            "rate_limited",
+            "shredded"
+          ],
+          "description": "Cross-tenant or unknown ref => not_found (indistinguishable; no existence oracle). Same tenant without ACL => forbidden. Both are audited."
+        },
+        "trace_id": {
+          "type": "string",
+          "minLength": 8
+        },
+        "ref": {
+          "$ref": "#/$defs/ref"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "total_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "start",
+            "end"
+          ],
+          "properties": {
+            "start": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "end": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "encoding": {
+          "enum": [
+            "utf-8",
+            "base64"
+          ]
+        },
+        "content": {
+          "type": "string"
+        },
+        "trust": {
+          "enum": [
+            "trusted_contract",
+            "verified_tool_output",
+            "untrusted_content"
+          ]
+        },
+        "next_selector": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/selector"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "coverage_after": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "covered_bytes",
+            "total_bytes",
+            "complete"
+          ],
+          "properties": {
+            "covered_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_bytes": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "complete": {
+              "type": "boolean"
+            }
+          }
+        },
+        "retry_after_ms": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "ok"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "ref",
+              "sha256",
+              "total_size_bytes",
+              "range",
+              "encoding",
+              "content",
+              "trust",
+              "next_selector",
+              "coverage_after"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "not_found",
+                  "forbidden",
+                  "expired",
+                  "stale",
+                  "digest_mismatch",
+                  "shredded"
+                ]
+              }
+            }
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "content"
+                  ]
+                },
+                {
+                  "required": [
+                    "sha256"
+                  ]
+                },
+                {
+                  "required": [
+                    "total_size_bytes"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "rate_limited"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "retry_after_ms"
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

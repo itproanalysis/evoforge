@@ -1,0 +1,412 @@
+{
+ "version": "oracle-corpus/1",
+ "note": "Self-authored labeled corpus for regression and accuracy measurement of the oracle classifier. Not an external benchmark: it measures agreement with EvoForge's own taxonomy, including known regex failure modes.",
+ "cases": [
+  {
+   "id": "py001",
+   "lang": "py",
+   "label": "none",
+   "src": "def test_runs():\n    compute(3)\n",
+   "note": ""
+  },
+  {
+   "id": "py002",
+   "lang": "py",
+   "label": "none",
+   "src": "def test_smoke():\n    app = create_app()\n    app.start()\n    app.stop()\n",
+   "note": ""
+  },
+  {
+   "id": "py003",
+   "lang": "py",
+   "label": "none",
+   "src": "def test_comment_only():\n    # self.assertEqual(result, 3)\n    run()\n",
+   "note": "assert text inside a comment"
+  },
+  {
+   "id": "py004",
+   "lang": "py",
+   "label": "none",
+   "src": "def test_string_only():\n    log('assert x == 1')\n    run()\n",
+   "note": "assert text inside a string"
+  },
+  {
+   "id": "py005",
+   "lang": "py",
+   "label": "none",
+   "src": "def test_helper_assert():\n    def check(v):\n        assert v == 3\n    run()\n",
+   "note": "nested helper defined but not counted (documented limit)"
+  },
+  {
+   "id": "py006",
+   "lang": "py",
+   "label": "none",
+   "src": "def test_print():\n    print(compute(2))\n",
+   "note": ""
+  },
+  {
+   "id": "py007",
+   "lang": "py",
+   "label": "tautology",
+   "src": "def test_taut():\n    x = compute(3)\n    assert x == x\n",
+   "note": ""
+  },
+  {
+   "id": "py008",
+   "lang": "py",
+   "label": "tautology",
+   "src": "def test_true():\n    compute(3)\n    assert True\n",
+   "note": ""
+  },
+  {
+   "id": "py009",
+   "lang": "py",
+   "label": "tautology",
+   "src": "class T(unittest.TestCase):\n    def test_same(self):\n        v = f()\n        self.assertEqual(v, v)\n",
+   "note": ""
+  },
+  {
+   "id": "py010",
+   "lang": "py",
+   "label": "tautology",
+   "src": "class T(unittest.TestCase):\n    def test_true_const(self):\n        f()\n        self.assertTrue(True)\n",
+   "note": ""
+  },
+  {
+   "id": "py011",
+   "lang": "py",
+   "label": "tautology",
+   "src": "def test_taut_attr():\n    r = run()\n    assert r.status == r.status\n",
+   "note": ""
+  },
+  {
+   "id": "py012",
+   "lang": "py",
+   "label": "existence",
+   "src": "def test_not_none():\n    assert compute(3) is not None\n",
+   "note": ""
+  },
+  {
+   "id": "py013",
+   "lang": "py",
+   "label": "existence",
+   "src": "def test_instance():\n    assert isinstance(load(), Config)\n",
+   "note": ""
+  },
+  {
+   "id": "py014",
+   "lang": "py",
+   "label": "existence",
+   "src": "class T(unittest.TestCase):\n    def test_nn(self):\n        self.assertIsNotNone(make())\n",
+   "note": ""
+  },
+  {
+   "id": "py015",
+   "lang": "py",
+   "label": "existence",
+   "src": "class T(unittest.TestCase):\n    def test_inst(self):\n        self.assertIsInstance(make(), Widget)\n",
+   "note": ""
+  },
+  {
+   "id": "py016",
+   "lang": "py",
+   "label": "existence",
+   "src": "def test_hasattr():\n    assert hasattr(mod, 'run')\n",
+   "note": ""
+  },
+  {
+   "id": "py017",
+   "lang": "py",
+   "label": "existence",
+   "src": "def test_ne_none():\n    assert make() != None\n",
+   "note": ""
+  },
+  {
+   "id": "py018",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_truthy():\n    assert compute(3)\n",
+   "note": ""
+  },
+  {
+   "id": "py019",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_msg():\n    ok = validate(x)\n    assert ok, 'expected x == 1'\n",
+   "note": "message contains == (regex false positive)"
+  },
+  {
+   "id": "py020",
+   "lang": "py",
+   "label": "boolean",
+   "src": "class T(unittest.TestCase):\n    def test_t(self):\n        self.assertTrue(is_valid(x))\n",
+   "note": ""
+  },
+  {
+   "id": "py021",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_is_true():\n    assert is_valid(x) is True\n",
+   "note": ""
+  },
+  {
+   "id": "py022",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_eq_true():\n    assert check() == True\n",
+   "note": ""
+  },
+  {
+   "id": "py023",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_not():\n    assert not failed()\n",
+   "note": ""
+  },
+  {
+   "id": "py024",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_call():\n    assert path.exists()\n",
+   "note": ""
+  },
+  {
+   "id": "py025",
+   "lang": "py",
+   "label": "boolean",
+   "src": "class T(unittest.TestCase):\n    def test_f(self):\n        self.assertFalse(r.errors)\n",
+   "note": ""
+  },
+  {
+   "id": "py026",
+   "lang": "py",
+   "label": "boolean",
+   "src": "def test_any():\n    assert any(items)\n",
+   "note": ""
+  },
+  {
+   "id": "py027",
+   "lang": "py",
+   "label": "mock_only",
+   "src": "def test_mock():\n    m = Mock()\n    use(m)\n    m.send.assert_called_once()\n",
+   "note": ""
+  },
+  {
+   "id": "py028",
+   "lang": "py",
+   "label": "mock_only",
+   "src": "def test_mock_with():\n    m = Mock()\n    use(m)\n    m.send.assert_called_once_with('a')\n",
+   "note": ""
+  },
+  {
+   "id": "py029",
+   "lang": "py",
+   "label": "mock_only",
+   "src": "def test_called():\n    m = Mock()\n    use(m)\n    assert m.send.called\n",
+   "note": ""
+  },
+  {
+   "id": "py030",
+   "lang": "py",
+   "label": "mock_only",
+   "src": "def test_count():\n    m = Mock()\n    use(m)\n    assert m.send.call_count == 2\n",
+   "note": ""
+  },
+  {
+   "id": "py031",
+   "lang": "py",
+   "label": "mock_only",
+   "src": "def test_not_called():\n    m = Mock()\n    use(m)\n    m.close.assert_not_called()\n",
+   "note": ""
+  },
+  {
+   "id": "py032",
+   "lang": "py",
+   "label": "mock_only",
+   "src": "async def test_awaited():\n    m = AsyncMock()\n    await use(m)\n    m.fetch.assert_awaited_once()\n",
+   "note": ""
+  },
+  {
+   "id": "py033",
+   "lang": "py",
+   "label": "snapshot",
+   "src": "def test_snap(snapshot):\n    assert render() == snapshot\n",
+   "note": ""
+  },
+  {
+   "id": "py034",
+   "lang": "py",
+   "label": "snapshot",
+   "src": "def test_snap2(snapshot):\n    snapshot.assert_match(render(), 'out.txt')\n",
+   "note": ""
+  },
+  {
+   "id": "py035",
+   "lang": "py",
+   "label": "snapshot",
+   "src": "def test_snap3(snap):\n    assert render() == snap\n",
+   "note": ""
+  },
+  {
+   "id": "py036",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_value():\n    assert compute(3) == 9\n",
+   "note": ""
+  },
+  {
+   "id": "py037",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_multiline():\n    assert (\n        compute(3)\n        == 9\n    )\n",
+   "note": "multi-line (regex miss)"
+  },
+  {
+   "id": "py038",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "class T(unittest.TestCase):\n    def test_eq(self):\n        self.assertEqual(add(1, 2), 3)\n",
+   "note": ""
+  },
+  {
+   "id": "py039",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_in():\n    assert 'x' in keys()\n",
+   "note": ""
+  },
+  {
+   "id": "py040",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_lt():\n    assert latency() < 100\n",
+   "note": ""
+  },
+  {
+   "id": "py041",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_len():\n    assert len(items()) == 3\n",
+   "note": ""
+  },
+  {
+   "id": "py042",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_boolop():\n    r = run()\n    assert r is not None and r.value == 3\n",
+   "note": "strongest part of a BoolOp"
+  },
+  {
+   "id": "py043",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_all_eq():\n    assert all(x == 0 for x in zeros(5))\n",
+   "note": ""
+  },
+  {
+   "id": "py044",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_np():\n    np.testing.assert_allclose(f(), [1.0, 2.0])\n",
+   "note": ""
+  },
+  {
+   "id": "py045",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_pd():\n    pd.testing.assert_frame_equal(load(), expected)\n",
+   "note": ""
+  },
+  {
+   "id": "py046",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "class T(unittest.TestCase):\n    def test_almost(self):\n        self.assertAlmostEqual(pi(), 3.14159, places=4)\n",
+   "note": ""
+  },
+  {
+   "id": "py047",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_approx():\n    assert mean([1, 2]) == pytest.approx(1.5)\n",
+   "note": ""
+  },
+  {
+   "id": "py048",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_mixed():\n    m = Mock()\n    assert use(m) == 'ok'\n    m.send.assert_called_once()\n",
+   "note": "value beats mock"
+  },
+  {
+   "id": "py049",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "def test_is_obj():\n    assert get() is SENTINEL\n",
+   "note": ""
+  },
+  {
+   "id": "py050",
+   "lang": "py",
+   "label": "value_equality",
+   "src": "class T(unittest.TestCase):\n    def test_count_equal(self):\n        self.assertCountEqual(f(), [1, 2])\n",
+   "note": ""
+  },
+  {
+   "id": "py051",
+   "lang": "py",
+   "label": "exception",
+   "src": "def test_raises():\n    with pytest.raises(ValueError):\n        compute(-1)\n",
+   "note": ""
+  },
+  {
+   "id": "py052",
+   "lang": "py",
+   "label": "exception",
+   "src": "class T(unittest.TestCase):\n    def test_r(self):\n        with self.assertRaises(KeyError):\n            d['x']\n",
+   "note": ""
+  },
+  {
+   "id": "py053",
+   "lang": "py",
+   "label": "exception",
+   "src": "class T(unittest.TestCase):\n    def test_r2(self):\n        self.assertRaises(KeyError, d.__getitem__, 'x')\n",
+   "note": ""
+  },
+  {
+   "id": "py054",
+   "lang": "py",
+   "label": "exception",
+   "src": "def test_raises_match():\n    with pytest.raises(ValueError, match='neg'):\n        compute(-1)\n",
+   "note": ""
+  },
+  {
+   "id": "py055",
+   "lang": "py",
+   "label": "exception",
+   "src": "def test_warns():\n    with pytest.warns(DeprecationWarning):\n        old()\n",
+   "note": ""
+  },
+  {
+   "id": "py056",
+   "lang": "py",
+   "label": "property",
+   "src": "@given(st.integers())\ndef test_prop(n):\n    check(n)\n",
+   "note": ""
+  },
+  {
+   "id": "py057",
+   "lang": "py",
+   "label": "property",
+   "src": "@hypothesis.given(st.lists(st.integers()))\ndef test_sorted(xs):\n    assert sorted(sorted(xs)) == sorted(xs)\n",
+   "note": ""
+  },
+  {
+   "id": "py058",
+   "lang": "py",
+   "label": "property",
+   "src": "@settings(max_examples=50)\n@given(st.text())\ndef test_roundtrip(s):\n    assert decode(encode(s)) == s\n",
+   "note": ""
+  }
+ ]
+}

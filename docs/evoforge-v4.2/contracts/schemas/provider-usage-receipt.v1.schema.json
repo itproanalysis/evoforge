@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evoforge.example/schemas/provider-usage-receipt-v1.json",
+  "title": "EvoForge Provider Usage Receipt v1",
+  "description": "One row per model call. Platform-managed provider keys (ADR-047): EvoForge pays the provider and charges the tenant. provider cost (cost_micros) and customer price (customer_price_micros) are both recorded; only source=provider_billed rows count toward measured KPIs. Money is integer micro-units; never float.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "billing_owner",
+    "call_id",
+    "call_purpose",
+    "cost_micros",
+    "currency",
+    "customer_price_micros",
+    "model",
+    "packet_id",
+    "price_table_version",
+    "project_id",
+    "provider",
+    "receipt_id",
+    "recorded_at",
+    "reservation_key",
+    "schema_version",
+    "source",
+    "tenant_id",
+    "tokens"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "provider-usage-receipt/v1"
+    },
+    "receipt_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "tenant_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "project_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "packet_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "call_id": {
+      "$ref": "#/$defs/uuid"
+    },
+    "call_purpose": {
+      "enum": [
+        "task_turn",
+        "retrieval_turn",
+        "review_chunk",
+        "review_cross_chunk",
+        "rerun",
+        "probe"
+      ],
+      "description": "retrieval_turn = the extra model turn caused by a retrieve_evidence tool call. It is the dominant restore cost and must be attributed to the context strategy."
+    },
+    "provider": {
+      "enum": [
+        "openai",
+        "anthropic",
+        "google",
+        "meta",
+        "other"
+      ]
+    },
+    "model": {
+      "type": "string",
+      "minLength": 1
+    },
+    "provider_request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "source": {
+      "enum": [
+        "provider_billed",
+        "estimated"
+      ]
+    },
+    "billing_owner": {
+      "const": "platform",
+      "description": "BYOK is out of scope in v4.0 (ADR-047)."
+    },
+    "tokens": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "uncached_input",
+        "cache_write",
+        "cache_read",
+        "output"
+      ],
+      "properties": {
+        "uncached_input": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cache_write": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cache_write_ttl": {
+          "type": "string",
+          "pattern": "^[0-9]+(m|h)$"
+        },
+        "cache_read": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "output": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "reasoning_output": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "raw_usage_fields": {
+      "type": "object",
+      "description": "Verbatim provider usage object (e.g. input_tokens_details.cached_tokens / cache_write_tokens, cache_creation_input_tokens / cache_read_input_tokens, total_cached_tokens) for reconciliation."
+    },
+    "cost_micros": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "currency": {
+      "const": "USD"
+    },
+    "price_table_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "recorded_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "customer_price_micros": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Amount charged to the tenant for this call under price_table_version (written to core.usage_ledger as model_usage)."
+    },
+    "ledger_entry_id": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/uuid"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "core.usage_ledger entry created at settlement; null only while the reservation is open."
+    },
+    "reservation_key": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "description": "core.cost_reservations.request_key reserved BEFORE the call."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "source": {
+            "const": "provider_billed"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "provider_request_id",
+          "raw_usage_fields"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    }
+  }
+}

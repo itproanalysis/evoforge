@@ -1,0 +1,111 @@
+{
+  "registry_version": "seed-2026-10-25",
+  "warning": "Seed values transcribed from public provider docs on 2026-10-25. They are inputs to be re-verified by the registry probe job, not constants. Prices per token are deliberately absent: the price table is a separate versioned artifact. Match rule: within a provider, the first entry in file order whose model_match glob matches wins; '*' is the fallback.",
+  "entries": [
+    {
+      "entry_id": "openai.gpt-5.6-plus",
+      "provider": "openai",
+      "model_match": ["gpt-5.6*", "gpt-6*"],
+      "verified_at": "2026-10-25",
+      "max_age_days": 14,
+      "source_urls": ["https://developers.openai.com/api/docs/guides/prompt-caching"],
+      "caching": {
+        "implicit_default": true,
+        "can_disable": true,
+        "disable_method": "prompt_cache_options.mode=explicit with no prompt_cache_breakpoint => no cache read/write",
+        "explicit_supported": true,
+        "explicit_method": "prompt_cache_options.mode=explicit + prompt_cache_breakpoint on content blocks",
+        "max_breakpoints": null,
+        "min_cacheable_tokens": 1024,
+        "ttl_options": ["30m", "12h"],
+        "write_multiplier": { "30m": 1.25, "12h": 2.5 },
+        "read_multiplier": 0.1,
+        "usage_fields": { "cache_read": "usage.input_tokens_details.cached_tokens", "cache_write": "usage.input_tokens_details.cache_write_tokens", "total_input": "usage.input_tokens" },
+        "isolation": "prompt_cache_key can separate cache accounting per customer; treat as accounting, not as a security boundary",
+        "notes": "Read multiplier differs on some models (docs list 0.05x for one model). Resolve per model from the price table."
+      }
+    },
+    {
+      "entry_id": "openai.pre-5.6",
+      "provider": "openai",
+      "model_match": ["*"],
+      "verified_at": "2026-10-25",
+      "max_age_days": 14,
+      "source_urls": ["https://developers.openai.com/api/docs/guides/prompt-caching"],
+      "caching": {
+        "implicit_default": true,
+        "can_disable": false,
+        "explicit_supported": false,
+        "max_breakpoints": null,
+        "min_cacheable_tokens": null,
+        "ttl_options": ["in_memory", "24h"],
+        "write_multiplier": null,
+        "read_multiplier": null,
+        "usage_fields": { "cache_read": "usage.input_tokens_details.cached_tokens" },
+        "notes": "No cache-write surcharge on these models. Minimum length varies with tools/images/schemas; cached_tokens rounded down to multiples of 128. A0 arm not runnable: baseline is RAW with automatic caching."
+      }
+    },
+    {
+      "entry_id": "anthropic.claude-current",
+      "provider": "anthropic",
+      "model_match": ["claude-opus-5-5*", "claude-sonnet-5-5*", "claude-haiku-5-5*", "claude-opus-5*", "claude-fable-5*", "claude-mythos-5*"],
+      "verified_at": "2026-10-25",
+      "max_age_days": 14,
+      "source_urls": ["https://platform.claude.com/docs/en/build-with-claude/prompt-caching"],
+      "caching": {
+        "implicit_default": false,
+        "can_disable": true,
+        "disable_method": "omit cache_control (no top-level automatic caching, no block breakpoints)",
+        "explicit_supported": true,
+        "explicit_method": "cache_control {type: ephemeral[, ttl]} on blocks, or top-level automatic caching",
+        "max_breakpoints": 4,
+        "min_cacheable_tokens": 512,
+        "ttl_options": ["5m", "1h"],
+        "write_multiplier": { "5m": 1.25, "1h": 2.0 },
+        "read_multiplier": 0.1,
+        "usage_fields": { "cache_write": "usage.cache_creation_input_tokens", "cache_read": "usage.cache_read_input_tokens", "uncached_input": "usage.input_tokens" },
+        "isolation": "isolated per organization; per workspace on Claude API (org-level only on some cloud platforms)",
+        "notes": "Read multiplier is lower on some current models (0.05x / 0.025x per docs). Prompts below minimum are silently uncached: check both usage fields = 0. Longer TTL entries must precede shorter ones."
+      }
+    },
+    {
+      "entry_id": "google.gemini-2.5-3.x",
+      "provider": "google",
+      "model_match": ["gemini-2.5*", "gemini-3*"],
+      "verified_at": "2026-10-25",
+      "max_age_days": 14,
+      "source_urls": ["https://ai.google.dev/gemini-api/docs/caching"],
+      "caching": {
+        "implicit_default": true,
+        "can_disable": false,
+        "explicit_supported": true,
+        "explicit_method": "cached content objects via generateContent API (not Interactions API)",
+        "max_breakpoints": null,
+        "min_cacheable_tokens": 2048,
+        "write_multiplier": null,
+        "read_multiplier": null,
+        "usage_fields": { "cache_read": "usage.total_cached_tokens" },
+        "notes": "Implicit discount is not guaranteed (applies only on hit). Min tokens 2048 (2.5) / 4096 (3.x listed models). Explicit cache storage pricing and TTL not stated on the page: take from price table."
+      }
+    },
+    {
+      "entry_id": "google.gemini-4",
+      "provider": "google",
+      "model_match": ["gemini-4*"],
+      "verified_at": "2026-10-25",
+      "max_age_days": 14,
+      "source_urls": ["https://ai.google.dev/gemini-api/docs/caching"],
+      "caching": {
+        "implicit_default": true,
+        "can_disable": false,
+        "explicit_supported": false,
+        "max_breakpoints": null,
+        "min_cacheable_tokens": 4096,
+        "write_multiplier": null,
+        "read_multiplier": null,
+        "usage_fields": { "cache_read": "usage.total_cached_tokens" },
+        "notes": "Multi-turn: previous request cached only if the new request adds >= 2050 tokens; small deltas reprocess the last 2050 tokens at full rate. Planner must batch small tool results into >= 2050-token turns or accept no cache."
+      }
+    }
+  ]
+}

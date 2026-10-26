@@ -1,0 +1,34 @@
+{
+  "schema_version": "provider-usage-receipt/v1",
+  "receipt_id": "0b7e1f00-1111-4c22-8d33-0000000000f1",
+  "tenant_id": "6f1d2c3b-0a00-4b1e-9c2d-0000000000a1",
+  "project_id": "6f1d2c3b-0a00-4b1e-9c2d-0000000000b1",
+  "packet_id": "0b7e1f00-1111-4c22-8d33-0000000000e4",
+  "call_id": "0b7e1f00-1111-4c22-8d33-0000000000f2",
+  "call_purpose": "retrieval_turn",
+  "provider": "anthropic",
+  "model": "claude-opus-5-5",
+  "provider_request_id": "msg_example_0001",
+  "source": "provider_billed",
+  "billing_owner": "byok_customer",
+  "tokens": {
+    "uncached_input": 180,
+    "cache_write": 2400,
+    "cache_write_ttl": "5m",
+    "cache_read": 21500,
+    "output": 140
+  },
+  "raw_usage_fields": {
+    "input_tokens": 180,
+    "cache_creation_input_tokens": 2400,
+    "cache_read_input_tokens": 21500,
+    "output_tokens": 140
+  },
+  "cost_micros": 0,
+  "customer_price_micros": 0,
+  "reservation_key": "rsv-0002-0003-seat4-000007",
+  "ledger_entry_id": null,
+  "currency": "USD",
+  "price_table_version": "EXAMPLE-ONLY",
+  "recorded_at": "2026-10-25T09:03:12Z"
+}

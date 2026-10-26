@@ -1,0 +1,855 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+<testsuite name="api" tests="120">
+<testcase classname="app.api.test_orders_0" name="test_case_000" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_001" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_002" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_003" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_004" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_005" time="0.05"><skipped message="requires redis"/><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_006" time="0.06"><skipped message="requires redis"/><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_007" time="0.07"><skipped message="requires redis"/><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_008" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_009" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_010" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_011" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_012" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_013" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_014" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_015" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_016" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_017" time="0.07"><failure type="AssertionError" message="expected 200 but was 500">Traceback (most recent call last):
+  File "tests/api/test_orders.py", line 88, in test_case_017
+    assert resp.status_code == 200, f"expected 200 but was {resp.status_code}"
+AssertionError: expected 200 but was 500
+</failure><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_018" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_0" name="test_case_019" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_020" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_021" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_022" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_023" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_024" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_025" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_026" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_027" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_028" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_029" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_030" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_031" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_032" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_033" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_034" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_035" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_036" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_037" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_038" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_1" name="test_case_039" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_040" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_041" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_042" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_043" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_044" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_045" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_046" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_047" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_048" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_049" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_050" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_051" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_052" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_053" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_054" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_055" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_056" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_057" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_058" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_2" name="test_case_059" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_060" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_061" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_062" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_063" time="0.03"><failure type="AssertionError" message="assert 3 == 4">  File "tests/api/test_cart.py", line 41, in test_case_063
+    assert len(cart.items) == 4
+AssertionError: assert 3 == 4
+</failure><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_064" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_065" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_066" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_067" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_068" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_069" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_070" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_071" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_072" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_073" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_074" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_075" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_076" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_077" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_078" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_3" name="test_case_079" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_080" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_081" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_082" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_083" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_084" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_085" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_086" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_087" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_088" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_089" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_090" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_091" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_092" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_093" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_094" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_095" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_096" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_097" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_098" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_4" name="test_case_099" time="0.09"><error type="TimeoutError" message="db pool exhausted after 30s">  File "app/db/pool.py", line 210, in acquire
+    raise TimeoutError("db pool exhausted after 30s")
+TimeoutError: db pool exhausted after 30s
+</error><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_100" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_101" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_102" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_103" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_104" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_105" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_106" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_107" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_108" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_109" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_110" time="0.00"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_111" time="0.01"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_112" time="0.02"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_113" time="0.03"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_114" time="0.04"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_115" time="0.05"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_116" time="0.06"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_117" time="0.07"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_118" time="0.08"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+<testcase classname="app.api.test_orders_5" name="test_case_119" time="0.09"><system-out>INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+INFO request handled path=/v1/orders status=200 latency_ms=12
+</system-out></testcase>
+</testsuite>
+</testsuites>

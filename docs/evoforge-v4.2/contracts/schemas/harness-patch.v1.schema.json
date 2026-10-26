@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evoforge.dev/schemas/harness-patch.v1.schema.json",
+  "title": "EvoForge harness patch (M6 optimizer mutation unit)",
+  "description": "Structured patch for Harness Evolution (p.38, D-051). Free-form rewrites are not representable. Trust Kernel paths and the edit budget are checked by reference_impl/harness_optimizer.py::check_patch.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "patch_id", "run_id", "generation", "parent_versions", "module", "category", "phase", "ops", "rationale"],
+  "properties": {
+    "schema_version": {"const": "harness-patch/v1"},
+    "patch_id": {"type": "string", "pattern": "^hp_[0-9a-z]{8,32}$"},
+    "run_id": {"type": "string", "minLength": 1},
+    "generation": {"type": "integer", "minimum": 0},
+    "parent_versions": {"type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": {"type": "string", "pattern": "^hv_[0-9a-z]{8,32}$"},
+      "description": "EvoDAG parents: a patch may compose any subset of earlier versions, not only the latest."},
+    "module": {"enum": ["T", "C", "S", "M", "W"], "description": "Tool interface, Context, Skills, Memory, Workflow (D-012)"},
+    "category": {"enum": ["prompt", "tool", "middleware"]},
+    "phase": {"enum": ["capability", "steering"], "description": "capability = code changes, steering = text changes"},
+    "ops": {"type": "array", "minItems": 1, "maxItems": 20, "items": {
+      "type": "object", "additionalProperties": false, "required": ["file", "op"],
+      "properties": {
+        "file": {"type": "string", "pattern": "^(?!/)(?!.*\\.\\.)[A-Za-z0-9_./-]+$"},
+        "op": {"enum": ["insert_after", "insert_before", "replace", "delete", "create"]},
+        "anchor": {"type": "string", "minLength": 1, "maxLength": 2000},
+        "text": {"type": "string", "maxLength": 20000},
+        "lines": {"type": "integer", "minimum": 1, "maximum": 200}
+      },
+      "allOf": [
+        {"if": {"properties": {"op": {"enum": ["insert_after", "insert_before", "replace", "delete"]}}}, "then": {"required": ["anchor"]}},
+        {"if": {"properties": {"op": {"enum": ["insert_after", "insert_before", "replace", "create"]}}}, "then": {"required": ["text"]}},
+        {"if": {"properties": {"op": {"enum": ["replace", "delete"]}}}, "then": {"required": ["lines"]}}
+      ]}},
+    "rationale": {"type": "string", "minLength": 10, "maxLength": 4000},
+    "minibatch": {"type": "object", "additionalProperties": false, "required": ["parent_score", "child_score", "batch_hash"],
+      "properties": {"parent_score": {"type": "number"}, "child_score": {"type": "number"}, "batch_hash": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "evaluated_on": {"type": "array", "items": {"enum": ["minibatch", "dev"]}, "uniqueItems": true,
+      "description": "test is deliberately not representable: D_test results never attach to a patch"}
+  }
+}

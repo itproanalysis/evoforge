@@ -1,0 +1,6 @@
+{
+  "kind": "retrieve_evidence.response",
+  "request_id": "rq-foreign-ref-probe-0001",
+  "status": "not_found",
+  "trace_id": "tr_77aa01"
+}
