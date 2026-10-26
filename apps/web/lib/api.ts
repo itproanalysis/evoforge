@@ -136,6 +136,18 @@ export function postCreatePR(evidence_id: string, title: string, body = "", base
   });
 }
 
+export function getLedger() {
+  return req<LedgerSnapshot>("/v1/ledger");
+}
+
+export interface LedgerSnapshot {
+  project: string;
+  spent_cents: number;
+  reserved_cents: number;
+  overruns: unknown[];
+  unknown_reservations: string[];
+}
+
 export function getEvidence(id: string) {
   return req<EvidenceChain | Record<string, unknown>>(
     `/v1/evidence/${encodeURIComponent(id)}`,
