@@ -93,3 +93,12 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 상태가 그대로면 반복 알림을 보내지 않으며, 중요한 진척·완료·실패 또는 사용자 조치가 필요할 때 알린다.
 요구사항이 모두 충족되고 검증 근거가 기록되면 자동화를 비활성화한다.
 로컬 파일 작업이므로 PC와 Codex 앱이 실행 중이어야 한다.
+
+## 현재 작업 클레임
+
+- **Codex 지원 / `codex/receipt-support` / `C:\evo_forge_codex`:** Muse round3의 T7(main/evidence)·T8(critic)·T9(web)와 분리해,
+  PostgreSQL의 정식 영수증 JSON 계약 검증·저장·스코프/예약 바인딩과 실제 DB 검증을 맡는다.
+  파일: `evoforge/postgres_receipts.py`, `postgres_kernel.py`, `services/api/migrations/`,
+  `services/api/requirements.txt`, Codex 소유 `test_postgres_kernel.py`·`test_receipt_contract.py`, 관련 문서·CI 검증 연결.
+  T8 수용을 위해 Codex 소유 `test_provider_accounting.py`의 양성 suite fixture를 3종 계약에 맞추되 비용·실패 검증은 유지한다.
+  상위 우선권 브랜치가 먼저 main에 반영된 뒤 동기화·통합한다. 상위 클레임과 겹치면 해당 파일 편집을 중단한다.
