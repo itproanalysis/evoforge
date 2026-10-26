@@ -16,9 +16,9 @@ const card: React.CSSProperties = {
 
 export default function Lab() {
   const [diff, setDiff] = useState("");
+  const [goal, setGoal] = useState("");
   const [tests, setTests] = useState<string[]>([]);
   const [gates, setGates] = useState<GateVerdict[]>([]);
-  const [candidateId, setCandidateId] = useState("cand_local");
   const [review, setReview] = useState("");
   const [sealed, setSealed] = useState<string[]>([]);
   const [pr, setPr] = useState("");
@@ -29,12 +29,14 @@ export default function Lab() {
     try {
       const c = localStorage.getItem("evoforge.candidate");
       const g = localStorage.getItem("evoforge.gates");
+      const gg = localStorage.getItem("evoforge.goal");
       if (c) {
         const cand = JSON.parse(c);
         setDiff(cand.diff ?? "");
-        setTests(cand.tests ?? []);
-        if (cand.id) setCandidateId(cand.id);
+        const t = cand.tests ?? [];
+        setTests(t.map((x: unknown) => (typeof x === "string" ? x : (x as { code?: string }).code ?? JSON.stringify(x))));
       }
+      if (gg) setGoal(JSON.parse(gg));
       if (g) setGates(JSON.parse(g));
     } catch {}
   }, []);
@@ -47,11 +49,15 @@ export default function Lab() {
     setBusy("review");
     setErr("");
     try {
-      const out = await postReview(candidateId, gates);
-      setReview(
-        `verdict=${out.verdict}${out.reason ? ` reason=${out.reason}` : ""}`,
+      const out = await postReview(goal || "unspecified goal", diff);
+      const result = out.review?.result ?? "INCONCLUSIVE";
+      const n = out.review?.findings?.length ?? 0;
+      setReview(`verdict=${result} findings=${n}${out.stub ? " (stub, no MODEL_API_KEY)" : ""}`);
+      setSealed(
+        (out.sealed_tests ?? []).map((t) =>
+          typeof t === "string" ? t : (t.code ?? JSON.stringify(t)),
+        ),
       );
-      setSealed(out.sealed_tests ?? []);
     } catch (e) {
       // Backend may not implement review yet — keep sealed local tests visible.
       setErr(`review API: ${e instanceof Error ? e.message : String(e)} (미구현이면 로컬 sealed tests 사용)`);
@@ -66,8 +72,13 @@ export default function Lab() {
     setBusy("pr");
     setErr("");
     try {
-      const out = await postCreatePR(candidateId);
-      setPr(out.pr_url ?? out.pr_id ?? JSON.stringify(out.raw ?? out));
+      const out = await postCreatePR(
+        diff,
+        `EvoForge: ${goal.slice(0, 60) || "candidate"}`,
+        gates,
+        `goal=${goal}`,
+      );
+      setPr(out.pr?.html_url ?? JSON.stringify(out));
     } catch (e) {
       setErr(`pr API: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -84,11 +95,12 @@ export default function Lab() {
 
       <section style={card}>
         <label style={{ fontSize: 12, color: "#8b96ad" }}>
-          candidate_id{" "}
+          goal{" "}
           <input
-            value={candidateId}
-            onChange={(e) => setCandidateId(e.target.value)}
-            style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: "1px solid #33405c", background: "#0b0e14", color: "#e8edf5" }}
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            placeholder="Mission Control에서 입력한 목표"
+            style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: "1px solid #33405c", background: "#0b0e14", color: "#e8edf5", width: 420 }}
           />
         </label>
         <h3>Candidate diff</h3>

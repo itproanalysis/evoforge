@@ -25,18 +25,17 @@ export interface GenerateResponse {
 }
 
 export interface ReviewResponse {
-  candidate_id?: string;
-  verdict: GateResult | string;
-  sealed_tests?: string[];
-  reason?: string;
+  sealed_tests?: Array<{ code: string } | string>;
+  review?: { result: string; findings?: unknown[] };
+  stub?: boolean;
+  model?: string;
+  evidence_id?: string;
   raw?: unknown;
 }
 
 export interface PRResponse {
-  pr_url?: string;
-  pr_id?: string;
-  blocked?: boolean;
-  reason?: string;
+  pr?: { html_url?: string; number?: number };
+  evidence_id?: string;
   raw?: unknown;
 }
 
@@ -70,17 +69,23 @@ export function postGenerate(goal: string, repo_sha = "HEAD", risk = "LOW") {
   });
 }
 
-export function postReview(candidate_id: string, gates: GateVerdict[]) {
+export function postReview(goal_contract: string, diff: string, ci = "") {
   return req<ReviewResponse>("/v1/candidates/review", {
     method: "POST",
-    body: JSON.stringify({ candidate_id, gates }),
+    body: JSON.stringify({ goal_contract, diff, ci }),
   });
 }
 
-export function postCreatePR(candidate_id: string) {
+export function postCreatePR(
+  diff: string,
+  title: string,
+  gates: GateVerdict[],
+  body = "",
+  base = "main",
+) {
   return req<PRResponse>("/v1/pr/create", {
     method: "POST",
-    body: JSON.stringify({ candidate_id }),
+    body: JSON.stringify({ diff, title, gates, body, base }),
   });
 }
 

@@ -72,6 +72,7 @@ export default function MissionControl() {
       try {
         localStorage.setItem("evoforge.candidate", JSON.stringify(out.candidate));
         localStorage.setItem("evoforge.gates", JSON.stringify(out.gates ?? []));
+        localStorage.setItem("evoforge.goal", JSON.stringify(goal));
       } catch {}
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
