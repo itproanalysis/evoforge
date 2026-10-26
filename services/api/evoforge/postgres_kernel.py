@@ -12,11 +12,11 @@ from datetime import date
 import re
 from uuid import UUID
 
-import psycopg
-from psycopg.rows import dict_row
-
-
 class KernelRejected(ValueError):
+    pass
+
+
+class KernelNotFound(KernelRejected):
     pass
 
 
@@ -68,6 +68,11 @@ class PostgresKernel:
     @contextmanager
     def _transaction(self):
         try:
+            import psycopg
+            from psycopg.rows import dict_row
+        except ImportError:
+            raise KernelUnavailable("PostgreSQL client unavailable") from None
+        try:
             with psycopg.connect(self._dsn, autocommit=True, connect_timeout=5, row_factory=dict_row) as conn:
                 with conn.transaction():
                     conn.execute("SET LOCAL ROLE core_app")
@@ -79,7 +84,9 @@ class PostgresKernel:
             if (error.diag.message_primary or "").startswith(("BUDGET_", "CREDIT_EXHAUSTED")):
                 raise BudgetRefused("project budget or prepaid credit refused reservation") from None
             raise KernelRejected("Trust Kernel rejected the operation") from None
-        except (psycopg.IntegrityError, psycopg.errors.NoDataFound, psycopg.errors.RaiseException,
+        except psycopg.errors.NoDataFound:
+            raise KernelNotFound("resource not found in scope") from None
+        except (psycopg.IntegrityError, psycopg.errors.RaiseException,
                 psycopg.errors.InsufficientPrivilege):
             raise KernelRejected("Trust Kernel rejected the operation") from None
         except psycopg.Error:
@@ -101,7 +108,7 @@ class PostgresKernel:
                            (self._intent_key(call_id), self.scope.tenant_id,
                             self.scope.project_id, str(call_id))).fetchone()
         if not row or row["outcome"] is None:
-            raise KernelRejected("reservation or provider intent not found in scope")
+            raise KernelNotFound("reservation or provider intent not found in scope")
         return ReservationState(call_id=call_id, **row)
 
     def reservation(self, call_id: UUID) -> ReservationState:

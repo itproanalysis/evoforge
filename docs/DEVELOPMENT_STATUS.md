@@ -17,8 +17,9 @@
 - [x] 현재 채팅의 자동 재개 활성화. 자동화 ID: `evoforge`, 확인 간격: 15분.
 - [x] CI 검증 의존성·PostgreSQL 15 테스트 환경·웹 빌드 검사 구성. 새 가상환경의 참조 112개·API 93개·웹 프로덕션 빌드 통과. 컨테이너 실행은 미검증.
 - [x] 후속 Windows 임시 PostgreSQL 15.19 실제 실행: SQL 96개·참조 112개·계약 C1–C9 전체 통과. 컨테이너/배포 실행은 미검증.
-- [x] PostgreSQL 어댑터의 예약·영수증 정산·병합 승인과 실제 DB 수용 테스트 21개 통과. FastAPI 요청 경로 연결은 남아 있다.
+- [x] PostgreSQL 어댑터의 예약·영수증 정산·병합 승인과 실제 DB 수용 테스트 21개 통과. Generate/Review 요청의 DB 연결은 남아 있다.
 - [x] SDK 자동 재시도 비활성화·Critic 호출별 예약·부분 실패 비용 보존·서버 메타데이터·Phase A 테스트 보존. API 116개와 관련 신규 23개 검증 통과.
+- [x] 서비스 토큰·서버 소유 스코프의 내부 FastAPI DB 경로 연결. API 139개, 실제 PostgreSQL HTTP 포함 25개 통과.
 
 ## 이어서 수행할 작업
 
@@ -45,14 +46,33 @@
 > A 성공 뒤 B 실패에도 A 지출·응답 근거가 남고, B의 거부/UNKNOWN을 구분한다.
 > Phase B의 테스트 덮어쓰기와 모델 JSON 메타데이터 위조도 막았다. [상세 검증](PROVIDER_CALL_ACCOUNTING.md).
 
+> **내부 DB HTTP 검증 완료 (Codex, 2026-10-27):** `/v1/kernel`의 인증·입력·상태/오류 매핑과 실제 DB 연결을 검증했다.
+> 스코프는 서버 소유이며 DB 오류 시 메모리로 대체하지 않는다. [설정·경로·검증](INTERNAL_KERNEL_API.md).
+> Generate/Review의 패킷·영수증 연결과 브라우저 사용자 인증은 별도 미완료다.
+
+> **우선권 (프로젝트 소유자 지정, 2026-10-27): Muse Spark 1 > Claude 2 > Codex 3.** 규칙은 [`AGENTS.md`](../AGENTS.md).
+
+> **main 병합 완료 (Claude + Muse Spark, 2026-10-27, `f421bd2` fast-forward):** 우선권에 따라 먼저 병합했다.
+> Codex의 미커밋 변경은 보존했다: `main.py`의 `kernel_router` 2줄은 3-way 병합으로 새 `main` 위에 다시 적용했고 나머지 파일은 건드리지 않았다.
+> 병합 후 main 작업 트리(Codex WIP 포함) API 200 passed·1 skipped.
+> 이전 기록 — 브랜치 `refs/heads/muse/round2` @ `f421bd2`, main `dd4c106` 병합 포함:
+> Builder = Muse Spark 1.3(OpenCode `tools/muse_improve.py --via opencode`), Critic = Claude 봉인 테스트·리뷰.
+> T6 영수증 대사(`ledger.reconcile`, `POST /v1/ledger/reconcile`, `GET /v1/ledger`) — Muse 1라운드 통과.
+> T5 서버 Runner(`evoforge/runner.py`, `POST /v1/runs`, PR은 서버 실행 증거 필수, `/v1/eval/sandbox` 저장소 허용 목록) — Muse 3라운드 통과 후
+> Critic 수정: `G2_REQUIRED`=필수 테스트 실제 실행·전부 통과(p.36), held-out 격리(conftest·pytest.ini·visible 테스트의 held-out 변조 3/3 위조 → 차단).
+> 근거: API 177 passed·1 skipped(실 DB 없음), 참조 112, validate 0 failure, tsc·next build, 브라우저 E2E(실 샌드박스 실행 → PR 차단).
+> 잔여 위험(마이크로VM 전까지): held-out 테스트가 import하는 후보 모듈은 같은 프로세스에서 실행, 백그라운드 프로세스 미종료, 네트워크·메타데이터 서버 접근 가능 → 비밀이 있는 호스트에서는 `EVO_REPO_ROOTS` 미설정 유지.
+
 - [x] 모델 호출 실패 후 비용 예약을 접수 전 실패(환불)·결과 불명(`UNKNOWN` 보류)으로 처리. 영수증 대사로 UNKNOWN을 settle/refund하는 잡은 미구현.
 - [x] 실행 성공 수·전체 수의 입력 관계 검증(422)과 0건 실행의 증거 부족(INCONCLUSIVE) 처리.
 - [x] 기준 브랜치 파일에 unified diff를 엄격 적용해 문맥을 보존하는 PR 생성 경로 구현·검증(mock transport).
 - [x] PR은 서버가 저장한 게이트 평가(`evidence_id`)가 전부 PASS일 때만 생성. 웹 Lab도 Evaluate → PR 순서로 변경.
-- [ ] 실제 Runner와 봉인 테스트 결과 연결.
+- [x] 실제 Runner와 봉인 테스트 결과 연결 (로컬 subprocess Runner, `f421bd2` main 병합; microVM 아님).
 - [x] PostgreSQL SQL 계약의 비용 예약·원장·RLS·병합 승인 등 96개 검사 실제 실행.
 - [x] 정본 함수·micro-USD 단위의 PostgreSQL 어댑터와 int cents 변환 구현. 잘못된 `project_budgets` 스텁 제거.
+- [x] 내부 FastAPI 요청에서 PostgreSQL 예약·정산·병합 승인 호출과 인증/스코프·연결 오류의 차단 검증.
 - [ ] FastAPI에서 인증된 프로젝트 컨텍스트·컨텍스트 패킷·영수증 저장을 새 PostgreSQL 어댑터에 연결. 현재 요청 경로는 메모리 원장을 사용한다.
+- [ ] 브라우저 사용자 로그인·프로젝트 멤버십과 워크플로 호출 권한 연결. 내부 서비스 토큰을 브라우저로 전달하지 않는다.
 - [ ] 개발 Muse Builder CLI의 프로젝트 비용 예약·정식 영수증 연결. 현재 CLI를 플랫폼 예산 통제가 완료된 경로로 사용하지 않는다.
 - [ ] Muse Spark 실제 호출과 저장소 연결을 포함한 통합 경로 검증.
 - [ ] 배포·통합 검증 결과와 남은 요구사항을 대조하고 완료 근거 기록.

@@ -60,8 +60,11 @@ UNKNOWN의 예약 유지, 확정 미접수 해제, 영수증 바인딩·중복 �
 
 ## 남은 연결 작업
 
-FastAPI는 현재 메모리 원장을 사용한다. 새 어댑터를 요청 경로에 연결하려면 서버가 검증한
+기존 Generate/Review는 현재 메모리 원장을 사용한다. 새 어댑터를 해당 경로에 연결하려면 서버가 검증한
 사용자/프로젝트 컨텍스트, 컨텍스트 패킷·영수증 저장, 공급사 allowlist와 Broker 호출을 연결해야 한다.
 그 전에 영수증을 임의 생성하거나 DB 실패 시 메모리 원장으로 대체하지 않는다.
 정본에 없는 `project_budgets`를 참조하던 미사용 `ledger.reserve_pg/settle_pg` 코드는 제거했다.
 실제 Muse Spark 호출·GitHub 작업·배포 검증은 계속 별도 미완료 항목이다.
+
+후속 작업으로 [인증된 내부 FastAPI 경로](INTERNAL_KERNEL_API.md)를 연결하고 실제 DB HTTP 포함 25개를 통과했다.
+Generate/Review의 패킷·영수증 연결은 계속 남아 있다.

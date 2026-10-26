@@ -31,7 +31,7 @@ python -m venv .venv; .\.venv\Scripts\Activate
 pip install -r requirements.txt
 copy .env.example .env  # MODEL_API_KEY, DATABASE_URL, GITHUB_APP_*
 pytest -q               # API 회귀 테스트
-uvicorn main:app --reload --port 8080
+uvicorn main:app --env-file .env --reload --port 8080
 
 # 2) Web
 cd C:\evo_forge\apps\web

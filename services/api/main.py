@@ -19,11 +19,13 @@ from pydantic import BaseModel, Field, StrictInt, model_validator
 
 from evoforge import broker_meta, ledger
 from evoforge.patch import PatchError
+from evoforge.kernel_api import router as kernel_router
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
 
 ledger.configure({"default": int(os.getenv("EVO_PROJECT_BUDGET_CENTS", "50000"))})
 
 app = FastAPI(title="EvoForge API", version="0.2.0-hackathon")
+app.include_router(kernel_router)
 # Web (Mission Control) is a separate origin locally and on Cloud Run; no cookies, so no credentials.
 app.add_middleware(
     CORSMiddleware,
