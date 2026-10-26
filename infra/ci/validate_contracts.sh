@@ -14,3 +14,6 @@ runuser -u postgres -- createuser --host=/var/run/postgresql --port=5432 --usern
 # Force the isolated local test cluster, never a deployment DATABASE_URL.
 export PGHOST=/var/run/postgresql PGPORT=5432 PGUSER=root PGDATABASE=postgres
 python -I docs/evoforge-v4.2/tools/validate_package.py --pg
+python -m pip install --no-cache-dir -r services/api/requirements.txt
+EVO_TEST_DATABASE_URL='host=/var/run/postgresql port=5432 user=root dbname=postgres' \
+  python -m pytest services/api/tests/test_postgres_kernel.py -q

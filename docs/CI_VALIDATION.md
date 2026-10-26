@@ -15,6 +15,8 @@
   웹 이미지의 컨텍스트는 `apps/web`로 설정했다.
   웹 Dockerfile에서 복사하는 `public/`은 빈 디렉터리도 체크아웃에 남도록 `.gitkeep`을 추가했다.
 - GitHub Actions `web`: `npm ci` 후 프로덕션 빌드를 검사한다.
+- 후속 PostgreSQL 어댑터 수용 테스트도 `contracts` 및 Cloud Build 검증 단계의 같은 일회용 서버에 연결했다.
+  로컬에서는 실제 PostgreSQL에서 21개를 통과했다. [어댑터 검증](POSTGRES_KERNEL.md)을 참고한다.
 - Muse Spark의 모델 설정은 유지했다.
 
 ## 로컬 검증 근거

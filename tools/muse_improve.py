@@ -49,10 +49,11 @@ def _load_env() -> None:
 
 
 def _client():
-    from openai import OpenAI
-
-    return OpenAI(base_url=os.getenv("MODEL_API_BASE", "https://api.meta.ai/v1"),
-                  api_key=os.environ["MODEL_API_KEY"])
+    api_root = str(ROOT / "services/api")
+    if api_root not in sys.path:
+        sys.path.insert(0, api_root)
+    from evoforge.broker_meta import _client as make_client
+    return make_client()
 
 
 def _read(rel: str) -> str:
@@ -84,18 +85,22 @@ def _allowed(task: dict, rel: str) -> bool:
 def _call(task: dict, feedback: str, log) -> dict:
     model = os.getenv("MODEL_BUILDER", "muse-spark-1.3")
     t0 = time.time()
-    resp = _client().chat.completions.create(
-        model=model,
-        messages=[{"role": "system", "content": SYSTEM},
-                  {"role": "user", "content": _prompt(task, feedback)}],
-        response_format={"type": "json_object"},
-        max_tokens=int(os.getenv("MUSE_MAX_TOKENS", "16000")),
-    )
+    client = _client()
+    from evoforge.broker_meta import call_metadata, provider_errors
+    with provider_errors():
+        resp = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": SYSTEM},
+                      {"role": "user", "content": _prompt(task, feedback)}],
+            response_format={"type": "json_object"},
+            max_tokens=int(os.getenv("MUSE_MAX_TOKENS", "16000")),
+        )
     usage = resp.usage.model_dump() if getattr(resp, "usage", None) else {}
     raw = resp.choices[0].message.content or "{}"
-    log({"event": "builder_call", "model": model, "ms": int((time.time() - t0) * 1000),
+    log({**call_metadata(resp, model, "development_builder"),
+         "event": "builder_call", "model": model, "ms": int((time.time() - t0) * 1000),
          "usage": {k: v for k, v in usage.items() if isinstance(v, int)},
-         "request_id": getattr(resp, "id", None)})
+         })
     try:
         return json.loads(raw)
     except json.JSONDecodeError:

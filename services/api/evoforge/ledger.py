@@ -1,4 +1,4 @@
-"""Integer-cents cost ledger. Fail-closed. No float money."""
+"""In-memory integer-cents demo ledger. Durable DB operations use postgres_kernel."""
 from __future__ import annotations
 
 import json
@@ -162,27 +162,13 @@ def snapshot(project: str = "default") -> dict:
                                      if r.project == project and r.state == "UNKNOWN"]}
 
 
+def reservation(reservation_id: str) -> dict:
+    """Copy of one reservation for server-side call evidence."""
+    if reservation_id not in _reservations:
+        raise KeyError(reservation_id)
+    return asdict(_reservations[reservation_id])
+
+
 def reset() -> None:  # tests only
     _budgets.clear(); _spent.clear(); _reserved.clear()
     _reservations.clear(); _overruns.clear()
-
-
-# ---- Postgres-ready (same semantics, BYO conn) ----
-RESERVE_SQL = ("UPDATE project_budgets SET reserved_cents = reserved_cents + %(cost)s "
-               "WHERE project=%(project)s AND (budget_cents - spent_cents - reserved_cents) >= %(cost)s")
-SETTLE_SQL = ("UPDATE project_budgets SET reserved_cents = reserved_cents - %(reserved)s, "
-              "spent_cents = spent_cents + %(actual)s WHERE project=%(project)s")
-
-
-def reserve_pg(conn, project: str, cost_cents: int) -> bool:
-    with conn.cursor() as cur:
-        cur.execute(RESERVE_SQL, {"project": project, "cost": cost_cents})
-        ok = cur.rowcount == 1
-        conn.commit()
-        return ok
-
-
-def settle_pg(conn, project: str, reserved_cents: int, actual_cents: int) -> None:
-    with conn.cursor() as cur:
-        cur.execute(SETTLE_SQL, {"project": project, "reserved": reserved_cents, "actual": actual_cents})
-        conn.commit()
