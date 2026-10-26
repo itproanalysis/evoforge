@@ -1,4 +1,4 @@
-# EvoForge CI/CD — build context root = repo root C:\evo_forge (see Dockerfiles).
+# EvoForge CI/CD -- build context root = repo root (see Dockerfiles).
 # Substitutions: _PROJECT (required), _REGION (default asia-northeast3),
 # _ENV (default hackathon). Images tagged :$COMMIT_SHA + :latest.
 substitutions:
@@ -65,7 +65,7 @@ steps:
         docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA &&
         docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:latest
 
-  # 3) Apply SQL migrations via private-IP proxy sidecar (core + context plane).
+  # 3) Apply SQL migrations via private-IP (core + context plane).
   # Contract freeze: files applied verbatim; any CHECK/trigger diff fails the build.
   - name: gcr.io/cloud-builders/gcloud
     id: migrate
@@ -87,7 +87,7 @@ steps:
         psql "$$URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql
     secretEnv: []
 
-  # 4) Terraform apply (infra) — deploys Cloud Run pointing at fresh digests.
+  # Terraform apply (infra) -- deploys Cloud Run pointing at fresh digests.
   - name: hashicorp/terraform:1.9
     id: tf-apply
     entrypoint: sh
