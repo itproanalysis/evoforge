@@ -1,0 +1,17 @@
+{
+  "id": "T9_ledger_honesty_web",
+  "planned_by": "muse-spark-1.3 (round-3 plan)",
+  "goal": "Mission Control ledger honesty (spent/reserved/UNKNOWN)\nWHY: Phase 5 demands 청구=원장=receipt and D4-5 cost ledger; Mission Control shows Spent (est.) 추정치 from a constant and hides UNKNOWN holds, misleading judges on Whether-it-works.\n\nSPEC: apps/web/lib/api.ts: add getLedger() GET /v1/ledger -> {project,spent_cents,reserved_cents,overruns,unknown_reservations}. apps/web/app/page.tsx: fetch ledger on mount and after Generate; display Spent=spent_cents, Reserved=reserved_cents, Unknown holds=len(unknown_reservations), Overruns=len(overruns); delete the '~¢ 추정치 / provider_billed 없음' estimate text; Generate 402 surfaces budget-exhausted message. Amounts are int cents only (no float). pnpm build passes.\nCritic constraint: keep the existing Mission Control layout and other cards; only the cost card changes. Use integer cents formatting only (no float math on money).\n\nACCEPTANCE (your own plan): Against stubbed GET /v1/ledger the page renders ledger spent/reserved/unknown counts and no 추정치/estimate text; UNKNOWN>0 shows hold count; 402 on Generate shows budget-exhausted message; pnpm build (or next build) passes\nOUT OF SCOPE: services/api/** (no API changes); ledger reconcile math / postgres files; gate or PR flow changes",
+  "edit": [
+    "apps/web/lib/api.ts",
+    "apps/web/app/page.tsx"
+  ],
+  "context": [
+    "services/api/main.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
+    "git checkout -- apps/web/tsconfig.tsbuildinfo"
+  ]
+}

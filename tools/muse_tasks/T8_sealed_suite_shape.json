@@ -1,0 +1,14 @@
+{
+  "id": "T8_sealed_suite_shape",
+  "planned_by": "muse-spark-1.3 (round-3 plan)",
+  "goal": "Enforce sealed held-out suite shape (3+, kinds)\nWHY: No-reward-hacking requires held-out >=3/task with compositional+negative coverage; critic stub returns a single kindless test and the model path trusts arbitrary JSON, so /v1/runs can be fed a non-compositional suite (roadmap D2-3 Critic sealed tests, Phase 4 holdout).\n\nSPEC: In services/api/evoforge/critic.py add ensure_sealed_suite(sealed)->(ok, normalized, findings): requires >=3 entries each {code: non-empty str containing 'def test_', kind in {compositional,negative,boundary}} with compositional, negative and boundary all present. call_critic applies it to both paths: no-key stub deterministically builds a 3-kind suite from goal_contract ONLY (never the diff); model path with non-compliant sealed_tests returns sealed_tests=[] (or normalized valid subset), review={result:INCONCLUSIVE, findings:[...note...]}, stub=False, execution_verified=False, HTTP 200 (never 500). Invariants: Phase A input stays goal_contract only (no diff/transcript/rationale passed in); function signature call_critic(goal_contract,diff,ci,dispatch) unchanged; no new endpoints; MODEL_API_KEY absent -> deterministic stub.\n\nACCEPTANCE (your own plan): Stub review (no key) returns >=3 sealed tests covering compositional+negative+boundary with review.result INCONCLUSIVE; Model JSON with <3 tests / missing kinds / code without def test_ -> INCONCLUSIVE with finding, sealed_tests empty or valid-subset only; Valid 3-kind model suite passes through unchanged (review result from model); Existing provider-accounting and T5 runner tests still pass\nOUT OF SCOPE: services/api/evoforge/postgres_kernel.py; services/api/evoforge/kernel_api.py (do not create); runner.py execution / gates.py verdicts; new API endpoints\nCritic constraint (consistent with existing test_invalid_phase_a_evidence_cannot_start_phase_b): a Phase A suite that fails the shape check must NOT start Phase B (exactly one provider call), and the review is INCONCLUSIVE with a finding. Keep sealed test dict keys (code, kind) as given for a valid suite.",
+  "edit": [
+    "services/api/evoforge/critic.py"
+  ],
+  "context": [
+    "services/api/tests/test_provider_accounting.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

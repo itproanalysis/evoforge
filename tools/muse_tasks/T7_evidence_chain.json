@@ -1,0 +1,15 @@
+{
+  "id": "T7_evidence_chain",
+  "planned_by": "muse-spark-1.3 (round-3 plan)",
+  "goal": "Server evidence chain with stage drilldown\nWHY: Judging Whether-it-works needs per-edge event_id drilldown without hiding missing evidence; current GET /v1/evidence/{id} is a flat dict so the Evidence Timeline can never resolve stages (roadmap D2-3 Evidence).\n\nSPEC: New services/api/evoforge/evidence.py: record(kind,payload)->event_id (ev_<12hex>, unique), link(evidence_id, stage, event_id) append-only, chain(evidence_id)->[{stage,event_id}] for stages ObjectiveVersion,Task,Candidate,Gate,Review,PR,Outcome (match apps/web EVIDENCE_STAGES). Wire into services/api/main.py: /v1/commands/generate links Task+Candidate+Gate; /v1/objectives links ObjectiveVersion; /v1/candidates/review links Review; /v1/runs links Candidate+Gate (+run base); /v1/pr/create links PR and preserves source_evidence_id link. GET /v1/evidence/{id} returns {id, chain, data:<existing payload>}; missing stages get event_id null (never fabricated); unknown id -> 404. Invariants: chain append-only; chain entries are ids only (no held-out code in chain); existing response fields unchanged.\nCritic constraint (existing tests read these): GET /v1/evidence/{id} must keep every existing payload field at the top level (e.g. diff, tests, gates, run, source_evidence_id, pr) and ADD \"chain\" and \"data\" alongside them. Chain order must equal apps/web EVIDENCE_STAGES.\n\nACCEPTANCE (your own plan): POST generate then GET evidence shows non-null Task/Candidate/Gate and null Review/PR/Outcome (증거 부족), not 404; POST /v1/runs then /v1/pr/create chain preserves source_evidence_id link and PR stage resolves; GET unknown evidence id -> 404; held-out secret marker never appears in chain or GET body repr; python -m pytest services/api -q passes\nOUT OF SCOPE: services/api/evoforge/postgres_kernel.py; services/api/evoforge/kernel_api.py (do not create); ledger math / gate verdict rules; web UI changes",
+  "edit": [
+    "services/api/evoforge/evidence.py",
+    "services/api/main.py"
+  ],
+  "context": [
+    "apps/web/app/evidence/page.tsx"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

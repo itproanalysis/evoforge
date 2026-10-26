@@ -1,0 +1,69 @@
+{
+  "rationale": "T5 runner + T6 reconcile closed execution and UNKNOWN handling (Critic-accepted). Judging gaps now: (a) Whether-it-works evidence drilldown — API returns flat blobs, web Evidence page always shows 증거 부족 (roadmap D2-3 Evidence); (b) No-reward-hacking held-out shape — critic stub returns 1 kindless test and model path trusts any JSON, violating ≥3/task compositional+negative (+boundary) sealed suite (roadmap D2-3/Phase 4); (c) Cost honesty — Mission Control shows Spent (est.) 추정치 instead of ledger spent/reserved/UNKNOWN (Phase 5 청구=원장=receipt, D4-5 ledger). Codex's postgres_kernel.py/kernel_api.py untouched.",
+  "tasks": [
+    {
+      "id": "T7_evidence_chain",
+      "title": "Server evidence chain with stage drilldown",
+      "why": "Judging Whether-it-works needs per-edge event_id drilldown without hiding missing evidence; current GET /v1/evidence/{id} is a flat dict so the Evidence Timeline can never resolve stages (roadmap D2-3 Evidence).",
+      "spec": "New services/api/evoforge/evidence.py: record(kind,payload)->event_id (ev_<12hex>, unique), link(evidence_id, stage, event_id) append-only, chain(evidence_id)->[{stage,event_id}] for stages ObjectiveVersion,Task,Candidate,Gate,Review,PR,Outcome (match apps/web EVIDENCE_STAGES). Wire into services/api/main.py: /v1/commands/generate links Task+Candidate+Gate; /v1/objectives links ObjectiveVersion; /v1/candidates/review links Review; /v1/runs links Candidate+Gate (+run base); /v1/pr/create links PR and preserves source_evidence_id link. GET /v1/evidence/{id} returns {id, chain, data:<existing payload>}; missing stages get event_id null (never fabricated); unknown id -> 404. Invariants: chain append-only; chain entries are ids only (no held-out code in chain); existing response fields unchanged.",
+      "edit": [
+        "services/api/evoforge/evidence.py",
+        "services/api/main.py"
+      ],
+      "acceptance": [
+        "POST generate then GET evidence shows non-null Task/Candidate/Gate and null Review/PR/Outcome (증거 부족), not 404",
+        "POST /v1/runs then /v1/pr/create chain preserves source_evidence_id link and PR stage resolves",
+        "GET unknown evidence id -> 404",
+        "held-out secret marker never appears in chain or GET body repr",
+        "python -m pytest services/api -q passes"
+      ],
+      "out_of_scope": [
+        "services/api/evoforge/postgres_kernel.py",
+        "services/api/evoforge/kernel_api.py (do not create)",
+        "ledger math / gate verdict rules",
+        "web UI changes"
+      ]
+    },
+    {
+      "id": "T7_sealed_suite_shape",
+      "title": "Enforce sealed held-out suite shape (3+, kinds)",
+      "why": "No-reward-hacking requires held-out >=3/task with compositional+negative coverage; critic stub returns a single kindless test and the model path trusts arbitrary JSON, so /v1/runs can be fed a non-compositional suite (roadmap D2-3 Critic sealed tests, Phase 4 holdout).",
+      "spec": "In services/api/evoforge/critic.py add ensure_sealed_suite(sealed)->(ok, normalized, findings): requires >=3 entries each {code: non-empty str containing 'def test_', kind in {compositional,negative,boundary}} with compositional, negative and boundary all present. call_critic applies it to both paths: no-key stub deterministically builds a 3-kind suite from goal_contract ONLY (never the diff); model path with non-compliant sealed_tests returns sealed_tests=[] (or normalized valid subset), review={result:INCONCLUSIVE, findings:[...note...]}, stub=False, execution_verified=False, HTTP 200 (never 500). Invariants: Phase A input stays goal_contract only (no diff/transcript/rationale passed in); function signature call_critic(goal_contract,diff,ci,dispatch) unchanged; no new endpoints; MODEL_API_KEY absent -> deterministic stub.",
+      "edit": [
+        "services/api/evoforge/critic.py"
+      ],
+      "acceptance": [
+        "Stub review (no key) returns >=3 sealed tests covering compositional+negative+boundary with review.result INCONCLUSIVE",
+        "Model JSON with <3 tests / missing kinds / code without def test_ -> INCONCLUSIVE with finding, sealed_tests empty or valid-subset only",
+        "Valid 3-kind model suite passes through unchanged (review result from model)",
+        "Existing provider-accounting and T5 runner tests still pass"
+      ],
+      "out_of_scope": [
+        "services/api/evoforge/postgres_kernel.py",
+        "services/api/evoforge/kernel_api.py (do not create)",
+        "runner.py execution / gates.py verdicts",
+        "new API endpoints"
+      ]
+    },
+    {
+      "id": "T7_ledger_honesty_web",
+      "title": "Mission Control ledger honesty (spent/reserved/UNKNOWN)",
+      "why": "Phase 5 demands 청구=원장=receipt and D4-5 cost ledger; Mission Control shows Spent (est.) 추정치 from a constant and hides UNKNOWN holds, misleading judges on Whether-it-works.",
+      "spec": "apps/web/lib/api.ts: add getLedger() GET /v1/ledger -> {project,spent_cents,reserved_cents,overruns,unknown_reservations}. apps/web/app/page.tsx: fetch ledger on mount and after Generate; display Spent=spent_cents, Reserved=reserved_cents, Unknown holds=len(unknown_reservations), Overruns=len(overruns); delete the '~¢ 추정치 / provider_billed 없음' estimate text; Generate 402 surfaces budget-exhausted message. Amounts are int cents only (no float). pnpm build passes.",
+      "edit": [
+        "apps/web/lib/api.ts",
+        "apps/web/app/page.tsx"
+      ],
+      "acceptance": [
+        "Against stubbed GET /v1/ledger the page renders ledger spent/reserved/unknown counts and no 추정치/estimate text",
+        "UNKNOWN>0 shows hold count; 402 on Generate shows budget-exhausted message",
+        "pnpm build (or next build) passes"
+      ],
+      "out_of_scope": [
+        "services/api/** (no API changes)",
+        "ledger reconcile math / postgres files",
+        "gate or PR flow changes"
+      ]
+    }
+  ]
+}

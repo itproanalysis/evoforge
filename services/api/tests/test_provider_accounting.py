@@ -17,7 +17,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import main  # noqa: E402
 from evoforge import broker_meta, commands, critic, ledger  # noqa: E402
 
-SEALED = [{"code": "def test_contract():\n    assert result == 3\n"}]
+# A valid sealed suite (T8, owner priority Muse Spark > Codex): >= 3 tests covering all three kinds.
+SEALED = [{"code": "def test_contract():\n    assert result == 3\n", "kind": "compositional"},
+          {"code": "def test_negative():\n    assert result != -3\n", "kind": "negative"},
+          {"code": "def test_boundary():\n    assert result >= 0\n", "kind": "boundary"}]
 SPEC = {"sealed_tests": SEALED}
 REVIEW = {"review": {"result": "PASS", "findings": []}}
 SECRET_MARKER = "must-never-leave-provider-error-body"
