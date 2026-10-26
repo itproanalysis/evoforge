@@ -101,4 +101,7 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   파일: `evoforge/postgres_receipts.py`, `postgres_kernel.py`, `services/api/migrations/`,
   `services/api/requirements.txt`, Codex 소유 `test_postgres_kernel.py`·`test_receipt_contract.py`, 관련 문서·CI 검증 연결.
   T8 수용을 위해 Codex 소유 `test_provider_accounting.py`의 양성 suite fixture를 3종 계약에 맞추되 비용·실패 검증은 유지한다.
+  내부 영수증 수신·조회·저장 금액 정산을 위해 Codex 소유 `kernel_api.py`·`test_kernel_api.py`도 지원 범위에 포함한다.
   상위 우선권 브랜치가 먼저 main에 반영된 뒤 동기화·통합한다. 상위 클레임과 겹치면 해당 파일 편집을 중단한다.
+  T8 양성 provider fixture 지원 커밋: `92cc047` (`codex/receipt-support`), 기존 비용·실패 검증 유지.
+  round3의 봉인 suite 강화와 함께 채택할 수 있다. 영수증 기능은 별도 검증 진행 중이다.
