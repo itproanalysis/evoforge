@@ -14,14 +14,26 @@ import uuid
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "docs", "evoforge-v4.2", "reference_impl"))
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field, StrictInt, model_validator
 
-from evoforge import ledger
+from evoforge import broker_meta, ledger
+from evoforge.patch import PatchError
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
 
 ledger.configure({"default": int(os.getenv("EVO_PROJECT_BUDGET_CENTS", "50000"))})
 
 app = FastAPI(title="EvoForge API", version="0.2.0-hackathon")
+# Web (Mission Control) is a separate origin locally and on Cloud Run; no cookies, so no credentials.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.getenv(
+        "EVO_WEB_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if o.strip()],
+    allow_origin_regex=os.getenv(
+        "EVO_WEB_ORIGIN_REGEX", r"https://evoforge-web-[a-z0-9-]+\.(a\.run\.app|[a-z0-9-]+\.run\.app)"),
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
+)
 _evidence: dict[str, dict] = {}  # in-memory evidence store
 COST_CENTS = 120  # conservative per-model-call estimate (int cents)
 
@@ -50,20 +62,25 @@ class EvaluateRequest(BaseModel):
     diff: str
     tests: list[dict] = []
     heldout_kinds: list[str] = []
-    vis_pass: int = 0
-    vis_n: int = 1
-    held_pass: int = 0
-    held_n: int = 1
+    vis_pass: StrictInt = Field(0, ge=0)
+    vis_n: StrictInt = Field(0, ge=0)  # 0 runs = no execution evidence, never coerced to 1
+    held_pass: StrictInt = Field(0, ge=0)
+    held_n: StrictInt = Field(0, ge=0)
+
+    @model_validator(mode="after")
+    def _pass_within_runs(self):
+        if self.vis_pass > self.vis_n or self.held_pass > self.held_n:
+            raise ValueError("pass count exceeds run count")
+        return self
 
 
 class PRRequest(BaseModel):
-    diff: str
+    """Only a server-stored gate evaluation can back a PR; client diff/gates are ignored."""
+    evidence_id: str
     title: str
     body: str = ""
     branch: str = ""
     base: str = "main"
-    gates: list[dict] = []
-    wvi_link: str = ""
 
 
 class SandboxRequest(BaseModel):
@@ -82,6 +99,21 @@ def _reserve_or_402(project: str = "default") -> str:
         return ledger.reserve(COST_CENTS, project)
     except Exception:
         raise HTTPException(402, "budget exhausted (reserve_cost refused)")
+
+
+def _call_provider(rsv: str, fn, *args):
+    """Refund only when the provider certainly did not accept; otherwise hold for reconciliation."""
+    try:
+        out = fn(*args)
+    except broker_meta.ProviderNotAccepted as e:
+        ledger.refund(rsv)
+        raise HTTPException(502, f"provider not accepted ({e}); reservation {rsv} refunded")
+    except Exception as e:
+        ledger.mark_unknown(rsv, f"{type(e).__name__}: {e}")
+        raise HTTPException(502, f"provider outcome unknown ({type(e).__name__}); "
+                                 f"reservation {rsv} held for reconciliation")
+    ledger.settle(rsv, COST_CENTS)  # the call happened, whatever the gates say next
+    return out
 
 
 def _store_evidence(payload: dict) -> str:
@@ -111,12 +143,10 @@ def generate(req: GenerateRequest):
     if cmd.get("served"):
         return cmd["served"]
     rsv = _reserve_or_402()
-    from evoforge.broker_meta import call_builder
     from evoforge.gates import evaluate_integrity
 
-    candidate = call_builder(req.goal, req.repo_sha)
-    verdicts = evaluate_integrity(candidate["diff"], candidate["tests"])
-    ledger.settle(rsv, COST_CENTS)
+    candidate = _call_provider(rsv, broker_meta.call_builder, req.goal, req.repo_sha)
+    verdicts = evaluate_integrity(candidate.get("diff", ""), candidate.get("tests", []))
     eid = _store_evidence({"command_id": cmd["command_id"], "candidate": candidate,
                            "gates": [v.__dict__ for v in verdicts]})
     body = {"command_id": cmd["command_id"], "candidate": candidate,
@@ -140,9 +170,7 @@ def objectives(req: ObjectiveRequest):
 @app.post("/v1/candidates/review")
 def review(req: ReviewRequest):
     rsv = _reserve_or_402()
-    from evoforge.broker_meta import call_critic
-    out = call_critic(req.goal_contract, req.diff)
-    ledger.settle(rsv, COST_CENTS)
+    out = _call_provider(rsv, broker_meta.call_critic, req.goal_contract, req.diff)
     eid = _store_evidence({"review": out})
     return {**out, "evidence_id": eid}
 
@@ -152,22 +180,36 @@ def gates_evaluate(req: EvaluateRequest):
     from evoforge.gates import evaluate_full
     verdicts = evaluate_full(req.diff, req.tests, req.heldout_kinds,
                              req.vis_pass, req.vis_n, req.held_pass, req.held_n)
-    eid = _store_evidence({"gates": [v.__dict__ for v in verdicts]})
-    return {"gates": [v.__dict__ for v in verdicts], "evidence_id": eid}
+    gates = [v.__dict__ for v in verdicts]
+    eid = _store_evidence({"diff": req.diff, "tests": req.tests, "gates": gates})
+    return {"gates": gates, "evidence_id": eid}
 
 
 @app.post("/v1/pr/create")
 def pr_create(req: PRRequest):
-    from evoforge.github import create_pr
-    body = (req.body + "\n\nGates: "
-            + "; ".join(f"{g.get('gate')}={g.get('result')}" for g in req.gates)
-            + (f"\nWVI: {req.wvi_link}" if req.wvi_link else ""))
+    from evoforge import github
+
+    src = _evidence.get(req.evidence_id)
+    if src is None:
+        raise HTTPException(404, "unknown evidence id")
+    gates = src.get("gates")
+    if not isinstance(src.get("diff"), str) or not gates:
+        raise HTTPException(409, f"evidence {req.evidence_id} is not a gate evaluation")
+    blocked = [f"{g['gate']}={g['result']}" for g in gates if g.get("result") != "PASS"]
+    if blocked:
+        raise HTTPException(409, f"PR blocked by gates: {', '.join(blocked)}")
+    body = "\n".join([req.body, "", *(f"{g['gate']}={g['result']} ({g.get('reason', '')})" for g in gates),
+                      f"Evidence: {req.evidence_id}"])
     try:
-        pr = create_pr(req.diff, req.title, body, req.branch or f"evoforge/{uuid.uuid4().hex[:8]}", req.base)
+        pr = github.create_pr(src["diff"], req.title, body,
+                              req.branch or f"evoforge/{uuid.uuid4().hex[:8]}", req.base)
+    except PatchError as e:
+        raise HTTPException(409, str(e))
     except RuntimeError as e:
         raise HTTPException(400, str(e))
-    eid = _store_evidence({"pr": pr.get("html_url"), "title": req.title})
-    return {"pr": pr, "evidence_id": eid}
+    eid = _store_evidence({"pr": pr.get("html_url"), "title": req.title,
+                           "source_evidence_id": req.evidence_id})
+    return {"pr": pr, "evidence_id": eid, "source_evidence_id": req.evidence_id}
 
 
 @app.post("/v1/eval/sandbox")

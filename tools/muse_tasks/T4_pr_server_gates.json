@@ -1,0 +1,13 @@
+{
+  "id": "T4_pr_server_gates",
+  "goal": "A PR may only be opened for a candidate whose gates the SERVER evaluated and stored as all PASS (README: verified PR; D-006).\n1. services/api/main.py /v1/gates/evaluate must store the evaluated diff and tests together with the gates in its evidence\n   record (keys \"diff\", \"tests\", \"gates\"); response unchanged (\"gates\", \"evidence_id\").\n2. POST /v1/pr/create request becomes {evidence_id: str, title: str, body: str = \"\", branch: str = \"\", base: str = \"main\"}.\n   Any client-supplied \"diff\" or \"gates\" fields are ignored (never trusted).\n   - unknown evidence_id -> 404\n   - evidence record without both \"diff\" and \"gates\" (e.g. an objective record) -> 409\n   - any stored gate whose result != \"PASS\" -> 409, detail names the failing gate(s)\n   - otherwise call create_pr resolved from module evoforge.github AT CALL TIME with the STORED diff; the PR body is the client\n     body + one line per stored gate \"<GATE>=<RESULT> (<reason>)\" + a line \"Evidence: <evidence_id>\".\n   - RuntimeError from create_pr -> 400 (as today); evoforge.patch.PatchError -> 409.\n   - response: {\"pr\": <create_pr result>, \"evidence_id\": <new evidence id>, \"source_evidence_id\": <evidence_id>}; the new\n     evidence record stores \"source_evidence_id\" and the PR html_url.\nNothing else changes.",
+  "edit": [
+    "services/api/main.py"
+  ],
+  "context": [
+    "services/api/evoforge/gates.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

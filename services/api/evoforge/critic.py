@@ -16,6 +16,14 @@ CRITIC_SYSTEM = (
 )
 
 
+def _json(resp) -> dict:
+    try:
+        out = json.loads(resp.choices[0].message.content or "{}")
+    except (json.JSONDecodeError, TypeError):
+        return {}
+    return out if isinstance(out, dict) else {}
+
+
 def call_critic(goal_contract: str, diff: str = "", ci: str = "") -> dict:
     """Phase A input = goal_contract only; Phase B adds diff+ci. Stub without key."""
     if not os.getenv("MODEL_API_KEY"):
@@ -27,22 +35,28 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "") -> dict:
         return {"sealed_tests": sealed, "review": review, "stub": True,
                 "model": os.getenv("MODEL_CRITIC", "muse-spark-1.3")}
     from openai import OpenAI
-    client = OpenAI(base_url=os.getenv("MODEL_API_BASE", "https://api.meta.ai/v1"),
-                    api_key=os.environ["MODEL_API_KEY"])
+
+    from evoforge.broker_meta import provider_errors
+
     model = os.getenv("MODEL_CRITIC", "muse-spark-1.3")
     # Phase A then B as separate calls so builder context cannot leak in
-    a = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "system", "content": CRITIC_SYSTEM},
-                  {"role": "user", "content": f"SPEC (Phase A, no diff shown):\n{goal_contract}"}],
-        response_format={"type": "json_object"}, max_tokens=1500)
-    sealed = json.loads(a.choices[0].message.content or "{}").get("sealed_tests", [])
-    b = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "system", "content": CRITIC_SYSTEM},
-                  {"role": "user", "content": f"SPEC:\n{goal_contract}\nDIFF:\n{diff}\nCI:\n{ci}\nSEALED:\n{json.dumps(sealed)}"}],
-        response_format={"type": "json_object"}, max_tokens=1500)
-    data = json.loads(b.choices[0].message.content or "{}")
+    with provider_errors():
+        client = OpenAI(base_url=os.getenv("MODEL_API_BASE", "https://api.meta.ai/v1"),
+                        api_key=os.environ["MODEL_API_KEY"])
+        a = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": CRITIC_SYSTEM},
+                      {"role": "user", "content": f"SPEC (Phase A, no diff shown):\n{goal_contract}"}],
+            response_format={"type": "json_object"}, max_tokens=1500)
+        sealed = _json(a).get("sealed_tests", [])
+        b = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "system", "content": CRITIC_SYSTEM},
+                      {"role": "user", "content": f"SPEC:\n{goal_contract}\nDIFF:\n{diff}\nCI:\n{ci}\nSEALED:\n{json.dumps(sealed)}"}],
+            response_format={"type": "json_object"}, max_tokens=1500)
+    data = _json(b)
+    if not isinstance(data.get("review"), dict):  # billed but unusable: never a silent PASS
+        data["review"] = {"result": "INCONCLUSIVE", "findings": [{"note": "unparseable critic output", "evidence": "none"}]}
     data.setdefault("sealed_tests", sealed)
     data["stub"] = False
     data["model"] = model

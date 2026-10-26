@@ -1,0 +1,13 @@
+{
+  "id": "T3_patch_apply",
+  "goal": "Opening a PR must apply the unified diff to the base files instead of overwriting files with only '+' lines.\n1. New module services/api/evoforge/patch.py (stdlib only):\n   - class PatchError(ValueError)\n   - paths_in_diff(diff: str) -> list[str]: target paths in order. Accept headers '--- a/<p>' / '+++ b/<p>' and also bare\n     '--- <p>' / '+++ <p>' (strip a trailing tab+timestamp); '/dev/null' means add (old side) or delete (new side); for deletes\n     report the old path.\n   - apply_unified_diff(files: dict[str, str | None], diff: str) -> dict[str, str | None]: `files` maps each path from\n     paths_in_diff to its current text (None = absent). Returns the new text for every touched path (None = deleted).\n     Support multiple files, multiple hunks per file, '@@ -a,b +c,d @@' with omitted counts (=1), context/'-'/'+' lines,\n     '\\ No newline at end of file', and completely empty diff lines meaning an empty context line. Hunk context and removed\n     lines must match exactly at the stated position (you may search for a unique exact match if offsets drift); otherwise\n     PatchError. Adding a file that exists, or modifying/deleting a file that is absent -> PatchError. A diff with no file\n     headers -> PatchError. Preserve the original text exactly outside hunks, including whether it ends with a newline.\n2. services/api/evoforge/github.py create_pr(diff, title, body, branch, base=\"main\", client=None):\n   - client: optional httpx.Client to use (tests pass one with httpx.MockTransport); when None create one as today and close it.\n   - Compute paths with patch.paths_in_diff BEFORE any write; fetch each path's content at `base` via GET\n     /repos/{repo}/contents/{path} with params ref=base (200 -> base64 'content' and 'sha'; 404 -> None); apply_unified_diff;\n     only then create the branch and PUT each changed file (base64 content, message, branch, and the base blob 'sha' for\n     updates) or DELETE removed files (DELETE /repos/{repo}/contents/{path} with JSON message, sha, branch). Then open the PR.\n   - PatchError propagates unchanged and no write request (POST/PUT/DELETE) is sent when the patch does not apply.\n     Other failures stay RuntimeError.\n3. services/api/main.py /v1/pr/create: evoforge.patch.PatchError -> HTTP 409 with the error text.",
+  "edit": [
+    "services/api/evoforge/patch.py",
+    "services/api/evoforge/github.py",
+    "services/api/main.py"
+  ],
+  "context": [],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

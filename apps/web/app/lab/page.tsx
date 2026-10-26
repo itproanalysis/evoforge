@@ -3,8 +3,19 @@ import { useEffect, useState } from "react";
 import {
   type GateVerdict,
   postCreatePR,
+  postEvaluate,
   postReview,
 } from "../../lib/api";
+
+const field: React.CSSProperties = {
+  marginLeft: 6,
+  padding: 4,
+  borderRadius: 6,
+  border: "1px solid #33405c",
+  background: "#0b0e14",
+  color: "#e8edf5",
+  width: 64,
+};
 
 const card: React.CSSProperties = {
   background: "#141b2d",
@@ -22,8 +33,11 @@ export default function Lab() {
   const [review, setReview] = useState("");
   const [sealed, setSealed] = useState<string[]>([]);
   const [pr, setPr] = useState("");
-  const [busy, setBusy] = useState<"review" | "pr" | null>(null);
+  const [busy, setBusy] = useState<"review" | "eval" | "pr" | null>(null);
   const [err, setErr] = useState("");
+  const [heldoutKinds, setHeldoutKinds] = useState("compositional, negative, boundary");
+  const [counts, setCounts] = useState({ vis_pass: 0, vis_n: 0, held_pass: 0, held_n: 0 });
+  const [evalId, setEvalId] = useState("");
 
   useEffect(() => {
     try {
@@ -44,6 +58,25 @@ export default function Lab() {
   const inconclusive = gates.some((g) => g.result === "INCONCLUSIVE");
   const failed = gates.some((g) => g.result === "FAIL");
   const mergeBlocked = inconclusive || failed;
+  const prReady = evalId !== "" && gates.length > 0 && !mergeBlocked;
+
+  const doEvaluate = async () => {
+    setBusy("eval");
+    setErr("");
+    try {
+      const out = await postEvaluate(diff, tests, {
+        heldout_kinds: heldoutKinds.split(",").map((s) => s.trim()).filter(Boolean),
+        ...counts,
+      });
+      setGates(out.gates);
+      setEvalId(out.evidence_id);
+    } catch (e) {
+      setEvalId("");
+      setErr(`evaluate API: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const doReview = async () => {
     setBusy("review");
@@ -73,9 +106,8 @@ export default function Lab() {
     setErr("");
     try {
       const out = await postCreatePR(
-        diff,
+        evalId,
         `EvoForge: ${goal.slice(0, 60) || "candidate"}`,
-        gates,
         `goal=${goal}`,
       );
       setPr(out.pr?.html_url ?? JSON.stringify(out));
@@ -128,6 +160,52 @@ export default function Lab() {
       </section>
 
       <section style={card}>
+        <h3 style={{ marginTop: 0 }}>Gate evaluation (POST /v1/gates/evaluate)</h3>
+        <p style={{ color: "#8b96ad", fontSize: 12 }}>
+          실행 통계는 Runner 결과를 입력합니다. 0건 실행은 증거 부족(INCONCLUSIVE)이며 PR이 차단됩니다.
+        </p>
+        <label style={{ fontSize: 12, color: "#8b96ad" }}>
+          held-out kinds
+          <input
+            value={heldoutKinds}
+            onChange={(e) => setHeldoutKinds(e.target.value)}
+            style={{ ...field, width: 280 }}
+          />
+        </label>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
+          {(["vis_pass", "vis_n", "held_pass", "held_n"] as const).map((k) => (
+            <label key={k} style={{ fontSize: 12, color: "#8b96ad" }}>
+              {k}
+              <input
+                type="number"
+                min={0}
+                value={counts[k]}
+                onChange={(e) => setCounts({ ...counts, [k]: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
+                style={field}
+              />
+            </label>
+          ))}
+        </div>
+        <button
+          onClick={doEvaluate}
+          disabled={busy !== null || !diff}
+          style={{ marginTop: 10, padding: "8px 16px", borderRadius: 6, background: "#0891b2", color: "#fff", border: 0, cursor: "pointer" }}
+        >
+          {busy === "eval" ? "Evaluating…" : "Evaluate gates"}
+        </button>
+        {evalId ? (
+          <ul style={{ fontSize: 13 }}>
+            {gates.map((g) => (
+              <li key={g.gate}>
+                <code>{g.gate}</code>={g.result} <span style={{ color: "#8b96ad" }}>{g.reason}</span>
+              </li>
+            ))}
+            <li style={{ color: "#8b96ad" }}>evidence: <code>{evalId}</code></li>
+          </ul>
+        ) : null}
+      </section>
+
+      <section style={card}>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <button
             onClick={doReview}
@@ -138,8 +216,9 @@ export default function Lab() {
           </button>
           <button
             onClick={doPR}
-            disabled={busy !== null}
-            style={{ padding: "8px 16px", borderRadius: 6, background: "#7c3aed", color: "#fff", border: 0, cursor: "pointer" }}
+            disabled={busy !== null || !prReady}
+            title={prReady ? "서버 평가 전부 PASS" : "서버 게이트 평가가 전부 PASS여야 PR 생성 가능"}
+            style={{ padding: "8px 16px", borderRadius: 6, background: prReady ? "#7c3aed" : "#3a4358", color: "#fff", border: 0, cursor: prReady ? "pointer" : "not-allowed" }}
           >
             {busy === "pr" ? "Creating…" : "Create PR (POST /v1/pr/create)"}
           </button>

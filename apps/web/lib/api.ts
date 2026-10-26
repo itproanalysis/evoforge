@@ -36,7 +36,21 @@ export interface ReviewResponse {
 export interface PRResponse {
   pr?: { html_url?: string; number?: number };
   evidence_id?: string;
+  source_evidence_id?: string;
   raw?: unknown;
+}
+
+export interface EvaluateResponse {
+  gates: GateVerdict[];
+  evidence_id: string;
+}
+
+export interface RunStats {
+  heldout_kinds: string[];
+  vis_pass: number;
+  vis_n: number;
+  held_pass: number;
+  held_n: number;
 }
 
 export interface EvidenceLink {
@@ -76,16 +90,18 @@ export function postReview(goal_contract: string, diff: string, ci = "") {
   });
 }
 
-export function postCreatePR(
-  diff: string,
-  title: string,
-  gates: GateVerdict[],
-  body = "",
-  base = "main",
-) {
+export function postEvaluate(diff: string, tests: string[], stats: RunStats) {
+  return req<EvaluateResponse>("/v1/gates/evaluate", {
+    method: "POST",
+    body: JSON.stringify({ diff, tests: tests.map((code) => ({ code })), ...stats }),
+  });
+}
+
+// The server opens a PR only from its own stored, all-PASS gate evaluation.
+export function postCreatePR(evidence_id: string, title: string, body = "", base = "main") {
   return req<PRResponse>("/v1/pr/create", {
     method: "POST",
-    body: JSON.stringify({ diff, title, gates, body, base }),
+    body: JSON.stringify({ evidence_id, title, body, base }),
   });
 }
 

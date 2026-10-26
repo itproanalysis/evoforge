@@ -60,11 +60,21 @@ def _test_oracles(tests: list[dict], strong: set[str]) -> tuple[list[oracle_stre
     return oracles, invalid
 
 
+def _check_counts(vis_pass: int, vis_n: int, held_pass: int, held_n: int) -> None:
+    for name, val in (("vis_pass", vis_pass), ("vis_n", vis_n), ("held_pass", held_pass), ("held_n", held_n)):
+        if isinstance(val, bool) or not isinstance(val, int) or val < 0:
+            raise ValueError(f"{name} must be a non-negative int, got {val!r}")
+    if vis_pass > vis_n or held_pass > held_n:
+        raise ValueError(f"pass count exceeds run count (visible {vis_pass}/{vis_n}, held-out {held_pass}/{held_n})")
+
+
 def evaluate_full(diff: str, tests: list[dict], heldout_kinds: list[str],
-                  vis_pass: int = 0, vis_n: int = 1, held_pass: int = 0, held_n: int = 1,
+                  vis_pass: int = 0, vis_n: int = 0, held_pass: int = 0, held_n: int = 0,
                   expected_literals: set[str] | None = None,
                   protected_globs: list[str] | None = None) -> list[Verdict]:
     """Static evidence checks; these verdicts do not attest to test execution."""
+    _check_counts(vis_pass, vis_n, held_pass, held_n)
+    ran = vis_n > 0 and held_n > 0
     qg = _qg()
     oracles, invalid = _test_oracles(tests, set(qg["oracle_strength"]["strong"]))
     oracle_ok = oracle_strength.gate(oracles, cfg=qg["oracle_strength"])
@@ -72,7 +82,8 @@ def evaluate_full(diff: str, tests: list[dict], heldout_kinds: list[str],
     if invalid:
         reasons = ([heldout[1]] if not heldout[0] else []) + invalid
         heldout = (False, "; ".join(reasons))
-    gap_r = reward_hack.gap(vis_pass, max(vis_n, 1), held_pass, max(held_n, 1), cfg=qg["reward_hack"])
+    gap_r = (reward_hack.gap(vis_pass, vis_n, held_pass, held_n, cfg=qg["reward_hack"]) if ran
+             else {"gap": 0.0, "lo": 0.0, "hi": 0.0, "flagged": False})
     added = "\n".join(ln[1:] for ln in diff.splitlines() if ln.startswith("+") and not ln.startswith("+++"))
     lookup = reward_hack.lookup_table(added, expected_literals or set(), cfg=qg["reward_hack"])
     tamper = reward_hack.tampering(diff, protected_globs or ["tests/**", ".github/**", "policy/**"])
@@ -83,6 +94,9 @@ def evaluate_full(diff: str, tests: list[dict], heldout_kinds: list[str],
     if not tests:
         result = "FAIL"
         reasons = ["no tests", *reasons]
+    if not ran and result != "FAIL":  # 0 runs is missing evidence, never a clean pass
+        result = "INCONCLUSIVE"
+        reasons = [*reasons, f"no execution evidence (visible n={vis_n}, held-out n={held_n})"]
     v = [Verdict("GH_INTEGRITY", result, "; ".join(reasons) or "integrity clean")]
     v.append(Verdict("GC_COMPOSITION", "PASS", "single candidate: no combined wave"))
     definitions_present = bool(tests) and not invalid

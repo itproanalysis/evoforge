@@ -12,6 +12,9 @@ QG_PATH = os.path.normpath(os.path.join(
     "contracts", "quality_gates.json"))
 
 
+OPEN = {"RESERVED", "UNKNOWN"}  # UNKNOWN settles/refunds only via receipt reconciliation
+
+
 class Overdraft(Exception):
     pass
 
@@ -21,8 +24,9 @@ class Reservation:
     id: str
     project: str
     cost_cents: int
-    state: str  # RESERVED | SETTLED | REFUNDED
+    state: str  # RESERVED | UNKNOWN | SETTLED | REFUNDED
     ts: float
+    reason: str = ""
 
 
 _budgets: dict[str, int] = {}      # project -> total budget cents
@@ -79,7 +83,7 @@ def settle(reservation_id: str, actual_cents: int) -> dict:
     r = _reservations.get(reservation_id)
     if r is None:
         raise KeyError(f"unknown reservation {reservation_id}")
-    if r.state != "RESERVED":
+    if r.state not in OPEN:
         raise ValueError(f"reservation {reservation_id} already {r.state}")
     _reserved[r.project] = _reserved.get(r.project, 0) - r.cost_cents
     _spent[r.project] = _spent.get(r.project, 0) + actual_cents
@@ -99,11 +103,23 @@ def refund(reservation_id: str) -> dict:
     r = _reservations.get(reservation_id)
     if r is None:
         raise KeyError(reservation_id)
-    if r.state != "RESERVED":
+    if r.state not in OPEN:
         raise ValueError(f"already {r.state}")
     _reserved[r.project] -= r.cost_cents
     r.state = "REFUNDED"
     return {"reservation_id": reservation_id, "refunded": r.cost_cents}
+
+
+def mark_unknown(reservation_id: str, reason: str) -> dict:
+    """Provider outcome unknown: cents stay reserved until a receipt settles or refunds it."""
+    r = _reservations.get(reservation_id)
+    if r is None:
+        raise KeyError(reservation_id)
+    if r.state != "RESERVED":
+        raise ValueError(f"reservation {reservation_id} already {r.state}")
+    r.state = "UNKNOWN"
+    r.reason = reason
+    return {"reservation_id": reservation_id, "state": r.state, "reserved": r.cost_cents, "reason": reason}
 
 
 def _mark_overrun(project: str, reason: str) -> None:
@@ -118,7 +134,9 @@ def overruns() -> list[dict]:
 def snapshot(project: str = "default") -> dict:
     return {"project": project, "spent_cents": _spent.get(project, 0),
             "reserved_cents": _reserved.get(project, 0),
-            "overruns": [o for o in _overruns if o["project"] == project]}
+            "overruns": [o for o in _overruns if o["project"] == project],
+            "unknown_reservations": [r.id for r in _reservations.values()
+                                     if r.project == project and r.state == "UNKNOWN"]}
 
 
 def reset() -> None:  # tests only

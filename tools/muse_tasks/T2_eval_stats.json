@@ -1,0 +1,15 @@
+{
+  "id": "T2_eval_stats",
+  "goal": "Execution statistics in POST /v1/gates/evaluate must be validated at the request boundary (CR-62, D-054).\n1. services/api/main.py EvaluateRequest: vis_pass, vis_n, held_pass, held_n are integers >= 0 with vis_pass <= vis_n and\n   held_pass <= held_n. Violations -> HTTP 422 (pydantic Field(ge=0) plus a model_validator). Defaults become 0 (no runs).\n   Booleans, floats and numeric strings must be rejected (use StrictInt).\n2. services/api/evoforge/gates.py evaluate_full: default vis_*/held_* to 0. Never coerce 0 runs into 1 run (remove max(n,1)).\n   If vis_n == 0 or held_n == 0 there is no execution evidence: GH_INTEGRITY must not be PASS. If the reward-hack detectors flag\n   the diff it is FAIL as today; otherwise it is INCONCLUSIVE with a reason containing \"no execution evidence\".\n   Only call reward_hack.gap when both n > 0. Keep every other decision identical (existing tests must still pass).\n3. Malformed counts passed directly to evaluate_full (negative, pass > n) raise ValueError.",
+  "edit": [
+    "services/api/main.py",
+    "services/api/evoforge/gates.py"
+  ],
+  "context": [
+    "docs/evoforge-v4.2/reference_impl/reward_hack.py",
+    "services/api/tests/test_integrity_contract.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

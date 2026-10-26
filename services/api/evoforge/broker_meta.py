@@ -6,6 +6,29 @@ OpenAI-compatible surface; no LiteLLM gateway (D-017).
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
+
+
+class ProviderNotAccepted(Exception):
+    """The provider certainly did not accept (or bill) the request -> refund."""
+
+
+class ProviderOutcomeUnknown(Exception):
+    """The request may have been accepted -> keep the reservation for reconciliation."""
+
+
+@contextmanager
+def provider_errors():
+    """Map official SDK errors onto the two reservation outcomes (p.09 call path)."""
+    import openai
+
+    try:
+        yield
+    except (openai.AuthenticationError, openai.PermissionDeniedError, openai.BadRequestError,
+            openai.NotFoundError, openai.UnprocessableEntityError, openai.RateLimitError) as e:
+        raise ProviderNotAccepted(f"{type(e).__name__}: {e}") from e
+    except openai.APIError as e:  # timeout, connection drop, 5xx, other status
+        raise ProviderOutcomeUnknown(f"{type(e).__name__}: {e}") from e
 
 
 def _client():
@@ -48,22 +71,24 @@ def call_builder(goal: str, repo_sha: str) -> dict:
             "rationale": "stub (no MODEL_API_KEY)",
             "stub": True,
         }
-    client = _client()
     model = os.getenv("MODEL_BUILDER", "muse-spark-1.3")
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": BUILDER_SYSTEM},
-            {"role": "user", "content": f"Goal: {goal}\nBase SHA: {repo_sha}"},
-        ],
-        response_format={"type": "json_object"},
-        max_tokens=2000,
-    )
+    with provider_errors():
+        resp = _client().chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": BUILDER_SYSTEM},
+                {"role": "user", "content": f"Goal: {goal}\nBase SHA: {repo_sha}"},
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=2000,
+        )
     import json
 
     try:
         data = json.loads(resp.choices[0].message.content or "{}")
     except Exception:
+        data = None
+    if not isinstance(data, dict):  # billed but unusable: empty candidate, gates will block
         data = {"diff": "", "tests": [], "rationale": "unparseable model output"}
     data["stub"] = False
     data["model"] = model

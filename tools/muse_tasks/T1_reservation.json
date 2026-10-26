@@ -1,0 +1,17 @@
+{
+  "id": "T1_reservation",
+  "goal": "Provider-call failures must not leak or silently drop cost reservations (CR-37/38, p.09 call path).\n1. In services/api/evoforge/broker_meta.py define two exceptions:\n   - ProviderNotAccepted(Exception): the provider certainly did NOT accept/bill the request.\n   - ProviderOutcomeUnknown(Exception): the request may have been accepted (timeout, 5xx, connection dropped, unparseable reply).\n   call_builder must map openai SDK errors: openai.AuthenticationError, openai.PermissionDeniedError,\n   openai.BadRequestError, openai.NotFoundError, openai.UnprocessableEntityError, openai.RateLimitError -> ProviderNotAccepted;\n   openai.APITimeoutError, openai.APIConnectionError, openai.InternalServerError, any other openai.APIStatusError -> ProviderOutcomeUnknown.\n   Keep the no-key deterministic stub exactly as it is.\n2. services/api/evoforge/critic.py call_critic: same mapping (import the two exceptions from evoforge.broker_meta).\n3. services/api/evoforge/ledger.py: add mark_unknown(reservation_id, reason: str) -> dict. Only a RESERVED reservation may move\n   to state \"UNKNOWN\" (otherwise ValueError; unknown id KeyError); its cents STAY in reserved (not refunded, not spent) until\n   reconciled. snapshot(project) must additionally return \"unknown_reservations\": list of reservation ids in UNKNOWN state for\n   that project. Existing behaviour unchanged.\n4. services/api/main.py, endpoints /v1/commands/generate and /v1/candidates/review:\n   - Resolve call_builder / call_critic from the module evoforge.broker_meta AT CALL TIME (tests monkeypatch the module attribute).\n   - ProviderNotAccepted -> ledger.refund(rsv); respond HTTP 502 with detail containing \"not accepted\".\n   - Any other exception (ProviderOutcomeUnknown or unexpected) -> ledger.mark_unknown(rsv, reason); respond HTTP 502 with detail\n     containing \"outcome unknown\" and the reservation id. Never settle or refund in this branch.\n   - A failed generate must NOT be cached as served: a retry with the same idempotency_key calls the builder again.\n   - A gate-evaluation crash after a successful builder call still settles the reservation (the provider call happened).\nDo not change behaviour of the success path or of any other endpoint.",
+  "edit": [
+    "services/api/evoforge/broker_meta.py",
+    "services/api/evoforge/critic.py",
+    "services/api/evoforge/ledger.py",
+    "services/api/main.py"
+  ],
+  "context": [
+    "services/api/evoforge/commands.py",
+    "services/api/tests/test_api.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
