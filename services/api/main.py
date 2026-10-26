@@ -94,6 +94,12 @@ class ObjectiveRequest(BaseModel):
     risk: str = "LOW"
 
 
+class ReconcileRequest(BaseModel):
+    reservation_id: str
+    billed_cents: StrictInt | None = Field(default=None, ge=0)
+    request_id: str | None = None
+
+
 def _reserve_or_402(project: str = "default") -> str:
     try:
         return ledger.reserve(COST_CENTS, project)
@@ -244,3 +250,20 @@ def command_advance(command_id: str, to_state: str):
         return advance(command_id, to_state)
     except (KeyError, TransitionError) as e:
         raise HTTPException(400, str(e))
+
+
+@app.post("/v1/ledger/reconcile")
+def ledger_reconcile(req: ReconcileRequest):
+    try:
+        result = ledger.reconcile(req.reservation_id, req.billed_cents, req.request_id)
+    except KeyError as e:
+        raise HTTPException(404, str(e))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    eid = _store_evidence(result)
+    return {**result, "evidence_id": eid}
+
+
+@app.get("/v1/ledger")
+def ledger_snapshot():
+    return ledger.snapshot("default")

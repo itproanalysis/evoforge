@@ -110,6 +110,29 @@ def refund(reservation_id: str) -> dict:
     return {"reservation_id": reservation_id, "refunded": r.cost_cents}
 
 
+def reconcile(reservation_id: str, billed_cents: int | None, request_id: str | None = None) -> dict:
+    """Close an UNKNOWN reservation from a provider receipt.
+
+    billed_cents None means NOT billed -> release like refund.
+    Otherwise settle at billed_cents (requires non-empty request_id).
+    """
+    r = _reservations.get(reservation_id)
+    if r is None:
+        raise KeyError(f"unknown reservation {reservation_id}")
+    if r.state != "UNKNOWN":
+        raise ValueError(f"reservation {reservation_id} already {r.state}")
+    if billed_cents is None:
+        refund(reservation_id)
+    else:
+        if isinstance(billed_cents, bool) or not isinstance(billed_cents, int) or billed_cents < 0:
+            raise ValueError("billed_cents must be non-negative int")
+        if not isinstance(request_id, str) or request_id == "":
+            raise ValueError("request_id must be a non-empty str")
+        settle(reservation_id, billed_cents)  # same overrun marking as any settle
+    return {"reservation_id": reservation_id, "state": r.state,
+            "billed_cents": billed_cents, "request_id": request_id}
+
+
 def mark_unknown(reservation_id: str, reason: str) -> dict:
     """Provider outcome unknown: cents stay reserved until a receipt settles or refunds it."""
     r = _reservations.get(reservation_id)
