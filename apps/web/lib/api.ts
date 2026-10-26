@@ -25,7 +25,7 @@ export interface GenerateResponse {
 }
 
 export interface ReviewResponse {
-  sealed_tests?: Array<{ code: string } | string>;
+  sealed_tests?: Array<{ code?: string; kind?: string } | string>;
   review?: { result: string; findings?: unknown[] };
   stub?: boolean;
   model?: string;
@@ -97,7 +97,38 @@ export function postEvaluate(diff: string, tests: string[], stats: RunStats) {
   });
 }
 
-// The server opens a PR only from its own stored, all-PASS gate evaluation.
+export interface SealedTest {
+  code: string;
+  kind: string;
+}
+
+export interface SuiteResult {
+  pass: number;
+  n: number;
+  timed_out: boolean;
+  exit_code: number | null;
+}
+
+export interface RunResponse {
+  gates: GateVerdict[];
+  run: { base: string; visible: SuiteResult; heldout: SuiteResult; heldout_kinds: string[] };
+  evidence_id: string;
+}
+
+export function postRun(
+  source_repo: string,
+  base_sha: string,
+  diff: string,
+  tests: string[],
+  heldout_tests: SealedTest[],
+) {
+  return req<RunResponse>("/v1/runs", {
+    method: "POST",
+    body: JSON.stringify({ source_repo, base_sha, diff, tests: tests.map((code) => ({ code })), heldout_tests }),
+  });
+}
+
+// The server opens a PR only from its own stored, all-PASS evidence of a server run.
 export function postCreatePR(evidence_id: string, title: string, body = "", base = "main") {
   return req<PRResponse>("/v1/pr/create", {
     method: "POST",

@@ -66,7 +66,8 @@ def call_builder(goal: str, repo_sha: str) -> dict:
     if not os.getenv("MODEL_API_KEY"):
         # Deterministic stub so UI/evals work without billing; NEVER claim as model output.
         return {
-            "diff": f"--- a/goal.txt\n+++ b/goal.txt\n@@\n+goal: {goal}\n+base: {repo_sha}\n",
+            "diff": ("--- /dev/null\n+++ b/evoforge_goal.txt\n@@ -0,0 +1,2 @@\n"
+                     f"+goal: {' '.join(goal.split())}\n+base: {repo_sha}\n"),  # valid new-file diff
             "tests": [{"code": "assert True  # stub — replace with Muse Spark output"}],
             "rationale": "stub (no MODEL_API_KEY)",
             "stub": True,

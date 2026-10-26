@@ -40,7 +40,7 @@ def fake_runner(monkeypatch):
 
 def _evaluate(diff=DIFF, heldout_kinds=HELDOUT, **kw):
     RUN.clear()
-    RUN.update({"vis_pass": 9, "vis_n": 10, "held_pass": 9, "held_n": 10, **kw})
+    RUN.update({"vis_pass": 10, "vis_n": 10, "held_pass": 10, "held_n": 10, **kw})
     heldout = [{"kind": k, "code": "def test_h():\n    assert 1 == 1\n"} for k in heldout_kinds]
     r = c.post("/v1/runs", json={"source_repo": "C:/repos/proj", "base_sha": "b" * 40, "diff": diff,
                                  "tests": STRONG, "heldout_tests": heldout})

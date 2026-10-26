@@ -83,6 +83,15 @@ class PRRequest(BaseModel):
     base: str = "main"
 
 
+class RunRequest(BaseModel):
+    source_repo: str
+    base_sha: str
+    diff: str = ""
+    tests: list[dict] = []
+    heldout_tests: list[dict] = []
+    timeout_s: int = Field(120, ge=1, le=600)
+
+
 class SandboxRequest(BaseModel):
     source_repo: str
     base_sha: str
@@ -191,6 +200,30 @@ def gates_evaluate(req: EvaluateRequest):
     return {"gates": gates, "evidence_id": eid}
 
 
+@app.post("/v1/runs")
+def runs(req: RunRequest):
+    from evoforge import runner
+    from evoforge.gates import apply_run, evaluate_full
+    try:
+        run = runner.run_candidate(req.source_repo, req.base_sha, req.diff,
+                                   req.tests, req.heldout_tests,
+                                   timeout_s=req.timeout_s)
+    except runner.RunnerError as e:
+        raise HTTPException(400, str(e))
+    except PatchError as e:
+        raise HTTPException(409, str(e))
+    verdicts = evaluate_full(req.diff, req.tests,
+                             [k for k in run["heldout_kinds"] if k],
+                             run["visible"]["pass"], run["visible"]["n"],
+                             run["heldout"]["pass"], run["heldout"]["n"])
+    # GH_INTEGRITY judges gaming; whether the required tests pass is G2_REQUIRED's job.
+    gates = [v.__dict__ for v in apply_run(verdicts, run)]
+    eid = _store_evidence({"diff": req.diff, "tests": req.tests, "gates": gates,
+                           "run": run, "source_repo": req.source_repo,
+                           "base_sha": req.base_sha})
+    return {"gates": gates, "run": run, "evidence_id": eid}
+
+
 @app.post("/v1/pr/create")
 def pr_create(req: PRRequest):
     from evoforge import github
@@ -201,6 +234,10 @@ def pr_create(req: PRRequest):
     gates = src.get("gates")
     if not isinstance(src.get("diff"), str) or not gates:
         raise HTTPException(409, f"evidence {req.evidence_id} is not a gate evaluation")
+    if not isinstance(src.get("run"), dict):
+        raise HTTPException(409, f"evidence {req.evidence_id} has no server run; "
+                                 "PRs require a /v1/runs server execution "
+                                 "(client-reported counts cannot back a PR)")
     blocked = [f"{g['gate']}={g['result']}" for g in gates if g.get("result") != "PASS"]
     if blocked:
         raise HTTPException(409, f"PR blocked by gates: {', '.join(blocked)}")
@@ -220,7 +257,12 @@ def pr_create(req: PRRequest):
 
 @app.post("/v1/eval/sandbox")
 def eval_sandbox(req: SandboxRequest):
+    from evoforge import runner
     from evoforge.hygiene_api import run_sandbox
+    try:
+        runner.allowed_repo(req.source_repo)
+    except runner.RunnerError as e:
+        raise HTTPException(400, str(e))
     try:
         out = run_sandbox(req.source_repo, req.base_sha, req.future_shas)
     except Exception as e:

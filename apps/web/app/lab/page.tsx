@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import {
   type GateVerdict,
   postCreatePR,
-  postEvaluate,
+  postRun,
+  type SealedTest,
   postReview,
 } from "../../lib/api";
 
@@ -35,8 +36,10 @@ export default function Lab() {
   const [pr, setPr] = useState("");
   const [busy, setBusy] = useState<"review" | "eval" | "pr" | null>(null);
   const [err, setErr] = useState("");
-  const [heldoutKinds, setHeldoutKinds] = useState("compositional, negative, boundary");
-  const [counts, setCounts] = useState({ vis_pass: 0, vis_n: 0, held_pass: 0, held_n: 0 });
+  const [sealedTests, setSealedTests] = useState<SealedTest[]>([]);
+  const [repo, setRepo] = useState("");
+  const [baseSha, setBaseSha] = useState("HEAD");
+  const [runInfo, setRunInfo] = useState("");
   const [evalId, setEvalId] = useState("");
 
   useEffect(() => {
@@ -60,19 +63,21 @@ export default function Lab() {
   const mergeBlocked = inconclusive || failed;
   const prReady = evalId !== "" && gates.length > 0 && !mergeBlocked;
 
-  const doEvaluate = async () => {
+  // Held-out = the Critic's sealed tests; the server executes both suites (no client counts).
+  const doRun = async () => {
     setBusy("eval");
     setErr("");
     try {
-      const out = await postEvaluate(diff, tests, {
-        heldout_kinds: heldoutKinds.split(",").map((s) => s.trim()).filter(Boolean),
-        ...counts,
-      });
+      const out = await postRun(repo, baseSha, diff, tests, sealedTests);
       setGates(out.gates);
       setEvalId(out.evidence_id);
+      const v = out.run.visible;
+      const h = out.run.heldout;
+      setRunInfo(`visible ${v.pass}/${v.n}${v.timed_out ? " (timeout)" : ""} · held-out ${h.pass}/${h.n}${h.timed_out ? " (timeout)" : ""} · base ${out.run.base.slice(0, 12)}`);
     } catch (e) {
       setEvalId("");
-      setErr(`evaluate API: ${e instanceof Error ? e.message : String(e)}`);
+      setRunInfo("");
+      setErr(`run API: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setBusy(null);
     }
@@ -86,15 +91,16 @@ export default function Lab() {
       const result = out.review?.result ?? "INCONCLUSIVE";
       const n = out.review?.findings?.length ?? 0;
       setReview(`verdict=${result} findings=${n}${out.stub ? " (stub, no MODEL_API_KEY)" : ""}`);
-      setSealed(
-        (out.sealed_tests ?? []).map((t) =>
-          typeof t === "string" ? t : (t.code ?? JSON.stringify(t)),
-        ),
+      const st = (out.sealed_tests ?? []).map((t) =>
+        typeof t === "string" ? { code: t, kind: "" } : { code: t.code ?? "", kind: t.kind ?? "" },
       );
+      setSealedTests(st);
+      setSealed(st.map((t) => (t.kind ? `[${t.kind}] ${t.code}` : t.code)));
     } catch (e) {
-      // Backend may not implement review yet — keep sealed local tests visible.
-      setErr(`review API: ${e instanceof Error ? e.message : String(e)} (미구현이면 로컬 sealed tests 사용)`);
-      setSealed(tests);
+      // Builder tests must never stand in for the sealed held-out suite.
+      setErr(`review API: ${e instanceof Error ? e.message : String(e)}`);
+      setSealed([]);
+      setSealedTests([]);
       setReview("verdict=INCONCLUSIVE reason=review endpoint unavailable, human needed");
     } finally {
       setBusy(null);
@@ -160,39 +166,30 @@ export default function Lab() {
       </section>
 
       <section style={card}>
-        <h3 style={{ marginTop: 0 }}>Gate evaluation (POST /v1/gates/evaluate)</h3>
+        <h3 style={{ marginTop: 0 }}>Server run (POST /v1/runs)</h3>
         <p style={{ color: "#8b96ad", fontSize: 12 }}>
-          실행 통계는 Runner 결과를 입력합니다. 0건 실행은 증거 부족(INCONCLUSIVE)이며 PR이 차단됩니다.
+          위생 샌드박스에서 diff를 적용하고 후보 테스트(visible)와 Critic 봉인 테스트(held-out)를 서버가 실행합니다.
+          저장소는 서버의 EVO_REPO_ROOTS 안에 있어야 합니다. Review를 먼저 실행해 봉인 테스트를 받으세요.
         </p>
         <label style={{ fontSize: 12, color: "#8b96ad" }}>
-          held-out kinds
-          <input
-            value={heldoutKinds}
-            onChange={(e) => setHeldoutKinds(e.target.value)}
-            style={{ ...field, width: 280 }}
-          />
+          repo path
+          <input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="C:/repos/project" style={{ ...field, width: 280 }} />
         </label>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
-          {(["vis_pass", "vis_n", "held_pass", "held_n"] as const).map((k) => (
-            <label key={k} style={{ fontSize: 12, color: "#8b96ad" }}>
-              {k}
-              <input
-                type="number"
-                min={0}
-                value={counts[k]}
-                onChange={(e) => setCounts({ ...counts, [k]: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
-                style={field}
-              />
-            </label>
-          ))}
+        <label style={{ fontSize: 12, color: "#8b96ad", marginLeft: 12 }}>
+          base sha
+          <input value={baseSha} onChange={(e) => setBaseSha(e.target.value)} style={{ ...field, width: 140 }} />
+        </label>
+        <div>
+          <button
+            onClick={doRun}
+            disabled={busy !== null || !repo || sealedTests.length === 0}
+            title={sealedTests.length === 0 ? "Review로 봉인 테스트를 먼저 받으세요" : ""}
+            style={{ marginTop: 10, padding: "8px 16px", borderRadius: 6, background: "#0891b2", color: "#fff", border: 0, cursor: "pointer" }}
+          >
+            {busy === "eval" ? "Running…" : `Run on server (held-out ${sealedTests.length})`}
+          </button>
         </div>
-        <button
-          onClick={doEvaluate}
-          disabled={busy !== null || !diff}
-          style={{ marginTop: 10, padding: "8px 16px", borderRadius: 6, background: "#0891b2", color: "#fff", border: 0, cursor: "pointer" }}
-        >
-          {busy === "eval" ? "Evaluating…" : "Evaluate gates"}
-        </button>
+        {runInfo ? <p style={{ fontSize: 13 }}>{runInfo}</p> : null}
         {evalId ? (
           <ul style={{ fontSize: 13 }}>
             {gates.map((g) => (

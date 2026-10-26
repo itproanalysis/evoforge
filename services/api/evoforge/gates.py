@@ -60,6 +60,28 @@ def _test_oracles(tests: list[dict], strong: set[str]) -> tuple[list[oracle_stre
     return oracles, invalid
 
 
+def apply_run(verdicts: list[Verdict], run: dict) -> list[Verdict]:
+    """G2_REQUIRED = the full required suite actually executed and passed (p.36).
+
+    Only a server run can turn "definitions present" into PASS; any failure, skip,
+    timeout or empty suite is FAIL. Static FAILs (invalid test definitions) stay FAIL.
+    """
+    vis, held = run["visible"], run["heldout"]
+    for v in verdicts:
+        if v.gate != "G2_REQUIRED" or v.result == "FAIL":
+            continue
+        counts = f"visible {vis['pass']}/{vis['n']}, held-out {held['pass']}/{held['n']}"
+        if vis.get("timed_out") or held.get("timed_out"):
+            v.result, v.reason = "FAIL", f"required tests timed out ({counts})"
+        elif vis["n"] == 0 or held["n"] == 0:
+            v.result, v.reason = "FAIL", f"required suite missing or not collected ({counts})"
+        elif vis["pass"] < vis["n"] or held["pass"] < held["n"]:
+            v.result, v.reason = "FAIL", f"required tests failing ({counts})"
+        else:
+            v.result, v.reason = "PASS", f"required tests executed and passed ({counts})"
+    return verdicts
+
+
 def _check_counts(vis_pass: int, vis_n: int, held_pass: int, held_n: int) -> None:
     for name, val in (("vis_pass", vis_pass), ("vis_n", vis_n), ("held_pass", held_pass), ("held_n", held_n)):
         if isinstance(val, bool) or not isinstance(val, int) or val < 0:

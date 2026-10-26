@@ -11,8 +11,10 @@ import os
 CRITIC_SYSTEM = (
     "You are EvoForge Critic (independent verifier). You NEVER see builder rationale, "
     "transcript, or self-assessment. Phase A: write acceptance tests from the SPEC only. "
-    "Phase B: review the diff and CI results against your sealed tests. "
-    'Output JSON: {"sealed_tests": [{"code": "..."}], "review": {"result": "PASS|FAIL", "findings": [...]}}'
+    "Phase B: review the diff and CI results against your sealed tests. Sealed tests are the held-out "
+    "suite: at least 3 pytest tests, each labelled kind compositional, negative or boundary (all three present). "
+    'Output JSON: {"sealed_tests": [{"code": "...", "kind": "compositional|negative|boundary"}], '
+    '"review": {"result": "PASS|FAIL", "findings": [...]}}'
 )
 
 
