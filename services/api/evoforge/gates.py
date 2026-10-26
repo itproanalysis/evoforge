@@ -36,59 +36,57 @@ class Verdict:
 
 
 def evaluate_integrity(diff: str, tests: list[dict]) -> list[Verdict]:
-    """GH_INTEGRITY: oracle strength + reward-hack flags. Provisional rule D-054."""
-    qg = _qg()
-    strong = set(qg["oracle_strength"]["strong"])
-    codes = [t.get("code", "") for t in tests]
-    if not codes:
-        return [Verdict("GH_INTEGRITY", "FAIL", "no tests")]
-    kinds: list[str] = []
-    for c in codes:
-        try:
-            got = analyze(c)
-            kinds.append(got[0].strength if got else "none")
-        except SyntaxError:
-            kinds.append("none")
-    strong_frac = sum(1 for k in kinds if k in strong) / len(kinds)
-    min_frac = qg["oracle_strength"]["min_strong_fraction_new_tests"]
-    # tamper flags always FAIL (independent of provisional rule)
-    if "FIXME_BYPASS" in diff or "SKIP_GATE" in diff:
-        return [Verdict("GH_INTEGRITY", "FAIL", "tamper flag")]
-    if strong_frac < min_frac:
-        # holdout n=20 < 200 -> INCONCLUSIVE (blocks merge, needs exception or more tests)
-        return [Verdict("GH_INTEGRITY", "INCONCLUSIVE", f"oracle_strength {strong_frac:.2f} < {min_frac} (provisional, D-054)")]
-    return [Verdict("GH_INTEGRITY", "PASS", f"strong {strong_frac:.2f}")]
+    """Generation has no sealed held-out evidence, so it cannot earn PASS yet."""
+    return [v for v in evaluate_full(diff, tests, []) if v.gate == "GH_INTEGRITY"]
+
+
+def _test_oracles(tests: list[dict], strong: set[str]) -> tuple[list[oracle_strength.TestOracle], list[str]]:
+    """Count every test; retain malformed or empty snippets as missing evidence."""
+    oracles = []
+    invalid = []
+    for index, test in enumerate(tests, 1):
+        code = test.get("code") if isinstance(test, dict) else None
+        found = []
+        if isinstance(code, str) and code.strip():
+            try:
+                found = analyze(code)
+            except SyntaxError:
+                pass
+        if found:
+            oracles.extend(oracle_strength.TestOracle(t.name, t.strength, t.strength in strong) for t in found)
+        else:
+            invalid.append(f"test snippet {index}: missing or invalid Python test definitions")
+            oracles.append(oracle_strength.TestOracle(f"snippet_{index}", "none", False))
+    return oracles, invalid
 
 
 def evaluate_full(diff: str, tests: list[dict], heldout_kinds: list[str],
                   vis_pass: int = 0, vis_n: int = 1, held_pass: int = 0, held_n: int = 1,
                   expected_literals: set[str] | None = None,
                   protected_globs: list[str] | None = None) -> list[Verdict]:
-    """Full gate set: GH_INTEGRITY (oracle+heldout+reward-hack via integrity_gate.decide),
-    GC_COMPOSITION (PASS stub for single candidate), G2_REQUIRED (tests present)."""
+    """Static evidence checks; these verdicts do not attest to test execution."""
     qg = _qg()
-    codes = [t.get("code", "") for t in tests]
-    oracles = []
-    for c in codes:
-        try:
-            got = analyze(c)
-            oracles += [type("O", (), {"name": g.name, "strong": g.strong})() for g in got]
-        except SyntaxError:
-            pass
-    oracle_ok = oracle_strength.gate(
-        [oracle_strength.TestOracle(getattr(o, "name", "t"), "value_equality" if o.strong else "none", bool(o.strong))
-         for o in oracles]) if oracles else (False, "no tests")
-    heldout = reward_hack.heldout_ok(heldout_kinds or [])
-    gap_r = reward_hack.gap(vis_pass, max(vis_n, 1), held_pass, max(held_n, 1))
-    added = "\n".join(ln[1:] for ln in diff.splitlines() if ln.startswith("+"))
-    lookup = reward_hack.lookup_table(added, expected_literals or set())
+    oracles, invalid = _test_oracles(tests, set(qg["oracle_strength"]["strong"]))
+    oracle_ok = oracle_strength.gate(oracles, cfg=qg["oracle_strength"])
+    heldout = reward_hack.heldout_ok(heldout_kinds or [], cfg=qg["reward_hack"])
+    if invalid:
+        reasons = ([heldout[1]] if not heldout[0] else []) + invalid
+        heldout = (False, "; ".join(reasons))
+    gap_r = reward_hack.gap(vis_pass, max(vis_n, 1), held_pass, max(held_n, 1), cfg=qg["reward_hack"])
+    added = "\n".join(ln[1:] for ln in diff.splitlines() if ln.startswith("+") and not ln.startswith("+++"))
+    lookup = reward_hack.lookup_table(added, expected_literals or set(), cfg=qg["reward_hack"])
     tamper = reward_hack.tampering(diff, protected_globs or ["tests/**", ".github/**", "policy/**"])
     if "FIXME_BYPASS" in diff or "SKIP_GATE" in diff:  # legacy tripwire
         tamper = tamper + [{"kind": "legacy_tamper_flag", "file": None}]
     hack = reward_hack.verdict(gap_r, lookup, tamper)
-    result, reasons = integrity_gate.decide(oracle_ok, heldout, hack)
+    result, reasons = integrity_gate.decide(oracle_ok, heldout, hack, g=qg)
+    if not tests:
+        result = "FAIL"
+        reasons = ["no tests", *reasons]
     v = [Verdict("GH_INTEGRITY", result, "; ".join(reasons) or "integrity clean")]
     v.append(Verdict("GC_COMPOSITION", "PASS", "single candidate: no combined wave"))
-    v.append(Verdict("G2_REQUIRED", "PASS" if codes else "FAIL",
-                     "required tests present" if codes else "no tests"))
+    definitions_present = bool(tests) and not invalid
+    v.append(Verdict("G2_REQUIRED", "PASS" if definitions_present else "FAIL",
+                     "test definitions present; execution unverified" if definitions_present
+                     else "; ".join(invalid) or "no tests"))
     return v
