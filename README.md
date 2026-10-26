@@ -30,7 +30,7 @@ cd C:\evo_forge\services\api
 python -m venv .venv; .\.venv\Scripts\Activate
 pip install -r requirements.txt
 copy .env.example .env  # MODEL_API_KEY, DATABASE_URL, GITHUB_APP_*
-pytest -q               # 112 gates 그대로 통과해야 함
+pytest -q               # API 회귀 테스트
 uvicorn main:app --reload --port 8080
 
 # 2) Web
@@ -38,9 +38,16 @@ cd C:\evo_forge\apps\web
 pnpm install; pnpm dev  # http://localhost:3000
 ```
 
+## Main model and continuation
+
+- 메인 모델은 **Muse Spark**. 현재 Builder·Critic 기본 식별자는 `muse-spark-1.3`이며 로컬 예시 설정과 GCP 배포 설정에 반영되어 있다.
+- 모델 오류나 작업 중단을 이유로 다른 모델로 자동 대체하지 않는다. Critic은 동일 모델을 사용해도 명세 선행·컨텍스트 독립 검증을 유지한다.
+- 미완료 개발은 현재 Codex 채팅의 15분 간격 자동 재개로 이어간다. 진행·완료 조건은 [`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md), 구현 인수인계는 [`docs/DEVELOPMENT_HANDOFF.md`](docs/DEVELOPMENT_HANDOFF.md)에 기록한다.
+
 ## Contracts first
 
 - `validate`: `python -I docs/evoforge-v4.2/tools/validate_package.py --pg` (CI 필수)
+- Windows 임시 PostgreSQL 전체 검증: `python tools/validate_local_pg.py` ([실행 절차](docs/LOCAL_POSTGRES_VALIDATION.md)). 시스템 서비스 설치 없이 SQL 96개를 포함해 검사한다.
 - 금지: Caveman BSL 경로 열람/복사/의존, LiteLLM 기본 의존, BYOK UI, `reserve_cost` 우회 호출, float 금액, 패킷 내 LLM 요약(M3까지), 부작용 도구 투기 실행.
 - 금액은 NUMERIC(원자 단위 int), 모든 병합은 `core.authorize_merge` 경유.
 
