@@ -3,11 +3,32 @@ on: [push, pull_request]
 jobs:
   contracts:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: evoforge-ci-only
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: evoforge-ci-only
+      PGDATABASE: postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
-      - run: python3 -I docs/evoforge-v4.2/tools/validate_package.py
+      - run: python -m pip install -r tools/requirements-validation.txt
+      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends postgresql-client
+      - run: python -I docs/evoforge-v4.2/tools/validate_package.py --pg
   api:
     runs-on: ubuntu-latest
     steps:
@@ -16,5 +37,21 @@ jobs:
         with: { python-version: '3.12' }
       - run: pip install -r services/api/requirements.txt
       - run: pytest -q services/api/tests
-      - run: python -c "from main import app; from fastapi.testclient import TestClient; c=TestClient(app); assert c.get('/healthz').status_code==200" 
+      - run: python -c "from main import app; from fastapi.testclient import TestClient; c=TestClient(app); assert c.get('/healthz').status_code==200"
         working-directory: services/api
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - run: npm ci
+      - run: npm run build

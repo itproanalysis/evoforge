@@ -1,4 +1,4 @@
-# EvoForge CI/CD -- build context root = repo root (see Dockerfiles).
+# EvoForge CI/CD -- API context: repo root; web context: apps/web.
 # Substitutions: _PROJECT (required), _REGION (default asia-northeast3),
 # _ENV (default hackathon). Images tagged :$COMMIT_SHA + :latest.
 substitutions:
@@ -9,15 +9,12 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 steps:
-  # 0) Contract freeze check (no CHECK/trigger edits) + package validation.
-  - name: python:3.12-slim
+  # 0) Schemas, reference tests and SQL contracts in an isolated PostgreSQL 15 cluster.
+  - name: python:3.12-slim-bookworm
     id: validate
     entrypoint: bash
     args:
-      - -c
-      - |
-        pip install -q pyyaml &&
-        python docs/evoforge-v4.2/tools/validate_package.py --pg
+      - infra/ci/validate_contracts.sh
 
   # 1) API unit tests.
   - name: python:3.12-slim
@@ -53,7 +50,7 @@ steps:
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA
       - -t
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:latest
-      - .
+      - apps/web
   - name: gcr.io/cloud-builders/docker
     id: push
     entrypoint: bash
