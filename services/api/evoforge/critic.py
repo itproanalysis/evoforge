@@ -18,6 +18,49 @@ CRITIC_SYSTEM = (
 )
 
 
+ALLOWED_SEALED_KINDS = frozenset({"compositional", "negative", "boundary"})
+
+
+def ensure_sealed_suite(sealed):
+    """Validate the held-out (sealed) suite shape.
+
+    Returns (ok, normalized, findings) where normalized is the valid-entry
+    subset (entries kept as given) and findings is a list of
+    {note, evidence} dicts.
+    """
+    if not isinstance(sealed, list):
+        return False, [], [{"note": "invalid sealed suite: sealed_tests must be a list", "evidence": "none"}]
+    normalized = []
+    findings = []
+    for idx, test in enumerate(sealed):
+        if not isinstance(test, dict):
+            findings.append({"note": f"invalid sealed suite: entry {idx} must be an object", "evidence": "none"})
+            continue
+        code = test.get("code")
+        kind = test.get("kind")
+        if not isinstance(code, str) or not code.strip() or "def test_" not in code:
+            findings.append({"note": f"invalid sealed suite: entry {idx} code must be a non-empty str containing 'def test_'",
+                             "evidence": "none"})
+            continue
+        if kind not in ALLOWED_SEALED_KINDS:
+            findings.append({"note": f"invalid sealed suite: entry {idx} kind must be one of compositional, negative, boundary",
+                             "evidence": "none"})
+            continue
+        normalized.append(test)
+    kinds_present = {t.get("kind") for t in normalized}
+    missing = set(ALLOWED_SEALED_KINDS) - kinds_present
+    if len(sealed) < 3:
+        findings.append({"note": "invalid sealed suite: at least 3 sealed tests required", "evidence": "none"})
+    if len(normalized) != len(sealed):
+        findings.append({"note": "invalid sealed suite: every entry must have valid code and kind", "evidence": "none"})
+    if missing:
+        findings.append({"note": f"invalid sealed suite: missing kinds {sorted(missing)}", "evidence": "none"})
+    ok = len(sealed) >= 3 and len(normalized) == len(sealed) and not missing
+    if not ok and not findings:
+        findings.append({"note": "invalid sealed suite", "evidence": "none"})
+    return ok, normalized, findings
+
+
 def _json(resp) -> dict:
     try:
         out = json.loads(resp.choices[0].message.content or "{}")
@@ -29,7 +72,15 @@ def _json(resp) -> dict:
 def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=None) -> dict:
     """Phase A input = goal_contract only; Phase B adds diff+ci. Stub without key."""
     if not os.getenv("MODEL_API_KEY"):
-        sealed = [{"code": f"def test_goal():\n    assert {json.dumps(goal_contract[:60])} != ''  # sealed stub (Phase A)"}]
+        spec = json.dumps(goal_contract[:60])
+        sealed = [
+            {"code": f"def test_compositional_goal():\n    assert {spec} != ''  # sealed stub compositional (Phase A)",
+             "kind": "compositional"},
+            {"code": f"def test_negative_goal():\n    assert {spec} != 'INVALID'  # sealed stub negative (Phase A)",
+             "kind": "negative"},
+            {"code": f"def test_boundary_goal():\n    assert len({spec}) >= 0  # sealed stub boundary (Phase A)",
+             "kind": "boundary"},
+        ]
         review = {"result": "INCONCLUSIVE",
                   "findings": [{"note": "stub review (no MODEL_API_KEY); diff not trusted", "evidence": "none"}]}
         if diff:
@@ -68,13 +119,12 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
     a = complete([{"role": "system", "content": CRITIC_SYSTEM},
                   {"role": "user", "content": f"SPEC (Phase A, no diff shown):\n{goal_contract}"}], "critic_spec")
     sealed = _json(a).get("sealed_tests", [])
-    if not isinstance(sealed, list) or not sealed or any(
-        not isinstance(test, dict) or not isinstance(test.get("code"), str) or not test["code"].strip()
-        for test in sealed
-    ):
+    ok, _normalized, shape_findings = ensure_sealed_suite(sealed)
+    if not ok:
         return {"sealed_tests": [], "stub": False, "model": model, "provider_calls": completed,
                 "execution_verified": False,
-                "review": {"result": "INCONCLUSIVE", "findings": [{"note": "missing sealed tests", "evidence": "none"}]}}
+                "review": {"result": "INCONCLUSIVE", "findings": shape_findings or [
+                    {"note": "invalid sealed suite", "evidence": "none"}]}}
     b = complete([{"role": "system", "content": CRITIC_SYSTEM},
                   {"role": "user", "content": f"SPEC:\n{goal_contract}\nDIFF:\n{diff}\nCI:\n{ci}\nSEALED:\n{json.dumps(sealed)}"}], "critic_review")
     data = _json(b)

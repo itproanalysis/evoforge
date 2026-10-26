@@ -1,9 +1,11 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   API_BASE,
   type Candidate,
   type GateVerdict,
+  type LedgerSnapshot,
+  getLedger,
   postGenerate,
 } from "../lib/api";
 
@@ -37,24 +39,41 @@ export default function MissionControl() {
   const [commandId, setCommandId] = useState("");
   const [candidate, setCandidate] = useState<Candidate | null>(null);
   const [gates, setGates] = useState<GateVerdict[]>([]);
-  const [reserved, setReserved] = useState<number | null>(null);
   const [evidence, setEvidence] = useState<{ repo_sha: string; model: string } | null>(null);
   const [runs, setRuns] = useState(0);
+  const [ledger, setLedger] = useState<LedgerSnapshot | null>(null);
 
-  // Demo dashboard metrics (live API has no snapshot endpoint yet).
+  const refreshLedger = async () => {
+    try {
+      setLedger(await getLedger());
+    } catch {}
+  };
+
+  useEffect(() => {
+    void refreshLedger();
+  }, []);
+
+  // Dashboard metrics; cost figures come from the GET /v1/ledger snapshot.
   const inconclusive = gates.some((g) => g.result === "INCONCLUSIVE");
   const failed = gates.filter((g) => g.result === "FAIL").length;
-  const metrics = [
+  const fmtCents = (n: number | null | undefined) =>
+    typeof n === "number" ? `${n}¢` : "—";
+  const unknownCount =
+    ledger && Array.isArray(ledger.unknown_reservations)
+      ? ledger.unknown_reservations.length
+      : null;
+  const overrunCount =
+    ledger && Array.isArray(ledger.overruns) ? ledger.overruns.length : null;
+  const metrics: { k: string; v: string; sub?: string }[] = [
     { k: "Running seats", v: String(runs > 0 ? 1 : 0) },
     { k: "Waiting for human", v: inconclusive ? "1" : "0" },
     { k: "Active tasks", v: String(runs) },
     { k: "WVI", v: gates.length ? `${gates.filter((g) => g.result === "PASS").length}/${gates.length}` : "—" },
     { k: "Blocked merges", v: String(failed + (inconclusive ? 1 : 0)) },
-    {
-      k: "Spent (est.)",
-      v: reserved == null ? "—" : `~${reserved}¢`,
-      sub: "provider_billed 없음 → 추정치",
-    },
+    { k: "Spent", v: ledger ? fmtCents(ledger.spent_cents) : "—" },
+    { k: "Reserved", v: ledger ? fmtCents(ledger.reserved_cents) : "—" },
+    { k: "Unknown holds", v: unknownCount == null ? "—" : String(unknownCount) },
+    { k: "Overruns", v: overrunCount == null ? "—" : String(overrunCount) },
     { k: "Bottleneck", v: inconclusive ? "human review" : failed ? "gate FAIL" : "—" },
   ];
 
@@ -66,7 +85,6 @@ export default function MissionControl() {
       setCommandId(out.command_id);
       setCandidate(out.candidate);
       setGates(out.gates ?? []);
-      setReserved(out.budget_reserved_cents ?? null);
       setEvidence(out.evidence ?? null);
       setRuns((n) => n + 1);
       try {
@@ -75,9 +93,15 @@ export default function MissionControl() {
         localStorage.setItem("evoforge.goal", JSON.stringify(goal));
       } catch {}
     } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      setErr(
+        msg.includes("402")
+          ? `budget exhausted: Generate refused (${msg})`
+          : msg,
+      );
     } finally {
       setLoading(false);
+      await refreshLedger();
     }
   };
 
