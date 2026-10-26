@@ -27,6 +27,9 @@ python tools/validate_local_pg.py
 python tools/validate_local_pg.py --pg-bin 'C:\path\to\pgsql\bin'
 ```
 
+API 의존성을 설치한 Python에서 `--kernel-tests`를 추가하면 실제 PostgreSQL 어댑터 수용 테스트도 실행한다.
+[어댑터 검증 절차](POSTGRES_KERNEL.md)에 준비와 범위를 기록했다.
+
 ## 실행기의 동작
 
 - 저장소의 `.local/pg-tests/` 아래에 고유한 일회용 클러스터를 생성한다.

@@ -74,3 +74,12 @@ Claude의 API 수정은 `eff542f`로 병합되었고 API 테스트 93개가 통�
 SQL 96개와 참조 테스트 112개, C1–C9 전체가 실제로 통과했다. 서버 종료와 임시 클러스터 정리도 확인했다.
 앞 절의 SQL 미검증 상태는 해소되었으며, Docker/클라우드 실행은 계속 미검증이다.
 FastAPI의 실제 DB 연결은 별도 과제로 남았다. [검증 절차](LOCAL_POSTGRES_VALIDATION.md)에 범위와 재현 방법을 기록했다.
+
+## 2026-10-27 자동 재개: PostgreSQL 어댑터
+
+`evoforge/postgres_kernel.py`에 정본의 예약·정산·병합 승인 함수 호출을 구현하고 실제 DB 수용 테스트 21개를 통과했다.
+병렬 예산·중복 예약, 재시작 후 UNKNOWN 유지, 영수증과 call ID 바인딩, 중복 정산 방지,
+RLS 거부와 독립 리뷰·게이트·head에 따른 병합 승인 거부/허용을 확인했다.
+기존 API 93개도 통과했다. 정본 SQL을 수정하지 않았고, 잘못된 `project_budgets` 미사용 스텁은 제거했다.
+FastAPI의 컨텍스트·패킷·영수증 연결과 실제 모델·Runner·배포는 남아 있다.
+어댑터 사용·범위·CI와 로컬 검증은 [POSTGRES_KERNEL.md](POSTGRES_KERNEL.md)에 기록했다.

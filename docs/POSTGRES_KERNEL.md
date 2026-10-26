@@ -1,0 +1,67 @@
+# PostgreSQL Trust Kernel 어댑터
+
+`services/api/evoforge/postgres_kernel.py`는 정본의 `core.reserve_cost`,
+`core.settle_reservation`, `core.authorize_merge`를 실제 PostgreSQL 연결에서 호출한다.
+2026-10-27 PostgreSQL 15.19에서 수용 테스트 **21개**가 통과했다.
+같은 실행에서 참조 테스트 112개, SQL 계약 96개와 패키지 검사도 통과했다.
+
+## 단위와 컨텍스트
+
+- 금액은 양의 int64 **micro-USD**다. float·bool·문자열 금액을 거부한다.
+  기존 메모리 원장의 cents는 `cents_to_micros`로 정수 변환한다(1 cent = 10,000 micro-USD).
+- `KernelScope(tenant_id, project_id)`는 서버의 인증된 프로젝트 컨텍스트에서 만든다.
+  모델 출력이나 요청의 임의 tenant/project 값을 사용하지 않는다.
+- 각 호출은 자체 연결·트랜잭션을 사용하고 `SET LOCAL ROLE core_app` 및 테넌트/프로젝트 GUC를 적용한다.
+  영수증 조회 동안에는 `ctx_gateway` 역할을 사용한다. 서비스 DB 로그인에는 두 역할의 멤버십이 필요하다.
+- 연결 오류의 원문·DSN은 외부 오류 메시지로 내보내지 않는다.
+
+## 예약과 영수증
+
+`reserve_cost(call_id, period, amount_micros)`는 UUID call ID로 예약과 provider intent를 함께 기록한다.
+동일 ID의 재시도는 기존 결과를 반환하며, 금액·기간을 바꾼 재사용은 거부한다.
+테넌트 단위 잠금과 정본 함수로 병렬 요청의 예산·선불 크레딧 초과를 막는다.
+
+호출을 보내기 직전에 `mark_sent`로 기록한다.
+확실한 미접수만 `release_not_accepted`로 해제한다.
+결과가 불명확하면 `mark_unknown`으로 기록하고 금액을 계속 예약한다.
+새 어댑터 인스턴스에서도 UNKNOWN이 유지되며 무조건 재전송·환불할 수 없다.
+
+`settle_reservation(call_id, receipt_id, customer_micros)`는 같은 테넌트·프로젝트·call ID에 속한
+플랫폼 영수증과 공급사 참조를 요구한다. 공급사 비용과 가격표 버전은 DB 영수증에서 읽는다.
+정본 정산 함수의 원장 기록과 provider intent의 CONFIRMED 변경은 한 트랜잭션이다.
+같은 영수증·금액의 재시도는 중복 청구하지 않으며, 변경된 재시도는 거부한다.
+UNKNOWN도 이 영수증 경로로 정산할 수 있다.
+
+예약보다 높은 실제 비용은 정본의 `overrun` 표시를 보존한다.
+기존 테이블에 없는 상태나 잔액 열을 추가하지 않았다.
+
+## 병합 승인
+
+`authorize_merge(candidate_id, current_head_sha, policy_hash)`는 DB의 승인 함수를 호출한다.
+게이트·독립 리뷰가 부족하거나 검증 후 head가 달라지면 거부된다.
+이 메서드는 후보 상태나 GitHub 저장소를 변경하지 않는다.
+
+## 검증 실행
+
+```powershell
+python -m venv .local/venv-api
+& '.\.local\venv-api\Scripts\python.exe' -m pip install -r services/api/requirements.txt -r tools/requirements-validation.txt
+& '.\.local\venv-api\Scripts\python.exe' tools/validate_local_pg.py --kernel-tests
+```
+
+PostgreSQL 바이너리 준비는 [로컬 검증 절차](LOCAL_POSTGRES_VALIDATION.md)를 따른다.
+GitHub Actions와 Cloud Build에도 실제 어댑터 수용 테스트를 연결했다.
+테스트용 `EVO_TEST_DATABASE_URL`은 전용 일회용 서버를 가리켜야 한다.
+기존 Trust Kernel 역할이 있는 서버에서는 테스트 픽스처가 실행을 거부한다.
+
+검증한 항목은 재시작 후 예약 유지, 동시 요청의 중복 방지·예산 준수, strict 금액,
+UNKNOWN의 예약 유지, 확정 미접수 해제, 영수증 바인딩·중복 청구 방지,
+테넌트/프로젝트 격리와 RLS 거부, DB의 병합 승인 거부·허용이다.
+
+## 남은 연결 작업
+
+FastAPI는 현재 메모리 원장을 사용한다. 새 어댑터를 요청 경로에 연결하려면 서버가 검증한
+사용자/프로젝트 컨텍스트, 컨텍스트 패킷·영수증 저장, 공급사 allowlist와 Broker 호출을 연결해야 한다.
+그 전에 영수증을 임의 생성하거나 DB 실패 시 메모리 원장으로 대체하지 않는다.
+정본에 없는 `project_budgets`를 참조하던 미사용 `ledger.reserve_pg/settle_pg` 코드는 제거했다.
+실제 Muse Spark 호출·GitHub 작업·배포 검증은 계속 별도 미완료 항목이다.

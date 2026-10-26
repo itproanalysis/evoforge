@@ -7,6 +7,7 @@ on PATH, or unpack the official PostgreSQL 15.19 Windows binaries into
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -44,10 +45,14 @@ def _bin_directory(explicit: Path | None, suffix: str) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--pg-bin", type=Path)
+    parser.add_argument("--kernel-tests", action="store_true", help="also run live PostgreSQL adapter acceptance tests")
     options = parser.parse_args()
+    if options.kernel_tests and any(importlib.util.find_spec(m) is None for m in ("psycopg", "pytest")):
+        raise RuntimeError("--kernel-tests requires services/api/requirements.txt")
     suffix = ".exe" if os.name == "nt" else ""
     binaries = _bin_directory(options.pg_bin, suffix)
     env = os.environ.copy()
+    env.update(PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
     path_parts = [str(binaries)]
     if os.name == "nt":
         git_bash = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "Git/bin"
@@ -103,6 +108,14 @@ def main() -> int:
             detail = ROOT / ".local/validation-sql-detail.log"
             detail.write_text(sql.stdout + sql.stderr, encoding="utf-8")
             print(f"SQL diagnostic log: {detail}", flush=True)
+        elif options.kernel_tests:
+            env["EVO_TEST_DATABASE_URL"] = f"postgresql://postgres@127.0.0.1:{port}/postgres"
+            result = _run([sys.executable, "-m", "pytest", "services/api/tests/test_postgres_kernel.py", "-q"],
+                          env, timeout=180)
+            (ROOT / ".local/validation-kernel.log").write_text(result.stdout + result.stderr, encoding="utf-8")
+            print(result.stdout, end="", flush=True)
+            if result.stderr:
+                print(result.stderr, file=sys.stderr, end="", flush=True)
         return result.returncode
     finally:
         if (data / "PG_VERSION").is_file():
@@ -120,6 +133,9 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     try:
         raise SystemExit(main())
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
