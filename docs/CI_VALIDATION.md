@@ -24,9 +24,10 @@
 - `npm run build`: 페이지·타입 검사와 프로덕션 빌드 성공.
 - `python -m pytest services/api -q`: `eff542f` 기준 API 테스트 93개 통과.
 - Bash 문법 검사, YAML 파싱, Cloud Build 설정 일치, Dockerfile·컨텍스트 경로 확인 통과.
-- 로컬에는 Docker·PostgreSQL 실행 파일이 없어 PostgreSQL C8 검사와 컨테이너 이미지는
-  이번 실행에서 검증하지 못했다. CI 설정 추가만으로 SQL 96개가 통과했다고 판단하지 않는다.
-  GitHub Actions나 Cloud Build의 실제 실행 결과는 아직 확인하지 않았다.
+- 최초 CI 구성 시에는 PostgreSQL C8 검사와 컨테이너 이미지를 실행하지 못했다.
+  후속 작업에서 Windows용 임시 PostgreSQL 15.19 실행기로 C8 SQL 96개와 참조 112개,
+  C1–C9 전체의 실제 통과를 확인했다. [로컬 SQL 검증 절차](LOCAL_POSTGRES_VALIDATION.md)를 참고한다.
+- Docker 이미지, GitHub Actions, Cloud Build의 실제 실행 결과는 아직 확인하지 않았다.
 
 ## 다음 실행에서 확인할 명령
 
