@@ -17,7 +17,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import main  # noqa: E402
 from evoforge import broker_meta, commands, critic, ledger  # noqa: E402
 
-SEALED = [{"code": "def test_contract():\n    assert result == 3\n"}]
+SEALED = [
+    {"code": "def test_compositional():\n    assert result == 3\n", "kind": "compositional"},
+    {"code": "def test_negative():\n    assert result == 3\n", "kind": "negative"},
+    {"code": "def test_boundary():\n    assert result == 3\n", "kind": "boundary"},
+]
 SPEC = {"sealed_tests": SEALED}
 REVIEW = {"review": {"result": "PASS", "findings": []}}
 SECRET_MARKER = "must-never-leave-provider-error-body"
