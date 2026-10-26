@@ -10,3 +10,4 @@ terraform.tfstate*
 .terraform/
 *.tfvars
 .local/
+tools/muse_runs/

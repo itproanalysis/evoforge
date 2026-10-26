@@ -142,17 +142,135 @@ def _revert(touched: set[str]) -> None:
             (ROOT / rel).unlink(missing_ok=True)
 
 
+# ---- OpenCode mode: Muse Spark edits the checkout as an agent; the Critic stays outside ----
+
+OC_RULES = (
+    "You are EvoForge Builder (Muse Spark) working in this git checkout. Implement the SPEC below.\n"
+    "Rules: edit ONLY the EDITABLE files (you may add new tests as services/api/tests/test_muse_*.py). "
+    "Do not modify or delete existing tests, CI files, docs/, or contracts; do not add skips or special-case "
+    "test inputs; keep the surrounding code style. You may run `python -m pytest services/api -q`. "
+    "Do not run git commit/push/reset/checkout, do not install packages, do not access the network. "
+    "Independent sealed acceptance tests you cannot see will judge the result. "
+    "Finish with a 3-line summary of what you changed.\n"
+)
+
+
+def _opencode_bin() -> str:
+    if os.getenv("MUSE_OPENCODE"):
+        return os.environ["MUSE_OPENCODE"]
+    found = shutil.which("opencode") or shutil.which("opencode-cli")
+    if found:
+        return found
+    cli = Path(os.getenv("APPDATA", "")) / "ai.opencode.desktop" / "cli"
+    exes = sorted(cli.glob("*/opencode-cli.exe"))
+    if not exes:
+        raise SystemExit("OpenCode CLI not found; set MUSE_OPENCODE")
+    return str(exes[-1])
+
+
+def _changed_paths() -> list[str]:
+    out = subprocess.run(["git", "status", "--porcelain", "-uall"], cwd=ROOT, capture_output=True,
+                         text=True, encoding="utf-8").stdout
+    return [ln[3:].strip().strip('"').replace("\\", "/") for ln in out.splitlines() if ln.strip()]
+
+
+def _tracked(rel: str) -> bool:
+    return subprocess.run(["git", "ls-files", "--error-unmatch", rel], cwd=ROOT,
+                          capture_output=True).returncode == 0
+
+
+def _allowed_change(task: dict, rel: str) -> bool:
+    if rel in task["edit"]:
+        return True
+    p = Path(rel)
+    return (p.parent.as_posix() == "services/api/tests" and p.name.startswith("test_muse_")
+            and not _tracked(rel)) or rel.startswith("tools/muse_runs/")
+
+
+def _opencode_round(task: dict, feedback: str, session: str | None, log) -> str | None:
+    prompt = OC_RULES + f"\nSPEC ({task['id']}):\n{task['goal']}\n\nEDITABLE: {', '.join(task['edit'])}\n"
+    if task.get("context"):
+        prompt += f"READ-ONLY CONTEXT: {', '.join(task['context'])}\n"
+    if feedback:
+        prompt += f"\nFEEDBACK from the sealed checks on your previous attempt (fix the causes):\n{feedback}\n"
+    model = os.getenv("MUSE_OPENCODE_MODEL", "meta/muse-spark-1.3")
+    cmd = [_opencode_bin(), "run", "-m", model, "--auto", "--format", "json",
+           "--title", f"evoforge {task['id']}"] + (["-s", session] if session else []) + [prompt]
+    t0 = time.time()
+    r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+                       errors="replace", timeout=int(os.getenv("MUSE_OPENCODE_TIMEOUT", "2400")))
+    texts, tools, tokens = [], 0, {}
+    for ln in r.stdout.splitlines():
+        try:
+            ev = json.loads(ln)
+        except json.JSONDecodeError:
+            continue
+        session = ev.get("sessionID") or session
+        part = ev.get("part") or {}
+        if part.get("type") == "text" and part.get("text"):
+            texts.append(part["text"])
+        elif part.get("type") == "tool":
+            tools += 1
+        elif part.get("type") == "step-finish" and isinstance(part.get("tokens"), dict):
+            for k, v in part["tokens"].items():
+                if isinstance(v, int):
+                    tokens[k] = tokens.get(k, 0) + v
+    log({"event": "builder_call", "via": "opencode", "model": model, "session": session,
+         "ms": int((time.time() - t0) * 1000), "exit": r.returncode, "tool_calls": tools,
+         "tokens": tokens, "summary": (texts[-1] if texts else r.stderr[-500:])[:800]})
+    return session
+
+
+def _main_opencode(task: dict, a) -> int:
+    runs = ROOT / "tools/muse_runs"
+    runs.mkdir(exist_ok=True)
+    logf = runs / f"{task['id']}.jsonl"
+
+    def log(rec: dict) -> None:
+        rec["ts"] = int(time.time())
+        with logf.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+    dirty = [p for p in _changed_paths() if not p.startswith("tools/muse_runs/")]
+    if dirty:
+        raise SystemExit(f"checkout not clean, refusing to let the Builder edit: {dirty[:5]}")
+    session, feedback, touched = None, "", set()
+    for rnd in range(1, a.rounds + 1):
+        session = _opencode_round(task, feedback, session, log)
+        changed = _changed_paths()
+        rejected = sorted(p for p in changed if not _allowed_change(task, p))
+        _revert(set(rejected))  # out-of-scope edits never reach the Critic
+        touched |= {p for p in changed if p not in rejected and not p.startswith("tools/muse_runs/")}
+        ok, out = _checks(task, a.sealed)
+        fb = _feedback(out)
+        log({"event": "round", "round": rnd, "ok": ok, "rejected_paths": rejected, "summary": fb[-1500:]})
+        print(f"[{task['id']}] round {rnd}: {'PASS' if ok else 'FAIL'} session={session}"
+              + (f" (reverted out-of-scope {rejected})" if rejected else ""), flush=True)
+        if ok:
+            print(fb.splitlines()[-1] if fb else "")
+            return 0
+        feedback = fb + (f"\nYour edits to these paths were reverted (not editable): {rejected}" if rejected else "")
+    print(f"[{task['id']}] exhausted {a.rounds} rounds; reverting Builder edits")
+    print(feedback[-3000:])
+    _revert(touched)
+    return 1
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("task")
     ap.add_argument("--sealed", type=Path)
     ap.add_argument("--rounds", type=int, default=3)
+    ap.add_argument("--via", choices=["api", "opencode"], default="api",
+                    help="api: Meta Model API with MODEL_API_KEY; opencode: OpenCode agent on meta/muse-spark-*")
     a = ap.parse_args()
+    task = json.loads(Path(a.task).read_text(encoding="utf-8"))
+    if a.via == "opencode":
+        return _main_opencode(task, a)
     _load_env()
     if not os.getenv("MODEL_API_KEY"):
         print("MODEL_API_KEY missing — refusing to fake Builder output", file=sys.stderr)
         return 2
-    task = json.loads(Path(a.task).read_text(encoding="utf-8"))
     runs = ROOT / "tools/muse_runs"
     runs.mkdir(exist_ok=True)
     logf = runs / f"{task['id']}.jsonl"
