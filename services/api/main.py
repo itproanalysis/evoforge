@@ -17,7 +17,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field, StrictInt, model_validator
 
-from evoforge import broker_meta, ledger
+from evoforge import broker_meta, evidence as evidence_chain, ledger
 from evoforge.patch import PatchError
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
 
@@ -131,6 +131,11 @@ def _call_provider(rsv: str, fn, *args):
     return out
 
 
+def _link_stages(eid: str, stages) -> None:
+    for stage in stages:
+        evidence_chain.link(eid, stage, evidence_chain.record(stage, {"evidence_id": eid}))
+
+
 def _store_evidence(payload: dict) -> str:
     eid = f"ev_{uuid.uuid4().hex[:12]}"
     _evidence[eid] = {"id": eid, "ts": time.time(), **payload}
@@ -165,6 +170,7 @@ def generate(req: GenerateRequest):
     eid = _store_evidence({"command_id": cmd["command_id"], "candidate": candidate,
                            "reservation_id": rsv,
                            "gates": [v.__dict__ for v in verdicts]})
+    _link_stages(eid, ("Task", "Candidate", "Gate"))
     body = {"command_id": cmd["command_id"], "candidate": candidate,
             "gates": [v.__dict__ for v in verdicts],
             "budget_reserved_cents": COST_CENTS,
@@ -180,6 +186,7 @@ def objectives(req: ObjectiveRequest):
         raise HTTPException(400, "goal required")
     oid = f"obj_{uuid.uuid4().hex[:12]}"
     eid = _store_evidence({"objective_id": oid, "goal": req.goal, "risk": req.risk})
+    _link_stages(eid, ("ObjectiveVersion",))
     return {"objective_id": oid, "evidence_id": eid, "goal": req.goal, "risk": req.risk}
 
 
@@ -205,10 +212,12 @@ def review(req: ReviewRequest):
                     "response_document": response_document}))
         out = broker_meta.call_critic(req.goal_contract, req.diff, req.ci, dispatch=dispatch)
         eid = _store_evidence({"review": out, "provider_evidence_ids": phase_evidence_ids})
+        _link_stages(eid, ("Review",))
         return {**out, "evidence_id": eid, "provider_evidence_ids": phase_evidence_ids}
     rsv = _reserve_or_402()
     out = _call_provider(rsv, broker_meta.call_critic, req.goal_contract, req.diff, req.ci)
     eid = _store_evidence({"review": out})
+    _link_stages(eid, ("Review",))
     return {**out, "evidence_id": eid}
 
 
@@ -243,6 +252,7 @@ def runs(req: RunRequest):
     eid = _store_evidence({"diff": req.diff, "tests": req.tests, "gates": gates,
                            "run": run, "source_repo": req.source_repo,
                            "base_sha": req.base_sha})
+    _link_stages(eid, ("Candidate", "Gate"))
     return {"gates": gates, "run": run, "evidence_id": eid}
 
 
@@ -274,6 +284,10 @@ def pr_create(req: PRRequest):
         raise HTTPException(400, str(e))
     eid = _store_evidence({"pr": pr.get("html_url"), "title": req.title,
                            "source_evidence_id": req.evidence_id})
+    for entry in evidence_chain.chain(req.evidence_id):
+        if entry.get("event_id") is not None:
+            evidence_chain.link(eid, entry["stage"], entry["event_id"])
+    _link_stages(eid, ("PR",))
     return {"pr": pr, "evidence_id": eid, "source_evidence_id": req.evidence_id}
 
 
@@ -297,7 +311,9 @@ def eval_sandbox(req: SandboxRequest):
 def evidence(eid: str):
     if eid not in _evidence:
         raise HTTPException(404, "unknown evidence id")
-    return _evidence[eid]
+    stored = _evidence[eid]
+    data = {k: v for k, v in stored.items() if k not in ("chain", "data")}
+    return {**stored, "chain": evidence_chain.chain(eid), "data": data}
 
 
 @app.get("/v1/commands/{command_id}")
