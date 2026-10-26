@@ -18,6 +18,7 @@
 - [x] CI 검증 의존성·PostgreSQL 15 테스트 환경·웹 빌드 검사 구성. 새 가상환경의 참조 112개·API 93개·웹 프로덕션 빌드 통과. 컨테이너 실행은 미검증.
 - [x] 후속 Windows 임시 PostgreSQL 15.19 실제 실행: SQL 96개·참조 112개·계약 C1–C9 전체 통과. 컨테이너/배포 실행은 미검증.
 - [x] PostgreSQL 어댑터의 예약·영수증 정산·병합 승인과 실제 DB 수용 테스트 21개 통과. FastAPI 요청 경로 연결은 남아 있다.
+- [x] SDK 자동 재시도 비활성화·Critic 호출별 예약·부분 실패 비용 보존·서버 메타데이터·Phase A 테스트 보존. API 116개와 관련 신규 23개 검증 통과.
 
 ## 이어서 수행할 작업
 
@@ -40,6 +41,10 @@
 > 실제 PostgreSQL 수용 테스트 21개를 통과했다. 동시 요청·UNKNOWN·영수증 바인딩·RLS와 병합 승인 거부/허용을 확인했다.
 > 상세·재현: [POSTGRES_KERNEL.md](POSTGRES_KERNEL.md). 기존 API 테스트도 93개 통과(DB 미지정 시 DB 테스트 모듈 1개 skip).
 
+> **호출 경계 검증 완료 (Codex, 2026-10-27):** SDK의 자동 재시도를 끄고, 실제 Critic의 두 호출을 각각 예약한다.
+> A 성공 뒤 B 실패에도 A 지출·응답 근거가 남고, B의 거부/UNKNOWN을 구분한다.
+> Phase B의 테스트 덮어쓰기와 모델 JSON 메타데이터 위조도 막았다. [상세 검증](PROVIDER_CALL_ACCOUNTING.md).
+
 - [x] 모델 호출 실패 후 비용 예약을 접수 전 실패(환불)·결과 불명(`UNKNOWN` 보류)으로 처리. 영수증 대사로 UNKNOWN을 settle/refund하는 잡은 미구현.
 - [x] 실행 성공 수·전체 수의 입력 관계 검증(422)과 0건 실행의 증거 부족(INCONCLUSIVE) 처리.
 - [x] 기준 브랜치 파일에 unified diff를 엄격 적용해 문맥을 보존하는 PR 생성 경로 구현·검증(mock transport).
@@ -48,6 +53,7 @@
 - [x] PostgreSQL SQL 계약의 비용 예약·원장·RLS·병합 승인 등 96개 검사 실제 실행.
 - [x] 정본 함수·micro-USD 단위의 PostgreSQL 어댑터와 int cents 변환 구현. 잘못된 `project_budgets` 스텁 제거.
 - [ ] FastAPI에서 인증된 프로젝트 컨텍스트·컨텍스트 패킷·영수증 저장을 새 PostgreSQL 어댑터에 연결. 현재 요청 경로는 메모리 원장을 사용한다.
+- [ ] 개발 Muse Builder CLI의 프로젝트 비용 예약·정식 영수증 연결. 현재 CLI를 플랫폼 예산 통제가 완료된 경로로 사용하지 않는다.
 - [ ] Muse Spark 실제 호출과 저장소 연결을 포함한 통합 경로 검증.
 - [ ] 배포·통합 검증 결과와 남은 요구사항을 대조하고 완료 근거 기록.
 

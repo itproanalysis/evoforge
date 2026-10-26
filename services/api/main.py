@@ -107,9 +107,9 @@ def _call_provider(rsv: str, fn, *args):
         out = fn(*args)
     except broker_meta.ProviderNotAccepted as e:
         ledger.refund(rsv)
-        raise HTTPException(502, f"provider not accepted ({e}); reservation {rsv} refunded")
+        raise HTTPException(502, f"provider not accepted; reservation {rsv} refunded")
     except Exception as e:
-        ledger.mark_unknown(rsv, f"{type(e).__name__}: {e}")
+        ledger.mark_unknown(rsv, type(e).__name__)
         raise HTTPException(502, f"provider outcome unknown ({type(e).__name__}); "
                                  f"reservation {rsv} held for reconciliation")
     ledger.settle(rsv, COST_CENTS)  # the call happened, whatever the gates say next
@@ -148,6 +148,7 @@ def generate(req: GenerateRequest):
     candidate = _call_provider(rsv, broker_meta.call_builder, req.goal, req.repo_sha)
     verdicts = evaluate_integrity(candidate.get("diff", ""), candidate.get("tests", []))
     eid = _store_evidence({"command_id": cmd["command_id"], "candidate": candidate,
+                           "reservation_id": rsv,
                            "gates": [v.__dict__ for v in verdicts]})
     body = {"command_id": cmd["command_id"], "candidate": candidate,
             "gates": [v.__dict__ for v in verdicts],
@@ -169,8 +170,29 @@ def objectives(req: ObjectiveRequest):
 
 @app.post("/v1/candidates/review")
 def review(req: ReviewRequest):
+    if os.getenv("MODEL_API_KEY"):
+        # Real Critic calls have independent reservations and outcomes per phase.
+        phase_evidence_ids = []
+        def dispatch(send):
+            phase = "critic_spec" if not phase_evidence_ids else "critic_review"
+            rsv = _reserve_or_402()
+            metadata = None
+            response_document = None
+            try:
+                response = _call_provider(rsv, send)
+                metadata = broker_meta.call_metadata(response, os.getenv("MODEL_CRITIC", "muse-spark-1.3"), phase)
+                if hasattr(response, "model_dump"):
+                    response_document = response.model_dump(mode="json")
+                return response
+            finally:
+                phase_evidence_ids.append(_store_evidence({"kind": "provider_call", "phase": phase,
+                    "reservation": ledger.reservation(rsv), "metadata": metadata,
+                    "response_document": response_document}))
+        out = broker_meta.call_critic(req.goal_contract, req.diff, req.ci, dispatch=dispatch)
+        eid = _store_evidence({"review": out, "provider_evidence_ids": phase_evidence_ids})
+        return {**out, "evidence_id": eid, "provider_evidence_ids": phase_evidence_ids}
     rsv = _reserve_or_402()
-    out = _call_provider(rsv, broker_meta.call_critic, req.goal_contract, req.diff)
+    out = _call_provider(rsv, broker_meta.call_critic, req.goal_contract, req.diff, req.ci)
     eid = _store_evidence({"review": out})
     return {**out, "evidence_id": eid}
 

@@ -16,6 +16,10 @@ class ProviderNotAccepted(Exception):
 class ProviderOutcomeUnknown(Exception):
     """The request may have been accepted -> keep the reservation for reconciliation."""
 
+    def __init__(self, message: str, completed_calls: list[dict] | None = None):
+        super().__init__(message)
+        self.completed_calls = tuple(completed_calls or [])
+
 
 @contextmanager
 def provider_errors():
@@ -26,9 +30,9 @@ def provider_errors():
         yield
     except (openai.AuthenticationError, openai.PermissionDeniedError, openai.BadRequestError,
             openai.NotFoundError, openai.UnprocessableEntityError, openai.RateLimitError) as e:
-        raise ProviderNotAccepted(f"{type(e).__name__}: {e}") from e
+        raise ProviderNotAccepted(type(e).__name__) from None
     except openai.APIError as e:  # timeout, connection drop, 5xx, other status
-        raise ProviderOutcomeUnknown(f"{type(e).__name__}: {e}") from e
+        raise ProviderOutcomeUnknown(type(e).__name__) from None
 
 
 def _client():
@@ -37,6 +41,7 @@ def _client():
     return OpenAI(
         base_url=os.getenv("MODEL_API_BASE", "https://api.meta.ai/v1"),
         api_key=os.environ["MODEL_API_KEY"],
+        max_retries=0,  # retries require a new reservation and outcome reconciliation
     )
 
 
@@ -54,15 +59,31 @@ CRITIC_SYSTEM = (
 )
 
 
-def call_critic(goal: str, diff: str) -> dict:
+def call_critic(goal: str, diff: str, ci: str = "", *, dispatch=None) -> dict:
     """Spec-first critic via Muse Spark. Stub without key (deterministic)."""
     from evoforge.critic import call_critic as _c
 
-    return _c(goal, diff)
+    return _c(goal, diff, ci, dispatch=dispatch)
+
+
+def call_metadata(response, model: str, phase: str) -> dict:
+    """Transport/model metadata for later receipts; never supplied by model JSON.
+
+    This is not a billed receipt: no currency amount or pricing is inferred.
+    Completion IDs remain distinct from the transport's request ID.
+    """
+    usage = getattr(response, "usage", None)
+    return {
+        "provider": "meta", "model": model, "phase": phase,
+        "provider_request_id": getattr(response, "_request_id", None),
+        "provider_response_id": getattr(response, "id", None),
+        "usage": usage.model_dump() if usage is not None else {},
+        "billing_verified": False,
+    }
 
 
 def call_builder(goal: str, repo_sha: str) -> dict:
-    """Call Muse Spark builder. Raises RuntimeError without key (fail-closed)."""
+    """Call Muse Spark; without a key return an explicitly marked demo candidate."""
     if not os.getenv("MODEL_API_KEY"):
         # Deterministic stub so UI/evals work without billing; NEVER claim as model output.
         return {
@@ -90,7 +111,18 @@ def call_builder(goal: str, repo_sha: str) -> dict:
         data = None
     if not isinstance(data, dict):  # billed but unusable: empty candidate, gates will block
         data = {"diff": "", "tests": [], "rationale": "unparseable model output"}
+    tests = data.get("tests", [])
+    if not isinstance(tests, list) or any(
+        not isinstance(test, dict) or not isinstance(test.get("code"), str) for test in tests
+    ):
+        tests = []
+    data = {
+        "diff": data.get("diff") if isinstance(data.get("diff"), str) else "",
+        "tests": tests,
+        "rationale": data.get("rationale") if isinstance(data.get("rationale"), str) else "unusable model fields",
+    }
     data["stub"] = False
     data["model"] = model
     data["usage"] = getattr(resp, "usage", None).model_dump() if getattr(resp, "usage", None) else {}
+    data["provider_calls"] = [call_metadata(resp, model, "builder")]
     return data

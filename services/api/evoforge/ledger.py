@@ -139,6 +139,13 @@ def snapshot(project: str = "default") -> dict:
                                      if r.project == project and r.state == "UNKNOWN"]}
 
 
+def reservation(reservation_id: str) -> dict:
+    """Copy of one reservation for server-side call evidence."""
+    if reservation_id not in _reservations:
+        raise KeyError(reservation_id)
+    return asdict(_reservations[reservation_id])
+
+
 def reset() -> None:  # tests only
     _budgets.clear(); _spent.clear(); _reserved.clear()
     _reservations.clear(); _overruns.clear()
