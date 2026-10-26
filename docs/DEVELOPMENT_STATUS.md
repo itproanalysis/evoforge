@@ -96,6 +96,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex 추가 지원 / `codex/receipt-support`:** npm 설치에서 확인한 Next.js 중대 취약점 수정.
+  `apps/web/package.json`·`package-lock.json`만 수정해 Next 15 계열 보안 릴리스와 필요 전이 의존성을 고정하고 빌드·audit를 검증한다.
+  Muse의 T9 화면 코드는 보존한다.
 - **Codex 지원 / `codex/receipt-support` / `C:\evo_forge_codex`:** Muse round3의 T7(main/evidence)·T8(critic)·T9(web)와 분리해,
   PostgreSQL의 정식 영수증 JSON 계약 검증·저장·스코프/예약 바인딩과 실제 DB 검증을 맡는다.
   파일: `evoforge/postgres_receipts.py`, `postgres_kernel.py`, `services/api/migrations/`,
