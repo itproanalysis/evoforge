@@ -10,7 +10,7 @@ import hmac
 import os
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
@@ -109,3 +109,22 @@ def authorize(req: MergeAuthorizationRequest, kernel: PostgresKernel = Depends(a
     invoke(kernel.authorize_merge, req.candidate_id, req.head_sha, req.policy_hash)
     return {"authorized": True, "candidate_id": req.candidate_id,
             "head_sha": req.head_sha, "policy_hash": req.policy_hash}
+
+
+@router.post("/receipts")
+def record_receipt(document: dict = Body(...), kernel: PostgresKernel = Depends(authenticated_kernel)):
+    # Trusted Broker/reconciler only. A valid document is not proof of a bill;
+    # model JSON and browser clients must not receive this service credential.
+    return invoke(kernel.record_receipt, document)
+
+
+@router.get("/receipts/{receipt_id}")
+def receipt(receipt_id: UUID, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    return invoke(kernel.receipt_document, receipt_id)
+
+
+@router.post("/receipts/{receipt_id}/settle")
+def settle_receipt(receipt_id: UUID, req: InternalRequest,
+                   kernel: PostgresKernel = Depends(authenticated_kernel)):
+    # An empty object is required so amount/scope overrides are rejected.
+    return invoke(kernel.settle_from_receipt, receipt_id)

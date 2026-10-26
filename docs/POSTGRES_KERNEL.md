@@ -68,3 +68,6 @@ UNKNOWN의 예약 유지, 확정 미접수 해제, 영수증 바인딩·중복 �
 
 후속 작업으로 [인증된 내부 FastAPI 경로](INTERNAL_KERNEL_API.md)를 연결하고 실제 DB HTTP 포함 25개를 통과했다.
 Generate/Review의 패킷·영수증 연결은 계속 남아 있다.
+
+후속 영수증 문서 검증·원자적 보존과 저장 금액 정산은
+[RECEIPT_PERSISTENCE.md](RECEIPT_PERSISTENCE.md)에 기록했다.

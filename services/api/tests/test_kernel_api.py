@@ -5,7 +5,7 @@ from datetime import date
 from pathlib import Path
 import sys
 from unittest.mock import Mock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -108,3 +108,33 @@ def test_merge_authorization_returns_only_server_checked_head(api):
     assert response.status_code == 200
     api["kernel"].authorize_merge.assert_called_once_with(api["call"], "a" * 40, "1" * 64)
     assert response.json()["authorized"] is True
+
+
+def test_receipt_uses_same_authentication_and_does_not_accept_an_amount_override(api):
+    from receipt_fixtures import receipt_document
+    document = receipt_document(tenant=api['tenant'], project=api['project'])
+    rid = document['receipt_id']
+    api['kernel'].record_receipt.return_value = {**document, 'ledger_entry_id': None}
+    api['kernel'].receipt_document.return_value = {**document, 'ledger_entry_id': None}
+    api['kernel'].settle_from_receipt.return_value = api['kernel'].reservation.return_value
+    unauthenticated = api['client'].post('/v1/kernel/receipts', json=document)
+    assert unauthenticated.status_code == 401
+    api['kernel'].record_receipt.assert_not_called()
+    response = api['client'].post('/v1/kernel/receipts', json=document, headers=api['headers'])
+    assert response.status_code == 200 and response.json()['ledger_entry_id'] is None
+    api['kernel'].record_receipt.assert_called_once_with(document)
+    assert api['client'].get(f'/v1/kernel/receipts/{rid}', headers=api['headers']).status_code == 200
+    api['kernel'].receipt_document.assert_called_once_with(UUID(rid))
+    overridden = api['client'].post(f'/v1/kernel/receipts/{rid}/settle', headers=api['headers'],
+                                    json={'customer_micros': 1, 'tenant_id': str(uuid4())})
+    assert overridden.status_code == 422
+    api['kernel'].settle_from_receipt.assert_not_called()
+    assert api['client'].post(f'/v1/kernel/receipts/{rid}/settle', headers=api['headers'], json={}).status_code == 200
+    api['kernel'].settle_from_receipt.assert_called_once_with(UUID(rid))
+
+
+def test_invalid_receipt_returns_sanitized_422(api):
+    from evoforge.postgres_receipts import ReceiptInvalid
+    api['kernel'].record_receipt.side_effect = ReceiptInvalid('must-not-leak-provider-or-token-data')
+    response = api['client'].post('/v1/kernel/receipts', json={'bad': 'must-not-leak'}, headers=api['headers'])
+    assert response.status_code == 422 and 'must-not-leak' not in response.text

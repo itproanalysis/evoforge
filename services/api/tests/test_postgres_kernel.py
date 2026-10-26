@@ -10,7 +10,7 @@ from datetime import date
 import os
 from pathlib import Path
 import sys
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -24,8 +24,9 @@ from psycopg.types.json import Jsonb  # noqa: E402
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from evoforge.postgres_kernel import (  # noqa: E402
-    BudgetRefused, KernelRejected, KernelScope, PostgresKernel, cents_to_micros,
+    BudgetRefused, KernelNotFound, KernelRejected, KernelScope, PostgresKernel, cents_to_micros,
 )
+from receipt_fixtures import receipt_document  # noqa: E402
 
 PERIOD = date(2026, 10, 1)
 ROLES = ["ctx_owner", "ctx_gateway", "ctx_security", "core_owner", "core_app"]
@@ -47,6 +48,9 @@ def database():
             with psycopg.connect(test_dsn, autocommit=True) as connection:
                 connection.execute((folder / "context_plane_DRAFT.sql").read_text(encoding="utf-8"))
                 connection.execute((folder / "core_DRAFT.sql").read_text(encoding="utf-8"))
+                migration = (ROOT / "services/api/migrations/001_receipt_documents.sql").read_text(encoding="utf-8")
+                connection.execute(migration)
+                connection.execute(migration)  # extension reapplication is safe
             yield test_dsn
         finally:
             admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
@@ -315,3 +319,181 @@ def test_http_unavailable_database_never_uses_memory_fallback(funded, http_kerne
     monkeypatch.setenv('DATABASE_URL', 'postgresql://hidden:must-not-leak@127.0.0.1:1/unavailable')
     response = _http_reserve(http_kernel, uuid4())
     assert response.status_code == 503 and 'must-not-leak' not in response.text
+
+
+def _packet(funded, *, issued="now()", expires="now()+interval '1 hour'"):
+    """Test-owned timestamps only; never interpolate user/provider input into SQL."""
+    scope, packet = funded["scope"], uuid4()
+    with psycopg.connect(funded["dsn"], autocommit=True) as connection:
+        connection.execute(sql.SQL("""INSERT INTO ctx.context_packets
+            (tenant_id,project_id,packet_id,run_id,task_id,task_attempt_id,idempotency_key,
+             seat_id,function_role,agent_id,is_author_of_candidate,channel,profile,repo_sha,
+             contract_version,policy_version,policy_hash,tool_schema_hash,evidence_manifest_hash,
+             lease_epoch,provider,model,cache_mode,packet_sha256,issued_at,expires_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,1,'builder',%s,true,'api','SAFE',repeat('a',40),
+                    1,'test',repeat('1',64),repeat('2',64),repeat('3',64),0,'meta',
+                    'muse-spark-1.3','NONE',repeat('4',64),{},{})""")
+            .format(sql.SQL(issued), sql.SQL(expires)),
+            (scope.tenant_id, scope.project_id, packet, uuid4(), uuid4(), uuid4(), str(packet), uuid4()))
+    return packet
+
+
+def _document(funded, *, sent=True, unknown=False, packet=None):
+    packet = packet or _packet(funded)
+    call, kernel = uuid4(), funded["kernel"]
+    kernel.reserve_cost(call, PERIOD, 100)
+    if sent:
+        kernel.mark_sent(call)
+    if unknown:
+        kernel.mark_unknown(call)
+    scope = funded["scope"]
+    return receipt_document(tenant=scope.tenant_id, project=scope.project_id, packet=packet, call=call)
+
+
+def test_document_and_ctx_row_persist_atomically_and_reconcile_unknown_once(funded):
+    document, kernel = _document(funded, unknown=True), funded["kernel"]
+    rid, call = document["receipt_id"], document["call_id"]
+    recorded = kernel.record_receipt(document)
+    assert recorded == {**document, "ledger_entry_id": None}
+    assert kernel.record_receipt(dict(reversed(list(document.items())))) == recorded
+    restarted = PostgresKernel(funded["dsn"], funded["scope"])
+    assert restarted.receipt_document(rid) == recorded
+    state = restarted.settle_from_receipt(rid)
+    assert state.status == "COMMITTED" and state.actual_micros == 110
+    assert restarted.settle_from_receipt(rid) == state
+    closed = restarted.receipt_document(rid)
+    assert closed["ledger_entry_id"] is not None
+    assert restarted.record_receipt(document) == closed
+    with psycopg.connect(funded["dsn"]) as connection:
+        assert connection.execute("SELECT customer_micros,provider_cost_micros,receipt_id,entry_id "
+                                  "FROM core.usage_ledger WHERE tenant_id=%s AND entry_kind='model_usage'",
+                                  (funded["scope"].tenant_id,)).fetchall() == [
+                                      (-110, 80, UUID(rid), UUID(closed["ledger_entry_id"]))]
+    assert kernel.reservation(call).outcome == "CONFIRMED"
+
+
+def test_stored_quote_cannot_be_overridden_by_legacy_settlement(funded):
+    document, kernel = _document(funded), funded["kernel"]
+    kernel.record_receipt(document)
+    with pytest.raises(KernelRejected):
+        kernel.settle_reservation(document["call_id"], document["receipt_id"], 111)
+    assert kernel.reservation(document["call_id"]).status == "RESERVED"
+    assert kernel.settle_from_receipt(document["receipt_id"]).actual_micros == 110
+
+
+def test_concurrent_receipt_replays_store_and_settle_only_once(funded):
+    document, kernel = _document(funded), funded["kernel"]
+    with ThreadPoolExecutor(max_workers=6) as workers:
+        rows = list(workers.map(lambda _: kernel.record_receipt(document), range(6)))
+    assert all(row == rows[0] for row in rows)
+    with ThreadPoolExecutor(max_workers=6) as workers:
+        states = list(workers.map(lambda _: kernel.settle_from_receipt(document["receipt_id"]), range(6)))
+    assert all(state == states[0] for state in states)
+
+
+@pytest.mark.parametrize("change", ["price", "usage", "duplicate-call", "duplicate-provider-reference"])
+def test_changed_or_duplicate_receipt_never_leaves_partial_rows(funded, change):
+    from copy import deepcopy
+    document, kernel = _document(funded), funded["kernel"]
+    kernel.record_receipt(document)
+    other = deepcopy(document)
+    if change == "price":
+        other["customer_price_micros"] += 1
+    elif change == "usage":
+        other["raw_usage_fields"]["completion_tokens"] += 1
+    else:
+        other["receipt_id"] = str(uuid4())
+        if change == "duplicate-call":
+            other["provider_request_id"] += "-different"
+        else:
+            second = _document(funded)
+            other.update(call_id=second["call_id"], reservation_key=second["call_id"], packet_id=second["packet_id"])
+    with pytest.raises(KernelRejected):
+        kernel.record_receipt(other)
+    with psycopg.connect(funded["dsn"]) as connection:
+        for table in ("ctx.provider_usage_receipts", "runtime.provider_receipt_documents"):
+            assert connection.execute(sql.SQL("SELECT count(*) FROM {} WHERE tenant_id=%s")
+                                      .format(sql.SQL(table)), (funded["scope"].tenant_id,)).fetchone()[0] == 1
+
+
+@pytest.mark.parametrize("problem", ["unsent", "released", "missing-call", "foreign-scope", "model", "provider", "packet", "expired", "late-packet"])
+def test_receipt_requires_a_matching_context_before_reserved_dispatch(funded, problem):
+    document, kernel = _document(funded, sent=problem != "unsent"), funded["kernel"]
+    if problem == "released":
+        kernel.release_not_accepted(document["call_id"])
+    elif problem == "missing-call":
+        document["call_id"] = document["reservation_key"] = str(uuid4())
+    elif problem == "foreign-scope":
+        document["project_id"] = str(uuid4())
+    elif problem in {"model", "provider"}:
+        document[problem] = "other" if problem == "provider" else "other-model"
+    elif problem == "packet":
+        document["packet_id"] = str(uuid4())
+    elif problem == "expired":
+        document["packet_id"] = str(_packet(funded, issued="now()-interval '2 hours'", expires="now()-interval '1 hour'"))
+    elif problem == "late-packet":
+        document["packet_id"] = str(_packet(funded))
+    with pytest.raises(KernelRejected):
+        kernel.record_receipt(document)
+    with psycopg.connect(funded["dsn"]) as connection:
+        for table in ("ctx.provider_usage_receipts", "runtime.provider_receipt_documents"):
+            assert connection.execute(sql.SQL("SELECT count(*) FROM {} WHERE tenant_id=%s")
+                                      .format(sql.SQL(table)), (funded["scope"].tenant_id,)).fetchone()[0] == 0
+
+
+def test_receipt_getter_and_rls_cannot_expose_foreign_scope(funded):
+    document, kernel = _document(funded), funded["kernel"]
+    kernel.record_receipt(document)
+    for scope in (KernelScope(uuid4(), funded["scope"].project_id), KernelScope(funded["scope"].tenant_id, uuid4())):
+        foreign = PostgresKernel(funded["dsn"], scope)
+        with pytest.raises(KernelNotFound):
+            foreign.receipt_document(document["receipt_id"])
+        with foreign._transaction() as connection:
+            connection.execute("SET LOCAL ROLE ctx_gateway")
+            assert connection.execute("SELECT count(*) FROM runtime.provider_receipt_documents").fetchone()["count"] == 0
+
+
+def test_receipt_documents_are_append_only_even_for_database_owner(funded):
+    document = _document(funded)
+    funded["kernel"].record_receipt(document)
+    with psycopg.connect(funded["dsn"], autocommit=True) as connection:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            connection.execute("UPDATE runtime.provider_receipt_documents SET document_sha256=repeat('0',64) WHERE receipt_id=%s",
+                               (document["receipt_id"],))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            connection.execute("DELETE FROM runtime.provider_receipt_documents WHERE receipt_id=%s", (document["receipt_id"],))
+
+
+def test_receipt_digest_survives_raw_usage_numeric_json_round_trip(funded):
+    document, kernel = _document(funded), funded["kernel"]
+    document["raw_usage_fields"].update(large=1e20, signed_zero=-0.0, fraction=0.0123)
+    recorded = kernel.record_receipt(document)
+    assert kernel.receipt_document(document["receipt_id"]) == recorded
+    assert kernel.settle_from_receipt(document["receipt_id"]).status == "COMMITTED"
+
+
+def test_zero_quote_is_preserved_without_fake_charge_or_refund(funded):
+    document, kernel = _document(funded), funded["kernel"]
+    document["cost_micros"] = document["customer_price_micros"] = 0
+    kernel.record_receipt(document)
+    with pytest.raises(ValueError):
+        kernel.settle_from_receipt(document["receipt_id"])
+    assert kernel.reservation(document["call_id"]).status == "RESERVED"
+
+
+def test_http_receipt_ingestion_scope_and_quote_bound_settlement(funded, http_kernel, monkeypatch):
+    document = _document(funded)
+    rid = document["receipt_id"]
+    response = http_kernel.post('/v1/kernel/receipts', json=document)
+    assert response.status_code == 200, response.text
+    assert http_kernel.get(f'/v1/kernel/receipts/{rid}').json()['source'] == 'provider_billed'
+    legacy = http_kernel.post(f'/v1/kernel/reservations/{document["call_id"]}/settle',
+                              json={'receipt_id': rid, 'customer_micros': 111})
+    assert legacy.status_code == 409
+    assert http_kernel.post(f'/v1/kernel/receipts/{rid}/settle', json={'customer_micros': 111}).status_code == 422
+    assert http_kernel.post(f'/v1/kernel/receipts/{rid}/settle', json={}).json()['status'] == 'COMMITTED'
+    assert http_kernel.get(f'/v1/kernel/receipts/{rid}').json()['ledger_entry_id'] is not None
+    monkeypatch.setenv('EVO_PROJECT_ID', str(uuid4()))
+    foreign = http_kernel.get(f'/v1/kernel/receipts/{rid}')
+    missing = http_kernel.get(f'/v1/kernel/receipts/{uuid4()}')
+    assert foreign.status_code == missing.status_code == 404 and foreign.json() == missing.json()

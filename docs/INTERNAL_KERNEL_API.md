@@ -32,6 +32,9 @@ uvicorn main:app --env-file .env --reload --port 8080
 | `POST .../{call_id}/release-not-accepted` | 확실한 미접수 예약만 해제 |
 | `POST .../{call_id}/settle` | `receipt_id`, `customer_micros`로 바인딩된 영수증 정산 |
 | `POST /v1/kernel/merge-authorizations` | 후보·현재 head·policy hash를 DB 승인 함수로 확인 |
+| `POST /v1/kernel/receipts` | 정본 영수증 문서 검증·원자적 저장 |
+| `GET /v1/kernel/receipts/{receipt_id}` | 해당 스코프의 문서와 원장 entry ID 조회 |
+| `POST /v1/kernel/receipts/{receipt_id}/settle` | 본문 `{}`, 저장 금액으로 정산 |
 
 위의 `...`는 `/v1/kernel/reservations`다. 병합 승인은 후보 상태나 GitHub를 변경하지 않는다.
 현재 head·정책·증거가 바뀌면 실제 병합 직전에 다시 DB 승인을 거쳐야 한다.
@@ -40,6 +43,9 @@ uvicorn main:app --env-file .env --reload --port 8080
 없는 자원과 다른 스코프 자원은 같은 404, 상태·영수증 위반은 409,
 서버 설정 또는 DB 연결 문제는 503이다. 오류 본문에는 DSN·토큰 원문을 넣지 않는다.
 DB 오류를 메모리 원장으로 대체하지 않는다.
+
+영수증 확장 마이그레이션·계약·저장 금액 정산의 범위와 제한은
+[영수증 문서 연결](RECEIPT_PERSISTENCE.md)을 따른다. 스키마와 digest는 공급사 청구 입증이 아니다.
 
 ## 검증
 

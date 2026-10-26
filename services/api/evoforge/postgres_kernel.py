@@ -98,13 +98,22 @@ class PostgresKernel:
         return f"{self.scope.project_id}:{call_id}"
 
     def _read(self, conn, call_id: UUID, *, lock: bool = False) -> ReservationState:
+        if lock:
+            # Acquire the reservation lock before reading its joined intent.
+            # A joined SELECT ... FOR UPDATE may wait, then see the new r row
+            # with an intent from its older READ COMMITTED statement snapshot.
+            locked = conn.execute("SELECT 1 FROM core.cost_reservations WHERE tenant_id=%s "
+                                  "AND project_id=%s AND request_key=%s FOR UPDATE",
+                                  (self.scope.tenant_id, self.scope.project_id, str(call_id))).fetchone()
+            if not locked:
+                raise KernelNotFound("reservation or provider intent not found in scope")
         query = """SELECT r.period_start, r.reserved_micros, r.actual_micros, r.status,
                           i.status AS outcome
                      FROM core.cost_reservations r
                      LEFT JOIN core.side_effect_intents i ON i.tenant_id=r.tenant_id
                        AND i.kind='provider.call' AND i.idempotency_key=%s
                     WHERE r.tenant_id=%s AND r.project_id=%s AND r.request_key=%s"""
-        row = conn.execute(query + (" FOR UPDATE OF r" if lock else ""),
+        row = conn.execute(query,
                            (self._intent_key(call_id), self.scope.tenant_id,
                             self.scope.project_id, str(call_id))).fetchone()
         if not row or row["outcome"] is None:
@@ -200,6 +209,15 @@ class PostgresKernel:
                                    (self.scope.tenant_id, self.scope.project_id, receipt_id, call_id)).fetchone()
             if not receipt or not receipt["provider_request_id"]:
                 raise KernelRejected("matching platform receipt with provider reference required")
+            quoted = conn.execute("SELECT document,document_sha256 FROM runtime.provider_receipt_documents "
+                                  "WHERE tenant_id=%s AND project_id=%s AND receipt_id=%s",
+                                  (self.scope.tenant_id, self.scope.project_id, receipt_id)).fetchone()
+            if quoted:
+                from evoforge.postgres_receipts import canonical_receipt
+                document, digest = canonical_receipt(quoted["document"])
+                if (digest != quoted["document_sha256"]
+                        or document["customer_price_micros"] != customer_micros):
+                    raise KernelRejected("settlement amount differs from stored customer quote")
             conn.execute("SET LOCAL ROLE core_app")
             conn.execute("SELECT core.settle_reservation(%s,%s,%s,%s,%s,%s,%s)",
                          (self.scope.tenant_id, self.scope.project_id, str(call_id), customer_micros,
@@ -216,3 +234,79 @@ class PostgresKernel:
         with self._transaction() as conn:
             conn.execute("SELECT core.authorize_merge(%s,%s,%s,%s,%s)",
                          (self.scope.tenant_id, self.scope.project_id, candidate_id, head_sha, policy_hash))
+
+    def record_receipt(self, document: dict) -> dict:
+        """Atomically store a canonical Broker/reconciler receipt and its ctx row."""
+        from evoforge.postgres_receipts import canonical_receipt
+
+        record, digest = canonical_receipt(document)
+        if (record["tenant_id"] != str(self.scope.tenant_id)
+                or record["project_id"] != str(self.scope.project_id)):
+            raise KernelRejected("receipt scope mismatch")
+        call_id, receipt_id = UUID(record["call_id"]), UUID(record["receipt_id"])
+        with self._transaction() as conn:
+            from psycopg.types.json import Json, Jsonb
+            state = self._read(conn, call_id, lock=True)
+            reserved_at = conn.execute("SELECT created_at FROM core.cost_reservations WHERE tenant_id=%s "
+                                       "AND project_id=%s AND request_key=%s",
+                                       (self.scope.tenant_id, self.scope.project_id, str(call_id))).fetchone()["created_at"]
+            conn.execute("SET LOCAL ROLE ctx_gateway")
+            existing = conn.execute("SELECT document_sha256 FROM runtime.provider_receipt_documents "
+                                    "WHERE tenant_id=%s AND project_id=%s AND receipt_id=%s",
+                                    (self.scope.tenant_id, self.scope.project_id, receipt_id)).fetchone()
+            if existing:
+                if existing["document_sha256"] != digest:
+                    raise KernelRejected("receipt replay differs from stored document")
+                conn.execute("SET LOCAL ROLE core_app")
+                ledger = conn.execute("SELECT entry_id FROM core.usage_ledger WHERE tenant_id=%s AND project_id=%s "
+                                      "AND receipt_id=%s AND entry_kind='model_usage'",
+                                      (self.scope.tenant_id, self.scope.project_id, receipt_id)).fetchone()
+                return {**record, "ledger_entry_id": str(ledger["entry_id"]) if ledger else None}
+            if state.status != "RESERVED" or state.outcome not in {"SENT", "UNKNOWN_EXTERNAL_OUTCOME"}:
+                raise KernelRejected("receipt requires an in-flight reserved call")
+            packet = conn.execute("SELECT provider,model,issued_at,expires_at FROM ctx.context_packets "
+                                  "WHERE tenant_id=%s AND project_id=%s AND packet_id=%s",
+                                  (self.scope.tenant_id, self.scope.project_id, UUID(record["packet_id"]))).fetchone()
+            if (not packet or packet["provider"] != record["provider"] or packet["model"] != record["model"]
+                    or not packet["issued_at"] <= reserved_at < packet["expires_at"]):
+                raise KernelRejected("receipt packet was not a matching context at reservation time")
+            tokens = record["tokens"]
+            conn.execute("""INSERT INTO ctx.provider_usage_receipts
+                (tenant_id,project_id,receipt_id,packet_id,call_id,call_purpose,provider,model,
+                 provider_request_id,source,billing_owner,uncached_input,cache_write,cache_write_ttl,
+                 cache_read,output_tokens,raw_usage_fields,cost_micros,currency,price_table_version,recorded_at)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'platform',%s,%s,%s,%s,%s,%s,%s,'USD',%s,%s)""",
+                (self.scope.tenant_id, self.scope.project_id, receipt_id, UUID(record["packet_id"]), call_id,
+                 record["call_purpose"], record["provider"], record["model"], record.get("provider_request_id"),
+                 record["source"], tokens["uncached_input"], tokens["cache_write"], tokens.get("cache_write_ttl"),
+                 tokens["cache_read"], tokens["output"],
+                 Jsonb(record["raw_usage_fields"]) if "raw_usage_fields" in record else None,
+                 record["cost_micros"], record["price_table_version"], record["recorded_at"]))
+            conn.execute("INSERT INTO runtime.provider_receipt_documents "
+                         "(tenant_id,project_id,receipt_id,call_id,document,document_sha256) VALUES (%s,%s,%s,%s,%s,%s)",
+                         (self.scope.tenant_id, self.scope.project_id, receipt_id, call_id, Json(record), digest))
+            return {**record, "ledger_entry_id": None}
+
+    def receipt_document(self, receipt_id: UUID) -> dict:
+        from evoforge.postgres_receipts import canonical_receipt
+        receipt_id = UUID(str(receipt_id))
+        with self._transaction() as conn:
+            ledger = conn.execute("SELECT entry_id FROM core.usage_ledger WHERE tenant_id=%s AND project_id=%s "
+                                  "AND receipt_id=%s AND entry_kind='model_usage'",
+                                  (self.scope.tenant_id, self.scope.project_id, receipt_id)).fetchone()
+            conn.execute("SET LOCAL ROLE ctx_gateway")
+            row = conn.execute("SELECT document,document_sha256 FROM runtime.provider_receipt_documents "
+                               "WHERE tenant_id=%s AND project_id=%s AND receipt_id=%s",
+                               (self.scope.tenant_id, self.scope.project_id, receipt_id)).fetchone()
+            if not row:
+                raise KernelNotFound("receipt not found in scope")
+            record, digest = canonical_receipt(row["document"])
+            if digest != row["document_sha256"]:
+                raise KernelRejected("receipt digest mismatch")
+            return {**record, "ledger_entry_id": str(ledger["entry_id"]) if ledger else None}
+
+    def settle_from_receipt(self, receipt_id: UUID) -> ReservationState:
+        """Use the stored customer quote; no caller-supplied replacement amount."""
+        record = self.receipt_document(receipt_id)
+        return self.settle_reservation(UUID(record["call_id"]), UUID(record["receipt_id"]),
+                                       record["customer_price_micros"])

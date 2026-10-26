@@ -82,6 +82,7 @@ steps:
         apt-get update -qq && apt-get install -y -qq postgresql-client > /dev/null
         psql "$$URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql
         psql "$$URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql
+        psql "$$URL" -v ON_ERROR_STOP=1 -f services/api/migrations/001_receipt_documents.sql
     secretEnv: []
 
   # Terraform apply (infra) -- deploys Cloud Run pointing at fresh digests.

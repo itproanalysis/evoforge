@@ -102,3 +102,13 @@ timeout/5xx는 UNKNOWN을 유지한다. B가 A의 테스트를 바꾸거나 모�
 API 총 139개와 참조 112개·SQL 96개도 통과했다. 드라이버 없는 기본 앱의 시작도 확인했다.
 기존 Generate/Review는 계속 메모리 원장을 사용하며 브라우저 사용자 인증·패킷·영수증 연결은 남아 있다.
 설정과 제한은 [INTERNAL_KERNEL_API.md](INTERNAL_KERNEL_API.md)에 기록했다.
+
+## 2026-10-27 지원 브랜치: 영수증 문서와 저장 금액 정산
+
+`codex/receipt-support` (`C:\evo_forge_codex`)에서 정본 v1 영수증 검증, append-only 문서와 ctx 행의
+원자적 저장, 예약/패킷/서버 스코프 바인딩, 저장 금액 정산과 내부 HTTP 경로를 구현했다.
+동시 정산의 이전 intent 상태 혼합 문제와 선택 의존성 누락으로 생략되던 RFC3339 검사도 수정했다.
+API **269 passed·1 skipped**, 일회용 PostgreSQL **46 passed**, 참조 112·SQL 96·계약 검사 전체 통과.
+상위 Muse round3가 main에 먼저 반영된 뒤 동기화·통합한다. main 반영 여부와 커밋은 STATUS를 확인한다.
+남은 실제 공급사/워크플로/배포 연결과 0원 정산·영수증 정정 정책은
+[RECEIPT_PERSISTENCE.md](RECEIPT_PERSISTENCE.md)에 구체적으로 남겼다.
