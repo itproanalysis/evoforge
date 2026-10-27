@@ -71,6 +71,12 @@ export default async function LocaleLayout({
               >
                 {t('evidence')}
               </a>
+              <a
+                href="/performance"
+                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
+              >
+                {t('performance')}
+              </a>
             </nav>
             <div className="ml-auto flex items-center gap-4">
               <LanguageSwitcher />

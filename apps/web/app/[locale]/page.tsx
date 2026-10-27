@@ -7,9 +7,11 @@ import {
   type LedgerSnapshot,
   type MissionDetail,
   type MissionState,
+  type PerformanceSnapshot,
   getDashboard,
   getLedger,
   getMission,
+  getPerformance,
   postMission,
   postMissionAdvance,
   postMissionCancel,
@@ -33,6 +35,7 @@ export default function MissionControl() {
   const [mission, setMission] = useState<MissionDetail | null>(null);
   const [dashboard, setDashboard] = useState<DashboardSnapshot | null>(null);
   const [ledger, setLedger] = useState<LedgerSnapshot | null>(null);
+  const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
   const stopRef = useRef(false);
 
   const refreshState = async (missionId: string | null) => {
@@ -51,6 +54,7 @@ export default function MissionControl() {
 
   useEffect(() => {
     void refreshState(null);
+    getPerformance().then(setPerf).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -142,6 +146,27 @@ export default function MissionControl() {
           </Card>
         ))}
       </section>
+
+      <Card className="mt-4">
+        <div className="text-xs text-text-secondary">Performance (GET /v1/performance)</div>
+        <div className="text-sm mt-1">
+          {perf && perf.comparison.status === "measured" && perf.comparison.verdict ? (
+            <>
+              비교: <code>{perf.comparison.verdict}</code>{" "}
+              {typeof perf.comparison.delta_pp === "number"
+                ? `Δ${perf.comparison.delta_pp.toFixed(1)}%p`
+                : ""}
+            </>
+          ) : (
+            "not measured yet"
+          )}
+        </div>
+        <p className="mb-0 mt-2">
+          <a href="/performance" className="text-accent-cyan hover:underline">
+            Performance →
+          </a>
+        </p>
+      </Card>
 
       <Card className="mt-4">
         <div className="text-xs text-text-secondary mb-2">{t("objective-label")}</div>

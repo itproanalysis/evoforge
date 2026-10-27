@@ -15,7 +15,8 @@
   "navigation": {
     "mission-control": "미션 컨트롤",
     "improvement-lab": "개선 랩",
-    "evidence": "증거"
+    "evidence": "증거",
+    "performance": "성과 분석"
   },
   "mission-control": {
     "heading": "미션 컨트롤",

@@ -15,7 +15,8 @@
   "navigation": {
     "mission-control": "Mission Control",
     "improvement-lab": "Improvement Lab",
-    "evidence": "Evidence"
+    "evidence": "Evidence",
+    "performance": "Performance"
   },
   "mission-control": {
     "heading": "Mission Control",
