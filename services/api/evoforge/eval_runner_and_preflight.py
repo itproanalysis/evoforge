@@ -320,7 +320,13 @@ class PreflightCallBroker:
         server_now: Callable[[], datetime] | None = None,
     ):
         self.ledger = ledger
-        self.allowed_providers = allowed_providers or {"meta", "anthropic", "openai", "google", "other"}
+        if allowed_providers is None:
+            self.allowed_providers = {"meta", "anthropic", "openai", "google", "other"}
+        else:
+            if (not isinstance(allowed_providers, (set, frozenset))
+                    or any(not isinstance(provider, str) or not provider for provider in allowed_providers)):
+                raise TypeError("allowed_providers must be a set of nonempty provider names")
+            self.allowed_providers = set(allowed_providers)
         self.price_table_version = price_table_version
         self.default_period_start = default_period_start
         self._capability_today = capability_today or (lambda: datetime.now(timezone.utc).date())
@@ -331,6 +337,8 @@ class PreflightCallBroker:
         self.provider_calls_attempted: int = 0
 
     def set_provider_consent(self, tenant_id: str, provider: str, consented: bool = True) -> None:
+        if type(consented) is not bool:
+            raise TypeError("provider consent must be a boolean")
         self.provider_consents[(tenant_id, provider)] = consented
 
     def register_lease(
@@ -452,7 +460,7 @@ class PreflightCallBroker:
 
         if provider not in self.allowed_providers:
             raise PreflightError("PROVIDER_NOT_ALLOWED", f"provider {provider!r} not in allow-list")
-        if not self.provider_consents.get((tenant_id, provider), False):
+        if self.provider_consents.get((tenant_id, provider)) is not True:
             raise PreflightError("PROVIDER_CONSENT_MISSING", f"tenant {tenant_id} has not consented to {provider}")
 
         lease = self.leases.get((run_id, task_id))
@@ -562,7 +570,7 @@ class PreflightCallBroker:
             raise PreflightError("PACKET_BINDING_MISMATCH", "packet changed before provider dispatch")
         if binding.provider not in self.allowed_providers:
             raise PreflightError("PROVIDER_NOT_ALLOWED", "provider allow-list changed before dispatch")
-        if not self.provider_consents.get((binding.tenant_id, binding.provider), False):
+        if self.provider_consents.get((binding.tenant_id, binding.provider)) is not True:
             raise PreflightError("PROVIDER_CONSENT_MISSING", "provider consent was revoked before dispatch")
         expected_epoch = int(packet.get("fencing", {}).get("lease_epoch", 1)) if lease_epoch is None else lease_epoch
         # Re-verify lease right before network dispatch
