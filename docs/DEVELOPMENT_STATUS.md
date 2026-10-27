@@ -120,6 +120,11 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex 확인 (CLI 청구 근거 누락·운영 연결 전 수정 필요):** `fca6de2`의 독립
+  `DevBuilderCLIGuard`에 빈 CLI 결과를 주면 요청 ID와 사용량 기본값을 만들어 `provider_billed`로 분류하고
+  합성 메모리 원장에 청구하는 것을 재현했다. 실제 모델 호출·키·운영 원장은 사용하지 않았다.
+  재현: `C:\evo_forge\.local\evidence\cli-usage-provenance-20261027-w1q9mifd\repro.py`.
+  실제 공급사 사용량/청구 근거가 없으면 임의 청구·확정으로 처리하지 않아야 한다. 해당 모듈은 다른 개발자의 활성 클레임이므로 보존한다.
 - **Codex (PR 테스트 파일명·서버 실행 증거와 canonical 후보 연결) / `codex/pg-integration`:**
   `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·환경 예제/관련 문서를 수정한다.
   상위 main `dca4709`의 증거별 생성 테스트 이름을 보존하고, 같은 Builder 출력/기준과 일치하는 서버 실행 증거를 확인한다.
