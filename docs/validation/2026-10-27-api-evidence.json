@@ -1,0 +1,34 @@
+{
+  "recorded_at": "2026-10-27T03:01:43.386245+00:00",
+  "feature_revision": "69add6e",
+  "integration_revision": "42a85534554279be054ce7cbb81ffa8314b724f7",
+  "api": {
+    "passed": 403,
+    "skipped_db_module": 1
+  },
+  "postgres": {
+    "version": "15.19",
+    "passed": 81,
+    "sql_checks": 96,
+    "reference_tests": 112,
+    "migrations_reapplied": [
+      "001_receipt_documents.sql",
+      "002_builder_call_bindings.sql",
+      "003_api_evidence.sql"
+    ]
+  },
+  "fresh_api_process_restored_private_suite_and_run_evidence": true,
+  "heldout_code_absent_from_http": true,
+  "new_feature_used_real_model_calls": false,
+  "test_runner": "real local subprocess, synthetic Critic fixture",
+  "web_build": "passed",
+  "commands_and_public_cost_ledger_persisted": false,
+  "new_feature_deployed_to_cloud": false,
+  "local_log_bundle": "C:\\evo_forge\\.local\\evidence\\api-evidence-20261027-f29wjim1",
+  "file_sha256": {
+    "validation-evidence-api.log": "c5a847cef3c9ae12fa8a8acc872fdd6408fc20a6a91ab9bc425ac6c96ffd9721",
+    "validation-kernel.log": "8d5271a5c3b6076d364bf4778c9185a5d86eb194f300de397f45a0e581aa9595",
+    "validation-postgres.log": "1f21e4c74de011cbc679bdcffd3c8f518ccc52d65b80d17e0c7523bfbe813b40",
+    "validation-evidence-web.log": "bf14007b58f9e3bdd5b13937f4071279bc4a6c4ae66a1a20f464ec805f62a15c"
+  }
+}

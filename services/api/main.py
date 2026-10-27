@@ -497,8 +497,8 @@ def healthz():
 
 @app.post("/v1/commands/generate")
 def generate(req: GenerateRequest):
-    postgres_state.ensure_ready()  # storage failure must not poison command creation/replay
     """Vertical slice H1: reserve budget, call Muse Spark Builder, run GH_INTEGRITY."""
+    postgres_state.ensure_ready()  # storage failure must not poison command creation/replay
     if not req.goal.strip():
         raise HTTPException(400, "goal required")
     validated_paths: list[str] | None = None

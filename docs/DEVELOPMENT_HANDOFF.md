@@ -123,3 +123,11 @@ main 작업 폴더의 최종 API **291 passed·1 skipped**, 실제 DB **46 passe
 참조 112·SQL 96·패키지 검사와 웹 빌드가 통과했다.
 마이그레이션·설정·남은 통합은 [BUILDER_PREFLIGHT.md](BUILDER_PREFLIGHT.md), main 반영 기록은 STATUS를 따른다.
 `0551fbe`로 main에 반영했다. main의 API 시작/health/OpenAPI·패키지 검사·웹 빌드도 통과했다.
+
+## 2026-10-27 요청 증거 PostgreSQL 영속화
+
+`codex/evidence-persistence`의 `69add6e`는 기존 요청·비공개 봉인 리뷰·이벤트/체인을 선택 모드에서 PostgreSQL로 저장한다.
+실제 Runner 실행 후 새 API 프로세스에서도 복원하며, HTTP 봉인 마스킹과 tenant/project RLS를 유지한다.
+API 403 passed·1 skipped, 실제 DB 81 passed, 참조 112·SQL 96·패키지 검사·웹 빌드 통과.
+명령·공개 원장은 아직 메모리이고, 운영 DB 적용·전체 P0-2 완료는 별도다.
+[설정과 경계](EVIDENCE_PERSISTENCE.md), main 반영 기록과 원본 로그는 STATUS를 따른다.

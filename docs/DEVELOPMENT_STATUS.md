@@ -91,20 +91,20 @@
 - [x] PostgreSQL SQL 계약의 비용 예약·원장·RLS·병합 승인 등 96개 검사 실제 실행.
 - [x] 정본 함수·micro-USD 단위의 PostgreSQL 어댑터와 int cents 변환 구현. 잘못된 `project_budgets` 스텁 제거.
 - [x] 내부 FastAPI 요청에서 PostgreSQL 예약·정산·병합 승인 호출과 인증/스코프·연결 오류의 차단 검증.
-- [ ] FastAPI에서 인증된 프로젝트 컨텍스트·컨텍스트 패킷·영수증 저장을 새 PostgreSQL 어댑터에 연결. 현재 요청 경로는 메모리 원장을 사용한다.
-- [ ] 브라우저 사용자 로그인·프로젝트 멤버십과 워크플로 호출 권한 연결. 내부 서비스 토큰을 브라우저로 전달하지 않는다.
+- [ ] FastAPI의 canonical 명령·비용 예약·패킷·영수증을 요청 경로 전체에 연결. 증거는 PostgreSQL 선택 모드, 명령·공개 원장은 아직 메모리다.
+- [x] 소유자 로그인·web BFF·Google ID 토큰의 워크플로 권한 경계(R6). 다중 사용자·프로젝트 멤버십은 별도 범위다.
 - [ ] 개발 Muse Builder CLI의 프로젝트 비용 예약·정식 영수증 연결. 현재 CLI를 플랫폼 예산 통제가 완료된 경로로 사용하지 않는다.
 - [ ] Broker 전송 전에 packet/call 사전 바인딩·유효 상태·공급사 허용 목록·가격표를 확인하고 실제 Runner 증거를 core 후보·게이트와 영속 연결.
 - [ ] 정본을 우회하지 않는 0원 정산과 추정 영수증→실청구 정정·대사 정책 구현. 현재 0원은 문서만 보존하고 예약 정산은 거부한다.
-- [ ] Muse Spark 실제 호출과 저장소 연결을 포함한 통합 경로 검증.
+- [x] Muse Spark 실제 호출·원격 저장소·분리 Runner·GitHub PR의 GCP 통합 검증(R6, SERVICE_STATUS 참조). canonical 비용 DB 통합은 별도다.
 - [ ] 배포·통합 검증 결과와 남은 요구사항을 대조하고 완료 근거 기록.
 
 ## 외부 연결 확인 범위
 
-현재 Codex의 로컬 프로세스에서는 `MODEL_API_KEY`, `DATABASE_URL`, `GITHUB_TOKEN`이
-설정되지 않은 것을 확인했다. 저장소 루트와 API 폴더에도 `.env`가 없었다.
-다른 세션이나 Secret Manager의 설정 여부는 이 확인만으로 판단하지 않는다.
-실제 연동을 완료하려면 해당 실행 환경의 자격 증명과 접근 권한을 확인해야 한다.
+초기 Codex 로컬 프로세스 점검에서는 자격 증명 환경변수와 API `.env`가 없었다.
+이후 소유자 설정을 사용한 실 Meta·GitHub·GCP 검증은 상단과 `SERVICE_STATUS.md`에 기록되었다.
+별도 Codex 프로세스와 운영 런타임의 설정이 같다고 가정하지 않는다.
+PostgreSQL 증거 저장의 운영 적용에는 확장 003과 사전 생성한 프로젝트·서버 스코프 설정이 필요하다.
 비밀 값은 문서·채팅·로그에 기록하지 않는다.
 
 ## 자동 재개의 완료 판단
@@ -177,3 +177,14 @@ standalone 서버의 `/`, `/lab`, `/evidence`와 정적 JS HTTP 응답 및 검�
 `0551fbe`로 main에 fast-forward 반영했다. main 작업 폴더에서도 API 모듈 컴파일·health/OpenAPI,
 정본 패키지 검사와 웹 프로덕션 빌드가 통과했다. 상위 main/critic/runner/gates/evidence/web·봉인 테스트·정본은 그대로 보존했다.
 이는 Builder 호출 준비·전송 전 상태 검사다. SDK 전송기·실제 요율/청구·사용자 인증·Runner/core 증거 연결·배포는 남아 있다.
+
+## 요청 경로 증거 영속화 (지원 구현·검증 완료)
+
+`69add6e`는 `EVO_STATE_BACKEND=postgres`에서 실제 요청 증거·비공개 Critic 원본·단계 이벤트와 체인을
+PostgreSQL로 연결한다. 별도 API 프로세스에서도 기존 리뷰와 실제 Runner 결과를 복원하고,
+공개 HTTP에는 봉인 코드가 나오지 않는 것을 확인했다. 범위·확장 003·설정은 [EVIDENCE_PERSISTENCE.md](EVIDENCE_PERSISTENCE.md).
+
+API **403 passed·1 skipped**, 실제 PostgreSQL **81 passed**, 참조 **112개**·SQL **96개**·계약 검사와
+Next 15.5.28 프로덕션 빌드가 통과했다. DB 오류 시 메모리로 우회하거나 공급사를 호출하지 않고 503으로 거부하며,
+처음부터 저장소가 불가하면 명령의 멱등 키도 소비하지 않는다.
+명령·공개 비용 원장은 아직 메모리이므로 P0-2 전체 완료나 운영 Cloud SQL 적용 완료를 뜻하지 않는다.
