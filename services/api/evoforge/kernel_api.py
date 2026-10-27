@@ -9,10 +9,13 @@ from datetime import date
 import hmac
 import os
 from uuid import UUID
+from typing import Literal
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
+
+from evoforge.commands import NeedsConfirmation, TransitionError
 
 from evoforge.postgres_kernel import (
     BudgetRefused, KernelNotFound, KernelRejected, KernelScope,
@@ -23,12 +26,18 @@ router = APIRouter(prefix="/v1/kernel", tags=["internal-kernel"])
 bearer = HTTPBearer(auto_error=False)
 
 
-def authenticated_kernel(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> PostgresKernel:
+def authenticated_kernel(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+                         service_token: str | None = Header(default=None,alias='X-Evoforge-Kernel-Token')) -> PostgresKernel:
     expected = os.getenv("EVO_KERNEL_TOKEN", "")
     if len(expected) < 32 or not expected.isascii():
         raise HTTPException(503, "internal kernel authentication is not configured")
-    if (credentials is None or credentials.scheme.lower() != "bearer"
-            or not hmac.compare_digest(credentials.credentials.encode("utf-8"), expected.encode("utf-8"))):
+    # Google IAM/application ID authentication keeps Authorization. The private
+    # kernel credential is independent; an invalid explicit header never falls
+    # back to another credential. Legacy local Bearer use remains compatible.
+    supplied=service_token
+    if supplied is None and credentials is not None and credentials.scheme.lower()=='bearer':
+        supplied=credentials.credentials
+    if (supplied is None or not hmac.compare_digest(supplied.encode('utf-8'),expected.encode('utf-8'))):
         raise HTTPException(401, "internal kernel authentication required", headers={"WWW-Authenticate": "Bearer"})
     dsn = os.getenv("DATABASE_URL", "")
     try:
@@ -49,6 +58,10 @@ def invoke(operation, *args):
         raise HTTPException(409, "Trust Kernel rejected the operation") from None
     except KernelUnavailable:
         raise HTTPException(503, "PostgreSQL Trust Kernel unavailable") from None
+    except NeedsConfirmation:
+        raise HTTPException(409, 'command requires confirmation') from None
+    except TransitionError:
+        raise HTTPException(409, 'canonical command transition refused') from None
     except ValueError:
         raise HTTPException(422, "invalid kernel operation parameters") from None
 
@@ -85,6 +98,67 @@ class MergeAuthorizationRequest(InternalRequest):
     candidate_id: UUID
     head_sha: str = Field(pattern=r"^(?:[a-f0-9]{40}|[a-f0-9]{64})$")
     policy_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
+
+
+class CandidateRunRequest(InternalRequest):
+    candidate_id: UUID
+    call_id: UUID
+    evidence_id: str = Field(min_length=1, max_length=256)
+
+
+class CandidateRegistrationRequest(InternalRequest):
+    call_id: UUID
+    evidence_id: str = Field(min_length=1,max_length=256)
+    head_sha: str = Field(pattern=r'^[a-f0-9]{40}$')
+    pr_source_evidence_id: str | None = Field(default=None,min_length=1,max_length=256)
+
+
+class CommandRequest(InternalRequest):
+    goal: str = Field(min_length=1,max_length=100000)
+    idempotency_key: str = Field(min_length=1,max_length=4096)
+    risk: Literal['LOW','MEDIUM','HIGH','CRITICAL'] = 'LOW'
+    confirm: StrictBool = False
+    expected_version: StrictInt | None = Field(default=None,ge=0,le=2**63-1)
+
+
+class CommandResponseRequest(InternalRequest):
+    response: dict
+
+
+def existing_command(kernel,command_id):
+    from evoforge.postgres_commands import CommandStore
+    store=CommandStore(kernel)
+    command=invoke(store.get,command_id)
+    if command is None:
+        raise HTTPException(404,'resource not found in scope')
+    return store,command
+
+
+@router.post('/commands')
+def accept_command(req: CommandRequest, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_commands import CommandStore
+    # This is BUILD/ASK acceptance only, never a structured approval shortcut.
+    return invoke(CommandStore(kernel).create,req.goal,req.idempotency_key,'BUILD',req.risk,
+                  req.confirm,req.expected_version)
+
+
+@router.get('/commands/{command_id}')
+def command(command_id: str, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    return existing_command(kernel,command_id)[1]
+
+
+@router.post('/commands/{command_id}/dispatch')
+def dispatch_command(command_id: str, req: InternalRequest,
+                     kernel: PostgresKernel = Depends(authenticated_kernel)):
+    store,_=existing_command(kernel,command_id)
+    return invoke(store.dispatch,command_id)
+
+
+@router.post('/commands/{command_id}/complete')
+def complete_command(command_id: str, req: CommandResponseRequest,
+                     kernel: PostgresKernel = Depends(authenticated_kernel)):
+    store,_=existing_command(kernel,command_id)
+    return invoke(store.complete,command_id,req.response)
 
 
 @router.post("/reservations")
@@ -153,3 +227,30 @@ def prepare_builder_call(req: BuilderCallRequest, kernel: PostgresKernel = Depen
 @router.get("/builder-calls/{call_id}")
 def builder_call(call_id: UUID, kernel: PostgresKernel = Depends(authenticated_kernel)):
     return invoke(kernel.builder_call, call_id)
+
+
+@router.post('/candidate-runs')
+def candidate_run(req: CandidateRunRequest, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_run_evidence import record
+    return invoke(record,kernel,req.candidate_id,req.call_id,req.evidence_id)
+
+
+@router.post('/candidates')
+def register_candidate(req: CandidateRegistrationRequest,kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_candidates import register
+    if req.pr_source_evidence_id is None:
+        return invoke(register,kernel,req.call_id,req.evidence_id,req.head_sha)
+    return invoke(register,kernel,req.call_id,req.evidence_id,req.head_sha,req.pr_source_evidence_id)
+
+
+@router.get('/candidates/{candidate_id}')
+def registered_candidate(candidate_id: UUID,kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_candidates import read
+    return invoke(read,kernel,candidate_id)
+
+
+@router.get('/candidates/{candidate_id}/runner-evidence/{evidence_id}')
+def candidate_run_evidence(candidate_id: UUID, evidence_id: str,
+                           kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_run_evidence import read
+    return invoke(read,kernel,candidate_id,evidence_id)

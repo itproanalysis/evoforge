@@ -1,0 +1,98 @@
+{
+  "date": "2026-10-27",
+  "revision": "5b5b253a0bf9e4ebb3c2b9e4528f22b91c1fb44c",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "prior_implementation_revision": "8936658",
+  "scope": "Tenant-wide prepaid reservation guard under project RLS; private append-only holds, canonical lifecycle, backfill and fail-closed adapter readiness",
+  "checks": {
+    "pre_fix_regression_subset": {
+      "failed": 1,
+      "deselected": 131
+    },
+    "api": {
+      "passed": 463,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 139,
+      "new_credit_guard_cases": 8
+    },
+    "cross_project_parallel_reservations": {
+      "attempts": 24,
+      "accepted": 10,
+      "micros_each": 2000000,
+      "credit_micros": 20000000,
+      "included_in_postgresql_count": true
+    },
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "migration_notes": [
+    "Canonical reserve/settle function definitions and project policies unchanged; reservation trigger adds an independent tenant-wide check",
+    "Owner backfill temporarily removes FORCE RLS under source DDL/write locks and restores FORCE RLS in the same transaction before commit",
+    "core_app has no private hold table CRUD grants; only current-tenant aggregate execute permission",
+    "Apply extension 007 before deploying the new API; disabled/missing/non-firing guard refuses new reservations with no intent or reservation effects",
+    "Existing over-allocated reservations and UNKNOWN outcomes are retained, not automatically refunded or retransmitted"
+  ],
+  "limitations": [
+    "Support branch only; active Muse T22 main/evaluation/UI and sealed tests preserved",
+    "No paid provider call, actual bill verification, production migration, Docker build or GCP deployment in this validation",
+    "Public Generate/Review still use the memory ledger; canonical command/cost/performance integration remains incomplete",
+    "Actual settlement overruns follow the existing contract; this guard constrains new reservations and does not invent credit or receipts",
+    "Complete merge approval integration remains pending; no core.authorize_merge bypass",
+    "Muse Spark muse-spark-1.3, frozen contracts and active heartbeat retained"
+  ],
+  "source_sha256": {
+    "services/api/evoforge/postgres_kernel.py": "d5ddf587472e6976dc82eccbfba0c901e6ca6210bc6ceb6eda44a7f6122ffecc",
+    "services/api/migrations/007_tenant_credit_holds.sql": "6801a360ec7ef6aa71f30faa9f795cec71f0b522acbbd137b193d4eff6f4c8b5",
+    "services/api/tests/test_postgres_kernel.py": "ce354119f7d4bde3fe36f7c2bdabfc3feb31ae2c33bcb5756dff92590c070fe9",
+    "services/api/.env.example": "e969014158ec04101359f2e49aecc93151ab7e62a7de79894f40d97e81820e30",
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767",
+    "services/api/evoforge/broker_meta.py": "f50d55a3a54355db474c63ebbc99f53db878917680d055c5135847d72e5ea29c",
+    "docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql": "294f2961b3012ac18ade1efacb324fbb14721c76a41782864a0c0d977a262636"
+  },
+  "logs": {
+    "validation-credit-guard-before.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\tenant-credit-guard-20261027-ezvkqtpw\\validation-credit-guard-before.log",
+      "sha256": "f536181f1fd02605564f10f69bd92add80ff507726c223051e6faa98b814601a"
+    },
+    "validation-credit-guard-focused.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\tenant-credit-guard-20261027-ezvkqtpw\\validation-credit-guard-focused.log",
+      "sha256": "7c4f0a969f24089b03f6fb1c1a6524333821b7b053387284bd8273199b3ac429"
+    },
+    "validation-credit-guard-api-final.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\tenant-credit-guard-20261027-ezvkqtpw\\validation-credit-guard-api-final.log",
+      "sha256": "c20e5cc2eb4a996c178867034fb58c8d7d6cf68ec3728a72e74739db16d47796"
+    },
+    "validation-credit-guard-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\tenant-credit-guard-20261027-ezvkqtpw\\validation-credit-guard-postgres.log",
+      "sha256": "8c2d21263a576c3c37be6867024350e4ab443a1df252d70ac7dce017c3f883e9"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\tenant-credit-guard-20261027-ezvkqtpw\\validation-kernel.log",
+      "sha256": "01d57fd374fa9959de0601df160cce057751895c6bce96657396bf4d8ed16957"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\tenant-credit-guard-20261027-ezvkqtpw\\validation-postgres.log",
+      "sha256": "ce14791d26dab28fe9d7bb7c979d1d2917f5c7c84f6b59e2fd32f4a16296f8e0"
+    },
+    "validation-credit-guard-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\tenant-credit-guard-20261027-ezvkqtpw\\validation-credit-guard-contract.log",
+      "sha256": "64634a1b3f3c4c84745b7c6a7d05fc8f222b8fcb44c3cdd9e2ad0f296291f601"
+    },
+    "validation-credit-guard-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\tenant-credit-guard-20261027-ezvkqtpw\\validation-credit-guard-web.log",
+      "sha256": "633c6bfaab9d5aace920dbf2b81e17f593377ed1042174848b9b614f8e406af1"
+    }
+  }
+}

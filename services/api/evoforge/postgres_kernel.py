@@ -134,6 +134,14 @@ class PostgresKernel:
             return self._reserve(conn, call_id, period, amount_micros)
 
     def _reserve(self, conn, call_id: UUID, period: date, amount_micros: int) -> ReservationState:
+        self._require_usage_guards(conn)
+        guard = conn.execute("SELECT 1 FROM pg_trigger WHERE tgrelid='core.cost_reservations'::regclass "
+                             "AND tgname='tenant_credit_hold' AND (tgenabled='A' OR "
+                             "(tgenabled='O' AND current_setting('session_replication_role')<>'replica')) "
+                             "AND tgfoid='runtime.track_tenant_credit_hold()'::regprocedure "
+                             "AND NOT tgisinternal").fetchone()
+        if not guard:
+            raise KernelUnavailable('tenant credit guard is not installed and enabled')
         # Same lock as core.reserve_cost, acquired before its idempotency
         # lookup so concurrent retries of one call also remain idempotent.
         conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
@@ -155,6 +163,7 @@ class PostgresKernel:
     def mark_sent(self, call_id: UUID, expected_builder_model: str = "muse-spark-1.3") -> ReservationState:
         call_id = UUID(str(call_id))
         with self._transaction() as conn:
+            self._require_usage_guards(conn)
             previous = self._read(conn, call_id, lock=True)
             if previous.status != "RESERVED" or previous.outcome != "RESERVED":
                 raise KernelRejected("provider call already sent or reservation closed")
@@ -184,6 +193,18 @@ class PostgresKernel:
                 return previous
             if previous.status != "RESERVED" or previous.outcome not in {"RESERVED", "SENT"}:
                 raise KernelRejected("unknown or confirmed calls require receipt reconciliation")
+            self._require_usage_guards(conn)
+            # Receipt ingestion takes this same reservation lock. Read usage in
+            # a fresh statement after any lock wait so a committed receipt can
+            # never be followed by a "not accepted" release. Legacy ctx rows,
+            # estimates and zero quotes also require reconciliation.
+            conn.execute("SET LOCAL ROLE ctx_gateway")
+            usage = conn.execute("SELECT 1 FROM ctx.provider_usage_receipts WHERE tenant_id=%s "
+                                 "AND project_id=%s AND call_id=%s LIMIT 1",
+                                 (self.scope.tenant_id, self.scope.project_id, call_id)).fetchone()
+            conn.execute("SET LOCAL ROLE core_app")
+            if usage:
+                raise KernelRejected("recorded usage requires receipt reconciliation")
             if previous.outcome == "SENT":
                 conn.execute("UPDATE core.side_effect_intents SET status='FAILED' WHERE tenant_id=%s "
                              "AND kind='provider.call' AND idempotency_key=%s",
@@ -192,6 +213,18 @@ class PostgresKernel:
                          "AND project_id=%s AND request_key=%s",
                          (self.scope.tenant_id, self.scope.project_id, str(call_id)))
             return self._read(conn, call_id)
+
+    def _require_usage_guards(self, conn) -> None:
+        installed = conn.execute("SELECT count(*) AS installed FROM pg_trigger g "
+            "JOIN pg_class c ON c.oid=g.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE NOT tgisinternal "
+            "AND tgqual IS NULL AND (tgenabled='A' OR "
+            "(tgenabled='O' AND current_setting('session_replication_role')<>'replica')) AND ("
+            "(n.nspname='core' AND c.relname='cost_reservations' AND tgname='usage_release_guard' AND tgtype=19 "
+            "AND tgfoid=to_regprocedure('runtime.reject_usage_release()')) OR "
+            "(n.nspname='ctx' AND c.relname='provider_usage_receipts' AND tgname='usage_reservation_lock' AND tgtype=7 "
+            "AND tgfoid=to_regprocedure('runtime.lock_usage_reservation()')))").fetchone()['installed']
+        if installed != 2:
+            raise KernelUnavailable('receipt and release guards are not installed and enabled')
 
     def settle_reservation(self, call_id: UUID, receipt_id: UUID, customer_micros: int) -> ReservationState:
         call_id, receipt_id = UUID(str(call_id)), UUID(str(receipt_id))
@@ -242,8 +275,33 @@ class PostgresKernel:
         if not re.fullmatch(r"(?:[a-f0-9]{40}|[a-f0-9]{64})", head_sha) or not re.fullmatch(r"[a-f0-9]{64}", policy_hash):
             raise ValueError("immutable head SHA and policy hash required")
         with self._transaction() as conn:
+            anchor = conn.execute("SELECT c.head_sha,c.author_agent_id,t.risk_level,r.policy_hash,r.harness_version "
+                                  "FROM core.candidates c JOIN core.tasks t USING(tenant_id,project_id,task_id) "
+                                  "JOIN core.runs r USING(tenant_id,project_id,run_id) "
+                                  "WHERE c.tenant_id=%s AND c.project_id=%s AND c.candidate_id=%s "
+                                  "FOR SHARE OF c,t,r",
+                                  (self.scope.tenant_id,self.scope.project_id,candidate_id)).fetchone()
+            if not anchor:
+                raise KernelNotFound('candidate not found in scope')
+            if anchor['head_sha']!=head_sha or anchor['policy_hash']!=policy_hash:
+                raise KernelRejected('merge head or policy differs from the current run')
             conn.execute("SELECT core.authorize_merge(%s,%s,%s,%s,%s)",
                          (self.scope.tenant_id, self.scope.project_id, candidate_id, head_sha, policy_hash))
+            if anchor['risk_level'] in {'HIGH','CRITICAL'}:
+                # now() stays fixed at transaction start, including lock waits.
+                # Qualification must still be valid at the actual decision time.
+                current = conn.execute("WITH instant AS MATERIALIZED (SELECT clock_timestamp() AS checked_at) "
+                    "SELECT EXISTS(SELECT 1 FROM core.reviews v JOIN core.reviewer_qualifications q "
+                    "ON q.tenant_id=v.tenant_id AND q.agent_id=v.reviewer_agent_id CROSS JOIN instant "
+                    "WHERE v.tenant_id=%s AND v.project_id=%s AND v.candidate_id=%s AND v.head_sha=%s "
+                    "AND v.verdict='approve' AND v.reviewer_agent_id<>%s AND v.context_independent "
+                    "AND v.spec_tests_sealed_at IS NOT NULL AND v.diff_first_read_at IS NOT NULL "
+                    "AND q.risk_level=%s AND q.harness_version=%s "
+                    "AND q.qualified_at<=instant.checked_at AND q.expires_at>instant.checked_at) AS qualified",
+                    (self.scope.tenant_id,self.scope.project_id,candidate_id,head_sha,anchor['author_agent_id'],
+                     anchor['risk_level'],anchor['harness_version'])).fetchone()['qualified']
+                if not current:
+                    raise KernelRejected('reviewer qualification is no longer current')
 
     def record_receipt(self, document: dict) -> dict:
         """Atomically store a canonical Broker/reconciler receipt and its ctx row."""

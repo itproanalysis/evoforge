@@ -2,7 +2,10 @@
 FROM node:20-slim AS builder
 WORKDIR /app
 COPY package.json package-lock.json* pnpm-lock.yaml* ./
-RUN if [ -f pnpm-lock.yaml ]; then npm install -g pnpm && pnpm install --frozen-lockfile; elif [ -f package-lock.json ]; then npm ci; else npm install; fi
+# Pin npm to the version the lockfile was generated with (npm 11):
+# the stock npm 10 in node:20-slim resolves one transitive pin differently
+# (@swc/helpers) and fails `npm ci` on an otherwise consistent tree.
+RUN npm install -g npm@11.12.1 && if [ -f pnpm-lock.yaml ]; then npm install -g pnpm && pnpm install --frozen-lockfile; elif [ -f package-lock.json ]; then npm ci; else npm install; fi
 COPY . ./
 ARG NEXT_PUBLIC_API_BASE=""
 ENV NEXT_PUBLIC_API_BASE=$NEXT_PUBLIC_API_BASE

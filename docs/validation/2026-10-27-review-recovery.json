@@ -1,0 +1,92 @@
+{
+  "date": "2026-10-27",
+  "revision": "4bbbf6de87d4fc0dde02ffa9b78974d116237d60",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Recover completed Critic call evidence with mission review snapshots; require scoped, typed dependencies and atomic dependency closure",
+  "prior_implementation_revision": "293cba5",
+  "checks": {
+    "pre_fix_regression_subset": {
+      "failed": 8,
+      "deselected": 119,
+      "tests_added_before_implementation": true
+    },
+    "api": {
+      "passed": 463,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 131,
+      "new_recovery_cases": 13
+    },
+    "sdk_mock_http_interruption_cases": {
+      "passed": 3,
+      "included_in_postgresql_count": true
+    },
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "limitations": [
+    "Support branch only; Muse T22 main, evaluation, UI and unpromoted sealed tests preserved",
+    "Official SDK exercised with in-memory HTTP transport; no paid Muse call or real provider bill",
+    "Recovered provider_call records preserve existing estimated-memory-ledger audit evidence, not canonical financial settlement",
+    "Recovery requires an already stored review aggregate; UNKNOWN calls without one still require pre-dispatch binding and reconciliation",
+    "Public command/cost/performance persistence, complete canonical approval integration and production migration/deployment remain incomplete",
+    "Reapply extension 006 on test databases that used the previous unpublished draft",
+    "Default muse-spark-1.3, API min=max=1, and frozen v4.2 contracts unchanged"
+  ],
+  "source_sha256": {
+    "services/api/evoforge/postgres_missions.py": "9b36317d220fbc5d2120b6466b8c66503961ae9109ed2d81740f776a3fa6903d",
+    "services/api/migrations/006_api_missions.sql": "e35c67a50d0951489f99cacdff1b355349e73462b05440802aa6be21424ce123",
+    "services/api/tests/test_postgres_kernel.py": "ec430f0b1dfefe169eec6cc364e5eea4a982ac6a119976ea0f1b3898eec3ab6c",
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/missions.py": "8123aa664ca528e72d2be1e9594104036a49e7df3a5291117764e256a3c60304",
+    "services/api/evoforge/critic.py": "6d790c38a3d435828bfb71b4284c25d5373102f4e700ec845ebbfb632ccc2ac8",
+    "services/api/evoforge/broker_meta.py": "f50d55a3a54355db474c63ebbc99f53db878917680d055c5135847d72e5ea29c",
+    "services/api/evoforge/postgres_state.py": "e93864167e4efe4150adcb84395aebf517b1f23444ebbf55166e0bdaf9c9322f",
+    "services/api/evoforge/postgres_kernel.py": "fc87c6961bcfe0a83c3b737f2ed8438de8f17047ce03ea5d6eb377c1a684e0e8",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767"
+  },
+  "logs": {
+    "validation-review-recovery-before.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\review-recovery-20261027-qvkgnfg8\\validation-review-recovery-before.log",
+      "sha256": "abbb2d056fdadab1b9d43007cf9267a840d7e4b3093e7c39fe790c96359a0db5"
+    },
+    "validation-review-recovery-focused.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\review-recovery-20261027-qvkgnfg8\\validation-review-recovery-focused.log",
+      "sha256": "7f1cb3e6245728c5384364c38dbaebe4a8c937f899853f2809cdd4286c785061"
+    },
+    "validation-review-recovery-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\review-recovery-20261027-qvkgnfg8\\validation-review-recovery-api.log",
+      "sha256": "7303348be40322e77af9cf0dfac56e7240c4b3db5b9ae7972c1107c9931b6f0a"
+    },
+    "validation-review-recovery-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\review-recovery-20261027-qvkgnfg8\\validation-review-recovery-postgres.log",
+      "sha256": "b4d08d1f216f9c24cdd5b1f88bc20024e102740e4c86d862521018fb6c60e137"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\review-recovery-20261027-qvkgnfg8\\validation-kernel.log",
+      "sha256": "455717779d844147bafbf6f0795bb1ef4fc6b979c125d172f728f93dd6691970"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\review-recovery-20261027-qvkgnfg8\\validation-postgres.log",
+      "sha256": "716d0a5f6aeb11fe7b87f844e78586c2de19fe3942257e7a12ef869041ab4095"
+    },
+    "validation-review-recovery-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\review-recovery-20261027-qvkgnfg8\\validation-review-recovery-contract.log",
+      "sha256": "8235086884862af683dd5deec0d8b64a4b3383461a1b3d5add186dd06b79da07"
+    },
+    "validation-review-recovery-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\review-recovery-20261027-qvkgnfg8\\validation-review-recovery-web.log",
+      "sha256": "f02c6d4a0c516b37d9731e8364e7c7f174a50db2f05b68d0505401f75c9b15e2"
+    }
+  }
+}

@@ -20,6 +20,27 @@ from evoforge.postgres_kernel import (  # noqa: E402
 TOKEN = "test-only-kernel-service-token-not-a-real-secret"
 
 
+def test_candidate_registration_requires_service_auth_before_any_adapter(api):
+    body={'call_id':str(api['call']),'evidence_id':'ev_builder','head_sha':'a'*40}
+    assert api['client'].post('/v1/kernel/candidates',json=body).status_code==401
+    assert api['client'].get('/v1/kernel/candidates/'+str(uuid4())).status_code==401
+    api['factory'].assert_not_called()
+
+
+def test_candidate_registration_accepts_only_bound_ids_and_immutable_head(api,monkeypatch):
+    from evoforge import postgres_candidates
+    register=Mock(return_value={'candidate_id':str(uuid4()),'status':'PROPOSED'})
+    monkeypatch.setattr(postgres_candidates,'register',register)
+    body={'call_id':str(api['call']),'evidence_id':'ev_builder','head_sha':'a'*40}
+    for extra in ({'tenant_id':str(uuid4())},{'source_repo':'C:/private'},{'status':'MERGED'},
+                  {'head_sha':'main'},{'head_sha':'a'*64}):
+        assert api['client'].post('/v1/kernel/candidates',headers=api['headers'],json={**body,**extra}).status_code==422
+    register.assert_not_called()
+    result=api['client'].post('/v1/kernel/candidates',headers=api['headers'],json=body)
+    assert result.status_code==200 and result.json()['status']=='PROPOSED'
+    register.assert_called_once_with(api['kernel'],api['call'],'ev_builder','a'*40)
+
+
 @pytest.fixture
 def api(monkeypatch):
     tenant, project, call = uuid4(), uuid4(), uuid4()
@@ -57,6 +78,58 @@ def test_unauthenticated_requests_cannot_create_database_adapter(api, authorizat
     assert response.headers["www-authenticate"] == "Bearer"
     api["factory"].assert_not_called()
     assert TOKEN not in response.text
+
+
+def test_runner_evidence_ingestion_and_reads_require_the_internal_service_credential(api):
+    candidate=uuid4()
+    body={'candidate_id':str(candidate),'call_id':str(api['call']),'evidence_id':'ev_private'}
+    for authorization in (None,'Bearer wrong-token','Basic wrong-token'):
+        headers={'Authorization':authorization} if authorization else {}
+        writes=api['client'].post('/v1/kernel/candidate-runs',json=body,headers=headers)
+        reads=api['client'].get(f'/v1/kernel/candidates/{candidate}/runner-evidence/ev_private',headers=headers)
+        assert writes.status_code==reads.status_code==401
+        assert writes.headers['www-authenticate']==reads.headers['www-authenticate']=='Bearer'
+        assert TOKEN not in writes.text+reads.text
+    api['factory'].assert_not_called()
+
+
+def test_canonical_command_lifecycle_requires_service_auth_before_creating_adapter(api):
+    cid='cmd_'+uuid4().hex
+    client=api['client']
+    responses=[client.post('/v1/kernel/commands',json={'goal':'g','idempotency_key':'k'}),
+               client.get('/v1/kernel/commands/'+cid),
+               client.post('/v1/kernel/commands/'+cid+'/dispatch',json={}),
+               client.post('/v1/kernel/commands/'+cid+'/complete',json={'response':{'command_id':cid}})]
+    assert all(r.status_code==401 and TOKEN not in r.text for r in responses)
+    api['factory'].assert_not_called()
+
+
+def test_google_id_token_and_kernel_header_must_both_pass_when_id_auth_is_enabled(api,monkeypatch):
+    import main
+    # An explicit wrong header is never rescued by a valid legacy Bearer.
+    assert api['client'].post('/v1/kernel/reservations',json=api['body'],headers={
+        **api['headers'],'X-Evoforge-Kernel-Token':'wrong'}).status_code==401
+    api['factory'].assert_not_called()
+    audience='https://api.test.invalid'
+    service='approved-web@test.invalid'
+    monkeypatch.setenv('EVO_REQUIRE_ID_TOKEN','1')
+    monkeypatch.setenv('EVO_API_URL',audience)
+    monkeypatch.setenv('EVO_WEB_SERVICE_ACCOUNT',service)
+    def identity(token,expected):
+        assert expected==audience
+        if token!='trusted-test-id':
+            raise ValueError('invalid ID token')
+        return {'aud':audience,'email':service}
+    monkeypatch.setattr(main.auth_module,'verify_id_token',identity)
+    valid={'Authorization':'Bearer trusted-test-id','X-Evoforge-Kernel-Token':TOKEN}
+    assert api['client'].post('/v1/kernel/reservations',json=api['body'],headers={
+        **valid,'Authorization':'Bearer invalid-test-id'}).status_code==401
+    assert api['client'].post('/v1/kernel/reservations',json=api['body'],headers={
+        'Authorization':valid['Authorization']}).status_code==401
+    api['factory'].assert_not_called()
+    response=api['client'].post('/v1/kernel/reservations',json=api['body'],headers=valid)
+    assert response.status_code==200 and TOKEN not in response.text
+    api['factory'].assert_called_once()
 
 
 @pytest.mark.parametrize("missing", ["EVO_TENANT_ID", "EVO_PROJECT_ID", "DATABASE_URL", "EVO_KERNEL_TOKEN"])

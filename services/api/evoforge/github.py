@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 from urllib.parse import quote
 
 from evoforge.patch import apply_unified_diff, paths_in_diff
@@ -19,6 +20,19 @@ def _env() -> tuple[str, str]:
 
 def _h(tok: str) -> dict:
     return {"Authorization": f"Bearer {tok}", "Accept": "application/vnd.github+json"}
+
+
+def _base_sha(c, repo: str, tok: str, base: str) -> str:
+    response = c.get(f"{API}/repos/{repo}/git/ref/heads/{quote(base)}", headers=_h(tok))
+    if response.status_code != 200:
+        raise RuntimeError(f"base {base} lookup failed: {response.status_code} {response.text[:200]}")
+    try:
+        sha = response.json()["object"]["sha"]
+    except (KeyError, TypeError, ValueError):
+        raise RuntimeError(f"base {base} returned an invalid commit") from None
+    if not isinstance(sha, str) or not sha:
+        raise RuntimeError(f"base {base} returned an invalid commit")
+    return sha
 
 
 def _base_files(c, repo: str, tok: str, paths: list[str], base: str) -> tuple[dict, dict]:
@@ -63,17 +77,25 @@ def _validate_extra_path(path: str) -> None:
 
 
 def create_pr(diff: str, title: str, body: str, branch: str, base: str = "main", client=None,
-              extra_files: dict | None = None) -> dict:
+              extra_files: dict | None = None, *, expected_base_sha: str | None = None) -> dict:
     """Apply `diff` to `base` (PatchError before any write), commit to `branch`, open PR.
 
     `extra_files` maps new test paths -> text; each is committed as a new file
     on the same branch before the PR opens. Collisions (exists at base or
     touched by the diff) raise PatchError; escapes raise PatchError.
+
+    With expected_base_sha, file and collision reads use that immutable commit
+    and the target branch must still point at it at both preflight checks.
+    The legacy branch-ref path detects branch movement across its reads.
     """
     import httpx
 
     from evoforge.patch import PatchError
 
+    if expected_base_sha is not None and (
+            not isinstance(expected_base_sha, str)
+            or not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", expected_base_sha)):
+        raise PatchError("expected base SHA must be an immutable Git object ID")
     tok, repo = _env()
     paths = paths_in_diff(diff)
     extra = dict(extra_files or {})
@@ -85,24 +107,26 @@ def create_pr(diff: str, title: str, body: str, branch: str, base: str = "main",
             raise PatchError(f"test file is not text: {p}")
     c = client or httpx.Client(timeout=30)
     try:
-        texts, shas = _base_files(c, repo, tok, paths, base)
+        sha = _base_sha(c, repo, tok, base)
+        if expected_base_sha is not None and sha != expected_base_sha:
+            raise PatchError("base branch differs from the verified base SHA")
+        read_ref = expected_base_sha if expected_base_sha is not None else base
+        texts, shas = _base_files(c, repo, tok, paths, read_ref)
         if extra:
             for p in extra:
                 r = c.get(f"{API}/repos/{repo}/contents/{quote(p)}", headers=_h(tok),
-                          params={"ref": base})
+                          params={"ref": read_ref})
                 if r.status_code == 404:
                     continue
                 if r.status_code == 200:
                     raise PatchError(f"test file already exists at base: {p}")
                 raise RuntimeError(f"read {p}@{base} failed: {r.status_code} {r.text[:200]}")
         changed = apply_unified_diff(texts, diff)  # raises PatchError; nothing written yet
-        b = c.get(f"{API}/repos/{repo}/git/ref/heads/{base}", headers=_h(tok))
-        if b.status_code != 200:
-            raise RuntimeError(f"base {base} lookup failed: {b.status_code} {b.text[:200]}")
-        sha = b.json()["object"]["sha"]
+        if _base_sha(c, repo, tok, base) != sha:
+            raise PatchError("base branch changed during PR preflight")
         r = c.post(f"{API}/repos/{repo}/git/refs", headers=_h(tok),
                    json={"ref": f"refs/heads/{branch}", "sha": sha})
-        if r.status_code not in (200, 201) and "already exists" not in r.text:
+        if r.status_code not in (200, 201):
             raise RuntimeError(f"branch create failed: {r.status_code} {r.text[:200]}")
         for path, text in changed.items():
             url = f"{API}/repos/{repo}/contents/{quote(path)}"

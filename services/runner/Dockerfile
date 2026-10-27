@@ -12,8 +12,10 @@ WORKDIR /app
 COPY services/runner/requirements.txt /app/services/runner/requirements.txt
 RUN pip install --no-cache-dir -r /app/services/runner/requirements.txt
 
-# Only the Runner app (no API code, no contracts, no secrets).
+# Runner app only; no API runtime, contracts or secrets.
 COPY services/runner/ /app/services/runner/
+# Shared stdlib-only provenance hashing; no API dependencies or credentials.
+COPY services/api/evoforge/runner_attestation.py /app/services/runner/runner_attestation.py
 
 WORKDIR /app/services/runner
 USER evoforge

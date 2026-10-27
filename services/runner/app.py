@@ -478,6 +478,16 @@ def run(req: RunRequest):
         except _RunnerError as e:
             raise HTTPException(400, str(e))
         try:
+            from evoforge import runner_attestation
+        except ModuleNotFoundError:
+            # The production image contains this stdlib-only shared utility,
+            # without importing or copying the API runtime.
+            import runner_attestation
+        try:
+            provenance = runner_attestation.prepare(base.lower(), req.diff, visible, sealed)
+        except ValueError:
+            raise HTTPException(503, 'Runner image identity configuration is invalid') from None
+        try:
             _apply_diff(dest, req.diff)
         except _RunnerError as e:
             raise HTTPException(400, str(e))
@@ -497,8 +507,8 @@ def run(req: RunRequest):
             fh.write("[pytest]\n")
         held = _run_suite(dest, sealed_dir, os.path.join(tmpbase, f"held-{secrets.token_hex(8)}.xml"),
                           sealed, timeout_s, sealed_ini=ini)
-        return {"base": base.lower(), "visible": vis, "heldout": held,
-                "heldout_kinds": [t["kind"] for t in sealed]}
+        return runner_attestation.attach({"base": base.lower(), "visible": vis, "heldout": held,
+                "heldout_kinds": [t["kind"] for t in sealed]}, provenance)
     finally:
         _remove_tree(tmpbase)
 

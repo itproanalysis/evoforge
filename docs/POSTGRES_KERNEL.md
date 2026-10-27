@@ -23,6 +23,13 @@
 
 호출을 보내기 직전에 `mark_sent`로 기록한다.
 확실한 미접수만 `release_not_accepted`로 해제한다.
+같은 tenant/project/call의 영수증이 이미 있으면 정산 전에도 해제를 거부한다.
+문서 없는 기존 ctx 영수증·추정 영수증·0원 견적도 대사를 기다리며 예약을 유지한다.
+영수증 저장과 같은 예약 행 잠금을 사용하고, 잠금 대기 뒤 새 statement로 조회해 직전에 커밋된 영수증도 확인한다.
+정상 미접수의 멱등 해제와 다른 호출/프로젝트의 영수증 격리는 유지한다.
+확장 009는 별도 ctx 적재와 직접 예약 SQL도 같은 행 잠금으로 직렬화한다.
+새 예약·전송·실제 해제는 두 트리거가 실행되지 않는 상태이면 503으로 거부한다.
+적용 순서·권한·직접 SQL 검증은 [DB 영수증/해제 보호](USAGE_RELEASE_GUARDS.md)를 따른다.
 결과가 불명확하면 `mark_unknown`으로 기록하고 금액을 계속 예약한다.
 새 어댑터 인스턴스에서도 UNKNOWN이 유지되며 무조건 재전송·환불할 수 없다.
 
@@ -74,3 +81,21 @@ Generate/Review의 패킷·영수증 연결은 계속 남아 있다.
 
 Builder 패킷·동의·task fencing과 예약을 함께 확인하는 지원 경로는
 [BUILDER_PREFLIGHT.md](BUILDER_PREFLIGHT.md)에 기록했다.
+
+테넌트의 여러 프로젝트가 같은 선불 잔액을 초과해 예약하는 RLS 경계는 확장 007에서 추가 검사한다.
+신규 예약 어댑터는 이 가드가 없거나 실행되지 않는 설정이면 503으로 거부한다.
+기존 데이터 백필과 범위는 [TENANT_CREDIT_GUARD.md](TENANT_CREDIT_GUARD.md)를 따른다.
+
+## 병합 승인 시점의 정책과 자격
+
+어댑터는 후보·task·run 행의 공유 잠금 아래에서 요청 head/policy가 현재 서버 run과 일치하는지 확인한다.
+정본 `core.authorize_merge`로 모든 필수 게이트·독립 리뷰·HIGH/CRITICAL 사람 승인 등을 검사한다.
+HIGH/CRITICAL은 같은 risk/harness의 context-independent spec-first approve 검증자 자격이 실제 DB 시각에도 유효해야 한다.
+트랜잭션 시작 시각에 고정된 `now()`만으로 지연/잠금 대기 후 만료된 자격을 승인하지 않는다.
+자격 시험 모듈·정본 함수·필수 증거를 변경하거나 새 승인/리뷰를 생성하지 않는다.
+
+이 API는 검사 시점의 판정이다. 실제 외부 병합 전에 다시 검사하고 같은 expected head를 사용하는 절차가 필요하며,
+이 어댑터는 GitHub merge를 실행하지 않는다. 검증 원본은 `docs/validation/2026-10-27-merge-freshness.json`을 따른다.
+수정 전 새 회귀 **2 failed**, 수정 후 API **465 passed·1 skipped**·실제 PostgreSQL **147 passed**,
+참조 **112개**·SQL **96개**·계약 **0 failure**·웹 빌드 통과. 만료 거부와 새 유효 자격의 정상 승인을 함께 확인했다.
+게이트·리뷰·사람 승인·자격은 이 검사의 합성 DB fixture이며 실제 운영 승인이나 외부 병합 완료 증명이 아니다.

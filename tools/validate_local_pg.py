@@ -111,7 +111,7 @@ def main() -> int:
         elif options.kernel_tests:
             env["EVO_TEST_DATABASE_URL"] = f"postgresql://postgres@127.0.0.1:{port}/postgres"
             result = _run([sys.executable, "-m", "pytest", "services/api/tests/test_postgres_kernel.py", "-q"],
-                          env, timeout=180)
+                          env, timeout=600)
             (ROOT / ".local/validation-kernel.log").write_text(result.stdout + result.stderr, encoding="utf-8")
             print(result.stdout, end="", flush=True)
             if result.stderr:

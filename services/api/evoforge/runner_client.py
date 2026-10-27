@@ -128,6 +128,8 @@ def _validate_counts(section: object, name: str) -> dict:
         val = section.get(key)
         if isinstance(val, bool) or not isinstance(val, int) or val < 0:
             raise RunnerClientError(f"malformed runner reply ({name}.{key})")
+    if section['pass'] > section['n']:
+        raise RunnerClientError(f"malformed runner reply ({name}: pass exceeds n)")
     if not isinstance(section.get("timed_out"), bool):
         raise RunnerClientError(f"malformed runner reply ({name}.timed_out)")
     exit_code = section.get("exit_code")
@@ -214,8 +216,19 @@ def run_via_runner(source_repo, base_sha, diff, visible_tests, sealed_tests,
         kinds = data.get("heldout_kinds")
         if not isinstance(kinds, list) or any(not isinstance(k, str) for k in kinds):
             raise RunnerClientError("malformed runner reply (heldout_kinds)")
-        return {"base": base, "hygiene": [], "visible": visible,
-                "heldout": heldout, "heldout_kinds": list(kinds)}
+        if data.get('hygiene', []) != []:
+            raise RunnerClientError('runner sandbox hygiene failed')
+        result = {"base": base, "hygiene": [], "visible": visible,
+                  "heldout": heldout, "heldout_kinds": list(kinds)}
+        from evoforge import runner_attestation
+        try:
+            expected_image = runner_attestation.configured_image()
+            if expected_image or 'attestation' in data:
+                result['attestation'] = data.get('attestation')
+                runner_attestation.verify(result,effective_base,diff or '',visible_tests,sealed_tests,expected_image)
+        except (ValueError,TypeError,KeyError,UnicodeError):
+            raise RunnerClientError('Runner provenance validation failed') from None
+        return result
     finally:
         if bundle_path:
             try:

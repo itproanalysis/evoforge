@@ -1,0 +1,129 @@
+{
+  "date": "2026-10-27",
+  "revision": "afecb31d3e41dbfd4421879c6043b8006429c841",
+  "prior_implementation_revision": "b4caf388ea77dd7273c1ee7028f8052cc254f3f0",
+  "integrated_main_revision": "04bafa5ef6426328d94059caec3cd31a8e114baf",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Database trigger serialization of independent ctx receipt writers and direct core reservation releases, plus fail-closed adapter readiness before reserve/send/release",
+  "checks": {
+    "pre_fix_regression_subset": {
+      "failed": 10,
+      "deselected": 156
+    },
+    "post_fix_regression_subset": {
+      "passed": 11,
+      "deselected": 155
+    },
+    "api": {
+      "passed": 485,
+      "skipped": 1,
+      "seconds": 315.0
+    },
+    "live_postgresql_kernel": {
+      "passed": 166,
+      "new_database_usage_guard_cases": 11,
+      "seconds": 158.98,
+      "postgresql_version": "15.19"
+    },
+    "independent_database_accounts": "actual core_app and ctx_gateway session authorization, no shared account-role memberships needed",
+    "concurrency": "both insertion-first and release-first orders wait on PostgreSQL row locks, then refuse the conflicting second operation",
+    "atomicity": "failed direct release rolls back intent mutation and retains tenant hold; rejected late receipt leaves no ctx row",
+    "availability": "missing, disabled or replica-only configuration of either trigger blocks new reserve/send/release with 503 and no new reservation",
+    "migration": "reapplied without core function/policy changes, FORCE RLS preserved, helpers inaccessible to app/gateway, temporary CREATE revoked",
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "limitations": [
+    "Frozen core reserve/settle/authorize functions, RLS policies, financial history and Muse model defaults unchanged",
+    "Apply extension 009 before deploying the new API; production DB was not changed",
+    "Existing released reservations with conflicting historical bills are not rewritten or automatically charged; zero-price and billing-correction policies remain incomplete",
+    "Privileged schema owners can perform DDL; administrator bypass remains an operations access-control responsibility",
+    "Context receipts without a matching canonical UUID reservation remain permitted; full public Broker/cost wiring and source receipt verification remain incomplete",
+    "Real PostgreSQL, Git and Runner tests execute while model transports, receipt billing and approval/qualification evidence are synthetic fixtures",
+    "Support branch only; priority Muse T22 main/evaluation/UI claim and unpromoted sealed tests preserved; no paid call, production migration, actual GitHub merge, Docker image build or deployment performed",
+    "muse-spark-1.3 default, no automatic alternate model, heartbeat remains active"
+  ],
+  "source_sha256": {
+    "services/api/evoforge/postgres_kernel.py": "29160d50c5fdea92d4ff575eb59cd0319b24e273b7b8cebea536f38be6996cf1",
+    "services/api/tests/test_postgres_kernel.py": "034ebfc3708f3727d9e448e36b1749978d68ad93449241d88d2d8a8bcc59f015",
+    "services/api/evoforge/kernel_api.py": "86c0919f008e4d99f997f4f67afb3b2f8411536dacd62cb8cfbe59062f074de1",
+    "services/api/evoforge/postgres_commands.py": "e459ba8a31a7f1a1b4358f7f2759a14c098ec1217c15eaaf8d603791c600ab52",
+    "services/api/evoforge/postgres_missions.py": "9b36317d220fbc5d2120b6466b8c66503961ae9109ed2d81740f776a3fa6903d",
+    "services/api/evoforge/postgres_candidates.py": "d6463307ba76f35d2bfd3230ba7f67ee7a384d0cd1893c475c0b45bd16cf276f",
+    "services/api/evoforge/postgres_run_evidence.py": "aceb2901625ef5aec7c1875987cd844e0d8108c030414d6debfdea28983ec4ca",
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767",
+    "services/api/evoforge/critic.py": "15a0995fdd21f4cff81894f85bf0c550518cec8771e2f34736040148ba631bb9",
+    "services/api/evoforge/broker_meta.py": "f50d55a3a54355db474c63ebbc99f53db878917680d055c5135847d72e5ea29c",
+    "services/api/evoforge/context_mesh.py": "74fe0fe28bbb5db585af0d5e84d7c6590283705b97924c7c2e30d0f7efa59edf",
+    "services/api/evoforge/review_qualification.py": "e8c6c7a38ea68757b2e769f0761dfdb00d4ee64e198d90c84b975a357cb192ef",
+    "services/api/evoforge/runtime_guards.py": "98c4eaaf832e8cff8310fd6dc0caefab8f345755d0ce7684b2dae59aae33f345",
+    "services/api/tests/test_context_mesh_cr.py": "a28eb03a33f1fb1b3f7e722ad3d183d3010f8eabccc44d5e88aab1d30159d118",
+    "services/api/tests/test_review_qualification_cr.py": "ef5565f1f6bc2cf857c3a7b5c38126da8aee14354a5c5e0bd9b579576c3f1d4c",
+    "services/api/tests/test_runtime_guards_cr.py": "ffbddfb4e4094d12445548a4c034b34907d85bd033a596bd2dac9c9b8ad5c691",
+    "services/api/tests/test_muse_runner.py": "fa0402c94b1a6d9de9a045dd025059d9517fdcafa0057be9ebc3898c5fb2abf0",
+    "apps/web/Dockerfile": "e1409b6037f06efafacb28b08fa09abe385d75d04496a4ce651bab85ea570930",
+    "apps/web/app/layout.tsx": "64f1cf1dc98c01ccaef73b8d5b411a64566fb5062ebd957d6a6c0d08e9c3540c",
+    "cloudbuild.yaml": "9814f271ff779d729effc06fe66d384a31a1074c7b090c1b5dea8dd20fe6272f",
+    "infra/gcp/cloudbuild.yaml": "9814f271ff779d729effc06fe66d384a31a1074c7b090c1b5dea8dd20fe6272f",
+    "infra/gcp/cloudbuild.prod.yaml": "ca6dbc411d295c309849dcf47bd5a091c99367c704a4126ab4b831b94fa2f942",
+    "tools/validate_local_pg.py": "2c122b5c70679ecd08ea5e52fce598a3ab0fa2ec0296bff80aa86ef3b5703ad7",
+    "docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql": "294f2961b3012ac18ade1efacb324fbb14721c76a41782864a0c0d977a262636",
+    "services/api/migrations/001_receipt_documents.sql": "95b2b3dc427e65181bf976b693cbe1c6db5ac7274fc8d6e35b140c8f8574c1f6",
+    "services/api/migrations/002_builder_call_bindings.sql": "388c5e1defa87119e85979c862b5bae3fdef64ae82b0699786ff49a65b7fc35c",
+    "services/api/migrations/003_api_evidence.sql": "a5873cad67ee4a4ded041923257db06ee1a4dfe82c99bbe4a6e108d26d4bcaea",
+    "services/api/migrations/004_api_commands.sql": "a50570f607a3d52c6bb20fb582c38ac16b78523ca8f6d24b10805b35cbd9f378",
+    "services/api/migrations/005_runner_candidates.sql": "3d2f4a17e70d05b772719ea42c9b53e8b438001191dd80f4a85651f6b04e51cb",
+    "services/api/migrations/006_api_missions.sql": "e35c67a50d0951489f99cacdff1b355349e73462b05440802aa6be21424ce123",
+    "services/api/migrations/007_tenant_credit_holds.sql": "36e211e5bb45282d84a5d8e215e869aa4e6745b8e9c13fc3704de90087bc44e2",
+    "services/api/migrations/008_builder_candidates.sql": "ee2b9f7dedb6c5e3d20bf8a1f13c2906792ad3b7c25c456365261f85f6afb616",
+    "services/api/evoforge/postgres_receipts.py": "e6be3a7e65b41778292caa062c47b462017537e7438e5e555edabc7429285b7c",
+    "services/api/tests/receipt_fixtures.py": "2ee0b227a226b0454a74dd3c5880e2cc42a49f7eb95b99e168f8a621c0220648",
+    "docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql": "8768b9552148579363932b7d69f3e6f1abfee95610dc5c3c8abc78a4bd4fb5ff",
+    "services/api/migrations/009_usage_release_guards.sql": "4d20c1e5c3498eea9afa63193867addef6231dd44710ef18ca2e08c0dded7062",
+    "services/api/.env.example": "73d2d1b56725bb146f0fa389f00a0a27ae5d0f33db75ee4317183ec8961fafd4"
+  },
+  "logs": {
+    "validation-db-usage-guard-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\db-usage-guard-20261027-ur5bi8s3\\validation-db-usage-guard-api.log",
+      "sha256": "f503163735e61591b2cc7e6c73357a5e47ad8ed87641bf6b6681f09bcc330653"
+    },
+    "validation-db-usage-guard-before.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\db-usage-guard-20261027-ur5bi8s3\\validation-db-usage-guard-before.log",
+      "sha256": "ca5080da95efb6392fe2d7ce04c2ae038f3b88b55306e19aec79c5771a012454"
+    },
+    "validation-db-usage-guard-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\db-usage-guard-20261027-ur5bi8s3\\validation-db-usage-guard-contract.log",
+      "sha256": "fdb9d31431d292e2b63258bfef4e7545a1da8a38acb017da6d0ce969ad4349c4"
+    },
+    "validation-db-usage-guard-focused.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\db-usage-guard-20261027-ur5bi8s3\\validation-db-usage-guard-focused.log",
+      "sha256": "e79793ed45c99afeca60dd64710f95cd082dceffe9efd66eb01b8c92075bf0ec"
+    },
+    "validation-db-usage-guard-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\db-usage-guard-20261027-ur5bi8s3\\validation-db-usage-guard-postgres.log",
+      "sha256": "8de6bd1315977575cbc1c899df56f32cf64a2a9d895ae747d471c77700220a3c"
+    },
+    "validation-db-usage-guard-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\db-usage-guard-20261027-ur5bi8s3\\validation-db-usage-guard-web.log",
+      "sha256": "19f8fa500939aa92acbf4bf906ffb726e475564d4e33646b6ac5e33f639d28b8"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\db-usage-guard-20261027-ur5bi8s3\\validation-kernel.log",
+      "sha256": "7ca1a4027e1032f82712a3e159ff26d84b91249337a135a03e648c0fe074deeb"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\db-usage-guard-20261027-ur5bi8s3\\validation-postgres.log",
+      "sha256": "7b6b4247798e0c10df694b349b3907c263ec739958017b676c08c94eaf49e08b"
+    }
+  }
+}
