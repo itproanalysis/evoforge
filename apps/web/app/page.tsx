@@ -6,11 +6,15 @@ import {
   type LedgerSnapshot,
   type MissionDetail,
   type MissionState,
+  type MissionSummary,
+  type Outcome,
   type PerformanceSnapshot,
   getDashboard,
   getLedger,
   getMission,
   getPerformance,
+  listMissions,
+  listOutcomes,
   postMission,
   postMissionAdvance,
   postMissionCancel,
@@ -42,36 +46,56 @@ function stateColor(s: string) {
   return "#f59e0b";
 }
 
+function round1(val: number): number {
+  return Math.round(val * 10) / 10;
+}
+
 export default function MissionControl() {
   const [goal, setGoal] = useState("Fix flaky login retry");
   const [repoRef, setRepoRef] = useState("HEAD");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [mission, setMission] = useState<MissionDetail | null>(null);
+  const [missions, setMissions] = useState<MissionSummary[]>([]);
+  const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSnapshot | null>(null);
   const [ledger, setLedger] = useState<LedgerSnapshot | null>(null);
   const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
   const stopRef = useRef(false);
+  const selectedIdRef = useRef<string | null>(null);
 
   const refreshState = async (missionId: string | null) => {
+    const targetId = missionId ?? selectedIdRef.current;
     try {
       setDashboard(await getDashboard());
     } catch {}
     try {
       setLedger(await getLedger());
     } catch {}
-    if (missionId) {
+    try {
+      setPerf(await getPerformance());
+    } catch {}
+    try {
+      const out = await listOutcomes();
+      setOutcomes(out.outcomes ?? []);
+    } catch {}
+    let list: MissionSummary[] = [];
+    try {
+      const res = await listMissions();
+      list = res.missions ?? [];
+      setMissions(list);
+    } catch {}
+    const idToLoad = targetId || (list.length > 0 ? list[0].mission_id : null);
+    if (idToLoad) {
+      selectedIdRef.current = idToLoad;
       try {
-        setMission(await getMission(missionId));
+        setMission(await getMission(idToLoad));
       } catch {}
     }
   };
 
   useEffect(() => {
     void refreshState(null);
-    getPerformance()
-      .then(setPerf)
-      .catch(() => {});
   }, []);
 
   // Poll the mission and the dashboard while a mission is active.
@@ -94,6 +118,7 @@ export default function MissionControl() {
           v: String(n),
         })),
         { k: "Active missions", v: String(dashboard.active_missions) },
+        { k: "Validated (WVI)", v: String(dashboard.validated_improvements ?? 0) },
         { k: "Blocked merges", v: String(dashboard.blocked_merges) },
         { k: "Spent", v: fmtCents(dashboard.spent_cents) },
         { k: "Reserved", v: fmtCents(dashboard.reserved_cents) },
@@ -113,6 +138,7 @@ export default function MissionControl() {
     setMission(null);
     try {
       const created = await postMission(goal, repoRef || "HEAD");
+      selectedIdRef.current = created.mission_id;
       let current = await getMission(created.mission_id);
       setMission(current);
       await refreshState(current.mission_id);
@@ -133,8 +159,7 @@ export default function MissionControl() {
       );
     } finally {
       setBusy(false);
-      if (mission) await refreshState(mission.mission_id);
-      else await refreshState(null);
+      await refreshState(selectedIdRef.current);
     }
   };
 
@@ -174,7 +199,7 @@ export default function MissionControl() {
             <>
               비교: <code>{perf.comparison.verdict}</code>{" "}
               {typeof perf.comparison.delta_pp === "number"
-                ? `Δ${perf.comparison.delta_pp.toFixed(1)}%p`
+                ? `Δ${round1(perf.comparison.delta_pp)}%p`
                 : ""}
             </>
           ) : (
@@ -241,6 +266,14 @@ export default function MissionControl() {
             </span>
             <span style={{ fontSize: 13, color: "#aeb9cf" }}>{mission.goal}</span>
           </div>
+          {mission.pr_url ? (
+            <div style={{ fontSize: 13, marginTop: 8 }}>
+              PR:{" "}
+              <a href={mission.pr_url} style={{ color: "#22c55e" }}>
+                {mission.pr_url}
+              </a>
+            </div>
+          ) : null}
           <div style={{ fontSize: 13, marginTop: 8 }}>
             evidence:{" "}
             {mission.evidence_ids.length ? mission.evidence_ids.join(", ") : "—"}
@@ -250,6 +283,68 @@ export default function MissionControl() {
               Evidence Timeline →
             </a>
           </p>
+        </section>
+      ) : null}
+
+      {missions.length > 0 ? (
+        <section style={{ ...card, marginTop: 16 }}>
+          <div style={label}>Live Server Missions (GET /v1/missions)</div>
+          <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+            {missions.map((m) => (
+              <div
+                key={m.mission_id}
+                onClick={() => {
+                  selectedIdRef.current = m.mission_id;
+                  void getMission(m.mission_id).then(setMission).catch(() => {});
+                }}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  padding: 8,
+                  borderRadius: 6,
+                  border: "1px solid #263048",
+                  background: "#0f1524",
+                  cursor: "pointer",
+                  fontSize: 13,
+                }}
+              >
+                <span>
+                  <code>{m.mission_id}</code> · <strong>{m.state}</strong> · {m.goal}
+                </span>
+                <span style={{ color: "#8b96ad" }}>
+                  evidence: {m.evidence_ids.length}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {outcomes.length > 0 ? (
+        <section style={{ ...card, marginTop: 16 }}>
+          <div style={label}>Validated Outcomes · WVI (GET /v1/outcomes)</div>
+          <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+            {outcomes.map((o, idx) => (
+              <div
+                key={`${o.mission_id}-${idx}`}
+                style={{
+                  padding: 8,
+                  borderRadius: 6,
+                  border: "1px solid #263048",
+                  background: "#0f1524",
+                  fontSize: 13,
+                }}
+              >
+                <code>{o.mission_id}</code> · {o.outcome_status} · sha:{" "}
+                <code>{o.merged_sha.slice(0, 12)}</code>{" "}
+                {o.pr_url ? (
+                  <a href={o.pr_url} style={{ color: "#7db4ff" }}>
+                    {o.pr_url}
+                  </a>
+                ) : null}
+              </div>
+            ))}
+          </div>
         </section>
       ) : null}
 

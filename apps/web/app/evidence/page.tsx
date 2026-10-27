@@ -1,6 +1,12 @@
 "use client";
-import { useState } from "react";
-import { EVIDENCE_STAGES, getEvent, getEvidence } from "../../lib/api";
+import { useEffect, useState } from "react";
+import {
+  EVIDENCE_STAGES,
+  getEvent,
+  getEvidence,
+  listMissions,
+  listOutcomes,
+} from "../../lib/api";
 
 const card: React.CSSProperties = {
   background: "#141b2d",
@@ -42,6 +48,7 @@ function normalize(raw: unknown, fallbackId: string): Link[] {
 
 export default function EvidencePage() {
   const [id, setId] = useState("cmd_demo");
+  const [recentIds, setRecentIds] = useState<string[]>([]);
   const [links, setLinks] = useState<Link[] | null>(null);
   const [raw, setRaw] = useState("");
   const [err, setErr] = useState("");
@@ -51,24 +58,72 @@ export default function EvidencePage() {
   const [detailErr, setDetailErr] = useState("");
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const fetchOne = async () => {
+  const fetchById = async (targetId: string) => {
+    const clean = targetId.trim();
+    if (!clean) return;
+    setId(clean);
     setLoading(true);
     setErr("");
     try {
-      const out = await getEvidence(id);
-      setLinks(normalize(out, id));
+      const out = await getEvidence(clean);
+      setLinks(normalize(out, clean));
       setRaw(JSON.stringify(out, null, 2));
       setSelected(null);
       setDetail("");
       setDetailErr("");
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
-      setLinks(normalize(null, id));
+      setLinks(normalize(null, clean));
       setRaw("");
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchOne = async () => {
+    await fetchById(id);
+  };
+
+  useEffect(() => {
+    let qId = "";
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      qId = (sp.get("id") ?? "").trim();
+    }
+    if (qId) {
+      void fetchById(qId);
+    }
+    void (async () => {
+      const items: string[] = [];
+      const seen = new Set<string>();
+      try {
+        const mRes = await listMissions();
+        for (const m of mRes.missions ?? []) {
+          for (const eid of [...(m.evidence_ids ?? [])].reverse()) {
+            if (eid && !seen.has(eid)) {
+              seen.add(eid);
+              items.push(eid);
+            }
+          }
+        }
+      } catch {}
+      try {
+        const oRes = await listOutcomes();
+        for (const o of oRes.outcomes ?? []) {
+          for (const eid of [o.evidence_id, o.pr_evidence_id, o.run_evidence_id]) {
+            if (eid && !seen.has(eid)) {
+              seen.add(eid);
+              items.push(eid);
+            }
+          }
+        }
+      } catch {}
+      setRecentIds(items);
+      if (!qId && items.length > 0) {
+        void fetchById(items[0]);
+      }
+    })();
+  }, []);
 
   const fetchEvent = async (eventId: string) => {
     setSelected(eventId);
@@ -107,6 +162,27 @@ export default function EvidencePage() {
             {loading ? "Loading…" : "Fetch evidence"}
           </button>
         </div>
+        {recentIds.length > 0 ? (
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
+            {recentIds.slice(0, 12).map((eid) => (
+              <button
+                key={eid}
+                onClick={() => void fetchById(eid)}
+                style={{
+                  background: id === eid ? "#2563eb" : "#0f1524",
+                  color: "#e8edf5",
+                  border: "1px solid #33405c",
+                  borderRadius: 6,
+                  padding: "2px 8px",
+                  cursor: "pointer",
+                  fontSize: 12,
+                }}
+              >
+                <code>{eid}</code>
+              </button>
+            ))}
+          </div>
+        ) : null}
         {err ? <p style={{ color: "#ef4444", fontSize: 13 }}>Error: {err}</p> : null}
       </section>
 
