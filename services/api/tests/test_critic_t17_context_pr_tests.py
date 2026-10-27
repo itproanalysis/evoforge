@@ -6,6 +6,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import httpx
@@ -144,9 +145,9 @@ def _run_evidence(monkeypatch, diff=FIX, tests=VIS):
         "visible": {"pass": len(tests), "n": len(tests), "timed_out": False, "exit_code": 0},
         "heldout": {"pass": 3, "n": 3, "timed_out": False, "exit_code": 0}})
     import evoforge.repo_source as rs
-    monkeypatch.setattr(rs, "resolve_repo_dir", lambda *a, **k: str(Path(__file__).parent))
+    monkeypatch.setattr(rs, "resolve_repo_dir", lambda *a, **k: tempfile.mkdtemp(prefix="evoforge-remote-test-"))
     if hasattr(main, "resolve_repo_dir"):
-        monkeypatch.setattr(main, "resolve_repo_dir", lambda *a, **k: str(Path(__file__).parent))
+        monkeypatch.setattr(main, "resolve_repo_dir", lambda *a, **k: tempfile.mkdtemp(prefix="evoforge-remote-test-"))
     rid = server_review(c, monkeypatch, sealed_suite(f"def test_h():\n    assert 1 == 1  # {MARK}\n"))
     r = c.post("/v1/runs", json={"source_repo": "", "base_sha": "b" * 40, "diff": diff, "tests": tests,
                                  "review_evidence_id": rid})
