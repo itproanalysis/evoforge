@@ -193,3 +193,20 @@ manifest는 지원 브랜치의 `docs/validation/2026-10-27-mission-persistence.
 공유 `_generate_core`·mission의 호출 전 실행권·canonical 명령/비용·UNKNOWN 대사와 원자적 Objective 기록은 후속 작업이다.
 공개 command/ledger/performance 저장, 전체 승인·실제 청구·운영 마이그레이션/배포도 계속 미완료다.
 API min=max=1·Muse Spark `muse-spark-1.3`과 현재 채팅의 자동 재개를 유지한다.
+
+## 2026-10-27 Critic 호출 증거 복구 보강
+
+지원 브랜치 `codex/pg-integration`의 `4bbbf6d`는 완료된 리뷰의 provider_evidence_ids를
+mission 단계 포인터와 같은 버전에 복원한다. SQL도 호출 레코드의 scope·kind·phase·mission_id와 ID 누락을 검사한다.
+수정 전 집중 회귀 8개 실패, 수정 후 API 463 passed·1 skipped·실제 DB 131 passed(신규 13개)·
+참조 112·SQL 96·계약 0 failure·웹 빌드 통과. 공식 SDK+모의 HTTP로 리뷰 API 연결 중단 세 지점을 확인했다.
+실제 모델 청구·운영 배포 검증은 수행하지 않았다.
+
+manifest: 지원 브랜치의 `docs/validation/2026-10-27-review-recovery.json`.
+원본 로그 8개: main `.local/evidence/review-recovery-20261027-qvkgnfg8`.
+이전 확장 006 초안을 적용한 테스트 DB에는 해당 SQL을 재적용한다. 과거 snapshot은 그대로 보존한다.
+
+집계 리뷰 출력이 없는 UNKNOWN은 모델 호출 전 mission/command 바인딩과 대사가 필요하다.
+이 기록은 기존 추정 원장 감사 자료이며 canonical 정산으로 계산하지 않는다.
+T22의 상위 병합 뒤 공유 core·공개 명령/비용 연결을 이어가고, 그 전까지 같은 main 파일을 편집하지 않는다.
+지원 코드의 main 반영·전체 개발·운영 DB/실청구 통합은 미완료이며 자동 재개를 유지한다.
