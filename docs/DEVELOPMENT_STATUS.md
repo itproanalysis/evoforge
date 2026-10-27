@@ -118,6 +118,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex / `codex/commands-persistence` / `C:\evo_forge_codex`:** P0-2 명령의 canonical PostgreSQL 접수·상태·히스토리·완료 응답 영속화를 맡는다.
+  우선 `postgres_commands.py`·확장 004·Codex DB 테스트·문서/환경 예제만 수정한다.
+  상위 round7의 `commands.py`/main 변경이 main에 먼저 반영된 뒤 호환 연결·재검증한다. 비용 원장 변경은 이번 단계와 별도다.
 - **Codex (증거 단계 완료·클레임 해제) / `codex/evidence-persistence` / `C:\evo_forge_codex`:** P0-2 중 서버 증거·비공개 봉인 리뷰·이벤트/체인의 PostgreSQL 영속화를 실제 요청 경로에 연결한다.
   `postgres_state.py`, `evidence.py`, main의 저장소 선택/오류 경계·예약 전 가용성 확인, 확장 003, Codex DB 테스트와 관련 문서·환경 예제를 수정한다.
   상위 Muse round6의 인증·원격 checkout·Runner·Builder/PR 구현은 보존한다. 명령·비용 원장의 PG 요청 연결은 별도 잔여 항목이다.
