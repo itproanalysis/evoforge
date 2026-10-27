@@ -131,9 +131,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·환경 예제/관련 문서를 수정한다.
   상위 main `dca4709`의 증거별 생성 테스트 이름을 보존하고, 같은 Builder 출력/기준과 일치하는 서버 실행 증거를 확인한다.
   기존 후보 binding과 정본 승인·예약/영수증 경로, 상위 T22/승격 Critic 테스트는 보존한다.
-- **Codex (로컬 DB 검증 시간 제한 보강 완료) / `codex/pg-integration`:** `tools/validate_local_pg.py`의
-  전체 PostgreSQL 테스트 제한을 동시 개발 부하에 맞춰 180초에서 300초로 조정했다(`912ea9d`).
-  180초 초과 기록을 보존했고 재실행은 221초에 166개 통과했다. 개별 테스트·정본 판정은 변경하지 않았다.
+- **Codex (로컬 DB 검증 시간 제한 재보강) / `codex/pg-integration`:** `tools/validate_local_pg.py`의
+  전체 PostgreSQL 테스트 제한을 180초에서 300초로 조정해 221초 통과를 확인했다(`912ea9d`).
+  추가 동시 작업에서 300초도 초과해 600초로 조정하고 재검증한다. 개별 테스트·정본 판정은 변경하지 않는다.
 - **Antigravity (M0 위생 평가 러너·Broker/CLI 사전 바인딩/예약 가드 및 다중 코덱/섀도 감사/승격 게이트 런타임) / `agy/eval-and-preflight` / `C:\evo_forge_agy`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
   M0 위생 평가 러너 통합(CR-74, 전후 7항목 감사·5필드 scaffold score_record·GH_INTEGRITY·G2_REQUIRED),
