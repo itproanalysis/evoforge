@@ -122,6 +122,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (CLI/Broker 패킷·리스 현재 시각 재검사) / `codex/preflight-freshness`:**
+  `eval_runner_and_preflight.py`, 새 `test_preflight_freshness.py`, 관련 비봉인 테스트 및 문서를 소유한다.
+  패킷이 발행된 시각을 현재 시각으로 오인해 만료된 패킷/리스를 허용하는지 검증하고 보강한다.
+
 - **Codex (Muse 직접 API capability 사전 검증) / `codex/muse-capabilities`:** 정본 seed는 변경하지 않고
   공식 근거의 별도 보수적 capability 입력과 정본 S1–S11 검증을 연결한다. 캐시 비활성화·프록시 endpoint·
   만료된 근거를 허용하지 않는다. 새 `provider_capabilities.py`/capability JSON/`test_muse_capability.py`,
