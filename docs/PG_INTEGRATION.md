@@ -60,6 +60,12 @@ source·로그 SHA-256은 `docs/validation/2026-10-27-upstream-sync.json`에 기
 원본 로그 8개는 `C:\evo_forge\.local\evidence\receipt-release-20261027-tp1nltz3`,
 source·로그 해시는 `docs/validation/2026-10-27-receipt-release.json`을 따른다.
 
+DB 자체의 별도 적재/해제 보호는 `afecb31`과 [확장 009](USAGE_RELEASE_GUARDS.md)를 따른다.
+후속 검증은 API **485 passed·1 skipped**, 실제 PostgreSQL **166 passed**(신규 11개)·참조 **112개**·
+SQL **96개**·계약 **0 failure**·웹 빌드 통과다. 원본 8개는 main `.local/evidence/db-usage-guard-20261027-ur5bi8s3`,
+source·로그 SHA-256은 `docs/validation/2026-10-27-db-usage-guard.json`에 기록했다.
+운영 DB에는 미적용이며 새 API 배포 전에 확장 009까지 적용해야 한다.
+
 ## 남은 공개 경로와 운영 연결
 
 공개 Generate와 mission은 현재 메모리 명령·추정 원장을 사용한다. 내부 HTTP 명령 경로는 항상 PostgreSQL을 사용한다.

@@ -42,3 +42,10 @@ psql -v ON_ERROR_STOP=1 -f services/api/migrations/009_usage_release_guards.sql
 관리자에 의한 DDL/트리거 우회는 운영 권한 관리 대상이다. 과거에 이미 해제된 예약과 충돌하는 청구를
 자동 복구하거나 재청구하지 않는다. 0원 정산·추정→실청구 정정 정책과 공개 Broker 비용 연결도 계속 미완료다.
 Muse Spark `muse-spark-1.3` 기본값과 자동 모델 대체 금지는 유지한다.
+
+## 검증 기록
+
+구현 `afecb31`의 수정 전 집중 회귀는 10 failed, 수정 후 11 passed다.
+API 485 passed·1 skipped, 실제 PostgreSQL 166 passed, 참조 112·SQL 96·계약 0 failure·웹 빌드 통과.
+원본 로그 8개는 `C:\evo_forge\.local\evidence\db-usage-guard-20261027-ur5bi8s3`,
+source·로그 해시는 `docs/validation/2026-10-27-db-usage-guard.json`에 보존했다.
