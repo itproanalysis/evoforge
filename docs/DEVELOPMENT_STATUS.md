@@ -26,6 +26,7 @@
 - [x] Context Mesh(L1–L5 로그 게이트·Vault·Folder 복원·Packet v2 컴파일러·캐시 네임스페이스 솔트·온라인 결정 규칙), 400KB 대형 Diff 분할·Review Coverage 원장·리뷰어 자격 시험 풀, 공급망/BSL-1.1/SBOM 스캐너·테넌트 공정 큐·플랫폼 키 KMS 격리 가드(`ebfeb95`) main 반영·검증. API 465개·참조 112개·신규 CR 15개 통과.
 - [x] 정본 0원 정산·추정 영수증 KPI 제외(CR-13)·추정→실청구 단일 역분개 대사(CR-40)·부작용 intent 전이(CR-47) 및 UNKNOWN 예약 자동 대사 잡(CR-39), 5좌석 적응형 Collective·12개 정본 MCP 도구·가역 에포크 접기(ReFold)+압축 경계 3턴 continuation 평가(CR-75)·M6 GEPA 하네스 최적화 루프(CR-76)(`defc4c9`) main 반영·검증. API 478개·참조 112개·신규 CR 8개 통과.
 - [x] M0 위생 평가 러너(CR-74), Broker/CLI 사전 바인딩·비용 예약/영수증 가드(CR-29/33/37/38/41), 다중 코덱 파이프라인/섀도 감사 모니터(CR-03~05/09/57), 제자리 재작성 비용 회계(CR-27), 품질/승격 런타임(CR-51~58/62~64/67/77/79), 및 미검증 CLI 결과의 UNKNOWN 예약 보존·비용 미제공 시 무비용 정산·전송 예외 시 UNKNOWN 전이(`fca6de2`, `aa67447`, `93d78cb`) main 반영·검증. API 494개·신규 CR 10개 통과.
+- [x] 도메인 이벤트 Envelope·낙관적 동시성(R27-2/C-11)·Outbox/Inbox 멱등 소비·1만 건 재생/중복/역순 수렴(R27-1)·Canonical Trajectory v1·실시간 UI SSE 투영/폭주 샘플링(R44-1~3), 및 OpenTelemetry 컨텍스트 span·서비스 SLO vs 안전 불변식 분리 감시(R47-2)·청구서 드리프트(>1%)/PG 웹훅 중복·역순·부분 환불 대사(R47-3, R48-1~3)·투기 불일치 1건 즉시 전역 차단/보상 해킹 격리(R47-4)·Incident 상태 머신·패킷 STALE(CR-22)/코덱 플래그 OFF(CR-24)/S11 캐시 배치(CR-69)/전체 삭제 연쇄(CR-17, R46-2)/출시 증거 패키지(R49-1, R49-5, R50-1)(`cd2e459`) main 반영·검증. API 503개·참조 112개·신규 CR 9개 통과.
 
 ## 이어서 수행할 작업
 
@@ -139,11 +140,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   기존 비봉인 `test_eval_runner_and_preflight_cr.py`, 새 `test_cli_billing_provenance.py` 및 관련 문서를 소유해
   공급사 청구 근거가 없으면 UNKNOWN 예약을 유지하도록 회귀 검증한다. 상위 T22와 정본은 수정하지 않는다.
 
-- **Codex 확인 (CLI 비용 대사 및 타임아웃 UNKNOWN 처리 완료·검증 통과):** `fca6de2`/`aa67447`의 빈 CLI 결과 임의 청구는
-  상위 `93d78cb`에서 수정되어 빈 결과의 예약 유지가 확인됐다. 추가 지적된 실제 청구액 근거가 없는 사용량의 0원 정산(가짜 `model_usage` 청구 방지)
-  및 전송 예외/시간 초과 시 intent의 `UNKNOWN_EXTERNAL_OUTCOME` 전이도 구현·검증했다.
-  `unverified_cost.py`·`unknown_exception.py` 재현 테스트 및 수용 테스트 전체 통과 확인.
-  정본 registry seed에 Meta/Muse 항목이 없어 합성 Muse 패킷이 거부되는 것은 계약에 부합하는 동작(`muse_registry_probe.py` 통과)이며 정본을 수정하거나 다른 모델로 대체하지 않는다.
+- **Codex 확인 (CLI 비용 근거 보강):** `93d78cb`는 빈 결과를 UNKNOWN으로 남겼고 `8f2323c`는
+  전송 예외 시 UNKNOWN 전이를 추가했다. 그러나 비용 없는 결과를 0원으로 정산하는 회귀가 확인되어
+  `b243426`은 명시적인 공급사 비용·고객 청구액·토큰 값이 없으면 예약을 유지한다.
+  실제 공급사 청구 출처 검증과 PostgreSQL 운영 연결은 아직 미완료다.
 - **Codex (PR 테스트 파일명·서버 실행 증거와 canonical 후보 연결) / `codex/pg-integration`:**
   `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·환경 예제/관련 문서를 수정한다.
   상위 main `dca4709`의 증거별 생성 테스트 이름을 보존하고, 같은 Builder 출력/기준과 일치하는 서버 실행 증거를 확인한다.
@@ -617,3 +617,22 @@ source 49개·로그 해시는 지원 브랜치 `docs/validation/2026-10-27-pr-s
 근거: API **494 passed·1 skipped**(신규 CR 수용 테스트 10개 포함), 참조 **112개**·`validate_package.py` **0 failure**(C1..C9 전체 통과).
 Codex 재현 스크립트(`repro.py`, `unverified_cost.py`, `unknown_exception.py`, `muse_registry_probe.py`) 4종 전체 통과 확인.
 기존 `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 수정하지 않았다.
+
+## 서버 후보 증거·CLI 청구액 검증 및 Muse capability 진행
+
+`9bbc7c2`에 지원 브랜치 `b243426`까지 병합되었다. 후보 등록은 같은 Builder/기준/통과한 서버 실행 증거와
+증거별 테스트 파일명 및 immutable Git tree를 대조하고, 확장 010에 실행 증거 바인딩을 남긴다.
+CLI 결과의 비용을 추정하거나 누락 금액을 0원으로 바꾸지 않고 UNKNOWN 예약을 유지한다.
+명시된 공급사 비용과 고객 청구액은 따로 저장하며 실제 0원도 명시된 경우에만 정산한다.
+
+실제 로컬 PostgreSQL·Git·Runner 회귀 169개, SQL 96개·참조 112개 통과(`b243426`).
+CLI 관련 집중 29개·전체 API 538개(1 skipped)·계약 0 failure 통과. DB/Git/Runner는 실제지만
+모델 응답·청구·리뷰·GitHub transport는 합성 데이터다. 원본: `.local/evidence/cli-billing-20261027-3tagslmg` 및
+`.local/evidence/tagged-candidate-20261027-q6zgkkht`. 외부 운영 배포·실청구는 완료가 아니다.
+
+별도 `codex/muse-capabilities`의 `e9a1168`은 Meta 직접 API에 한해 별도 capability 입력으로 정본 S1–S11을
+검사한다. 프록시·만료·미확인 캐시 비활성화/명시적 breakpoint는 거부하며 정본 seed는 변경하지 않았다.
+집중 22개·패키지 배치 검사 및 계약 0 failure가 통과했고 전체 API 검사가 진행 중이다.
+원본: `.local/evidence/muse-capability-20261027-a799ryo1`. 해당 브랜치는 아직 main에 반영되지 않았다.
+공개 Generate/PR/Broker와 PostgreSQL 예약·영수증·승인 전체 연결 및 실제 실행·배포는 계속 미완료다.
+T22 우선 작업과 Muse Spark 기본값·현재 채팅 자동 재개를 유지한다.

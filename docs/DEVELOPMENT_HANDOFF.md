@@ -331,3 +331,16 @@ manifest: 지원 브랜치 `docs/validation/2026-10-27-db-usage-guard.json`(sour
 새 API 전에 확장 009까지 적용해야 한다. 운영 DB/실청구·Docker 이미지/배포는 미검증이며 기존 충돌 청구·0원/정정 정책은 별도다.
 상위 T22 main/평가/UI·봉인 테스트를 보존했다. 상위 main 반영 뒤 공개 명령/Broker 비용·전체 승인 연결을 이어간다.
 전체 개발은 미완료이고 Muse Spark 기본값·자동 재개를 유지한다. 지원 코드는 main 미반영이다.
+
+## 2026-10-27 후보 실행 증거·CLI 청구 근거·Muse capability
+
+`9bbc7c2`가 `b243426`까지 main에 통합했다. 서버 실행 증거와 후보 Git tree/증거별 테스트 파일명 연결,
+확장 010, 청구액 미확인 시 UNKNOWN 예약 유지가 포함된다. 실제 PostgreSQL·Git·Runner 169개,
+SQL 96·참조 112·CLI 집중 29개·정본 검사 0 failure를 통과했다. 모델/청구/리뷰/HTTP는 합성 fixture다.
+원본: `.local/evidence/tagged-candidate-20261027-q6zgkkht`, `.local/evidence/cli-billing-20261027-3tagslmg`.
+전체 API 538개(1 skipped)도 통과했다. 실제 provider 출처 확인, 공개 명령과 DB 경로의 연결, 운영 배포는 미완료다.
+
+별도 `codex/muse-capabilities`의 `e9a1168`은 Meta 공식 직접 API·Muse Spark의 보수적인 capability를
+정본 schema와 S1–S11에 연결하고 만료·프록시·미확인 캐시 모드를 차단한다. 집중 22개·계약 검사는
+통과했고 전체 API 검사가 진행 중이다. main 미반영; 원본 `.local/evidence/muse-capability-20261027-a799ryo1`.
+T22와 다른 작업을 보존하고 완료 전 현재 채팅의 자동 재개를 유지한다.
