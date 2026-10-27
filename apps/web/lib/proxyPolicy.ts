@@ -8,6 +8,8 @@ const EXACT_ALLOW = new Set([
   "/v1/ledger",
   "/v1/ledger/reconcile",
   "/v1/eval/sandbox",
+  "/v1/missions",
+  "/v1/dashboard",
 ]);
 
 const SEGMENT_RE = /^[A-Za-z0-9._~-]+$/;
@@ -41,6 +43,17 @@ export function resolveApiPath(segments: string[]): string | null {
     segments[0] === "v1" &&
     segments[1] === "commands" &&
     segments[3] === "advance"
+  ) {
+    return apiPath;
+  }
+  if (segments.length === 3 && segments[0] === "v1" && segments[1] === "missions") {
+    return apiPath;
+  }
+  if (
+    segments.length === 4 &&
+    segments[0] === "v1" &&
+    segments[1] === "missions" &&
+    (segments[3] === "advance" || segments[3] === "cancel")
   ) {
     return apiPath;
   }

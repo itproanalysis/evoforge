@@ -1,0 +1,56 @@
+{
+ "family": "ci_saturated",
+ "suite_version": "v0",
+ "tasks": [
+  {
+   "id": "SV0-CI-01",
+   "goal": "Mixed test history quarantines instead of passing or failing",
+   "files": {
+    "quarantine.py": "\"\"\"Decide whether a result quarantines a flaky check.\"\"\"\n\n\ndef decide(history):\n    if all(history):\n        return \"PASS\"\n    return \"FAIL\"\n"
+   },
+   "reference_fix": "--- a/quarantine.py\n+++ b/quarantine.py\n@@ -2,6 +2,10 @@\n \n \n def decide(history):\n+    if not history:\n+        raise ValueError(\"empty history\")\n     if all(history):\n         return \"PASS\"\n-    return \"FAIL\"\n+    if not any(history):\n+        return \"FAIL\"\n+    return \"QUARANTINE\"\n",
+   "heldout": [
+    {
+     "id": "H1",
+     "kind": "compositional",
+     "code": "import quarantine\n\n\ndef test_ci01_compositional_mixed_quarantines():\n    assert quarantine.decide([True, True]) == \"PASS\"\n    assert quarantine.decide([True, False]) == \"QUARANTINE\"\n"
+    },
+    {
+     "id": "H2",
+     "kind": "negative",
+     "code": "import quarantine\n\n\ndef test_ci01_negative_empty_history_rejected():\n    try:\n        quarantine.decide([])\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+    },
+    {
+     "id": "H3",
+     "kind": "boundary",
+     "code": "import quarantine\n\n\ndef test_ci01_boundary_single_result():\n    assert quarantine.decide([False]) == \"FAIL\"\n    assert quarantine.decide([True]) == \"PASS\"\n"
+    }
+   ]
+  },
+  {
+   "id": "SV0-CI-02",
+   "goal": "Timing summaries use the median, not a middle pick",
+   "files": {
+    "benchstat.py": "\"\"\"Robust statistics for saturated CI timing data.\"\"\"\n\n\ndef median(values):\n    if not values:\n        raise ValueError(\"empty\")\n    ordered = sorted(values)\n    return ordered[len(ordered) // 2]\n"
+   },
+   "reference_fix": "--- a/benchstat.py\n+++ b/benchstat.py\n@@ -5,4 +5,7 @@\n     if not values:\n         raise ValueError(\"empty\")\n     ordered = sorted(values)\n-    return ordered[len(ordered) // 2]\n+    mid = len(ordered) // 2\n+    if len(ordered) % 2:\n+        return ordered[mid]\n+    return (ordered[mid - 1] + ordered[mid]) / 2\n",
+   "heldout": [
+    {
+     "id": "H1",
+     "kind": "compositional",
+     "code": "import benchstat\n\n\ndef test_ci02_compositional_median_values():\n    assert benchstat.median([3, 1, 2]) == 2\n    assert benchstat.median([9, 1, 5, 3]) == 4.0\n"
+    },
+    {
+     "id": "H2",
+     "kind": "negative",
+     "code": "import benchstat\n\n\ndef test_ci02_negative_empty_rejected():\n    try:\n        benchstat.median([])\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+    },
+    {
+     "id": "H3",
+     "kind": "boundary",
+     "code": "import benchstat\n\n\ndef test_ci02_boundary_single_and_even():\n    assert benchstat.median([7]) == 7\n    assert benchstat.median([1, 2, 3, 4]) == 2.5\n"
+    }
+   ]
+  }
+ ]
+}

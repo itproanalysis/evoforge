@@ -1,0 +1,21 @@
+{
+  "id": "T20_sealed_eval_baseline",
+  "planned_by": "muse-spark-1.3 (round-7 plan)",
+  "goal": "Sealed evaluation set v0 + X_SINGLE baseline harness\nWHY: Phase 4 M0-d exit requires sealed eval set v0 (6 families, held-out>=3 incl compositional+negative) + X_SINGLE measurement; SERVICE_STATUS P1 second bullet.\n\nSPEC: New server-only module services/api/evoforge/sealed_eval.py + endpoints in services/api/main.py: GET /v1/eval/suites returns [{family, task_count, heldout_kinds}] with exactly 6 families each heldout>=3 including >=1 compositional and >=1 negative (kinds from vocabulary.json, no deprecated ids); POST /v1/eval/baseline {suite_version=v0, model=muse-spark-1.3} -> 201 {baseline_id, evidence_id, X_SINGLE: {pass_rate, n, cost_cents}} executed only via reference_impl/eval_hygiene.py sandbox pattern (reconstruct base-only + 7-item audit) and score_record() rules via reference_impl/quality_gate.py semantics, egress-deny/timeout mapped to 502/504 not 500; sealed task code never leaves server (returns only {kind, code_sha256, code_len}); result stored as server evidence with Gate+Outcome stages linked from main.py. Web: apps/web/app/lab/page.tsx adds read-only Sealed v0 + X_SINGLE panel (GET only, no code display). Invariants: no change to contracts/sql, schemas, quality_gates.json numbers; no LiteLLM/BYOK/caveman paths; provider calls go through reserve->settle ledger path.\nCritic: your new tests go in services/api/tests/test_muse_*.py; put the sealed v0 task files under evals/sealed_v0/ (server-side data).\n\nACCEPTANCE (your own plan): Real-filesystem test: suite fixture files on disk have 6 families x >=3 held-out with compositional+negative kinds verified by reading files, not mocks; baseline run on one family in sandbox records evidence with X_SINGLE counts matching score_record() recomputation; HTTP redaction: baseline/suite responses contain no code strings, only sha256/len; oversized/timeout runner failure returns 413/502/504 per existing runner mapping, never raw traceback; pytest services/api -q and validate_package.py pass; deprecated-identifier grep stays 0\nOUT OF SCOPE: evoforge/postgres_*.py, evoforge/evidence.py, kernel_api.py; X_ADAPTIVE5, Tier A verdicts, reviewer qualification exams (Phase 6); microVM/host network hardening beyond current runner sandbox",
+  "edit": [
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/main.py",
+    "apps/web/app/lab/page.tsx",
+    "apps/web/lib/api.ts",
+    "evals/sealed_v0/"
+  ],
+  "context": [
+    "AGENTS.md",
+    "docs/SERVICE_STATUS.md"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
+    "git checkout -- apps/web/tsconfig.tsbuildinfo"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "id": "T18_mission_lifecycle",
+  "planned_by": "muse-spark-1.3 (round-7 plan)",
+  "goal": "Single command lifecycle + real Mission Control state\nWHY: Owner must click Generate, Lab Review, type repo path, Run, PR by hand; Running seats/Active tasks/Bottleneck are hard-coded local counters. This is the stated product gap and P1 first bullet.\n\nSPEC: New mission resource in services/api/main.py (+ new module services/api/evoforge/missions.py, may extend services/api/evoforge/commands.py): POST /v1/missions {goal, repo_ref, target_paths?, risk} -> 201 {mission_id, state=CREATED, evidence_id}; POST /v1/missions/{id}/advance {to: GENERATED|REVIEWED|RAN|PR_OPENED|CANCELLED|FAILED} executed server-side by calling existing generate->review->runs->pr/create chain with same auth/validation/gate rules, or POST /v1/missions/{id}/cancel -> 200 {state=CANCELLED} from any non-terminal state; terminal states PR_OPENED/CANCELLED/FAILED reject further advance with 409; unknown id 404; HIGH/CRITICAL risk still requires confirm=true else 409. GET /v1/missions lists {mission_id, state, goal, updated_at, evidence_ids} and GET /v1/missions/{id} returns full stage pointers; GET /v1/dashboard returns {missions_by_state, active_missions, blocked_merges, spent_cents, reserved_cents, unknown_holds} computed only from server commands/missions store + GET /v1/ledger snapshot, no client counters. Web: Mission Control (apps/web/app/page.tsx + apps/web/lib/api.ts) gets one objective input + Run mission button polling GET /v1/missions/{id} with visible state chip and Stop/Cancel button; cards render only GET /v1/dashboard; remove local runs+1 and localStorage candidate handoff as state source. Invariants: one mission_id maps to one generate/review/run/PR evidence chain; cancel never deletes evidence; sealed code never in HTTP; proxy allowlist covers new paths with '..'/prefix bypass tests.\nCritic constraints: (1) the web reaches the API only through the proxy, so apps/web/lib/proxyPolicy.ts and apps/web/lib/proxyPolicy.cases.json must allow exactly /v1/missions, /v1/dashboard, /v1/missions/{id}, /v1/missions/{id}/advance and /v1/missions/{id}/cancel (same strict segment rules). (2) Request shapes: POST /v1/missions {goal, repo_ref, target_paths?, risk, confirm?}; POST /v1/missions/{id}/advance {to}. (3) Missions call the existing internal functions with the same validation and gates; the mission's run uses the configured GitHub repo (source_repo '') at repo_ref. (4) Your new tests go in services/api/tests/test_muse_*.py (test_critic_* names belong to the Critic).\n\nACCEPTANCE (your own plan): TestClient real HTTP (no provider mocks except MODEL_API_KEY-absent stub path): create->advance through GENERATED->REVIEWED->RAN->PR_OPENED with stub-blocked run still transitions correctly or 409 with reason; cancel from REVIEWED blocks later advance with 409; GET /v1/dashboard after 2 missions + ledger snapshot matches server counts; Mission Control renders dashboard values, no hard-coded Running seats/Active tasks strings; Auth parity: no session 401, wrong-aud 403 on new endpoints; proxy rejects '..' and non-allowlisted prefix; no token in argv/logs; pytest services/api -q and validate_package.py pass\nOUT OF SCOPE: evoforge/postgres_*.py, evoforge/evidence.py, kernel_api.py (Codex-owned, link from main.py only); PostgreSQL persistence of missions (memory store + P0-2 min=max=1 stays); Changing quality_gates.json thresholds or sealed-test redaction rules",
+  "edit": [
+    "services/api/main.py",
+    "services/api/evoforge/missions.py",
+    "services/api/evoforge/commands.py",
+    "apps/web/lib/api.ts",
+    "apps/web/app/page.tsx",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "AGENTS.md",
+    "docs/SERVICE_STATUS.md"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
+    "git checkout -- apps/web/tsconfig.tsbuildinfo"
+  ]
+}

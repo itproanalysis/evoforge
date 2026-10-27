@@ -1,0 +1,20 @@
+{
+  "id": "T19_review_chain_ledger",
+  "planned_by": "muse-spark-1.3 (round-7 plan)",
+  "goal": "Link Review into run chain + fix ledger footer wording\nWHY: SERVICE_STATUS 2.45: run evidence chain has no Review stage; layout footer says costs are estimates although ledger records real provider_billed cents.\n\nSPEC: In services/api/main.py POST /v1/runs only: after validating review_evidence_id, copy that review evidence's Review-stage event_id into the new run evidence via evidence_chain.link(run_eid,'Review',review_event_id) (idempotent same-event; never re-record or mutate review evidence; do not edit evoforge/evidence.py). GET /v1/evidence/{run_eid} chain then shows non-null Review event whose GET /v1/events/{id} drilldown returns the review summary; POST /v1/pr/create already copies chain and must preserve the Review link. Web: apps/web/app/layout.tsx footer changes to real-ledger wording (e.g. costs are provider_billed actuals in cents from GET /v1/ledger; UNKNOWN holds listed separately), removing 추정치/estimates claim; apps/web/app/evidence/page.tsx shows Review row linked to drilldown. Invariants: link() append-only violation still 500->mapped 409/500 today unchanged; stub/invalid reviews still 409 before any link; sealed code still redacted in all HTTP views.\nCritic: your new tests go in services/api/tests/test_muse_*.py.\n\nACCEPTANCE (your own plan): Real TestClient chain traversal: review -> run -> pr/create where GET /v1/evidence/{run_id} has Review event_id equal to GET /v1/evidence/{review_id} Review event_id, and GET /v1/events/{review_event} returns stage=Review with sealed counts but no code; Stub review run still 409 and creates no run evidence with Review link; missing Review stage still renders null (not 500); Footer contains no 추정치/estimate wording; pytest services/api -q and validate_package.py pass\nOUT OF SCOPE: evoforge/evidence.py, evoforge/postgres_*.py, kernel_api.py; Backfilling old run evidences; Receipt/label display changes beyond footer string\nCritic constraints from the T18 review (test-backed): (a) your T18 mission steps duplicate the review/run/PR endpoint code in main.py; refactor so POST /v1/candidates/review, POST /v1/runs, POST /v1/pr/create and the mission steps call ONE shared implementation each (the Review link must therefore appear in mission run chains too). (b) Remove the test-shaped branch in the mission run path (`runner.run_candidate is _ORIGINAL_RUN_CANDIDATE` / fallback to remote on BaseException): when EVO_RUNNER_URL is set, candidate code must never run in the API process (exactly the POST /v1/runs behaviour).",
+  "edit": [
+    "services/api/main.py",
+    "apps/web/app/layout.tsx",
+    "apps/web/app/evidence/page.tsx",
+    "services/api/evoforge/missions.py"
+  ],
+  "context": [
+    "AGENTS.md",
+    "docs/SERVICE_STATUS.md"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
+    "git checkout -- apps/web/tsconfig.tsbuildinfo"
+  ]
+}

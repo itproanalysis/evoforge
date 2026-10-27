@@ -1,0 +1,58 @@
+{
+ "family": "parallel_multi_file",
+ "suite_version": "v0",
+ "tasks": [
+  {
+   "id": "SV0-PM-01",
+   "goal": "Shard and merge keep every element across partitions",
+   "files": {
+    "shard.py": "\"\"\"Split a sequence into n partitions.\"\"\"\n\n\ndef shard(items, n):\n    chunks = [[] for _ in range(n)]\n    for i, x in enumerate(items):\n        chunks[i % (n - 1 if n > 1 else 1)].append(x)\n    return chunks\n",
+    "merge.py": "\"\"\"Combine partitions back into one sequence.\"\"\"\n\n\ndef merge(chunks):\n    if not chunks:\n        return []\n    return list(chunks[0])\n"
+   },
+   "reference_fix": "--- a/merge.py\n+++ b/merge.py\n@@ -2,6 +2,7 @@\n \n \n def merge(chunks):\n-    if not chunks:\n-        return []\n-    return list(chunks[0])\n+    out = []\n+    for chunk in chunks:\n+        out.extend(chunk)\n+    return out\n--- a/shard.py\n+++ b/shard.py\n@@ -2,7 +2,9 @@\n \n \n def shard(items, n):\n+    if n <= 0:\n+        raise ValueError(\"n must be positive\")\n     chunks = [[] for _ in range(n)]\n     for i, x in enumerate(items):\n-        chunks[i % (n - 1 if n > 1 else 1)].append(x)\n+        chunks[i % n].append(x)\n     return chunks\n",
+   "heldout": [
+    {
+     "id": "H1",
+     "kind": "compositional",
+     "code": "import merge\nimport shard\n\n\ndef test_pm01_compositional_round_trip():\n    items = list(range(7))\n    chunks = shard.shard(items, 3)\n    assert [len(c) for c in chunks] == [3, 2, 2]\n    assert sorted(merge.merge(chunks)) == items\n"
+    },
+    {
+     "id": "H2",
+     "kind": "negative",
+     "code": "import shard\n\n\ndef test_pm01_negative_nonpositive_partitions_rejected():\n    try:\n        shard.shard([1, 2], 0)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+    },
+    {
+     "id": "H3",
+     "kind": "boundary",
+     "code": "import merge\nimport shard\n\n\ndef test_pm01_boundary_empty_input():\n    assert shard.shard([], 3) == [[], [], []]\n    assert merge.merge([[], [], []]) == []\n"
+    }
+   ]
+  },
+  {
+   "id": "SV0-PM-02",
+   "goal": "Parallel partial sums add up to the sequential total",
+   "files": {
+    "workshare.py": "\"\"\"Split work for parallel workers.\"\"\"\n\n\ndef split_work(items, n):\n    if n <= 0:\n        raise ValueError(\"n must be positive\")\n    if n == 1:\n        return [list(items)]\n    return [list(items[i::n]) for i in range(n - 1)]\n",
+    "addup.py": "\"\"\"Add partial worker results.\"\"\"\n\n\ndef combine(partials):\n    total = 0\n    for part in partials:\n        total += part\n    return total\n"
+   },
+   "reference_fix": "--- a/workshare.py\n+++ b/workshare.py\n@@ -4,6 +4,4 @@\n def split_work(items, n):\n     if n <= 0:\n         raise ValueError(\"n must be positive\")\n-    if n == 1:\n-        return [list(items)]\n-    return [list(items[i::n]) for i in range(n - 1)]\n+    return [list(items[i::n]) for i in range(n)]\n",
+   "heldout": [
+    {
+     "id": "H1",
+     "kind": "compositional",
+     "code": "import addup\nimport workshare\n\n\ndef test_pm02_compositional_parallel_sum():\n    parts = workshare.split_work([1, 2, 3, 4, 5, 6], 3)\n    assert parts == [[1, 4], [2, 5], [3, 6]]\n    assert addup.combine([sum(p) for p in parts]) == 21\n"
+    },
+    {
+     "id": "H2",
+     "kind": "negative",
+     "code": "import workshare\n\n\ndef test_pm02_negative_nonpositive_workers_rejected():\n    try:\n        workshare.split_work([1], 0)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+    },
+    {
+     "id": "H3",
+     "kind": "boundary",
+     "code": "import addup\nimport workshare\n\n\ndef test_pm02_boundary_empty_work():\n    assert workshare.split_work([], 2) == [[], []]\n    assert addup.combine([]) == 0\n"
+    }
+   ]
+  }
+ ]
+}

@@ -61,8 +61,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           style={{ padding: "16px 24px", fontSize: 12, color: "#8b96ad" }}
         >
           Builder: Muse Spark 1.3 via Meta Model API · Gates: GH_INTEGRITY
-          (oracle_ast + provisional D-054) · 비용 표시는 provider_billed
-          라벨이 있을 때만 확정값, 없으면 추정치
+          (oracle_ast + provisional D-054) · costs are provider_billed
+          actuals in cents from GET /v1/ledger; UNKNOWN holds listed separately
         </footer>
       </body>
     </html>

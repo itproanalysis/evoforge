@@ -1,0 +1,17 @@
+{
+  "id": "T20b_real_xsingle",
+  "planned_by": "Critic review of T20 (metric rejected)",
+  "goal": "CRITIC REJECTION of your T20 metric: run_baseline makes ONE provider call with a fixed prompt, discards its output, builds a synthetic repo and runs self-contained sealed tests that pass with no candidate at all. The resulting X_SINGLE pass_rate measures the tests, not the Builder (metric theater; exactly what EvoForge exists to prevent).\nSPEC (blueprint X_SINGLE = one-seat Builder solving sealed tasks, judged only by held-out tests):\n1. Task data (evals/sealed_v0/*.json, server-side only): every task gets `files` {repo-relative path: starting source with the defect} and `reference_fix` (unified diff against those files, server-side only, never returned over HTTP), and its held-out tests must import and exercise those files (not define the logic inside the test). Keep 6 families, >=2 tasks each, >=3 held-out per task with compositional+negative+boundary.\n2. sealed_eval.check_task(task) -> {fails_without_fix: bool, passes_with_fix: bool}: builds the task repo in a hygiene sandbox and runs its held-out suite on the unmodified files and with reference_fix applied. load_suites() or a module-level validation must refuse tasks where held-out passes without a fix or fails with the reference fix.\n3. run_baseline: for EACH task build the base repo from `files`, call broker_meta.call_builder(goal, base_sha, file_context=[{path, content} for the task files]) exactly once (X_SINGLE: one attempt) through the reserve -> settle ledger path (ProviderNotAccepted -> refund, other failure -> UNKNOWN, as elsewhere), apply its diff with evoforge.patch (an unappliable or empty diff scores 0), run the held-out suite with the same isolation as the Runner's sealed run (or the runner service when EVO_RUNNER_URL is set), score 1.0 only if every held-out test passes. X_SINGLE = {pass_rate, n, cost_cents = sum of settled reservations for this baseline}, plus per-family breakdown; keep evidence with Gate+Outcome links and score_record() per task.\n4. HTTP responses never contain held-out code, reference fixes or task files (sha256/len metadata only).",
+  "edit": [
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/main.py",
+    "evals/sealed_v0/"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t20_eval_baseline.py",
+    "docs/evoforge-v4.2/reference_impl/eval_hygiene.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
