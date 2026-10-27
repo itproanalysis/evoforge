@@ -118,6 +118,11 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — canonical 후보 등록 연결:** 새 `postgres_candidates.py`·확장 008·
+  Codex 소유 kernel_api.py/test_kernel_api.py/test_postgres_kernel.py·관련 문서를 수정한다.
+  저장된 Builder 출력과 정산된 call/receipt/request ID를 대조하고, 기준 SHA에 적용한 diff/visible 테스트가 실제 head의 Git tree와
+  일치할 때만 PROPOSED 후보를 원자적으로 만든다. Runner 연결 모듈도 등록 후 head drift를 거부하도록 보강한다.
+  main/상위 평가/UI/봉인 테스트·정본은 변경하지 않는다. 나머지 게이트·리뷰·병합 승인은 생성하지 않는다.
 - **Codex (테넌트 비용 예약 가드 검증 완료·T22 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 프로젝트 RLS가 다른 프로젝트의 open 예약을 숨겨
   선불 20,000,000µUSD에서 24,000,000µUSD를 허용하던 실패를 재현하고 `5b5b253`의 확장 007로 차단했다.
   정본 reserve/settle 함수와 RLS 정책은 보존하고 모델/main/T22 파일은 변경하지 않는다.
