@@ -74,3 +74,7 @@ Generate/Review의 패킷·영수증 연결은 계속 남아 있다.
 
 Builder 패킷·동의·task fencing과 예약을 함께 확인하는 지원 경로는
 [BUILDER_PREFLIGHT.md](BUILDER_PREFLIGHT.md)에 기록했다.
+
+테넌트의 여러 프로젝트가 같은 선불 잔액을 초과해 예약하는 RLS 경계는 확장 007에서 추가 검사한다.
+신규 예약 어댑터는 이 가드가 없거나 실행되지 않는 설정이면 503으로 거부한다.
+기존 데이터 백필과 범위는 [TENANT_CREDIT_GUARD.md](TENANT_CREDIT_GUARD.md)를 따른다.

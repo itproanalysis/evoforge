@@ -134,6 +134,13 @@ class PostgresKernel:
             return self._reserve(conn, call_id, period, amount_micros)
 
     def _reserve(self, conn, call_id: UUID, period: date, amount_micros: int) -> ReservationState:
+        guard = conn.execute("SELECT 1 FROM pg_trigger WHERE tgrelid='core.cost_reservations'::regclass "
+                             "AND tgname='tenant_credit_hold' AND (tgenabled='A' OR "
+                             "(tgenabled='O' AND current_setting('session_replication_role')<>'replica')) "
+                             "AND tgfoid='runtime.track_tenant_credit_hold()'::regprocedure "
+                             "AND NOT tgisinternal").fetchone()
+        if not guard:
+            raise KernelUnavailable('tenant credit guard is not installed and enabled')
         # Same lock as core.reserve_cost, acquired before its idempotency
         # lookup so concurrent retries of one call also remain idempotent.
         conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",

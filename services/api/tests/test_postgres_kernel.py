@@ -1862,3 +1862,175 @@ def test_mission_review_api_recovers_sdk_calls_after_attachment_failure(durable_
             instance.close()
         ledger.reset()
         ledger.configure({'default':50_000})
+
+
+def test_tenant_prepaid_credit_covers_reservations_hidden_by_project_rls(funded):
+    tenant=funded['scope'].tenant_id
+    other=uuid4()
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute("INSERT INTO core.projects(tenant_id,project_id,name) VALUES (%s,%s,'other')",(tenant,other))
+        conn.execute('UPDATE core.budgets SET cap_micros=30000000 WHERE tenant_id=%s',(tenant,))
+        conn.execute('INSERT INTO core.budgets VALUES (%s,%s,%s,30000000)',(tenant,other,PERIOD))
+    first=funded['kernel']
+    second=PostgresKernel(funded['dsn'],KernelScope(tenant,other))
+    first.reserve_cost(uuid4(),PERIOD,12000000)
+    with second._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.cost_reservations').fetchone()['n']==0
+    with pytest.raises(BudgetRefused):
+        second.reserve_cost(uuid4(),PERIOD,12000000)
+
+
+def _credit_sibling(funded):
+    tenant=funded['scope'].tenant_id
+    other=uuid4()
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute("INSERT INTO core.projects(tenant_id,project_id,name) VALUES (%s,%s,'sibling')",(tenant,other))
+        conn.execute('UPDATE core.budgets SET cap_micros=30000000 WHERE tenant_id=%s',(tenant,))
+        conn.execute('INSERT INTO core.budgets VALUES (%s,%s,%s,30000000)',(tenant,other,PERIOD))
+    return PostgresKernel(funded['dsn'],KernelScope(tenant,other))
+
+
+def _open_credit_holds(kernel):
+    with kernel._transaction() as conn:
+        return conn.execute('SELECT runtime.tenant_open_reserved_micros() AS held').fetchone()['held']
+
+
+def test_tenant_credit_holds_keep_unknown_and_release_only_on_canonical_closure(funded):
+    kernel=funded['kernel']
+    sibling=_credit_sibling(funded)
+    call=uuid4()
+    kernel.reserve_cost(call,PERIOD,12000000)
+    kernel.mark_sent(call)
+    kernel.mark_unknown(call)
+    assert _open_credit_holds(sibling)==12000000
+    with pytest.raises(BudgetRefused):
+        sibling.reserve_cost(uuid4(),PERIOD,10000000)
+    with pytest.raises(KernelRejected):
+        kernel.release_not_accepted(call)
+    receipt=_receipt(funded,call,cost=1000000)
+    kernel.settle_reservation(call,receipt,1000000)
+    assert _open_credit_holds(sibling)==0
+    second=uuid4()
+    sibling.reserve_cost(second,PERIOD,19000000)
+    assert _open_credit_holds(kernel)==19000000
+    sibling.release_not_accepted(second)
+    assert _open_credit_holds(kernel)==0
+    # Replaying a close does not write another negative hold.
+    sibling.release_not_accepted(second)
+    kernel.settle_reservation(call,receipt,1000000)
+    assert _open_credit_holds(kernel)==0
+
+
+def test_tenant_credit_hold_release_rolls_back_with_reservation_update(funded):
+    kernel=funded['kernel']
+    call=uuid4()
+    kernel.reserve_cost(call,PERIOD,700)
+    with pytest.raises(RuntimeError):
+        with kernel._transaction() as conn:
+            conn.execute("UPDATE core.cost_reservations SET status='RELEASED' WHERE request_key=%s",(str(call),))
+            raise RuntimeError('injected failure after release event')
+    assert kernel.reservation(call).status=='RESERVED' and _open_credit_holds(kernel)==700
+    kernel.release_not_accepted(call)
+    with pytest.raises(KernelRejected):
+        with kernel._transaction() as conn:
+            conn.execute("UPDATE core.cost_reservations SET status='RESERVED' WHERE request_key=%s",(str(call),))
+    assert _open_credit_holds(kernel)==0
+
+
+def test_parallel_cross_project_credit_holds_stop_at_tenant_balance(funded):
+    first=funded['kernel']
+    second=_credit_sibling(funded)
+    def reserve(i):
+        try:
+            (first if i%2 else second).reserve_cost(uuid4(),PERIOD,2000000)
+            return True
+        except BudgetRefused:
+            return False
+    with ThreadPoolExecutor(max_workers=8) as workers:
+        accepted=list(workers.map(reserve,range(24)))
+    assert sum(accepted)==10
+    assert _open_credit_holds(first)==_open_credit_holds(second)==20000000
+
+
+def test_tenant_credit_holds_are_isolated_and_private_under_real_core_app(funded):
+    tenant,project=uuid4(),uuid4()
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute("INSERT INTO core.tenants(tenant_id,name,plan) VALUES (%s,'other','TEAM')",(tenant,))
+        conn.execute("INSERT INTO core.projects(tenant_id,project_id,name) VALUES (%s,%s,'other')",(tenant,project))
+        conn.execute('INSERT INTO core.budgets VALUES (%s,%s,%s,10000000)',(tenant,project,PERIOD))
+        conn.execute("INSERT INTO core.usage_ledger(tenant_id,entry_kind,customer_micros,idempotency_key,price_table_version) "
+                     "VALUES (%s,'credit_grant',20000000,'other-credit','test')",(tenant,))
+    other=PostgresKernel(funded['dsn'],KernelScope(tenant,project))
+    other.reserve_cost(uuid4(),PERIOD,8000000)
+    assert _open_credit_holds(funded['kernel'])==0
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute('SET SESSION AUTHORIZATION core_app')
+        conn.execute("SELECT set_config('app.tenant_id',%s,false),set_config('app.project_ids',%s,false)",
+                     (str(funded['scope'].tenant_id),str(funded['scope'].project_id)))
+        conn.execute('SELECT core.reserve_cost(%s,%s,%s,%s,%s)',
+                     (funded['scope'].tenant_id,funded['scope'].project_id,PERIOD,str(uuid4()),600))
+        assert conn.execute('SELECT runtime.tenant_open_reserved_micros()').fetchone()[0]==600
+        for operation in ('SELECT * FROM runtime.tenant_credit_hold_events',
+                          'DELETE FROM runtime.tenant_credit_hold_events',
+                          "UPDATE runtime.tenant_credit_hold_events SET amount_micros=1"):
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                conn.execute(operation)
+    assert _open_credit_holds(other)==8000000
+
+
+def test_tenant_credit_hold_migration_backfills_legacy_rows_and_preserves_force_rls(funded):
+    kernel=funded['kernel']
+    sibling=_credit_sibling(funded)
+    open_call,closed_call=uuid4(),uuid4()
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        original=conn.execute("SELECT pg_get_functiondef('core.reserve_cost(uuid,uuid,date,text,bigint)'::regprocedure)").fetchone()[0]
+        conn.execute('ALTER TABLE core.cost_reservations DISABLE TRIGGER tenant_credit_hold')
+        try:
+            # Seed historical canonical rows, as created before adapter/007.
+            for scoped,call,amount in ((kernel,open_call,12000000),(sibling,uuid4(),12000000),(sibling,closed_call,100)):
+                with scoped._transaction() as legacy:
+                    legacy.execute('SELECT core.reserve_cost(%s,%s,%s,%s,%s)',
+                                   (scoped.scope.tenant_id,scoped.scope.project_id,PERIOD,str(call),amount))
+            with sibling._transaction() as legacy:
+                legacy.execute("UPDATE core.cost_reservations SET status='RELEASED' WHERE request_key=%s",(str(closed_call),))
+        finally:
+            conn.execute('ALTER TABLE core.cost_reservations ENABLE TRIGGER tenant_credit_hold')
+        migration=(ROOT/'services/api/migrations/007_tenant_credit_holds.sql').read_text(encoding='utf-8')
+        conn.execute(migration)
+        conn.execute(migration)
+        current=conn.execute("SELECT pg_get_functiondef('core.reserve_cost(uuid,uuid,date,text,bigint)'::regprocedure)").fetchone()[0]
+        assert current==original
+        flags=conn.execute("SELECT relrowsecurity,relforcerowsecurity FROM pg_class "
+                           "WHERE oid IN ('core.cost_reservations'::regclass,'runtime.tenant_credit_hold_events'::regclass)").fetchall()
+        assert flags==[(True,True),(True,True)]
+    assert _open_credit_holds(kernel)==_open_credit_holds(sibling)==24000000
+    with pytest.raises(BudgetRefused):
+        sibling.reserve_cost(uuid4(),PERIOD,1)
+    with kernel._transaction() as conn:
+        assert conn.execute('SELECT status FROM core.cost_reservations WHERE request_key=%s',(str(open_call),)).fetchone()['status']=='RESERVED'
+
+
+def test_tenant_credit_guard_disabled_refuses_reservation_without_side_effects(funded,http_kernel):
+    call=uuid4()
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute('ALTER TABLE core.cost_reservations DISABLE TRIGGER tenant_credit_hold')
+        try:
+            response=http_kernel.post('/v1/kernel/reservations',json={
+                'call_id':str(call),'period_start':PERIOD.isoformat(),'amount_micros':100})
+            assert response.status_code==503,response.text
+            with funded['kernel']._transaction() as check:
+                assert check.execute('SELECT count(*) AS n FROM core.cost_reservations').fetchone()['n']==0
+                assert check.execute('SELECT count(*) AS n FROM core.side_effect_intents').fetchone()['n']==0
+        finally:
+            conn.execute('ALTER TABLE core.cost_reservations ENABLE TRIGGER tenant_credit_hold')
+    assert funded['kernel'].reserve_cost(call,PERIOD,100).status=='RESERVED'
+
+
+def test_tenant_credit_guard_rejects_connections_that_skip_origin_triggers(funded):
+    from evoforge.postgres_kernel import KernelUnavailable
+    unsafe=PostgresKernel(make_conninfo(funded['dsn'],options='-c session_replication_role=replica'),funded['scope'])
+    with pytest.raises(KernelUnavailable):
+        unsafe.reserve_cost(uuid4(),PERIOD,100)
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.cost_reservations').fetchone()['n']==0
+        assert conn.execute('SELECT count(*) AS n FROM core.side_effect_intents').fetchone()['n']==0

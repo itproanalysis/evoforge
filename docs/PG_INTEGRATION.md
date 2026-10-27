@@ -12,6 +12,7 @@
 - 정산된 Builder 바인딩·현재 fencing·커밋 head의 실제 로컬/번들 Runner 결과 → core G2_REQUIRED.
 - Google ID 인증과 내부 커널 토큰을 각각 검사하는 HTTP 전달. 잘못된 명시 헤더는 대체하지 않는다.
 - 공개 mission facade의 선택 PostgreSQL 저장. 불변 입력·버전별 상태·단계 증거를 보존하고 완료된 서버 출력만 복원한다.
+- 확장 007의 테넌트 전체 예약 가드. 프로젝트 RLS를 넓히지 않고 다른 프로젝트의 미정산 예약도 선불 한도에 포함한다.
 
 클라이언트가 보낸 실행 수나 모델 JSON만으로 게이트를 만들지 않는다.
 다른 필수 게이트·독립 리뷰·승인은 누락 상태를 유지하며 `core.authorize_merge`의 거부를 확인한다.
@@ -33,6 +34,8 @@ Google 인증 연동 테스트의 서명 검증기는 fixture로 대체하므로
 `docs/validation/2026-10-27-mission-persistence.json`에 별도 근거를 기록한다.
 위 107개 집계는 mission 저장 추가 전 통합 검증 기록이다.
 리뷰 복구의 호출별 증거 누락 보강은 `docs/validation/2026-10-27-review-recovery.json`을 따른다.
+테넌트 전체 예약 보강과 적용 요구사항은 [TENANT_CREDIT_GUARD.md](TENANT_CREDIT_GUARD.md),
+별도 검증은 `docs/validation/2026-10-27-tenant-credit-guard.json`을 따른다.
 
 ## 남은 공개 경로와 운영 연결
 
