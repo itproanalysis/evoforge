@@ -88,8 +88,20 @@ def test_stub_review_still_409_and_no_run_evidence():
     assert len(main._evidence) == n
 
 
+def _footer_sources() -> str:
+    base = Path(__file__).resolve().parents[3] / "apps" / "web"
+    parts = []
+    for rel in ("app/layout.tsx", "app/[locale]/layout.tsx",
+                "messages/ko.json", "messages/en.json"):
+        p = base / rel
+        if p.is_file():
+            parts.append(p.read_text(encoding="utf-8"))
+    assert parts, "no web footer sources found"
+    return "\n".join(parts)
+
+
 def test_footer_states_real_ledger():
-    layout = (WEB / "app" / "layout.tsx").read_text(encoding="utf-8")
+    layout = _footer_sources()
     assert "추정치" not in layout and not re.search(r"estimat", layout, re.I)
     assert "ledger" in layout.lower() or "원장" in layout
 
