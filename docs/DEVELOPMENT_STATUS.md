@@ -70,7 +70,7 @@
 > T11 `GET /v1/events/{id}` 단계 요약 + Evidence 페이지 드릴다운; T12 모든 HTTP 응답에서 봉인 코드 제거({kind, code_sha256, code_len}), 원본은 서버 저장소만.
 > Codex 테스트 조정(Critic, 단언 유지): provider-accounting 봉인 픽스처 3종화, HTTP 응답 형태만 마스킹 형태로.
 > 근거: API 310 passed·1 skipped, validate 0 failure, tsc·next build, 브라우저(드릴다운, Lab 마스킹, stub 리뷰 409).
-> 남은 메모(Muse 다음 라운드 후보): layout 하단 "추정치" 문구가 T9 이후 사실과 다름; 키 없는 데모는 stub 리뷰라 Run 불가(의도된 동작).
+> 남은 메모(Muse 다음 라운드 후보): layout 하단 "추정치" 문구가 T9 이후 사실과 다름; 키 없는 오프라인 모드는 stub 리뷰라 Run 불가(의도된 동작).
 
 > **main 병합 완료 (Claude + Muse Spark, 2026-10-27, `f421bd2` fast-forward):** 우선권에 따라 먼저 병합했다.
 > Codex의 미커밋 변경은 보존했다: `main.py`의 `kernel_router` 2줄은 3-way 병합으로 새 `main` 위에 다시 적용했고 나머지 파일은 건드리지 않았다.
