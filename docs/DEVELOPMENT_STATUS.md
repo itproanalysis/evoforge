@@ -722,7 +722,7 @@ Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.
 `codex/runner-base-binding`의 `446e940`은 Git ref를 불변 커밋으로 한 번 해석해 bundle/요청에
 사용하고 원격 checkout HEAD 또는 Runner 응답의 기준이 요청과 다르면 거부한다. 실제 로컬 Git 객체·번들과
 합성 원격 응답 재현은 수정 전 4 failed·1 passed, 수정 후 집중 17 passed, 실제 Runner 서비스 포함 37 passed.
-정본 검사는 0 failure이며 전체 API·실제 PostgreSQL 검증은 진행 중이다.
+전체 API 642 passed·1 skipped, 실제 PostgreSQL 169 passed·정본 검사는 0 failure다.
 원본: `.local/evidence/runner-base-binding-20261028-srrygk3d`. 현재 수정 중인 runner와 승격 Critic 테스트는 보존했다.
 
 공개 `_pr_core`의 서버 검증 SHA 전달은 기존 승격 `test_critic_t17_context_pr_tests.py`가 허구의 `basesha`와
@@ -735,4 +735,5 @@ Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.
 생성한 참조가 다른 커밋으로 이동하면 bundle을 거부하며 조건부 삭제로 그 참조를 보존한다.
 실패 시 자체 생성한 부분 bundle만 정리한다. 수정 전 회귀 3 failed, 수정 후 실제 Runner 서비스 포함
 관련 42 passed. 원본: `.local/evidence/runner-bundle-ownership-20261028-w4esi1fq`.
-전체 API·실제 PostgreSQL 검증 중이며 main 미반영이다. 기존 미커밋 runner/승격 테스트는 보존한다.
+실제 PostgreSQL 169개·정본 SQL 96개·참조 112개가 통과했고 전체 API는 검증 중이며 main 미반영이다.
+기존 미커밋 runner/승격 테스트는 보존한다.

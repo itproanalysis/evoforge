@@ -385,7 +385,7 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 
 `codex/runner-base-binding` `446e940`은 Git ref를 불변 커밋으로 고정한 bundle을 사용하고
 요청 SHA와 다른 checkout 또는 응답 base를 거부한다. 수정 전 4 failed·1 passed, 수정 후 집중 17개 및
-실제 Runner 서비스 포함 37개 통과·정본 0 failure. 전체 API·실제 DB 검증 중.
+실제 Runner 서비스 포함 37개·전체 API 642개(1 skipped)·실제 PostgreSQL 169개 통과·정본 0 failure.
 원본 `.local/evidence/runner-base-binding-20261028-srrygk3d`; main의 미커밋 runner/승격 테스트는 보존했다.
 공개 PR 경로의 SHA 전달은 기존 승격 T17 테스트가 유효하지 않은 가짜 SHA로 성공을 요구하여 별도 조정이 필요하다.
 
@@ -393,4 +393,5 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 
 `codex/runner-bundle-ownership` `e8e3754`는 이름 충돌 시 기존 브랜치를 지우지 않고,
 참조 이동 시 bundle을 거부하며 변경된 참조를 보존한다. 수정 전 3 failed, 수정 후 실제 Runner 서비스 포함
-42 passed. 원본 `.local/evidence/runner-bundle-ownership-20261028-w4esi1fq`; 전체 API/DB 검증 중·main 미반영.
+42 passed. 원본 `.local/evidence/runner-bundle-ownership-20261028-w4esi1fq`; 실제 PostgreSQL 169개·SQL 96개·
+참조 112개 통과, 전체 API 검증 중·main 미반영.
