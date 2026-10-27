@@ -153,9 +153,20 @@ def test_mission_run_chain_carries_review(monkeypatch):
     assert run_chain["Review"] == review_chain["Review"]
 
 
+def _footer_text() -> str:
+    base = Path(__file__).resolve().parents[3] / "apps" / "web"
+    parts = []
+    for rel in ("app/layout.tsx", "app/[locale]/layout.tsx",
+                "messages/ko.json", "messages/en.json"):
+        p = base / rel
+        if p.is_file():
+            parts.append(p.read_text(encoding="utf-8"))
+    assert parts, "no web footer sources found"
+    return "\n".join(parts)
+
+
 def test_footer_has_real_ledger_wording():
-    text = (Path(__file__).resolve().parents[3] / "apps" / "web" / "app"
-            / "layout.tsx").read_text(encoding="utf-8")
+    text = _footer_text()
     assert "추정치" not in text
     assert "estimate" not in text.lower()
     assert "provider_billed" in text

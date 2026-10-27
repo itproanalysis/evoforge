@@ -169,7 +169,9 @@ def test_list_and_dashboard_from_server_state(env):
 
 
 def test_web_uses_dashboard_and_proxy_allows_new_paths():
-    page = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
+    candidates = [WEB / "app" / "[locale]" / "page.tsx", WEB / "app" / "page.tsx"]
+    page = next((p.read_text(encoding="utf-8") for p in candidates if p.is_file()), None)
+    assert page is not None, "no Mission Control page.tsx found"
     api = (WEB / "lib" / "api.ts").read_text(encoding="utf-8")
     assert "/v1/dashboard" in api and "/v1/missions" in api
     assert "runs + 1" not in page and "n + 1" not in page

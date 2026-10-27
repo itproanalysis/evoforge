@@ -6,7 +6,22 @@ from pathlib import Path
 
 WEB = Path(__file__).resolve().parents[3] / "apps" / "web"
 API = (WEB / "lib" / "api.ts").read_text(encoding="utf-8")
-PAGE = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
+
+
+def _mission_control_page() -> str:
+    """Mission Control page moved under app/[locale]/ during i18n; resolve dynamically."""
+    candidates = [
+        WEB / "app" / "page.tsx",
+        WEB / "app" / "[locale]" / "page.tsx",
+        *sorted((WEB / "app").rglob("page.tsx")),
+    ]
+    for p in candidates:
+        if p.is_file():
+            return p.read_text(encoding="utf-8")
+    raise FileNotFoundError(f"no Mission Control page.tsx under {WEB / 'app'}")
+
+
+PAGE = _mission_control_page()
 
 
 def test_get_ledger_client():
@@ -25,6 +40,12 @@ def test_page_uses_ledger_not_estimate():
 
 
 def test_budget_exhausted_message():
+    # Post-i18n the 402 mapping lives in lib/apiErrors.ts + messages/*.json.
+    errors_ts = WEB / "lib" / "apiErrors.ts"
+    if errors_ts.is_file():
+        text = errors_ts.read_text(encoding="utf-8")
+        assert "402" in text and "budget-exhausted" in text
+        return
     assert "402" in PAGE
 
 
