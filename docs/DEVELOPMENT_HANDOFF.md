@@ -357,7 +357,8 @@ UNKNOWN 예약을 유지한다. 수정 전 9 failed, 수정 후 관련 집중 38
 `codex/preflight-freshness` `8437ef5`는 실제 서버 시각의 패킷·참조·리스 만료 및 전송 직전 패킷 digest,
 허용 공급사·동의·리스 소유자/에포크를 확인한다. 수정 전 7+3 failed, 수정 후 집중 77 passed·계약 0 failure.
 원본: `.local/evidence/preflight-freshness-20261028-y7cky9v4`. T22가 main에 반영되어 `f69106a`에 동기화했고
-해당 revision의 실제 PostgreSQL 169개·SQL 96개·참조 112개·웹 npm ci/tsc/build가 통과했고 전체 API는 검증 중이다.
+해당 revision의 실제 PostgreSQL 169개·SQL 96개·참조 112개·웹 npm ci/tsc/build·전체 API 618개(1 skipped)가 통과했다.
+소스 79개와 로그 24개의 해시: `docs/validation/2026-10-28-preflight-freshness.json`.
 main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 
 이전 `e9a1168` API 560 passed·1 skipped·실제 PostgreSQL 169 passed·SQL 96·참조 112·웹 npm ci/tsc/build,

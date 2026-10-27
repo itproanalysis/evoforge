@@ -697,7 +697,8 @@ T22 우선 작업과 Muse Spark 기본값·현재 채팅 자동 재개를 유지
 SQL 96·참조 112·계약 및 격리된 웹 npm ci/tsc/프로덕션 빌드가 통과했다.
 `ca0b584`은 CLI 원본 사용량 보강과 함께 전체 API 569 passed·1 skipped를 통과했다.
 이후 T22a/T22b를 동기화한 `f69106a`에서 실제 PostgreSQL 169개·SQL 96개·참조 112개·정본 검사와
-웹 npm ci/tsc/프로덕션 빌드가 통과했다. 전체 API 재검사는 진행 중이다.
+웹 npm ci/tsc/프로덕션 빌드와 전체 API 618 passed·1 skipped가 통과했다.
+source 79개·원본 로그 24개의 SHA-256은 `docs/validation/2026-10-28-preflight-freshness.json`에 보존한다.
 새 보강은 아직 main 미반영이다. 모델/청구는 합성 fixture이며 실 provider 출처 및 공개 경로·운영 연결은 미완료다.
 
 ## 공급사 allowlist와 동의 fail-closed
