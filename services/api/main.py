@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import sys
 import time
 import uuid
@@ -18,6 +19,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, StrictInt, model_validator
+from typing import Literal
 
 from evoforge import auth as auth_module
 from evoforge import broker_meta, evidence as evidence_chain, ledger
@@ -25,6 +27,9 @@ from evoforge import runner as _runner_module
 from evoforge.patch import PatchError
 from evoforge.kernel_api import router as kernel_router
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
+from evoforge import missions as missions_store
+from evoforge.missions import NeedsConfirmation as MissionNeedsConfirmation
+from evoforge.missions import TransitionError as MissionTransitionError
 
 # The original in-process executor. /v1/runs prefers the remote Runner when
 # EVO_RUNNER_URL is set, but an installed test double (monkeypatched
@@ -817,6 +822,395 @@ def command_advance(command_id: str, to_state: str):
         return advance(command_id, to_state)
     except (KeyError, TransitionError) as e:
         raise HTTPException(400, str(e))
+
+
+class MissionCreate(BaseModel):
+    goal: str
+    repo_ref: str = "HEAD"
+    target_paths: list | None = None
+    risk: str = "LOW"
+    confirm: bool = False
+
+
+class MissionAdvance(BaseModel):
+    to: Literal["GENERATED", "REVIEWED", "RAN", "PR_OPENED", "CANCELLED", "FAILED"]
+
+
+_HEX40 = re.compile(r"^[0-9a-fA-F]{40}$")
+
+
+def _resolve_mission_base(repo_ref: str) -> str:
+    """Resolve a mission repo_ref to a concrete SHA without the GitHub API.
+
+    Branch/tag/HEAD refs are resolved with `git ls-remote` against the
+    configured remote, so missions work offline against a local
+    EVO_GITHUB_GIT_BASE and in production without an extra API call; full
+    SHAs pass through untouched. The token travels only as an HTTP header
+    value via the environment, never in argv or error messages.
+    """
+    import subprocess
+
+    from evoforge import repo_source as _rs
+
+    ref = repo_ref.strip()
+    if _HEX40.match(ref):
+        return ref
+    try:
+        remote = _rs.github_remote()
+    except Exception as e:
+        raise HTTPException(400, _rs.redact(str(e)))
+    env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_CONFIG_NOSYSTEM="1")
+    env["GIT_ASKPASS"] = "false"
+    tok = os.getenv("GITHUB_TOKEN", "") or ""
+    if tok:
+        import base64
+
+        header = "Authorization: Basic " + base64.b64encode(
+            f"x-access-token:{tok}".encode("utf-8")).decode("ascii")
+        env["GIT_CONFIG_COUNT"] = "2"
+        env["GIT_CONFIG_KEY_0"] = "http.extraheader"
+        env["GIT_CONFIG_VALUE_0"] = header
+        env["GIT_CONFIG_KEY_1"] = "credential.helper"
+        env["GIT_CONFIG_VALUE_1"] = ""
+    try:
+        proc = subprocess.run(["git", "ls-remote", remote, ref],
+                              capture_output=True, text=True, timeout=30, env=env)
+    except Exception:
+        raise HTTPException(400, f"unknown base ref: {ref!r}")
+    if proc.returncode != 0:
+        raise HTTPException(400, _rs.redact(f"unknown base ref: {ref!r}"))
+    for line in (proc.stdout or "").splitlines():
+        parts = line.split()
+        if len(parts) != 2 or not _HEX40.match(parts[0]):
+            continue
+        if parts[1] in (ref, f"refs/heads/{ref}", f"refs/tags/{ref}"):
+            return parts[0]
+    raise HTTPException(400, f"unknown base ref: {ref!r}")
+
+
+def _mission_public(mission: dict) -> dict:
+    pr_url = None
+    pr_eid = mission["stages"]["pr"]
+    if pr_eid:
+        pr_ev = _evidence.get(pr_eid, {})
+        if isinstance(pr_ev.get("pr"), str):
+            pr_url = pr_ev["pr"]
+    return {
+        "mission_id": mission["mission_id"],
+        "state": mission["state"],
+        "goal": mission["goal"],
+        "repo_ref": mission["repo_ref"],
+        "target_paths": mission["target_paths"],
+        "risk": mission["risk"],
+        "created_at": mission["created_at"],
+        "updated_at": mission["updated_at"],
+        "evidence_ids": list(mission["evidence_ids"]),
+        "generate_evidence_id": mission["stages"]["generate"],
+        "review_evidence_id": mission["stages"]["review"],
+        "run_evidence_id": mission["stages"]["run"],
+        "pr_evidence_id": mission["stages"]["pr"],
+        "pr_url": pr_url,
+    }
+
+
+def _mission_step_generate(mission: dict) -> str:
+    """Same reserve -> Builder -> GH_INTEGRITY path as POST /v1/commands/generate."""
+    validated = mission["target_paths"] or []
+    base_sha = mission["repo_ref"]
+    file_context = None
+    if validated:
+        # Branch refs resolve to a SHA first so context loading and the
+        # Builder see the same concrete base the existing helpers expect.
+        base_sha = _resolve_mission_base(mission["repo_ref"])
+        file_context = _load_builder_context(base_sha, validated)
+    rsv = _reserve_or_402()
+    from evoforge.gates import evaluate_integrity
+
+    if file_context:
+        candidate = _call_provider(rsv, broker_meta.call_builder, mission["goal"],
+                                   base_sha, file_context)
+    else:
+        candidate = _call_provider(rsv, broker_meta.call_builder, mission["goal"],
+                                   base_sha)
+    verdicts = evaluate_integrity(candidate.get("diff", ""), candidate.get("tests", []))
+    eid = _store_evidence({"mission_id": mission["mission_id"], "candidate": candidate,
+                           "reservation_id": rsv,
+                           "gates": [v.__dict__ for v in verdicts]})
+    _link_stages(eid, ("Task", "Candidate", "Gate"))
+    return eid
+
+
+def _mission_step_review(mission: dict) -> str:
+    """Same reserve -> Critic path as POST /v1/candidates/review (redacted in HTTP)."""
+    gen_eid = mission["stages"]["generate"]
+    gen = _evidence.get(gen_eid, {})
+    cand = gen.get("candidate") if isinstance(gen.get("candidate"), dict) else {}
+    diff = cand.get("diff") if isinstance(cand.get("diff"), str) else ""
+    if os.getenv("MODEL_API_KEY"):
+        phase_evidence_ids = []
+
+        def dispatch(send):
+            phase = "critic_spec" if not phase_evidence_ids else "critic_review"
+            rsv = _reserve_or_402()
+            metadata = None
+            response_document = None
+            try:
+                response = _call_provider(rsv, send)
+                metadata = broker_meta.call_metadata(response, os.getenv("MODEL_CRITIC", "muse-spark-1.3"), phase)
+                if hasattr(response, "model_dump"):
+                    response_document = response.model_dump(mode="json")
+                return response
+            finally:
+                phase_evidence_ids.append(_store_evidence({"kind": "provider_call", "phase": phase,
+                    "reservation": ledger.reservation(rsv), "metadata": metadata,
+                    "response_document": response_document}))
+
+        out = broker_meta.call_critic(mission["goal"], diff, "", dispatch=dispatch)
+        eid = _store_evidence({"mission_id": mission["mission_id"], "review": out,
+                               "provider_evidence_ids": phase_evidence_ids})
+        _link_stages(eid, ("Review",))
+        for pid in phase_evidence_ids:
+            missions_store.attach_evidence(mission["mission_id"], pid)
+        return eid
+    rsv = _reserve_or_402()
+    out = _call_provider(rsv, broker_meta.call_critic, mission["goal"], diff, "")
+    eid = _store_evidence({"mission_id": mission["mission_id"], "review": out})
+    _link_stages(eid, ("Review",))
+    return eid
+
+
+def _mission_step_run(mission: dict) -> str:
+    """Same server-held-out run as POST /v1/runs, at the configured repo ('') and repo_ref."""
+    from evoforge import runner
+    from evoforge.critic import ensure_sealed_suite
+    from evoforge.gates import apply_run, evaluate_full
+
+    review_eid = mission["stages"]["review"]
+    src = _evidence.get(review_eid) if review_eid else None
+    if src is None:
+        raise HTTPException(404, "unknown review evidence id")
+    inner = src.get("review")
+    if not isinstance(inner, dict):
+        raise HTTPException(409, f"evidence {review_eid} is not a review")
+    if inner.get("stub") is True:
+        raise HTTPException(409, f"evidence {review_eid} is a stub review "
+                                 "and cannot back a run")
+    sealed = inner.get("sealed_tests")
+    ok, normalized, _findings = ensure_sealed_suite(sealed)
+    if not ok:
+        raise HTTPException(409, f"evidence {review_eid} has an invalid sealed suite")
+    gen = _evidence.get(mission["stages"]["generate"], {})
+    cand = gen.get("candidate") if isinstance(gen.get("candidate"), dict) else {}
+    diff = cand.get("diff") if isinstance(cand.get("diff"), str) else ""
+    tests = cand.get("tests") if isinstance(cand.get("tests"), list) else []
+    base_sha = mission["repo_ref"]
+    if not _HEX40.match(base_sha.strip()):
+        base_sha = _resolve_mission_base(base_sha)
+    req = RunRequest(source_repo="", base_sha=base_sha, diff=diff,
+                     tests=tests, review_evidence_id=review_eid)
+    runner_url = (os.getenv("EVO_RUNNER_URL", "") or "").strip()
+    if runner_url and runner.run_candidate is _ORIGINAL_RUN_CANDIDATE:
+        run = _run_remote(req, normalized)
+    elif runner_url:
+        try:
+            run = _run_local(req, normalized)
+        except HTTPException:
+            raise
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except BaseException:
+            run = _run_remote(req, normalized)
+    else:
+        run = _run_local(req, normalized)
+    verdicts = evaluate_full(req.diff, req.tests,
+                             [k for k in run["heldout_kinds"] if k],
+                             run["visible"]["pass"], run["visible"]["n"],
+                             run["heldout"]["pass"], run["heldout"]["n"])
+    gates = [v.__dict__ for v in apply_run(verdicts, run)]
+    eid = _store_evidence({"mission_id": mission["mission_id"], "diff": req.diff,
+                           "tests": req.tests, "gates": gates, "run": run,
+                           "source_repo": "", "base_sha": base_sha,
+                           "review_evidence_id": review_eid})
+    _link_stages(eid, ("Candidate", "Gate"))
+    return eid
+
+
+def _mission_step_pr(mission: dict) -> str:
+    """Same all-PASS server-run gate as POST /v1/pr/create."""
+    from evoforge import github
+
+    run_eid = mission["stages"]["run"]
+    src = _evidence.get(run_eid) if run_eid else None
+    if src is None:
+        raise HTTPException(404, "unknown evidence id")
+    gates = src.get("gates")
+    if not isinstance(src.get("diff"), str) or not gates:
+        raise HTTPException(409, f"evidence {run_eid} is not a gate evaluation")
+    if not isinstance(src.get("run"), dict):
+        raise HTTPException(409, f"evidence {run_eid} has no server run; "
+                                 "PRs require a /v1/runs server execution "
+                                 "(client-reported counts cannot back a PR)")
+    blocked = [f"{g['gate']}={g['result']}" for g in gates if g.get("result") != "PASS"]
+    if blocked:
+        raise HTTPException(409, f"PR blocked by gates: {', '.join(blocked)}")
+    extra_files: dict[str, str] = {}
+    stored_tests = src.get("tests")
+    if isinstance(stored_tests, list):
+        for i, t in enumerate(stored_tests, 1):
+            if not isinstance(t, dict):
+                continue
+            code = t.get("code")
+            if not isinstance(code, str) or code == "":
+                continue
+            extra_files[f"tests/evoforge_gen/test_gen_{i}.py"] = code
+    for p in extra_files:
+        segs = p.split("/")
+        if "" in segs or ".." in segs or not p.startswith("tests/evoforge_gen/"):
+            raise HTTPException(409, f"test file path escapes tests/evoforge_gen/: {p}")
+    if extra_files:
+        try:
+            from evoforge.patch import paths_in_diff as _paths_in_diff
+
+            dpaths = set(_paths_in_diff(src["diff"]))
+        except Exception:
+            dpaths = set()
+        for p in extra_files:
+            if p in dpaths:
+                raise HTTPException(409, f"test file path collides with diff: {p}")
+    title = f"evoforge mission: {mission['goal'][:80]}"
+    body = "\n".join([mission["goal"], "",
+                      *(f"{g['gate']}={g['result']} ({g.get('reason', '')})" for g in gates),
+                      f"Evidence: {run_eid}"])
+    if extra_files:
+        body = body + f"\nTests: {', '.join(sorted(extra_files))}"
+    try:
+        pr = github.create_pr(src["diff"], title, body,
+                              f"evoforge/{uuid.uuid4().hex[:8]}", "main",
+                              extra_files=extra_files or None)
+    except PatchError as e:
+        raise HTTPException(409, str(e))
+    except RuntimeError as e:
+        raise HTTPException(400, str(e))
+    eid = _store_evidence({"mission_id": mission["mission_id"], "pr": pr.get("html_url"),
+                           "title": title, "source_evidence_id": run_eid})
+    for entry in evidence_chain.chain(run_eid):
+        if entry.get("event_id") is not None:
+            evidence_chain.link(eid, entry["stage"], entry["event_id"])
+    _link_stages(eid, ("PR",))
+    return eid
+
+
+_MISSION_STEPS = {
+    "GENERATED": _mission_step_generate,
+    "REVIEWED": _mission_step_review,
+    "RAN": _mission_step_run,
+    "PR_OPENED": _mission_step_pr,
+}
+
+
+@app.post("/v1/missions", status_code=201)
+def mission_create(req: MissionCreate):
+    if not req.goal.strip():
+        raise HTTPException(400, "goal required")
+    if not isinstance(req.repo_ref, str) or not req.repo_ref.strip():
+        raise HTTPException(400, "repo_ref required")
+    validated_paths = None
+    if req.target_paths is not None:
+        validated_paths = _validate_target_paths(req.target_paths)
+    try:
+        mission = missions_store.create(req.goal, req.repo_ref, validated_paths,
+                                        req.risk, req.confirm)
+    except MissionNeedsConfirmation as e:
+        raise HTTPException(409, str(e))
+    eid = _store_evidence({"mission_id": mission["mission_id"], "goal": req.goal,
+                           "risk": req.risk, "repo_ref": req.repo_ref})
+    _link_stages(eid, ("ObjectiveVersion",))
+    missions_store.attach_evidence(mission["mission_id"], eid)
+    return {"mission_id": mission["mission_id"], "state": mission["state"],
+            "evidence_id": eid}
+
+
+@app.get("/v1/missions")
+def missions_list():
+    return {"missions": [
+        {"mission_id": m["mission_id"], "state": m["state"], "goal": m["goal"],
+         "updated_at": m["updated_at"], "evidence_ids": list(m["evidence_ids"])}
+        for m in missions_store.all()
+    ]}
+
+
+@app.get("/v1/missions/{mission_id}")
+def mission_detail(mission_id: str):
+    mission = missions_store.get(mission_id)
+    if mission is None:
+        raise HTTPException(404, "unknown mission")
+    return _mission_public(mission)
+
+
+@app.post("/v1/missions/{mission_id}/advance")
+def mission_advance(mission_id: str, req: MissionAdvance):
+    mission = missions_store.get(mission_id)
+    if mission is None:
+        raise HTTPException(404, "unknown mission")
+    if req.to not in missions_store.STATES:
+        raise HTTPException(400, f"unknown state: {req.to}")
+    if mission["state"] in missions_store.TERMINAL:
+        raise HTTPException(409, f"mission {mission_id} is terminal ({mission['state']})")
+    if req.to not in missions_store.NEXT.get(mission["state"], set()):
+        raise HTTPException(409, f"{mission['state']} -> {req.to} illegal")
+    if req.to in ("CANCELLED", "FAILED"):
+        missions_store.mark(mission_id, req.to)
+        return {"mission_id": mission_id, "state": req.to,
+                "evidence_ids": list(mission["evidence_ids"])}
+    # Forward step: run the existing server-side chain first; the mission only
+    # moves when the step succeeds, so a 409/402/502 leaves the state (and the
+    # evidence chain) untouched.
+    eid = _MISSION_STEPS[req.to](mission)
+    missions_store.attach_evidence(mission_id, eid, missions_store.STAGE_OF[req.to])
+    missions_store.mark(mission_id, req.to)
+    return {"mission_id": mission_id, "state": req.to, "evidence_id": eid,
+            "evidence_ids": list(mission["evidence_ids"])}
+
+
+@app.post("/v1/missions/{mission_id}/cancel")
+def mission_cancel(mission_id: str):
+    mission = missions_store.get(mission_id)
+    if mission is None:
+        raise HTTPException(404, "unknown mission")
+    if mission["state"] in missions_store.TERMINAL:
+        raise HTTPException(409, f"mission {mission_id} is terminal ({mission['state']})")
+    # Cancel marks the state only; evidence is never deleted.
+    missions_store.mark(mission_id, "CANCELLED")
+    return {"mission_id": mission_id, "state": "CANCELLED"}
+
+
+@app.get("/v1/dashboard")
+def dashboard():
+    by_state = {s: 0 for s in missions_store.STATES}
+    active = 0
+    blocked = 0
+    for m in missions_store.all():
+        by_state[m["state"]] = by_state.get(m["state"], 0) + 1
+        if m["state"] not in missions_store.TERMINAL:
+            active += 1
+        if m["state"] == "FAILED":
+            blocked += 1
+        elif m["state"] == "RAN":
+            run_eid = m["stages"]["run"]
+            run_ev = _evidence.get(run_eid, {}) if run_eid else {}
+            gates = run_ev.get("gates")
+            if isinstance(gates, list) and any(g.get("result") != "PASS" for g in gates
+                                               if isinstance(g, dict)):
+                blocked += 1
+    snap = ledger.snapshot("default")
+    return {
+        "missions_by_state": by_state,
+        "active_missions": active,
+        "blocked_merges": blocked,
+        "spent_cents": snap["spent_cents"],
+        "reserved_cents": snap["reserved_cents"],
+        "unknown_holds": len(snap["unknown_reservations"]),
+    }
 
 
 @app.post("/v1/ledger/reconcile")

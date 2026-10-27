@@ -147,6 +147,77 @@ export function getLedger() {
   return req<LedgerSnapshot>("/v1/ledger");
 }
 
+export type MissionState =
+  | "CREATED"
+  | "GENERATED"
+  | "REVIEWED"
+  | "RAN"
+  | "PR_OPENED"
+  | "CANCELLED"
+  | "FAILED";
+
+export interface MissionSummary {
+  mission_id: string;
+  state: MissionState;
+  goal: string;
+  updated_at: number;
+  evidence_ids: string[];
+}
+
+export interface MissionDetail extends MissionSummary {
+  repo_ref: string;
+  target_paths: string[] | null;
+  risk: string;
+  created_at: number;
+  generate_evidence_id: string | null;
+  review_evidence_id: string | null;
+  run_evidence_id: string | null;
+  pr_evidence_id: string | null;
+  pr_url: string | null;
+}
+
+export interface DashboardSnapshot {
+  missions_by_state: Record<string, number>;
+  active_missions: number;
+  blocked_merges: number;
+  spent_cents: number;
+  reserved_cents: number;
+  unknown_holds: number;
+}
+
+export function postMission(goal: string, repo_ref = "HEAD", risk = "LOW") {
+  return req<{ mission_id: string; state: MissionState; evidence_id: string }>(
+    "/v1/missions",
+    { method: "POST", body: JSON.stringify({ goal, repo_ref, risk }) },
+  );
+}
+
+export function postMissionAdvance(mission_id: string, to: MissionState) {
+  return req<{ mission_id: string; state: MissionState; evidence_id?: string }>(
+    `/v1/missions/${encodeURIComponent(mission_id)}/advance`,
+    { method: "POST", body: JSON.stringify({ to }) },
+  );
+}
+
+export function postMissionCancel(mission_id: string) {
+  return req<{ mission_id: string; state: MissionState }>(
+    `/v1/missions/${encodeURIComponent(mission_id)}/cancel`,
+    { method: "POST" },
+  );
+}
+
+export function getMission(mission_id: string) {
+  return req<MissionDetail>(`/v1/missions/${encodeURIComponent(mission_id)}`);
+}
+
+export function listMissions() {
+  return req<{ missions: MissionSummary[] }>("/v1/missions");
+}
+
+export function getDashboard() {
+  return req<DashboardSnapshot>("/v1/dashboard");
+}
+
 export interface LedgerSnapshot {
   project: string;
   spent_cents: number;
