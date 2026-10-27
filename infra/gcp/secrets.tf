@@ -3,21 +3,27 @@
 resource "google_secret_manager_secret" "model_api_key" {
   secret_id = "MODEL_API_KEY"
   project   = var.project
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.apis]
 }
 
 resource "google_secret_manager_secret" "github_token" {
   secret_id = "GITHUB_TOKEN"
   project   = var.project
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.apis]
 }
 
 resource "google_secret_manager_secret" "db_url" {
   secret_id = "DB_URL"
   project   = var.project
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.apis]
 }
 
