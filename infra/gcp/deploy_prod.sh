@@ -36,12 +36,12 @@ echo "== api: private; only the web SA may invoke; Meta key + GitHub token from 
   --set-env-vars "^|^MODEL_API_BASE=https://api.meta.ai/v1|MODEL_BUILDER=muse-spark-1.3|MODEL_CRITIC=muse-spark-1.3|GITHUB_REPO=${GITHUB_REPO}|EVO_REQUIRE_ID_TOKEN=1|EVO_API_URL=${API_URL}|EVO_WEB_SERVICE_ACCOUNT=$(SA web)|EVO_RUNNER_URL=${RUNNER_URL}|EVO_RUNNER_AUDIENCE=${RUNNER_URL}|EVO_ALLOW_LOCAL_REPOS=0|EVO_WEB_ORIGINS=" \
   --quiet
 
-echo "== web: public origin, app-level owner login; calls the API server-side with its ID token"
+echo "== web: public origin, owner-only without login (EVO_WEB_AUTH=none, POST rate limit); calls the API server-side with its ID token"
 "$GCLOUD" run deploy evoforge-web --project "$PROJECT" --region "$REGION" --image "${REG}/web:${TAG}" \
   --service-account "$(SA web)" --allow-unauthenticated --port 3000 \
   --cpu 1 --memory 512Mi --min-instances 0 --max-instances 3 \
   --set-secrets "EVO_SESSION_SECRET=EVO_SESSION_SECRET:latest,EVO_OWNER_PASSWORD_HASH=EVO_OWNER_PASSWORD_HASH:latest" \
-  --set-env-vars "EVO_API_BASE=${API_URL},EVO_OWNER_USER=${OWNER_USER}" --quiet
+  --set-env-vars "EVO_API_BASE=${API_URL},EVO_OWNER_USER=${OWNER_USER},EVO_WEB_AUTH=${WEB_AUTH:-none},EVO_WEB_POST_PER_MIN=${WEB_POST_PER_MIN:-20}" --quiet
 
 echo "== invoker bindings (least privilege)"
 "$GCLOUD" run services add-iam-policy-binding evoforge-api --project "$PROJECT" --region "$REGION" \
