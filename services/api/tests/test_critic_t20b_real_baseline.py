@@ -100,3 +100,21 @@ def test_reference_fix_scores_one_and_builder_sees_task_files(monkeypatch):
 def test_reference_fix_never_exposed_over_http():
     r = c.get("/v1/eval/suites")
     assert r.status_code == 200 and "reference_fix" not in r.text and "+++ " not in r.text
+
+
+def test_baseline_runs_locally_even_when_runner_configured(monkeypatch):
+    """Sealed tasks live in ephemeral local repos: a configured runner service
+    must not break the baseline (live 502: RunnerBadRequest)."""
+    from evoforge import runner_client as _rc
+
+    monkeypatch.setenv("EVO_RUNNER_URL", "https://runner.invalid")
+    monkeypatch.setattr(_rc, "run_via_runner", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not call runner")))
+
+    def builder(goal, sha, file_context=None, **k):
+        return {"diff": "", "tests": [], "rationale": "nothing", "stub": False, "model": "m", "provider_calls": []}
+
+    monkeypatch.setattr(broker_meta, "call_builder", builder)
+    r = c.post("/v1/eval/baseline", json={"suite_version": "v0", "model": "muse-spark-1.3",
+                                          "family": "simple_sequential"})
+    assert r.status_code == 201, r.text
+    assert r.json()["X_SINGLE"]["n"] == 2

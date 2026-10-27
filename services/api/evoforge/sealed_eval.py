@@ -683,10 +683,12 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                 diff = out.get("diff") if isinstance(out, dict) else ""
                 score = 0.0
                 if _apply_candidate(dest, diff):
-                    score = _score_heldout(
-                        dest, source, base,
-                        diff if isinstance(diff, str) else "",
-                        task["heldout"], timeout_s, tmpbase)
+                    # Local execution: the task source is an ephemeral local
+                    # repo that a remote runner cannot read (same reason suite
+                    # validation never uses the runner). Remote execution is
+                    # reserved for server-owned repos (missions) via _score_heldout.
+                    score = _run_heldout_local(
+                        dest, task["heldout"], timeout_s, tmpbase)
                 record = eval_hygiene.score_record(tid, score, scaffold, [])
                 scores.append(record)
                 if score >= 1.0:
