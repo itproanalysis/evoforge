@@ -1,0 +1,125 @@
+{
+  "date": "2026-10-27",
+  "revision": "61c608b765ff0e11a9d3fdcdbb33a1ed570988e4",
+  "prior_implementation_revision": "5a7b1620a2f12f2f7c7bd0714649003c40ae1825",
+  "integrated_main_revision": "c63ed652a11fff481cb2a16cfcb192b248b8e88b",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Refuse not-accepted reservation release when scoped provider usage is already recorded, including receipts committed during the reservation lock wait",
+  "checks": {
+    "pre_fix_regression_subset": {
+      "failed": 7,
+      "passed": 1,
+      "deselected": 147
+    },
+    "post_fix_regression_subset": {
+      "passed": 8,
+      "deselected": 147
+    },
+    "api": {
+      "passed": 485,
+      "skipped": 1,
+      "seconds": 315.39
+    },
+    "live_postgresql_kernel": {
+      "passed": 155,
+      "new_receipt_release_cases": 8,
+      "seconds": 153.78,
+      "postgresql_version": "15.19"
+    },
+    "scoped_receipt_guard": "provider_billed, estimated, zero quotes and legacy ctx-only receipts with/without provider reference",
+    "concurrency": "release waits on actual PostgreSQL reservation row lock while receipt insertion remains uncommitted, then sees committed usage and refuses release",
+    "positive_path": "unrelated call/project receipts do not block a definitely unaccepted call; release remains idempotent; valid recorded quotes settle exactly once",
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "limitations": [
+    "This guard is in PostgresKernel; canonical reserve/settle/authorize functions, frozen SQL and RLS policies unchanged",
+    "PostgresKernel receipt ingestion and release use the same reservation lock; privileged external receipt writers must follow that locking protocol",
+    "No historical financial records rewritten; zero-price settlement and estimated-to-provider-billed correction policy remain incomplete",
+    "Real disposable PostgreSQL, Git and Runner tests execute, while model transports, receipt billing and approval/qualification evidence are synthetic fixtures",
+    "Support branch only; active Muse T22 main/evaluation/UI claim and unpromoted sealed tests preserved; public command/Broker cost integration still awaits the priority merge",
+    "No paid provider execution, production DB migration, Docker image build, actual GitHub merge or deployment performed",
+    "muse-spark-1.3 default, no automatic model replacement, heartbeat remains active"
+  ],
+  "source_sha256": {
+    "services/api/evoforge/postgres_kernel.py": "f81141caab309c9925d57cc2d54ddb0e62a80cf4a29c1d277a317ab0198826e6",
+    "services/api/tests/test_postgres_kernel.py": "2ea2597aade64f74054e726291db9625b97d6af3d21d0268661af121ebf59fff",
+    "services/api/evoforge/kernel_api.py": "86c0919f008e4d99f997f4f67afb3b2f8411536dacd62cb8cfbe59062f074de1",
+    "services/api/evoforge/postgres_commands.py": "e459ba8a31a7f1a1b4358f7f2759a14c098ec1217c15eaaf8d603791c600ab52",
+    "services/api/evoforge/postgres_missions.py": "9b36317d220fbc5d2120b6466b8c66503961ae9109ed2d81740f776a3fa6903d",
+    "services/api/evoforge/postgres_candidates.py": "d6463307ba76f35d2bfd3230ba7f67ee7a384d0cd1893c475c0b45bd16cf276f",
+    "services/api/evoforge/postgres_run_evidence.py": "aceb2901625ef5aec7c1875987cd844e0d8108c030414d6debfdea28983ec4ca",
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767",
+    "services/api/evoforge/critic.py": "15a0995fdd21f4cff81894f85bf0c550518cec8771e2f34736040148ba631bb9",
+    "services/api/evoforge/broker_meta.py": "f50d55a3a54355db474c63ebbc99f53db878917680d055c5135847d72e5ea29c",
+    "services/api/evoforge/context_mesh.py": "74fe0fe28bbb5db585af0d5e84d7c6590283705b97924c7c2e30d0f7efa59edf",
+    "services/api/evoforge/review_qualification.py": "e8c6c7a38ea68757b2e769f0761dfdb00d4ee64e198d90c84b975a357cb192ef",
+    "services/api/evoforge/runtime_guards.py": "98c4eaaf832e8cff8310fd6dc0caefab8f345755d0ce7684b2dae59aae33f345",
+    "services/api/tests/test_context_mesh_cr.py": "a28eb03a33f1fb1b3f7e722ad3d183d3010f8eabccc44d5e88aab1d30159d118",
+    "services/api/tests/test_review_qualification_cr.py": "ef5565f1f6bc2cf857c3a7b5c38126da8aee14354a5c5e0bd9b579576c3f1d4c",
+    "services/api/tests/test_runtime_guards_cr.py": "ffbddfb4e4094d12445548a4c034b34907d85bd033a596bd2dac9c9b8ad5c691",
+    "services/api/tests/test_muse_runner.py": "fa0402c94b1a6d9de9a045dd025059d9517fdcafa0057be9ebc3898c5fb2abf0",
+    "apps/web/Dockerfile": "e1409b6037f06efafacb28b08fa09abe385d75d04496a4ce651bab85ea570930",
+    "apps/web/app/layout.tsx": "64f1cf1dc98c01ccaef73b8d5b411a64566fb5062ebd957d6a6c0d08e9c3540c",
+    "cloudbuild.yaml": "9814f271ff779d729effc06fe66d384a31a1074c7b090c1b5dea8dd20fe6272f",
+    "infra/gcp/cloudbuild.yaml": "9814f271ff779d729effc06fe66d384a31a1074c7b090c1b5dea8dd20fe6272f",
+    "infra/gcp/cloudbuild.prod.yaml": "ca6dbc411d295c309849dcf47bd5a091c99367c704a4126ab4b831b94fa2f942",
+    "tools/validate_local_pg.py": "2c122b5c70679ecd08ea5e52fce598a3ab0fa2ec0296bff80aa86ef3b5703ad7",
+    "docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql": "294f2961b3012ac18ade1efacb324fbb14721c76a41782864a0c0d977a262636",
+    "services/api/migrations/001_receipt_documents.sql": "95b2b3dc427e65181bf976b693cbe1c6db5ac7274fc8d6e35b140c8f8574c1f6",
+    "services/api/migrations/002_builder_call_bindings.sql": "388c5e1defa87119e85979c862b5bae3fdef64ae82b0699786ff49a65b7fc35c",
+    "services/api/migrations/003_api_evidence.sql": "a5873cad67ee4a4ded041923257db06ee1a4dfe82c99bbe4a6e108d26d4bcaea",
+    "services/api/migrations/004_api_commands.sql": "a50570f607a3d52c6bb20fb582c38ac16b78523ca8f6d24b10805b35cbd9f378",
+    "services/api/migrations/005_runner_candidates.sql": "3d2f4a17e70d05b772719ea42c9b53e8b438001191dd80f4a85651f6b04e51cb",
+    "services/api/migrations/006_api_missions.sql": "e35c67a50d0951489f99cacdff1b355349e73462b05440802aa6be21424ce123",
+    "services/api/migrations/007_tenant_credit_holds.sql": "36e211e5bb45282d84a5d8e215e869aa4e6745b8e9c13fc3704de90087bc44e2",
+    "services/api/migrations/008_builder_candidates.sql": "ee2b9f7dedb6c5e3d20bf8a1f13c2906792ad3b7c25c456365261f85f6afb616",
+    "services/api/evoforge/postgres_receipts.py": "e6be3a7e65b41778292caa062c47b462017537e7438e5e555edabc7429285b7c",
+    "services/api/tests/receipt_fixtures.py": "2ee0b227a226b0454a74dd3c5880e2cc42a49f7eb95b99e168f8a621c0220648",
+    "docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql": "8768b9552148579363932b7d69f3e6f1abfee95610dc5c3c8abc78a4bd4fb5ff"
+  },
+  "logs": {
+    "validation-receipt-release-before.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\receipt-release-20261027-tp1nltz3\\validation-receipt-release-before.log",
+      "sha256": "143a70120c97c4938e3b0547209a0c64f75051fa057ecbf39d27954c62c1700c"
+    },
+    "validation-receipt-release-focused.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\receipt-release-20261027-tp1nltz3\\validation-receipt-release-focused.log",
+      "sha256": "fecd365fea0895e6c10a8d0a0e1b9e770a586edf18a249ebe39c36fbd2cb9582"
+    },
+    "validation-receipt-release-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\receipt-release-20261027-tp1nltz3\\validation-receipt-release-api.log",
+      "sha256": "90a7be5a319a434a0772475412f01c9ed9a3e34308fd19ab113fab3dd1a120b3"
+    },
+    "validation-receipt-release-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\receipt-release-20261027-tp1nltz3\\validation-receipt-release-postgres.log",
+      "sha256": "f8fd788ca07f6d186f97121bbb01338a4e063a99c79ce138c645d47a7fbf2545"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\receipt-release-20261027-tp1nltz3\\validation-kernel.log",
+      "sha256": "6f9cd099e1a31f182c4ee940e81e5d0e396d24335772e1bfd59aa796139f5441"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\receipt-release-20261027-tp1nltz3\\validation-postgres.log",
+      "sha256": "6ce03a6dc439a234e8dd00216f02083619142e6ed400555267b93cc7a773e47c"
+    },
+    "validation-receipt-release-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\receipt-release-20261027-tp1nltz3\\validation-receipt-release-contract.log",
+      "sha256": "1dd013cdcd0989ed2cd87656f65a01eba62febd6c28475bbf929ffc57ac26219"
+    },
+    "validation-receipt-release-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\receipt-release-20261027-tp1nltz3\\validation-receipt-release-web.log",
+      "sha256": "18223a92d7e17d739f9e2cda81a52127dec7c89b1946221ec96d673131ce239e"
+    }
+  }
+}

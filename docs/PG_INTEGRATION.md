@@ -53,6 +53,12 @@ source·로그 SHA-256은 `docs/validation/2026-10-27-upstream-sync.json`에 기
 이 집계가 이전 통합 집계보다 최신이며, 각 기능의 수정 전 실패 근거는 기존 manifest에 남아 있다.
 독립 모듈의 운영 연결·실 KMS·실제 모델 청구·Docker 이미지/운영 배포 검증을 뜻하지 않는다.
 
+영수증 저장 후 미접수 해제를 막는 `61c608b`의 후속 검증은 API **485 passed·1 skipped**,
+실제 PostgreSQL **155 passed**(신규 8개)·참조 **112개**·SQL **96개**·계약 **0 failure**·웹 빌드 통과다.
+수정 전 회귀는 7 failed·1 passed였으며 저장/해제의 실제 행 잠금 경합도 확인했다.
+원본 로그 8개는 `C:\evo_forge\.local\evidence\receipt-release-20261027-tp1nltz3`,
+source·로그 해시는 `docs/validation/2026-10-27-receipt-release.json`을 따른다.
+
 ## 남은 공개 경로와 운영 연결
 
 공개 Generate와 mission은 현재 메모리 명령·추정 원장을 사용한다. 내부 HTTP 명령 경로는 항상 PostgreSQL을 사용한다.
