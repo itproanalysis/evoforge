@@ -21,6 +21,30 @@ CRITIC_SYSTEM = (
 ALLOWED_SEALED_KINDS = frozenset({"compositional", "negative", "boundary"})
 
 
+def _output_budget() -> int:
+    """Single output-token budget for every Muse Spark chat call.
+
+    From env MODEL_MAX_TOKENS (default 8000); missing, non-int or <= 0
+    falls back to 8000. Read at call time.
+    """
+    try:
+        raw = os.getenv("MODEL_MAX_TOKENS")
+        value = int(raw) if raw is not None else 8000
+    except (TypeError, ValueError):
+        return 8000
+    return value if value > 0 else 8000
+
+
+def _is_truncated(resp) -> bool:
+    try:
+        choices = getattr(resp, "choices", None)
+        if not choices:
+            return False
+        return getattr(choices[0], "finish_reason", None) == "length"
+    except Exception:
+        return False
+
+
 def ensure_sealed_suite(sealed):
     """Validate the held-out (sealed) suite shape.
 
@@ -100,11 +124,13 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
     completed = []
 
     def complete(messages, phase):
+        budget = _output_budget()
+
         def send():
             with provider_errors():
                 return client.chat.completions.create(
                     model=model, messages=messages,
-                    response_format={"type": "json_object"}, max_tokens=1500)
+                    response_format={"type": "json_object"}, max_tokens=budget)
         try:
             response = dispatch(send) if dispatch is not None else send()
         except (ProviderNotAccepted, ProviderOutcomeUnknown):
@@ -114,10 +140,16 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
                 raise ProviderOutcomeUnknown("critic partially completed", completed) from None
             raise
         completed.append(call_metadata(response, model, phase))
-        return response
+        return response, budget
 
-    a = complete([{"role": "system", "content": CRITIC_SYSTEM},
+    a, budget_a = complete([{"role": "system", "content": CRITIC_SYSTEM},
                   {"role": "user", "content": f"SPEC (Phase A, no diff shown):\n{goal_contract}"}], "critic_spec")
+    if _is_truncated(a):
+        return {"sealed_tests": [], "stub": False, "model": model, "provider_calls": completed,
+                "execution_verified": False,
+                "review": {"result": "INCONCLUSIVE", "findings": [
+                    {"note": f"truncated Phase A output (finish_reason='length', budget {budget_a})",
+                     "evidence": "none"}]}}
     sealed = _json(a).get("sealed_tests", [])
     ok, _normalized, shape_findings = ensure_sealed_suite(sealed)
     if not ok:
@@ -125,8 +157,14 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
                 "execution_verified": False,
                 "review": {"result": "INCONCLUSIVE", "findings": shape_findings or [
                     {"note": "invalid sealed suite", "evidence": "none"}]}}
-    b = complete([{"role": "system", "content": CRITIC_SYSTEM},
+    b, budget_b = complete([{"role": "system", "content": CRITIC_SYSTEM},
                   {"role": "user", "content": f"SPEC:\n{goal_contract}\nDIFF:\n{diff}\nCI:\n{ci}\nSEALED:\n{json.dumps(sealed)}"}], "critic_review")
+    if _is_truncated(b):
+        return {"review": {"result": "INCONCLUSIVE", "findings": [
+                    {"note": f"truncated Phase B output (finish_reason='length', budget {budget_b})",
+                     "evidence": "none"}]},
+                "sealed_tests": sealed, "stub": False, "model": model,
+                "provider_calls": completed, "execution_verified": False}
     data = _json(b)
     review = data.get("review")
     if (not isinstance(review, dict) or review.get("result") not in {"PASS", "FAIL", "INCONCLUSIVE"}
