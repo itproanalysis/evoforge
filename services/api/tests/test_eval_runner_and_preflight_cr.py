@@ -307,3 +307,28 @@ def test_dev_builder_cli_guard_budget_governed_cr38() -> None:
     assert eng.tenant_open_reserved_micros(TENANT_ID) == 20_000
     assert sum(1 for row in eng._ledger if row.entry_kind == "model_usage") == 1
 
+    # Usage without verified cost defaults to 0 and must not be recorded as a model_usage charge
+    zero_cost_res = cli_guard.run_cli_task(
+        task_spec={"id": "synthetic-no-bill"},
+        packet=packet,
+        reserved_micros=20_000,
+        cli_runner=lambda _task: {"provider_request_id": "req_nobill_1", "uncached_input_tokens": 17, "output_tokens": 9},
+        period_start=PERIOD,
+    )
+    assert zero_cost_res["receipt"]["customer_price_micros"] == 0
+    assert zero_cost_res["settlement"]["settlement"]["zero_cost"] is True
+    assert not any(row.entry_kind == "model_usage" and row.customer_micros < 0 for row in eng._ledger if row.idempotency_key == f"settle:{zero_cost_res['receipt']['call_id']}")
+
+    # Transport timeout uncertainty marks intent UNKNOWN_EXTERNAL_OUTCOME
+    def timeout_runner(_task: dict) -> dict:
+        raise TimeoutError("synthetic transport timeout")
+
+    with pytest.raises(TimeoutError):
+        cli_guard.run_cli_task(
+            task_spec={"id": "synthetic-timeout"},
+            packet=packet,
+            reserved_micros=20_000,
+            cli_runner=timeout_runner,
+            period_start=PERIOD,
+        )
+    assert any(row.status == "UNKNOWN_EXTERNAL_OUTCOME" for row in eng._intents.values())

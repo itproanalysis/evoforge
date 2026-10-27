@@ -513,7 +513,15 @@ class PreflightCallBroker:
 
         self.ledger.mark_call_sent(binding.tenant_id, binding.project_id, binding.call_id)
         self.provider_calls_attempted += 1
-        response, receipt = transport(packet, binding)
+        try:
+            response, receipt = transport(packet, binding)
+        except Exception:
+            if hasattr(self.ledger, 'mark_call_unknown'):
+                try:
+                    self.ledger.mark_call_unknown(binding.tenant_id, binding.project_id, binding.call_id)
+                except Exception:
+                    pass
+            raise
         settlement = self.validate_and_settle_receipt(call_id, receipt)
         return {
             "response": response,
@@ -535,7 +543,7 @@ class DevBuilderCLIGuard:
         packet: dict[str, Any],
         reserved_micros: int,
         cli_runner: Callable[[dict[str, Any]], dict[str, Any]],
-        actual_micros: int = 12_000,
+        actual_micros: int | None = None,
         call_id: str | None = None,
         period_start: str | None = None,
     ) -> dict[str, Any]:
@@ -567,6 +575,13 @@ class DevBuilderCLIGuard:
             cached_read = int(cli_out.get("cached_read_tokens", 0))
             cache_write = int(cli_out.get("cache_write_tokens", 0))
             out_tok = int(cli_out["output_tokens"])
+            billed_micros = int(
+                cli_out.get("customer_price_micros",
+                    cli_out.get("cost_micros",
+                        cli_out.get("actual_micros", actual_micros if actual_micros is not None else 0)
+                    )
+                )
+            )
             receipt = {
                 "schema_version": "provider-usage-receipt/v1",
                 "receipt_id": receipt_id,
@@ -592,8 +607,8 @@ class DevBuilderCLIGuard:
                     "cache_read_input_tokens": cached_read,
                     "output_tokens": out_tok,
                 },
-                "cost_micros": actual_micros,
-                "customer_price_micros": actual_micros,
+                "cost_micros": billed_micros,
+                "customer_price_micros": billed_micros,
                 "reservation_key": binding.reservation_key,
                 "ledger_entry_id": None,
                 "currency": "USD",
