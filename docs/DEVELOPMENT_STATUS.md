@@ -119,6 +119,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (영수증 저장 후 예약 해제 경합 보강) / `codex/pg-integration` / `C:\evo_forge_codex`:**
+  Codex 소유 `postgres_kernel.py`·`test_postgres_kernel.py`와 관련 문서/검증 manifest를 수정한다.
+  정산 전 영수증이 이미 저장된 호출을 미접수로 예약 해제하는 경로를 실제 DB에서 재현하고 차단한다.
+  정본 reserve/settle·RLS·모델 기본값과 상위 T22의 main/평가/UI·봉인 테스트는 변경하지 않는다.
 - **Codex (병합 정책/자격·상위 동기화 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** Codex 소유 postgres_kernel.py와
   test_postgres_kernel.py·관련 문서에서 현재 policy와 HIGH/CRITICAL 자격을 대조한다(`1441518`).
   상위 main `2cb3627`까지 합친 `41949da`에서 API 485개·실제 DB 147개·SQL 96개·참조 112개·계약·웹 빌드 통과.
