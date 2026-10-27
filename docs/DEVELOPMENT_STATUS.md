@@ -118,10 +118,13 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex (mission 지원 검증 완료·공유 core 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** T22의 main/평가/UI 편집과 분리해
+- **Codex (mission 호출 증거 복구 검증 완료·공유 core 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** T22의 main/평가/UI 편집과 분리해
   `postgres_missions.py`, `missions.py`의 선택 backend, 확장 006, Codex 테스트·관련 문서를 수정한다.
   `50ffc5b`에서 API가 이미 사용하는 mission facade의 상태/단계 증거 복원·RLS·봉인 코드 비노출을 구현했다.
   API 463개·실제 DB 118개·SQL 96개·참조 112개·웹 빌드 통과. 지원 코드는 아직 main 미반영이다.
+  후속 `4bbbf6d`: `postgres_missions.py`·확장 006에서 리뷰 복구 시 provider_evidence_ids도 같은 버전에 복원한다.
+  누락·중복·다른 mission/scope·잘못된 호출 자료를 차단하고 API 463개·실제 DB 131개·계약·웹 빌드를 통과했다.
+  공개 main/공급사 전송기와 T22 파일은 수정하지 않았다. 아래 최신 복구 검증 기록을 따른다.
   main.py·상위 봉인 테스트는 편집하지 않는다. 모델 호출 전 claim·비용/명령의 공유 core 연결은 T22 병합 뒤 이어간다.
 - **Codex (내부 통합 검증 완료·공개 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 두 준비된 지원 브랜치를 별도 통합 브랜치에서 합쳤다.
   명령 완료 응답과 같은 scope의 서버 생성 증거를 원자적으로 연결하도록 `postgres_commands.py`·확장 004·Codex 테스트·문서를 보강한다.
@@ -305,3 +308,24 @@ API **463 passed·1 skipped**, 실제 PostgreSQL **118 passed**(mission 신규 1
 T22가 main에 먼저 반영되면 지원 브랜치에 동기화하고 공유 core의 호출 전 claim·명령 완료·비용 연결을 이어간다.
 출력 없는 UNKNOWN 대사·동시 모델 호출의 실행권·mission 접수와 Objective 기록의 원자성,
 공개 비용/명령/performance 저장·실제 청구·운영 DB/배포는 계속 미완료다. API min=max=1과 자동 재개를 유지한다.
+
+## Critic 호출 증거의 mission 복구 누락 보강 (지원 검증 완료)
+
+`codex/pg-integration`의 `4bbbf6d`는 리뷰 aggregate 저장 후 attach 중 종료될 때
+호출별 provider_evidence_ids도 단계 포인터와 같은 snapshot에 복원한다. 이미 연결된 ID는 중복 추가하지 않는다.
+확장 006은 같은 scope의 provider_call·spec→review 순서와 명시한 mission_id를 검사하고,
+review 포인터가 있는 버전에서 호출 ID를 생략하는 직접 SQL도 거부한다.
+Phase A 조기 종료의 단일 spec 기록은 보존한다. Runner의 봉인 suite 검사·정본 승인 경계는 변경하지 않았다.
+
+수정 전 새 복구 집중 사례 **8 failed**를 확인했다. 수정 후 API **463 passed·1 skipped**,
+실제 PostgreSQL **131 passed**(신규 회귀 13개 포함), 참조 **112개**·SQL **96개**·계약 **0 failure**,
+웹 프로덕션 빌드가 통과했다. 공식 SDK에 모의 HTTP를 사용해 실제 리뷰 API의 세 연결 지점에서 중단을 주입했고,
+재조회 시 호출 증거가 복원되며 Critic 재호출·중복 ID 저장이 없는 것을 확인했다. 실제 공급사 호출/청구 검증은 아니다.
+
+원본 로그 8개는 `C:\evo_forge\.local\evidence\review-recovery-20261027-qvkgnfg8`에 보존했다.
+지원 브랜치의 `docs/validation/2026-10-27-review-recovery.json`에 source·로그 해시와 범위를 기록했다.
+이전 확장 006 지원 초안을 사용한 테스트 DB에는 SQL 재적용이 필요하며 과거 불변 기록은 수정하지 않는다.
+
+저장된 리뷰 aggregate가 없는 UNKNOWN 호출은 이 복원 대상이 아니다. 기존 추정 원장의 호출 감사 기록을
+canonical 청구 영수증으로 취급하지 않는다. T22 상위 병합·공유 core 실행권·명령/비용·운영 통합은 계속 대기하며,
+전체 개발은 미완료이고 Muse Spark 기본값과 자동 재개를 유지한다.
