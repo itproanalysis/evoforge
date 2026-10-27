@@ -118,11 +118,12 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — canonical 후보 등록 연결:** 새 `postgres_candidates.py`·확장 008·
+- **Codex (후보 등록 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 새 `postgres_candidates.py`·확장 008·
   Codex 소유 kernel_api.py/test_kernel_api.py/test_postgres_kernel.py·관련 문서를 수정한다.
   저장된 Builder 출력과 정산된 call/receipt/request ID를 대조하고, 기준 SHA에 적용한 diff/visible 테스트가 실제 head의 Git tree와
   일치할 때만 PROPOSED 후보를 원자적으로 만든다. Runner 연결 모듈도 등록 후 head drift를 거부하도록 보강한다.
   main/상위 평가/UI/봉인 테스트·정본은 변경하지 않는다. 나머지 게이트·리뷰·병합 승인은 생성하지 않는다.
+  구현 `e947cbf`: API 465개·실제 DB 144개(신규 5개)·SQL 96개·참조 112개·계약·웹 빌드 통과. 지원 코드는 main 미반영이다.
 - **Codex (테넌트 비용 예약 가드 검증 완료·T22 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 프로젝트 RLS가 다른 프로젝트의 open 예약을 숨겨
   선불 20,000,000µUSD에서 24,000,000µUSD를 허용하던 실패를 재현하고 `5b5b253`의 확장 007로 차단했다.
   정본 reserve/settle 함수와 RLS 정책은 보존하고 모델/main/T22 파일은 변경하지 않는다.
@@ -363,3 +364,28 @@ UNKNOWN/정산/해제·롤백·닫힌 예약 재개방 금지·테넌트 격리�
 설정과 한계는 `docs/TENANT_CREDIT_GUARD.md`를 따른다.
 상위 T22의 main/평가/UI·봉인 테스트는 보존했다. 공개 명령/비용 통합·실제 청구·운영 반영은 계속 미완료이며
 Muse Spark `muse-spark-1.3`과 현재 채팅의 자동 재개를 유지한다.
+
+## 정산·Git 증거에 따른 canonical Builder 후보 등록 (지원 검증 완료)
+
+`codex/pg-integration`의 `e947cbf`는 인증된 내부 `POST/GET /v1/kernel/candidates`에서
+같은 scope의 정산된 Builder call·canonical 영수증/원장·transport request ID·서버 저장 출력을 대조한다.
+설정된 저장소의 immutable head가 reserved base에 Builder diff와 visible 테스트를 적용한 Git tree와
+정확히 일치할 때만 PROPOSED 후보와 확장 008의 불변 binding을 원자적으로 저장한다.
+현재 GitHub resolver에 맞춰 40자리 SHA-1만 허용하며 요청으로 모델/agent/tenant/경로/상태를 바꿀 수 없다.
+
+Git 확인 중에는 DB 트랜잭션을 잡지 않고, 저장 직전에 fencing·동의·영수증·출력을 다시 확인한다.
+등록 후 head/call이 바뀌면 Runner/G2 연결과 과거 PASS 재전송도 거부한다.
+다른 필수 게이트·독립 리뷰·승인이나 후보 상태 전이를 만들지 않으며 core.authorize_merge의 거부를 유지했다.
+
+API **465 passed·1 skipped**, 실제 PostgreSQL **144 passed**(신규 후보 등록 5개),
+참조 **112개**·SQL **96개**·계약 **0 failure**·웹 빌드 통과.
+동시 최초 등록 8회가 후보 하나로 수렴하고, 새 API 프로세스 조회·실제 로컬 Runner/G2 연결·병합 거부,
+잘못된 모델/request ID/정산액/Git 변경 거부·fencing 재검사·binding 저장 실패의 원자적 롤백을 확인했다.
+Builder/Critic/영수증/원격 checkout transport는 합성 fixture이며 실제 Muse 호출/청구 검증이 아니다.
+
+원본 로그 7개는 `C:\evo_forge\.local\evidence\candidate-registration-20261027-u3iva17t`에 보존했다.
+지원 브랜치의 `docs/validation/2026-10-27-candidate-registration.json`에 source/로그 해시,
+`docs/CANDIDATE_REGISTRATION.md`에 경로·008 적용·제한을 기록했다.
+상위 T22의 main/평가/UI·봉인 수용 테스트는 보존했고 지원 코드는 main 미반영이다.
+공개 Generate/mission/PR의 명령·Broker 예약/영수증·후보 등록 호출·PR base 전달과 전체 승인·운영 배포는 계속 미완료다.
+Muse Spark 기본값과 현재 채팅의 자동 재개를 유지한다.
