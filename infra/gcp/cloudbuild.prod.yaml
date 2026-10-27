@@ -1,0 +1,45 @@
+# EvoForge production images: tests gate the build; three images (api, web, runner).
+# Usage (repo root): gcloud builds submit --config=infra/gcp/cloudbuild.prod.yaml --project=$PROJECT .
+substitutions:
+  _REGION: asia-northeast3
+  _TAG: manual
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+
+steps:
+  # 0) API tests in a clean environment built only from requirements.txt (git needed by Runner tests).
+  - name: python:3.12-slim
+    id: pytest
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        apt-get update -qq && apt-get install -y -qq git >/dev/null &&
+        git config --global user.email ci@evoforge && git config --global user.name ci &&
+        pip install -q -r services/api/requirements.txt &&
+        python -m pytest services/api -q -p no:cacheprovider
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-api
+    waitFor: [pytest]
+    args: [build, -f, services/api/Dockerfile,
+           -t, "${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:${_TAG}", .]
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-runner
+    waitFor: [pytest]
+    args: [build, -f, services/runner/Dockerfile,
+           -t, "${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/runner:${_TAG}", .]
+
+  - name: gcr.io/cloud-builders/docker
+    id: build-web
+    waitFor: [pytest]
+    args: [build, -f, apps/web/Dockerfile,
+           -t, "${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:${_TAG}", apps/web]
+
+images:
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:${_TAG}"
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/runner:${_TAG}"
+  - "${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:${_TAG}"

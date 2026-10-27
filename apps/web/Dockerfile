@@ -9,7 +9,6 @@ RUN if [ -f pnpm-lock.yaml ]; then pnpm build; else npm run build; fi
 FROM node:20-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
-ENV NEXT_PUBLIC_API_BASE=http://localhost:8080
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
