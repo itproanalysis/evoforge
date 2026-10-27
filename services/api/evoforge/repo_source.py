@@ -12,6 +12,7 @@ Fetches only the base commit with its ancestry (no broader history).
 """
 from __future__ import annotations
 
+import base64
 import json
 import os
 import re
@@ -42,7 +43,13 @@ def redact(text: str) -> str:
         except Exception:
             return ""
     if tok in text:
-        return text.replace(tok, "[redacted]")
+        text = text.replace(tok, "[redacted]")
+    try:
+        b64 = base64.b64encode(f"x-access-token:{tok}".encode("utf-8")).decode("ascii")
+    except Exception:
+        b64 = ""
+    if b64 and b64 in text:
+        text = text.replace(b64, "[redacted]")
     return text
 
 
@@ -121,11 +128,20 @@ def resolve_ref_to_sha(repo: str, ref: str) -> str:
 def _run_git(cwd: str, *args: str) -> subprocess.CompletedProcess:
     tok = os.getenv("GITHUB_TOKEN", "") or ""
     cmd = ["git", "-c", "protocol.file.allow=always"]
-    if tok:
-        # Token travels only as an HTTP header value, never in a URL.
-        cmd += ["-c", f"http.extraHeader=Authorization: Bearer {tok}"]
     cmd += list(args)
     env = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_CONFIG_NOSYSTEM="1")
+    env["GIT_ASKPASS"] = "false"
+    if tok:
+        # Token travels only as an HTTP header value via the environment,
+        # never in argv (visible via process listing) or in a URL.
+        header = "Authorization: Basic " + base64.b64encode(
+            f"x-access-token:{tok}".encode("utf-8")
+        ).decode("ascii")
+        env["GIT_CONFIG_COUNT"] = "2"
+        env["GIT_CONFIG_KEY_0"] = "http.extraheader"
+        env["GIT_CONFIG_VALUE_0"] = header
+        env["GIT_CONFIG_KEY_1"] = "credential.helper"
+        env["GIT_CONFIG_VALUE_1"] = ""
     try:
         proc = subprocess.run(cmd, cwd=cwd, env=env, capture_output=True, timeout=120)
     except subprocess.TimeoutExpired:
