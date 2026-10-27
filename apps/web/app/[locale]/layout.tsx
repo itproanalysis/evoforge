@@ -40,39 +40,40 @@ export default async function LocaleLayout({
 
   const raw = (process.env.NEXT_PUBLIC_API_BASE ?? '').trim();
   const apiBase = raw === '' ? '/api/evoforge (same-origin)' : raw;
+  const prefix = locale === 'en' ? '' : `/${locale}`;
 
   return (
     <html lang={locale}>
       <body className="m-0 font-sans bg-background-primary text-text-primary">
         <NextIntlClientProvider messages={messages}>
-          <header className="flex items-center gap-5 px-6 py-3 bg-background-tertiary border-b border-border sticky top-0 z-10">
+          <header className="flex items-center gap-5 px-6 py-3 bg-background-tertiary border-b border-border sticky top-0 z-10 flex-wrap">
             <a
-              href={`/${locale === 'en' ? '' : locale}`}
+              href={prefix || '/'}
               className="text-text-tertiary no-underline font-extrabold text-xl hover:text-text-primary"
             >
               {tCommon('app-name')}
             </a>
-            <nav className="flex gap-4">
+            <nav className="flex gap-4 flex-wrap">
               <a
-                href={`/${locale === 'en' ? '' : locale}`}
+                href={prefix || '/'}
                 className="text-text-tertiary no-underline text-sm hover:text-text-primary"
               >
                 {t('mission-control')}
               </a>
               <a
-                href={`/${locale === 'en' ? '' : locale}/lab`}
+                href={`${prefix}/lab`}
                 className="text-text-tertiary no-underline text-sm hover:text-text-primary"
               >
                 {t('improvement-lab')}
               </a>
               <a
-                href={`/${locale === 'en' ? '' : locale}/evidence`}
+                href={`${prefix}/evidence`}
                 className="text-text-tertiary no-underline text-sm hover:text-text-primary"
               >
                 {t('evidence')}
               </a>
               <a
-                href="/performance"
+                href={`${prefix}/performance`}
                 className="text-text-tertiary no-underline text-sm hover:text-text-primary"
               >
                 {t('performance')}

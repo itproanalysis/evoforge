@@ -1,0 +1,17 @@
+{
+  "id": "T22a_performance_backend",
+  "planned_by": "split of T22 after repeated Builder timeouts",
+  "goal": "PERFORMANCE PAGE — show how well EvoForge performs now and how much it improved, using MEASURED numbers only.\nPrinciple: a number appears only when a server measurement backs it. Missing measurement = explicit 'not measured' with the reason, never a default, never a placeholder.\n\n1. Baseline: X_SINGLE = one Builder attempt per sealed v0 task (existing run_baseline). Stored as a measurement record:\n   {measurement_id, kind:'X_SINGLE', suite_version, model, harness_version, n, passed, pass_rate, wilson95:[lo,hi],\n    cost_cents, created_at, per_family:{family:{n,passed}}, evidence_id}.\n\n(T22a scope: items 1-5 only; the web page is T22b.)",
+  "edit": [
+    "services/api/evoforge/performance.py",
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t22a.py"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t20b_real_baseline.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

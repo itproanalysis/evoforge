@@ -1,0 +1,19 @@
+{
+  "id": "T22b_performance_page",
+  "planned_by": "split of T22 after repeated Builder timeouts",
+  "goal": "WEB PART OF T22 (T22b): the backend endpoints GET /v1/performance, GET /v1/eval/suites, POST /v1/eval/baseline, POST /v1/eval/pipeline are provided by T22a and return the JSON shapes in item 4 of the T22 spec.\nBuild apps/web/app/performance/page.tsx per item 6 of the T22 spec, add the Mission Control link per item 8, add getPerformance()/runBaseline()/runPipeline() to apps/web/lib/api.ts, and add the four paths to apps/web/lib/proxyPolicy.ts and proxyPolicy.cases.json (exact allowlist from item 7).\nShow 'not_measured' states with the reason and no number; no hard-coded result values.\nKeep the page usable at 375px without horizontal scroll.",
+  "edit": [
+    "apps/web/app/performance/page.tsx",
+    "apps/web/app/page.tsx",
+    "apps/web/lib/api.ts",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/performance.py"
+  ],
+  "check": [
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p .",
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

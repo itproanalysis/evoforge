@@ -1,13 +1,24 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { EVIDENCE_STAGES, getEvent, getEvidence } from "../../../lib/api";
+import {
+  EVIDENCE_STAGES,
+  getEvent,
+  getEvidence,
+  listMissions,
+  listOutcomes,
+} from "../../../lib/api";
 import { Button, Input, Card } from "../../../components/ui";
 import { getErrorMessageKey } from "../../../lib/apiErrors";
 
 interface Link {
   stage: string;
   event_id: string | null;
+}
+
+interface RecentEvidenceItem {
+  eid: string;
+  label: string;
 }
 
 function normalize(raw: unknown, fallbackId: string): Link[] {
@@ -25,7 +36,6 @@ function normalize(raw: unknown, fallbackId: string): Link[] {
         event_id: byStage.has(s) ? (byStage.get(s) as string | null) : null,
       }));
     }
-    // Flat object: pick known stage keys if present.
     const keys = [
       "objective_version",
       "task",
@@ -42,7 +52,6 @@ function normalize(raw: unknown, fallbackId: string): Link[] {
       }));
     }
   }
-  // Fallback: only id known → all links missing.
   void fallbackId;
   return EVIDENCE_STAGES.map((s) => ({ stage: s, event_id: null }));
 }
@@ -52,6 +61,7 @@ export default function EvidencePage() {
   const tErrors = useTranslations("errors");
 
   const [id, setId] = useState("cmd_demo");
+  const [recentIds, setRecentIds] = useState<RecentEvidenceItem[]>([]);
   const [links, setLinks] = useState<Link[] | null>(null);
   const [raw, setRaw] = useState("");
   const [err, setErr] = useState("");
@@ -61,12 +71,15 @@ export default function EvidencePage() {
   const [detailErr, setDetailErr] = useState("");
   const [detailLoading, setDetailLoading] = useState(false);
 
-  const fetchOne = async () => {
+  const fetchById = async (targetId: string) => {
+    const clean = targetId.trim();
+    if (!clean) return;
+    setId(clean);
     setLoading(true);
     setErr("");
     try {
-      const out = await getEvidence(id);
-      setLinks(normalize(out, id));
+      const out = await getEvidence(clean);
+      setLinks(normalize(out, clean));
       setRaw(JSON.stringify(out, null, 2));
       setSelected(null);
       setDetail("");
@@ -74,12 +87,57 @@ export default function EvidencePage() {
     } catch (e) {
       const errorKey = getErrorMessageKey(e);
       setErr(tErrors(errorKey as any));
-      setLinks(normalize(null, id));
+      setLinks(normalize(null, clean));
       setRaw("");
     } finally {
       setLoading(false);
     }
   };
+
+  const fetchOne = async () => {
+    await fetchById(id);
+  };
+
+  useEffect(() => {
+    let qId = "";
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      qId = (sp.get("id") ?? "").trim();
+    }
+    if (qId) {
+      void fetchById(qId);
+    }
+    void (async () => {
+      const items: RecentEvidenceItem[] = [];
+      const seen = new Set<string>();
+      try {
+        const mRes = await listMissions();
+        for (const m of mRes.missions ?? []) {
+          for (const eid of [...(m.evidence_ids ?? [])].reverse()) {
+            if (eid && !seen.has(eid)) {
+              seen.add(eid);
+              items.push({ eid, label: `${m.mission_id} (${m.state})` });
+            }
+          }
+        }
+      } catch {}
+      try {
+        const oRes = await listOutcomes();
+        for (const o of oRes.outcomes ?? []) {
+          for (const eid of [o.evidence_id, o.pr_evidence_id, o.run_evidence_id]) {
+            if (eid && !seen.has(eid)) {
+              seen.add(eid);
+              items.push({ eid, label: `WVI ${o.mission_id}` });
+            }
+          }
+        }
+      } catch {}
+      setRecentIds(items);
+      if (!qId && items.length > 0) {
+        void fetchById(items[0].eid);
+      }
+    })();
+  }, []);
 
   const fetchEvent = async (eventId: string) => {
     setSelected(eventId);
@@ -101,7 +159,7 @@ export default function EvidencePage() {
     <main>
       <h1 className="text-2xl font-bold">{t("heading")}</h1>
       <p className="text-text-secondary text-sm">{t("description")}</p>
-      
+
       <Card className="mt-4">
         <div className="flex gap-2">
           <Input
@@ -119,7 +177,39 @@ export default function EvidencePage() {
             {loading ? t("loading") : t("fetch-button")}
           </Button>
         </div>
-        {err && <p className="text-accent-red text-sm mt-2">{t("error-prefix")}{err}</p>}
+        <div className="mt-3">
+          <div className="text-xs text-text-secondary mb-1.5">
+            {t("recent-evidence-heading")}
+          </div>
+          {recentIds.length === 0 ? (
+            <div className="text-xs text-text-secondary">
+              {t("recent-evidence-empty")}
+            </div>
+          ) : (
+            <div className="flex gap-1.5 flex-wrap">
+              {recentIds.slice(0, 12).map((item) => (
+                <button
+                  key={item.eid}
+                  onClick={() => void fetchById(item.eid)}
+                  className={`text-xs px-2.5 py-1 rounded border cursor-pointer transition-colors ${
+                    id === item.eid
+                      ? "bg-accent-blue text-white border-accent-blue font-semibold"
+                      : "bg-background-primary text-text-tertiary border-border hover:border-border-secondary"
+                  }`}
+                >
+                  <code>{item.eid}</code>{" "}
+                  <span className="opacity-75">· {item.label}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {err && (
+          <p className="text-accent-red text-sm mt-2">
+            {t("error-prefix")}
+            {err}
+          </p>
+        )}
       </Card>
 
       {links && (
@@ -163,7 +253,8 @@ export default function EvidencePage() {
               {detailLoading && <p className="text-xs">{t("loading-event")}</p>}
               {detailErr && (
                 <p className="text-accent-red text-sm">
-                  {t("error-prefix")}{detailErr}
+                  {t("error-prefix")}
+                  {detailErr}
                 </p>
               )}
               {detail && (

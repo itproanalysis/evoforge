@@ -719,3 +719,292 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
             "reservation_id": reservation_ids[0] if reservation_ids else "",
             "reservation_ids": reservation_ids,
             "provider_stub": provider_stub}
+
+
+PIPELINE_MAX_ATTEMPTS = 3
+PIPELINE_PER_ATTEMPT_MAX_CENTS = BASELINE_COST_CENTS
+
+
+def count_tasks(family: str | None = None) -> int:
+    """Light task count for budget checks (no behavioural validation)."""
+    directory = sealed_dir()
+    try:
+        names = sorted(f for f in os.listdir(directory) if f.endswith(".json"))
+    except OSError as e:
+        raise SealedEvalError(f"sealed suite unavailable: {e}")
+    total = 0
+    for name in names:
+        path = os.path.join(directory, name)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                doc = json.load(fh)
+        except (OSError, ValueError):
+            raise SealedEvalError(f"sealed suite file unreadable: {name}")
+        if family is not None and doc.get("family") != family:
+            continue
+        tasks = doc.get("tasks")
+        if not isinstance(tasks, list):
+            raise SealedEvalError(f"sealed suite file invalid: {name}")
+        total += len(tasks)
+    if family is not None and total == 0:
+        raise ValueError(f"unknown family: {family!r}")
+    return total
+
+
+def _pipeline_prices() -> tuple[float, float, float]:
+    from evoforge import performance as _perf
+
+    return _perf.prices()
+
+
+def _pipeline_usage_cost(usage) -> int | None:
+    from evoforge import performance as _perf
+
+    return _perf.usage_cost_cents(usage)
+
+
+def _pipeline_usage_from_output(out: dict):
+    from evoforge import performance as _perf
+
+    return _perf.usage_from_output(out)
+
+
+def _call_pipeline_attempt(goal: str, base: str,
+                           file_context: list[dict]) -> tuple[str, object, int, bool]:
+    """One reserve -> Builder -> settle attempt with usage-derived cost.
+
+    Reservation is made at the conservative per-attempt maximum, then
+    settled to the usage-derived value. Missing usage settles at the
+    maximum and is flagged. Provider mapping matches the baseline:
+    not-accepted refunds, unknown outcomes are held for reconciliation.
+    """
+    rsv = _ledger.reserve(PIPELINE_PER_ATTEMPT_MAX_CENTS, "default")
+    try:
+        out = _broker.call_builder(goal, base, file_context=file_context)
+    except _broker.ProviderNotAccepted:
+        _ledger.refund(rsv)
+        raise SealedEvalError("provider not accepted; reservation refunded")
+    except Exception as e:
+        try:
+            _ledger.mark_unknown(rsv, type(e).__name__)
+        except Exception:
+            pass
+        raise SealedEvalError(
+            f"provider outcome unknown ({type(e).__name__}); reservation held")
+    usage = _pipeline_usage_from_output(out) if isinstance(out, dict) else None
+    actual = _pipeline_usage_cost(usage)
+    missing = actual is None
+    if missing:
+        actual = PIPELINE_PER_ATTEMPT_MAX_CENTS
+    _ledger.settle(rsv, int(actual))
+    return rsv, out, int(actual), missing
+
+
+def _parse_failure_xml(xml_path: str) -> list[dict]:
+    import xml.etree.ElementTree as _ET
+
+    try:
+        root = _ET.parse(xml_path).getroot()
+    except Exception:
+        return []
+    failures: list[dict] = []
+    for tc in root.iter("testcase"):
+        bad = None
+        for child in tc:
+            tag = child.tag.rsplit("}", 1)[-1]
+            if tag in ("failure", "error"):
+                bad = child
+                break
+        if bad is None:
+            continue
+        name = tc.get("name", "test")
+        classname = tc.get("classname", "")
+        label = f"{classname}::{name}" if classname else name
+        text = (bad.get("message", "") or "") + "\n" + (bad.text or "")
+        keep: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if "AssertionError" in line or stripped.startswith("E "):
+                keep.append(stripped[:300])
+            if len(keep) >= 4:
+                break
+        msg = " | ".join(keep)[:500] if keep else "assertion failed"
+        failures.append({"test": label[:200], "message": msg})
+    return failures
+
+
+def _run_heldout_local_detail(sandbox: str, heldout: list[dict],
+                              timeout_s: int, tmpbase: str) -> tuple[float, list[dict]]:
+    """Held-out run returning (score, failures) with Runner sealed isolation."""
+    import xml.etree.ElementTree as _ET  # noqa: F401
+
+    _check_size(heldout)
+    sealed = os.path.join(tmpbase, f"sealed-{secrets.token_hex(8)}")
+    os.makedirs(sealed)
+    for i, entry in enumerate(heldout, 1):
+        with open(os.path.join(sealed, f"test_heldout_{i}.py"), "w",
+                  encoding="utf-8", newline="") as fh:
+            fh.write(entry["code"])
+    ini = os.path.join(tmpbase, f"sealed-{secrets.token_hex(8)}.ini")
+    with open(ini, "w", encoding="utf-8", newline="") as fh:
+        fh.write("[pytest]\n")
+    xml = os.path.join(tmpbase, f"held-{secrets.token_hex(8)}.xml")
+    try:
+        result = _runner._run_suite(
+            sandbox, sealed, xml,
+            [{"code": entry["code"]} for entry in heldout],
+            timeout_s, sealed_ini=ini)
+    except (SealedTooLarge, SealedTimeout, SealedEvalError):
+        raise
+    except Exception as e:
+        raise SealedEvalError(f"sealed run failed: {type(e).__name__}")
+    if not isinstance(result, dict) or result.get("timed_out"):
+        raise SealedTimeout("sealed held-out run timed out")
+    n = result.get("n", 0)
+    passed = result.get("pass", 0)
+    if n < len(heldout) or passed != n:
+        failures = _parse_failure_xml(xml)
+        if not failures:
+            failures = [{"test": "held-out", "message": "assertion failed"}]
+        return 0.0, failures
+    return 1.0, []
+
+
+def _pipeline_feedback(goal: str, failures: list[dict],
+                       n: int, passed: int) -> str:
+    lines = [goal, "",
+             f"Previous attempt failed {n - passed}/{n} held-out tests. "
+             "Failing tests (names and assertion lines only):"]
+    for failure in failures[:10]:
+        lines.append(f"- {failure['test']}: {failure['message']}")
+    lines.append("Propose a corrected patch using only this feedback.")
+    return "\n".join(lines)[:4000]
+
+
+def run_pipeline(suite_version: str, model: str, family: str | None = None,
+                 timeout_s: int | None = None,
+                 max_attempts: int = PIPELINE_MAX_ATTEMPTS) -> dict:
+    """Adaptive pipeline: up to 3 Builder attempts per sealed task.
+
+    After a failed attempt the Builder receives only failing test names
+    and assertion error lines, never held-out code and never reference
+    fixes. A task passes when any attempt passes its held-out suite.
+    Costs are usage-derived per attempt; the total is the sum of all
+    settled attempts.
+    """
+    if suite_version != SUITE_VERSION:
+        raise ValueError(f"unknown suite_version: {suite_version!r}")
+    if model != BASELINE_MODEL:
+        raise ValueError(f"unknown model: {model!r}")
+    if timeout_s is None:
+        timeout_s = PYTEST_TIMEOUT_S
+    max_attempts = max(1, min(int(max_attempts), PIPELINE_MAX_ATTEMPTS))
+    suites = load_suites()
+    if family is not None:
+        suites = [s for s in suites if s["family"] == family]
+        if not suites:
+            raise ValueError(f"unknown family: {family!r}")
+    for suite in suites:
+        for task in suite["tasks"]:
+            _check_size(task["heldout"])
+    scaffold = {"name": SCAFFOLD_NAME, "version": SUITE_VERSION, "turn_cap": 3,
+                "model": model, "harness_version": HARNESS_VERSION}
+    pipeline_id = f"pl_{uuid.uuid4().hex[:12]}"
+    tmpbase = tempfile.mkdtemp(prefix="evoforge-pipeline-")
+    scores: list[dict] = []
+    audits: dict[str, list[dict]] = {}
+    redacted: list[dict] = []
+    by_family: dict[str, dict] = {}
+    reservation_ids: list[str] = []
+    settled_total = 0
+    attempts_total = 0
+    usage_missing = False
+    provider_stub = True
+    try:
+        for suite in suites:
+            fam = suite["family"]
+            fam_passed = 0
+            fam_cost = 0
+            for task in suite["tasks"]:
+                tid = task["id"]
+                source, base, future = _make_task_source_repo(
+                    tmpbase, tid, task["files"])
+                file_context = [{"path": p, "content": task["files"][p]}
+                                for p in sorted(task["files"])]
+                goal = task["goal"]
+                best = 0.0
+                for _attempt in range(max_attempts):
+                    safe = re.sub(r"[^A-Za-z0-9_]+", "_", tid).strip("_") or "task"
+                    dest = os.path.join(
+                        tmpbase,
+                        f"pipe-{fam}-{safe}-{secrets.token_hex(4)}")
+                    audit = _build_clean_sandbox(source, base, dest, future)
+                    audits[fam] = audit
+                    rsv, out, actual, missing = _call_pipeline_attempt(
+                        goal, base, file_context)
+                    reservation_ids.append(rsv)
+                    settled_total += actual
+                    fam_cost += actual
+                    attempts_total += 1
+                    if missing:
+                        usage_missing = True
+                    if isinstance(out, dict) and not out.get("stub"):
+                        provider_stub = False
+                    diff = out.get("diff") if isinstance(out, dict) else ""
+                    score = 0.0
+                    failures: list[dict] = []
+                    if _apply_candidate(dest, diff):
+                        if _runner_client.runner_url():
+                            score = _score_heldout(
+                                dest, source, base,
+                                diff if isinstance(diff, str) else "",
+                                task["heldout"], timeout_s, tmpbase)
+                            if score < 1.0:
+                                failures = [{"test": "held-out",
+                                             "message": "assertion failed"}]
+                        else:
+                            score, failures = _run_heldout_local_detail(
+                                dest, task["heldout"], timeout_s, tmpbase)
+                    if score >= 1.0:
+                        best = 1.0
+                        break
+                    best = max(best, score)
+                    goal = _pipeline_feedback(task["goal"], failures or
+                                              [{"test": "held-out",
+                                                "message": "assertion failed"}],
+                                              len(task["heldout"]),
+                                              int(score >= 1.0) * len(task["heldout"]))
+                record = eval_hygiene.score_record(tid, best, scaffold, [])
+                record["passed"] = bool(best >= 1.0)
+                scores.append(record)
+                if best >= 1.0:
+                    fam_passed += 1
+                for entry in task["heldout"]:
+                    redacted.append({"id": tid, "family": fam,
+                                     **_redact(entry["kind"], entry["code"])})
+            by_family[fam] = {"n": len(suite["tasks"]), "passed": fam_passed,
+                              "pass_rate": (fam_passed / len(suite["tasks"])
+                                            if suite["tasks"] else 0.0),
+                              "cost_cents": fam_cost}
+    finally:
+        _remove_tree(tmpbase)
+    passed = sum(1 for s in scores if s["score"] >= 1.0)
+    n = len(scores)
+    rate = (passed / n) if n else 0.0
+    lo, hi = _quality_gate.wilson(passed, n)
+    return {"pipeline_id": pipeline_id, "suite_version": SUITE_VERSION,
+            "model": model,
+            "PIPELINE": {"pass_rate": rate, "n": n, "passed": passed,
+                         "cost_cents": settled_total,
+                         "attempts_total": attempts_total},
+            "pass_rate_wilson_lo": lo, "pass_rate_wilson_hi": hi,
+            "scaffold": scaffold,
+            "audit": audits,
+            "scores": scores,
+            "tasks": redacted,
+            "by_family": by_family,
+            "reservation_id": reservation_ids[0] if reservation_ids else "",
+            "reservation_ids": reservation_ids,
+            "provider_stub": provider_stub,
+            "attempts_total": attempts_total,
+            "usage_missing": usage_missing}

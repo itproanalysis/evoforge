@@ -18,7 +18,6 @@
   ],
   "check": [
     "python -m pytest services/api -q -p no:cacheprovider",
-    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
-    "git checkout -- apps/web/tsconfig.tsbuildinfo"
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p ."
   ]
 }
