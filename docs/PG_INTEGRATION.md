@@ -81,3 +81,6 @@ source·로그 SHA-256은 `docs/validation/2026-10-27-db-usage-guard.json`에 �
 4. canonical 후보 생성·다른 게이트/리뷰/승인·0원과 청구 정정 정책, mission 호출 실행권·측정 상태와 운영 배포를 대조한다.
 
 Muse Spark `muse-spark-1.3` 기본값과 자동 모델 대체 금지는 유지한다.
+
+PR 준비의 기준 커밋 고정 옵션과 기존 작업 브랜치 보호는 [PR 기준 snapshot](PR_SNAPSHOT.md)을 따른다.
+정본 공개 `_pr_core`에서 서버가 검증한 SHA를 전달하는 연결은 상위 T22 반영 후 계속한다.
