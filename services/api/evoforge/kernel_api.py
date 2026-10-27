@@ -87,6 +87,12 @@ class MergeAuthorizationRequest(InternalRequest):
     policy_hash: str = Field(pattern=r"^[a-f0-9]{64}$")
 
 
+class CandidateRunRequest(InternalRequest):
+    candidate_id: UUID
+    call_id: UUID
+    evidence_id: str = Field(min_length=1, max_length=256)
+
+
 @router.post("/reservations")
 def reserve(req: ReserveRequest, kernel: PostgresKernel = Depends(authenticated_kernel)):
     return invoke(kernel.reserve_cost, req.call_id, req.period_start, req.amount_micros)
@@ -153,3 +159,16 @@ def prepare_builder_call(req: BuilderCallRequest, kernel: PostgresKernel = Depen
 @router.get("/builder-calls/{call_id}")
 def builder_call(call_id: UUID, kernel: PostgresKernel = Depends(authenticated_kernel)):
     return invoke(kernel.builder_call, call_id)
+
+
+@router.post('/candidate-runs')
+def candidate_run(req: CandidateRunRequest, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_run_evidence import record
+    return invoke(record,kernel,req.candidate_id,req.call_id,req.evidence_id)
+
+
+@router.get('/candidates/{candidate_id}/runner-evidence/{evidence_id}')
+def candidate_run_evidence(candidate_id: UUID, evidence_id: str,
+                           kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_run_evidence import read
+    return invoke(read,kernel,candidate_id,evidence_id)

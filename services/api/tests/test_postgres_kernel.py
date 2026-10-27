@@ -502,7 +502,7 @@ def test_http_receipt_ingestion_scope_and_quote_bound_settlement(funded, http_ke
     assert foreign.status_code == missing.status_code == 404 and foreign.json() == missing.json()
 
 
-def _builder_packet(funded, *, role="builder", model="muse-spark-1.3", expires_s=3600):
+def _builder_packet(funded, *, role="builder", model="muse-spark-1.3", expires_s=3600, base_sha='a'*40):
     """Real claim_task/fence plus a synthetic trusted Gateway packet/consent."""
     scope = funded["scope"]
     agent, run, task, packet = (uuid4() for _ in range(4))
@@ -514,7 +514,7 @@ def _builder_packet(funded, *, role="builder", model="muse-spark-1.3", expires_s
         for state in ("QUEUED", "RUNNING"):
             connection.execute("UPDATE core.runs SET status=%s WHERE run_id=%s", (state, run))
         connection.execute("INSERT INTO core.tasks(tenant_id,project_id,task_id,run_id,risk_level,base_sha) "
-                           "VALUES (%s,%s,%s,%s,'LOW',repeat('a',40))", (scope.tenant_id, scope.project_id, task, run))
+                           "VALUES (%s,%s,%s,%s,'LOW',%s)", (scope.tenant_id, scope.project_id, task, run, base_sha))
         epoch = connection.execute("SELECT core.claim_task(%s,%s,%s,%s,interval '1 hour')",
                                    (scope.tenant_id, scope.project_id, task, agent)).fetchone()[0]
         connection.execute("UPDATE core.tasks SET status='RUNNING' WHERE task_id=%s", (task,))
@@ -523,11 +523,11 @@ def _builder_packet(funded, *, role="builder", model="muse-spark-1.3", expires_s
              seat_id,function_role,agent_id,candidate_id,is_author_of_candidate,channel,profile,repo_sha,
              contract_version,policy_version,policy_hash,tool_schema_hash,evidence_manifest_hash,
              lease_epoch,provider,model,cache_mode,packet_sha256,issued_at,expires_at)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,'api','SAFE',repeat('a',40),
+            VALUES (%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,'api','SAFE',%s,
                     1,'test',repeat('1',64),repeat('2',64),repeat('3',64),%s,'meta',%s,'NONE',repeat('4',64),
                     now()+%s*interval '1 second',now()+%s*interval '1 second')""",
             (scope.tenant_id, scope.project_id, packet, run, task, uuid4(), str(packet), role, agent,
-             uuid4() if role in {"critic", "verifier"} else None, role not in {"critic", "verifier"}, epoch, model,
+             uuid4() if role in {"critic", "verifier"} else None, role not in {"critic", "verifier"}, base_sha, epoch, model,
              -7200 if expires_s < 0 else 0, expires_s))
         connection.execute("INSERT INTO core.provider_allowlist "
                            "(tenant_id,project_id,provider,model_glob,data_consent_at,consented_by) "
@@ -873,3 +873,219 @@ def test_state_database_failure_prevents_provider_call_without_memory_fallback(f
 def test_unknown_state_backend_is_not_a_memory_mode(funded, durable_api, monkeypatch):
     monkeypatch.setenv('EVO_STATE_BACKEND', 'postgrez')
     assert durable_api.post('/v1/objectives', json={'goal': 'g'}).status_code == 503
+
+
+@pytest.fixture
+def core_runner(funded,durable_api,http_kernel,monkeypatch,tmp_path):
+    """Real Runner/Postgres, synthetic Critic+receipt+registered image; no paid calls."""
+    import main
+    repo=tmp_path/'core-source'
+    repo.mkdir()
+    def git(*args):
+        return subprocess.check_output(['git','-C',str(repo),*args],text=True).strip()
+    git('init','-q')
+    git('config','user.name','Fixture')
+    git('config','user.email','fixture@example.invalid')
+    (repo/'value.py').write_text('result = 2\n',encoding='utf-8')
+    git('add','value.py')
+    git('commit','-qm','base')
+    base=git('rev-parse','HEAD')
+    (repo/'value.py').write_text('result = 3\n',encoding='utf-8')
+    git('commit','-qam','candidate')
+    head=git('rev-parse','HEAD')
+    context=_builder_packet(funded,base_sha=base)
+    scope=funded['scope']
+    candidate,call=uuid4(),uuid4()
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute('INSERT INTO core.candidates(tenant_id,project_id,candidate_id,task_id,author_agent_id,base_sha,head_sha) '
+                     'VALUES (%s,%s,%s,%s,%s,%s,%s)',(scope.tenant_id,scope.project_id,candidate,context['task'],context['agent'],base,head))
+    _prepare(funded,context['packet'],call)
+    funded['kernel'].mark_sent(call)
+    receipt=receipt_document(tenant=scope.tenant_id,project=scope.project_id,packet=context['packet'],call=call)
+    funded['kernel'].record_receipt(receipt)
+    assert funded['kernel'].settle_from_receipt(receipt['receipt_id']).status=='COMMITTED'
+    monkeypatch.setenv('EVO_RUNNER_IMAGE_DIGEST','sha256:'+'7'*64)
+    monkeypatch.setenv('EVO_RUNNER_URL','')
+    monkeypatch.setenv('EVO_REPO_ROOTS',str(tmp_path))
+    monkeypatch.setenv('EVO_ALLOW_LOCAL_REPOS','1')
+    sealed=[{'kind':kind,'code':f'# CORE_SEALED_CANARY_303\nfrom value import result\ndef test_{kind}():\n    assert result == 3\n'}
+            for kind in ('compositional','negative','boundary')]
+    monkeypatch.setattr(main.broker_meta,'call_critic',lambda *args,**kwargs:{
+        'stub':False,'model':'muse-spark-1.3','sealed_tests':sealed,'review':{'result':'PASS'}})
+    review=durable_api.post('/v1/candidates/review',json={'goal_contract':'result is 3'})
+    assert review.status_code==200,review.text
+    request={'source_repo':str(repo),'base_sha':head,'diff':'',
+             'tests':[{'code':'from value import result\ndef test_value():\n    assert result == 3\n'}],
+             'review_evidence_id':review.json()['evidence_id']}
+    response=durable_api.post('/v1/runs',json=request)
+    assert response.status_code==200,response.text
+    assert response.json()['run']['heldout']['pass']==3
+    return {'candidate':candidate,'call':call,'context':context,'head':head,'request':request,
+            'evidence':response.json()['evidence_id'],'client':http_kernel,'api':durable_api}
+
+
+def _bind_core_run(ctx,evidence=None,**extra):
+    return ctx['client'].post('/v1/kernel/candidate-runs',json={
+        'candidate_id':str(ctx['candidate']),'call_id':str(ctx['call']),
+        'evidence_id':evidence or ctx['evidence'],**extra})
+
+
+def test_actual_runner_gate_is_receipt_and_head_bound_durable_and_cannot_authorize_merge(funded,core_runner):
+    from evoforge.postgres_run_evidence import record,read
+    ctx=core_runner
+    response=_bind_core_run(ctx)
+    assert response.status_code==200,response.text
+    row=response.json()
+    assert row['result']=='PASS' and row['head_sha']==ctx['head']
+    assert 'CORE_SEALED_CANARY_303' not in response.text
+    assert _bind_core_run(ctx).json()==row
+    fresh=PostgresKernel(funded['dsn'],funded['scope'])
+    assert read(fresh,ctx['candidate'],ctx['evidence'])['gate_result_id']==UUID(row['gate_result_id'])
+    foreign=PostgresKernel(funded['dsn'],KernelScope(funded['scope'].tenant_id,uuid4()))
+    with pytest.raises(KernelNotFound):
+        read(foreign,ctx['candidate'],ctx['evidence'])
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute('DELETE FROM runtime.candidate_run_evidence WHERE candidate_id=%s',(ctx['candidate'],))
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute("UPDATE runtime.candidate_run_evidence SET evidence_sha256=repeat('0',64) WHERE candidate_id=%s",
+                         (ctx['candidate'],))
+    with ThreadPoolExecutor(max_workers=6) as workers:
+        ids=list(workers.map(lambda _:record(fresh,ctx['candidate'],ctx['call'],ctx['evidence'])['gate_result_id'],range(6)))
+    assert len(set(ids))==1
+    with fresh._transaction() as conn:
+        gates=conn.execute('SELECT gate,result FROM core.gate_results WHERE candidate_id=%s',(ctx['candidate'],)).fetchall()
+        assert gates==[{'gate':'G2_REQUIRED','result':'PASS'}]
+        assert conn.execute('SELECT status FROM core.candidates WHERE candidate_id=%s',(ctx['candidate'],)).fetchone()['status']=='PROPOSED'
+    denied=ctx['client'].post('/v1/kernel/merge-authorizations',json={
+        'candidate_id':str(ctx['candidate']),'head_sha':ctx['head'],'policy_hash':'1'*64})
+    assert denied.status_code==409
+    child_env={**os.environ,'CORE_CANDIDATE':str(ctx['candidate']),'CORE_EVIDENCE':ctx['evidence']}
+    script="""import json,os
+import main
+from fastapi.testclient import TestClient
+with TestClient(main.app) as c:
+    r=c.get('/v1/kernel/candidates/'+os.environ['CORE_CANDIDATE']+'/runner-evidence/'+os.environ['CORE_EVIDENCE'],
+            headers={'Authorization':'Bearer '+os.environ['EVO_KERNEL_TOKEN']})
+    assert r.status_code==200
+    print(json.dumps(r.json()))
+"""
+    child=subprocess.run([sys.executable,'-c',script],cwd=ROOT/'services/api',env=child_env,capture_output=True,
+                         text=True,timeout=20,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    assert child.returncode==0 and __import__('json').loads(child.stdout)['gate_result_id']==row['gate_result_id']
+
+
+@pytest.mark.parametrize('change',['diff','head','result','image','review'])
+def test_runner_gate_rejects_mismatched_server_evidence_without_partial_rows(funded,core_runner,change):
+    import main
+    from copy import deepcopy
+    ctx=core_runner
+    document=deepcopy(main._evidence[ctx['evidence']])
+    document.pop('id')
+    if change=='diff':
+        document['diff']='--- a/value.py\n+++ b/value.py\n@@ -1 +1 @@\n-result = 2\n+result = 3\n'
+    elif change=='head':
+        document['base_sha']='f'*40
+    elif change=='result':
+        document['run']['visible']['pass']=0
+    elif change=='image':
+        document['run']['attestation']['runner_image_digest']='sha256:'+'8'*64
+    else:
+        document['review_evidence_id']=None
+    eid=main._store_evidence(document)
+    main._link_stages(eid,('Candidate','Gate'))
+    assert _bind_core_run(ctx,eid).status_code in (404,409)
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.gate_results WHERE candidate_id=%s',(ctx['candidate'],)).fetchone()['n']==0
+    assert funded['kernel'].reservation(ctx['call']).status=='COMMITTED'
+
+
+def test_runner_gate_requires_settlement_current_fence_and_server_owned_fields(funded,core_runner,monkeypatch):
+    ctx=core_runner
+    assert _bind_core_run(ctx,tenant_id=str(uuid4())).status_code==422
+    assert _bind_core_run(ctx,result='PASS').status_code==422
+    with monkeypatch.context() as patch:
+        patch.delenv('EVO_RUNNER_IMAGE_DIGEST')
+        assert _bind_core_run(ctx).status_code==503
+    pending=uuid4()
+    _prepare(funded,ctx['context']['packet'],pending)
+    request={'candidate_id':str(ctx['candidate']),'call_id':str(pending),'evidence_id':ctx['evidence']}
+    assert ctx['client'].post('/v1/kernel/candidate-runs',json=request).status_code==409
+    assert funded['kernel'].reservation(pending).status=='RESERVED'
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute('UPDATE core.tasks SET lease_epoch=lease_epoch+1 WHERE task_id=%s',(ctx['context']['task'],))
+    assert _bind_core_run(ctx).status_code==409
+    monkeypatch.setenv('EVO_PROJECT_ID',str(uuid4()))
+    missing=ctx['client'].get(f'/v1/kernel/candidates/{ctx["candidate"]}/runner-evidence/{ctx["evidence"]}')
+    unknown=ctx['client'].get(f'/v1/kernel/candidates/{uuid4()}/runner-evidence/missing')
+    assert missing.status_code==unknown.status_code==404 and missing.json()==unknown.json()
+
+
+def test_failed_real_run_records_fail_and_old_success_replay_cannot_override_it(funded,core_runner):
+    from copy import deepcopy
+    ctx=core_runner
+    assert _bind_core_run(ctx).json()['result']=='PASS'
+    request=deepcopy(ctx['request'])
+    request['tests'][0]['code']=request['tests'][0]['code'].replace('result == 3','result == 4')
+    failed=ctx['api'].post('/v1/runs',json=request)
+    assert failed.status_code==200 and failed.json()['run']['visible']['pass']==0
+    assert _bind_core_run(ctx,failed.json()['evidence_id']).json()['result']=='FAIL'
+    assert _bind_core_run(ctx).json()['result']=='PASS'  # historical replay, no new row
+    with funded['kernel']._transaction() as conn:
+        results=conn.execute('SELECT result FROM core.gate_results WHERE candidate_id=%s ORDER BY recorded_at DESC',
+                             (ctx['candidate'],)).fetchall()
+        assert results==[{'result':'FAIL'},{'result':'PASS'}]
+
+
+def test_runner_gate_and_binding_rollback_together_on_storage_failure(funded,core_runner,monkeypatch):
+    from evoforge import postgres_run_evidence as bridge
+    from evoforge.postgres_kernel import KernelUnavailable
+    ctx=core_runner
+    original=bridge._read
+    called=[]
+    def fail_after_writes(*args):
+        called.append(True)
+        if len(called)==2:
+            raise KernelUnavailable('injected storage failure')
+        return original(*args)
+    monkeypatch.setattr(bridge,'_read',fail_after_writes)
+    assert _bind_core_run(ctx).status_code==503
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.gate_results WHERE candidate_id=%s',(ctx['candidate'],)).fetchone()['n']==0
+        assert conn.execute('SELECT count(*) AS n FROM runtime.candidate_run_evidence WHERE candidate_id=%s',(ctx['candidate'],)).fetchone()['n']==0
+
+
+def test_remote_bundle_runner_provenance_survives_client_and_backstops_core_gate(core_runner,monkeypatch):
+    import importlib.util
+    import httpx
+    from copy import deepcopy
+    ctx=core_runner
+    spec=importlib.util.spec_from_file_location('codex_runner_wire_fixture',ROOT/'services/runner/app.py')
+    module=importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    from fastapi.testclient import TestClient
+    captured=[]
+    with TestClient(module.app,raise_server_exceptions=False) as service:
+        def send(url,**kwargs):
+            assert url=='https://runner.test.invalid/run'
+            response=service.post('/run',json=kwargs['json'])
+            captured.append(response.json())
+            return response
+        monkeypatch.setenv('EVO_RUNNER_URL','https://runner.test.invalid')
+        monkeypatch.setenv('EVO_RUNNER_AUDIENCE','')
+        monkeypatch.setattr(httpx,'post',send)
+        response=ctx['api'].post('/v1/runs',json=ctx['request'])
+    assert response.status_code==200,response.text
+    assert captured and response.json()['run']['attestation']['runner_image_digest']=='sha256:'+'7'*64
+    assert _bind_core_run(ctx,response.json()['evidence_id']).json()['result']=='PASS'
+    assert 'CORE_SEALED_CANARY_303' not in response.text
+    # The API client validates the configured identity and counts before a
+    # malformed Runner response can become a persisted gate/evidence record.
+    for change in ('counts','attestation'):
+        raw=deepcopy(captured[0])
+        if change=='counts':
+            raw['visible']['pass']=raw['visible']['n']+1
+        else:
+            raw.pop('attestation')
+        monkeypatch.setattr(httpx,'post',lambda *args,**kwargs:httpx.Response(200,json=raw))
+        assert ctx['api'].post('/v1/runs',json=ctx['request']).status_code==502

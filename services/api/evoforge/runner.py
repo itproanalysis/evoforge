@@ -283,6 +283,11 @@ def run_candidate(source_repo, base_sha, diff, visible_tests, heldout_tests,
         _apply_diff(dest, diff)
         _check_suite(visible_tests, "visible")
         _check_suite(heldout_tests, "heldout")
+        from evoforge import runner_attestation
+        try:
+            provenance = runner_attestation.prepare(base, diff or '', visible_tests, heldout_tests)
+        except ValueError:
+            raise RunnerError('Runner image identity configuration is invalid') from None
         # Visible (candidate-side) suite runs first, while no held-out file exists anywhere,
         # so candidate code can neither read nor rewrite the sealed tests.
         vis_dir = _write_suite(dest, "visible", "test_visible", visible_tests)
@@ -299,9 +304,9 @@ def run_candidate(source_repo, base_sha, diff, visible_tests, heldout_tests,
             fh.write("[pytest]\n")  # pins config: no ini/addopts from the candidate tree
         held = _run_suite(dest, sealed, os.path.join(tmpbase, f"held-{secrets.token_hex(8)}.xml"),
                           heldout_tests, timeout_s, sealed_ini=ini)
-        return {"base": base, "hygiene": [],
+        return runner_attestation.attach({"base": base, "hygiene": [],
                 "visible": vis, "heldout": held,
-                "heldout_kinds": [str(t.get("kind", "")) for t in heldout_tests]}
+                "heldout_kinds": [str(t.get("kind", "")) for t in heldout_tests]}, provenance)
     finally:
         _remove_tree(tmpbase)
         if is_temp:
