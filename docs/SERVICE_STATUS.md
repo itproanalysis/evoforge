@@ -32,7 +32,7 @@ visible 3/3·held-out 3/3) → 게이트 `GH_INTEGRITY`·`GC_COMPOSITION`·`G2_R
 | # | 갭 | 현재 | 필요한 것 |
 |---|---|---|---|
 | P0-1 | 인증·권한 | API·웹 무인증 | 웹 로그인 세션, API 비공개(웹 서버만 ID 토큰으로 호출), 허용 계정 제한 |
-| P0-2 | 영속성 | 요청 경로가 메모리 원장·증거·명령 사용 → 재시작 시 소실 | Cloud SQL + PostgreSQL 커널을 요청 경로에 연결 |
+| P0-2 | 영속성 | 증거·비공개 리뷰·이벤트/체인은 PostgreSQL 선택 모드 연결. 명령·공개 원장은 메모리 | canonical 명령·비용 커널 연결과 운영 Cloud SQL 검증. [현재 범위](EVIDENCE_PERSISTENCE.md) |
 | P0-3 | Runner 격리 | API 프로세스 안 subprocess, 메타데이터 서버·네트워크 접근 가능 | 비밀·권한 없는 별도 Runner 서비스, API가 base 번들만 전달 |
 | P0-4 | 원격 저장소 | Runner가 로컬 경로만 허용 | 구성된 GitHub 저장소를 base에서 서버가 체크아웃 |
 | P0-5 | Builder 문맥 | 목표 문장만 전달(파일 내용 없음) | 대상 파일 내용(크기 상한·경로 제한)을 Builder에 전달 |

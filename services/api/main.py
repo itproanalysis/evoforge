@@ -21,6 +21,8 @@ from pydantic import BaseModel, Field, StrictInt, model_validator
 
 from evoforge import auth as auth_module
 from evoforge import broker_meta, evidence as evidence_chain, ledger
+from evoforge import postgres_state
+from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
 from evoforge import runner as _runner_module
 from evoforge.patch import PatchError
 from evoforge.kernel_api import router as kernel_router
@@ -49,8 +51,18 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "Authorization"],
 )
-_evidence: dict[str, dict] = {}  # in-memory evidence store
+_evidence = postgres_state.ScopedRecords("records")
 COST_CENTS = 120  # conservative per-model-call estimate (int cents)
+
+
+@app.exception_handler(KernelUnavailable)
+async def state_unavailable(request: Request, exc):
+    return JSONResponse({"detail": "state storage unavailable"}, status_code=503)
+
+
+@app.exception_handler(KernelRejected)
+async def state_rejected(request: Request, exc):
+    return JSONResponse({"detail": "state storage rejected the operation"}, status_code=409)
 
 
 def _expected_api_audience() -> str:
@@ -284,6 +296,7 @@ class ReconcileRequest(BaseModel):
 
 
 def _reserve_or_402(project: str = "default") -> str:
+    postgres_state.ensure_ready()  # reject unavailable state before any provider reservation/call
     try:
         return ledger.reserve(COST_CENTS, project)
     except Exception:
@@ -484,6 +497,7 @@ def healthz():
 
 @app.post("/v1/commands/generate")
 def generate(req: GenerateRequest):
+    postgres_state.ensure_ready()  # storage failure must not poison command creation/replay
     """Vertical slice H1: reserve budget, call Muse Spark Builder, run GH_INTEGRITY."""
     if not req.goal.strip():
         raise HTTPException(400, "goal required")

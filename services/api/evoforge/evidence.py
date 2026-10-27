@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import copy
 import uuid
+from evoforge.postgres_state import ScopedRecords, backend
 
 EVIDENCE_STAGES = (
     "ObjectiveVersion",
@@ -19,7 +20,7 @@ EVIDENCE_STAGES = (
 )
 STAGES = EVIDENCE_STAGES
 
-_EVENTS: dict[str, dict] = {}
+_EVENTS = ScopedRecords("events")
 _LINKS: dict[str, dict[str, str]] = {}
 
 
@@ -98,7 +99,8 @@ def view(event_id: str) -> dict | None:
     if ev is None:
         return None
     stage = ev.get("stage", ev.get("kind"))
-    linked = sorted(eid for eid, per in _LINKS.items() if event_id in per.values())
+    store = backend()
+    linked = store.owners(event_id) if store else sorted(eid for eid, per in _LINKS.items() if event_id in per.values())
     return {
         "id": ev["id"],
         "stage": stage,
@@ -113,6 +115,9 @@ def link(evidence_id: str, stage: str, event_id: str) -> str:
     """Append-only link: relinking a stage to a different event raises; same event is idempotent."""
     if stage not in EVIDENCE_STAGES:
         raise ValueError(f"unknown stage: {stage!r}")
+    store = backend()
+    if store:
+        return store.link(evidence_id, stage, event_id)
     per = _LINKS.setdefault(evidence_id, {})
     if stage in per:
         if per[stage] != event_id:
@@ -124,7 +129,8 @@ def link(evidence_id: str, stage: str, event_id: str) -> str:
 
 def chain(evidence_id: str) -> list[dict]:
     """Return [{stage, event_id}] in EVIDENCE_STAGES order; missing stages are null."""
-    per = _LINKS.get(evidence_id, {})
+    store = backend()
+    per = store.links(evidence_id) if store else _LINKS.get(evidence_id, {})
     return [{"stage": s, "event_id": per.get(s)} for s in EVIDENCE_STAGES]
 
 

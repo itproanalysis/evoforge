@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import sys
 import time
+import subprocess
 from uuid import UUID, uuid4
 
 import pytest
@@ -746,3 +747,129 @@ def test_preflight_uses_wall_clock_after_waiting_for_tenant_reservation_lock(fun
                 control.commit()  # always release the worker, even on assertion failure
             with pytest.raises(KernelRejected):
                 pending.result(timeout=10)
+
+
+@pytest.fixture
+def durable_api(funded, monkeypatch):
+    from fastapi.testclient import TestClient
+    import main
+    monkeypatch.setenv('EVO_STATE_BACKEND', 'postgres')
+    monkeypatch.setenv('DATABASE_URL', funded['dsn'])
+    monkeypatch.setenv('EVO_TENANT_ID', str(funded['scope'].tenant_id))
+    monkeypatch.setenv('EVO_PROJECT_ID', str(funded['scope'].project_id))
+    monkeypatch.setenv('EVO_REQUIRE_ID_TOKEN', '0')
+    monkeypatch.delenv('MODEL_API_KEY', raising=False)
+    with TestClient(main.app, raise_server_exceptions=False) as client:
+        yield client
+
+
+def test_request_evidence_and_private_review_survive_a_new_api_process(funded, durable_api, monkeypatch, tmp_path):
+    """Synthetic Critic, real local Runner and PostgreSQL; never a provider call."""
+    import json
+    import main
+    from evoforge import postgres_state
+    repo = tmp_path / 'durable-source'
+    repo.mkdir()
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(repo), *args], text=True).strip()
+    git('init', '-q')
+    git('config', 'user.name', 'Fixture')
+    git('config', 'user.email', 'fixture@example.invalid')
+    (repo / 'value.py').write_text('result = 2\n', encoding='utf-8')
+    git('add', 'value.py')
+    git('commit', '-qm', 'base')
+    base = git('rev-parse', 'HEAD')
+    monkeypatch.setenv('EVO_ALLOW_LOCAL_REPOS', '1')
+    monkeypatch.setenv('EVO_REPO_ROOTS', str(tmp_path))
+    monkeypatch.setenv('EVO_RUNNER_URL', '')
+    canary = 'DURABLE_SEALED_CANARY_881'
+    sealed = [{'kind': kind, 'code': f'# {canary}\nfrom value import result\ndef test_{kind}():\n    assert result == 3\n'}
+              for kind in ('compositional', 'negative', 'boundary')]
+    monkeypatch.setattr(main.broker_meta, 'call_critic', lambda *args, **kwargs: {
+        'stub': False, 'model': 'muse-spark-1.3', 'sealed_tests': sealed, 'review': {'result': 'PASS'}})
+    review = durable_api.post('/v1/candidates/review', json={'goal_contract': 'value must be 3'})
+    assert review.status_code == 200 and canary not in review.text
+    review_id = review.json()['evidence_id']
+    assert postgres_state.ScopedRecords('records')[review_id]['review']['sealed_tests'] == sealed
+    # No process-local evidence or links can supply these later reads.
+    main._evidence._memory.clear()
+    main.evidence_chain._LINKS.clear()
+    response = durable_api.post('/v1/runs', json={
+        'source_repo': str(repo), 'base_sha': base,
+        'diff': '--- a/value.py\n+++ b/value.py\n@@ -1 +1 @@\n-result = 2\n+result = 3\n',
+        'tests': [{'code': 'from value import result\ndef test_value():\n    assert result == 3\n'}],
+        'review_evidence_id': review_id,
+    })
+    assert response.status_code == 200, response.text
+    assert response.json()['run']['visible']['pass'] == 1
+    assert response.json()['run']['heldout']['pass'] == 3
+    evidence_id = response.json()['evidence_id']
+    script = """import json,os
+import main
+from fastapi.testclient import TestClient
+from evoforge.postgres_state import ScopedRecords
+with TestClient(main.app) as c:
+    response=c.get('/v1/evidence/'+os.environ['FIXTURE_EVIDENCE_ID'])
+    body=response.json()
+    events=[c.get('/v1/events/'+x['event_id']).json() for x in body['chain'] if x['event_id']]
+    raw=ScopedRecords('records')[os.environ['FIXTURE_REVIEW_ID']]
+    print(json.dumps({'status':response.status_code,'body':body,'events':events,
+                      'private_code_kept':all('def test_' in t['code'] for t in raw['review']['sealed_tests'])}))
+"""
+    child_env = {**os.environ, 'FIXTURE_EVIDENCE_ID': evidence_id, 'FIXTURE_REVIEW_ID': review_id}
+    child = subprocess.run([sys.executable, '-c', script], cwd=ROOT / 'services/api', env=child_env,
+                           capture_output=True, text=True, encoding='utf-8', timeout=20,
+                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    assert child.returncode == 0, 'fresh API process failed'
+    restored = json.loads(child.stdout)
+    assert restored['status'] == 200 and restored['private_code_kept']
+    assert restored['body']['run']['heldout']['pass'] == 3
+    assert restored['events'] and canary not in child.stdout
+    assert all('stage' in event and 'summary' in event for event in restored['events'])
+
+
+def test_durable_evidence_scope_immutability_and_shared_links(funded, durable_api, monkeypatch):
+    from evoforge import evidence, postgres_state
+    records = postgres_state.ScopedRecords('records')
+    records['e1'] = {'id': 'e1', 'gates': []}
+    records['e2'] = {'id': 'e2'}
+    event = evidence.record('Gate', evidence_id='e1', summary={'result': 'INCONCLUSIVE'})
+    for parent in ('e1', 'e2'):
+        assert evidence.link(parent, 'Gate', event) == event
+        assert evidence.link(parent, 'Gate', event) == event
+    assert evidence.view(event)['evidence_ids'] == ['e1', 'e2']
+    records['e1'] = {'id': 'e1', 'gates': []}  # exact replay
+    with pytest.raises(KernelRejected):
+        records['e1'] = {'id': 'e1', 'gates': [{'result': 'PASS'}]}
+    with pytest.raises(KernelRejected):
+        records.clear()
+    other = evidence.record('Gate', evidence_id='e1', summary={})
+    with pytest.raises(KernelRejected):
+        evidence.link('e1', 'Gate', other)
+    monkeypatch.setenv('EVO_PROJECT_ID', str(uuid4()))
+    absent = durable_api.get('/v1/evidence/e1')
+    missing = durable_api.get('/v1/evidence/missing')
+    assert absent.status_code == missing.status_code == 404 and absent.json() == missing.json()
+    assert evidence.view(event) is None
+    assert len(records) == 0
+
+
+def test_state_database_failure_prevents_provider_call_without_memory_fallback(funded, durable_api, monkeypatch):
+    import main
+    from evoforge import commands
+    main._evidence._memory['private-memory'] = {'id': 'private-memory'}
+    monkeypatch.setenv('DATABASE_URL', 'postgresql://private:never-echo-this@127.0.0.1:1/missing')
+    called = []
+    monkeypatch.setattr(main.broker_meta, 'call_builder', lambda *args: called.append(args))
+    key = 'db-failure-' + uuid4().hex
+    response = durable_api.post('/v1/commands/generate', json={'goal': 'must not call provider', 'idempotency_key': key})
+    assert response.status_code == 503 and not called
+    assert key not in commands._by_key
+    read = durable_api.get('/v1/evidence/private-memory')
+    assert read.status_code == 503
+    assert 'never-echo-this' not in response.text + read.text
+
+
+def test_unknown_state_backend_is_not_a_memory_mode(funded, durable_api, monkeypatch):
+    monkeypatch.setenv('EVO_STATE_BACKEND', 'postgrez')
+    assert durable_api.post('/v1/objectives', json={'goal': 'g'}).status_code == 503
