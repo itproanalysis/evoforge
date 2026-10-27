@@ -84,3 +84,6 @@ Muse Spark `muse-spark-1.3` 기본값과 자동 모델 대체 금지는 유지�
 
 PR 준비의 기준 커밋 고정 옵션과 기존 작업 브랜치 보호는 [PR 기준 snapshot](PR_SNAPSHOT.md)을 따른다.
 정본 공개 `_pr_core`에서 서버가 검증한 SHA를 전달하는 연결은 상위 T22 반영 후 계속한다.
+main `3495cdc`까지 포함한 PR 보호 검증은 API **508 passed·1 skipped**, 실제 PostgreSQL **166 passed**,
+참조 **112개**·SQL **96개**·계약 **0 failure**·웹 빌드 통과다.
+원본 9개는 main `.local/evidence/pr-snapshot-20261027-6wq9831x`, 해시는 `docs/validation/2026-10-27-pr-snapshot.json`을 따른다.

@@ -25,3 +25,9 @@ diff와 추가 테스트 파일을 확인한 뒤 브랜치가 같은 커밋인�
 기준 이동·이동 후 원복, 고정 SHA 파일/추가 테스트 조회, 기존 작업 브랜치 거부와 입력 오류를 확인한다.
 기존 승격 Critic 테스트의 ref 기반 호출과 테스트 충돌 거부도 유지한다.
 이 검증은 실제 GitHub PR 생성이나 운영 배포가 아니다. Muse Spark 기본값은 유지한다.
+
+main `3495cdc`까지 포함한 검증에서 수정 전 신규 회귀 9 failed, 수정 후 신규·기존 Critic 집중 34 passed,
+API 508 passed·1 skipped, 실제 PostgreSQL 166 passed, 참조 112·SQL 96·계약 0 failure·웹 빌드가 통과했다.
+첫 DB 실행은 180초 제한으로 종료됐고 제한을 300초로 늘린 재실행이 221초에 통과했다.
+원본 로그 9개는 `C:\evo_forge\.local\evidence\pr-snapshot-20261027-6wq9831x`,
+source·로그 SHA-256은 `docs/validation/2026-10-27-pr-snapshot.json`을 따른다.
