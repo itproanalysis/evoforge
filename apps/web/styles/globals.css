@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Background colors */
+  --color-bg-primary: #0b0e14;
+  --color-bg-secondary: #141b2d;
+  --color-bg-tertiary: #111726;
+  --color-bg-elevated: #0f1524;
+  
+  /* Border colors */
+  --color-border-default: #263048;
+  --color-border-secondary: #33405c;
+  
+  /* Text colors */
+  --color-text-primary: #e8edf5;
+  --color-text-secondary: #8b96ad;
+  --color-text-tertiary: #cfe3ff;
+  --color-text-link: #7db4ff;
+  
+  /* Accent colors */
+  --color-accent-blue: #2563eb;
+  --color-accent-green: #22c55e;
+  --color-accent-red: #ef4444;
+  --color-accent-amber: #f59e0b;
+  --color-accent-cyan: #38bdf8;
+  --color-accent-red-dark: #7f1d1d;
+  --color-accent-cyan-dark: #0891b2;
+}
+
+@layer base {
+  body {
+    @apply m-0 bg-background-primary text-text-primary;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}

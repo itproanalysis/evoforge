@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import createIntlMiddleware from 'next-intl/middleware';
 
 const COOKIE_NAME = "__Host-evoforge-session";
+
+// Create next-intl middleware
+const intlMiddleware = createIntlMiddleware({
+  locales: ['en', 'ko'],
+  defaultLocale: 'en',
+  localePrefix: 'as-needed',
+});
 
 // Server-only auth mode, read at runtime. Any value other than "none"
 // means the default "session" behaviour (owner login required).
@@ -51,38 +59,55 @@ async function validSession(raw: string | undefined, secret: string): Promise<bo
 
 export async function middleware(req: NextRequest) {
   const p = req.nextUrl.pathname;
+  
+  // Skip auth check for static assets and API routes
+  if (
+    p.startsWith("/_next/") ||
+    p === "/favicon.ico" ||
+    p === "/favicon.png" ||
+    p.startsWith("/api/")
+  ) {
+    return NextResponse.next();
+  }
+  
+  // Apply i18n middleware first to handle locale routing
+  const intlResponse = intlMiddleware(req);
+  
+  // If auth is disabled, skip auth check
   if (authDisabled()) {
-    if (p === "/login" || p.startsWith("/login/")) {
+    if (p === "/login" || p.startsWith("/login/") || p === "/ko/login" || p === "/en/login") {
       const url = req.nextUrl.clone();
       url.pathname = "/";
       url.search = "";
       return NextResponse.redirect(url, 307);
     }
-    return NextResponse.next();
+    return intlResponse;
   }
+  
+  // Skip auth for login pages
   if (
     p === "/login" ||
     p.startsWith("/login/") ||
-    p === "/api/login" ||
-    p.startsWith("/_next/") ||
-    p === "/favicon.ico" ||
-    p === "/favicon.png"
+    p === "/ko/login" ||
+    p === "/en/login" ||
+    p === "/api/login"
   ) {
-    return NextResponse.next();
+    return intlResponse;
   }
-  if (p.startsWith("/api/")) {
-    return NextResponse.next();
-  }
+  
+  // Validate session
   const raw = req.cookies.get(COOKIE_NAME)?.value;
   const secret = process.env.EVO_SESSION_SECRET ?? "";
   if (await validSession(raw, secret)) {
-    return NextResponse.next();
+    return intlResponse;
   }
+  
+  // Redirect to login if not authenticated
   const url = req.nextUrl.clone();
   url.pathname = "/login";
   return NextResponse.redirect(url);
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ['/', '/(ko|en)/:path*', '/((?!_next/static|_next/image|favicon.ico|api).*)'],
 };

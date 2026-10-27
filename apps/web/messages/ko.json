@@ -1,0 +1,132 @@
+{
+  "common": {
+    "app-name": "EvoForge",
+    "api-label": "API",
+    "loading": "로딩 중...",
+    "error": "오류",
+    "cancel": "취소",
+    "save": "저장",
+    "close": "닫기"
+  },
+  "languages": {
+    "english": "English",
+    "korean": "한국어"
+  },
+  "navigation": {
+    "mission-control": "미션 컨트롤",
+    "improvement-lab": "개선 랩",
+    "evidence": "증거"
+  },
+  "mission-control": {
+    "heading": "미션 컨트롤",
+    "description": "POST /api/evoforge/v1/missions · 단일 명령 수명 주기",
+    "objective-label": "목표",
+    "objective-placeholder": "불안정한 로그인 재시도 수정",
+    "repo-ref-label": "repo_ref",
+    "run-mission": "미션 실행",
+    "stop-mission": "중지",
+    "running-mission": "미션 실행 중…",
+    "mission-id": "mission_id",
+    "evidence-label": "증거",
+    "error-prefix": "오류: ",
+    "evidence-link": "증거 타임라인 →",
+    "metrics": {
+      "active-missions": "활성 미션",
+      "blocked-merges": "차단된 병합",
+      "spent": "지출",
+      "reserved": "예약",
+      "unknown-holds": "알 수 없는 보류",
+      "missions-prefix": "미션: "
+    },
+    "states": {
+      "CREATED": "생성됨",
+      "GENERATED": "생성됨",
+      "REVIEWED": "검토됨",
+      "RAN": "실행됨",
+      "PR_OPENED": "PR 열림",
+      "CANCELLED": "취소됨",
+      "FAILED": "실패"
+    },
+    "ledger": {
+      "heading": "원장 스냅샷 (GET /v1/ledger)",
+      "spent-cents": "spent_cents",
+      "reserved-cents": "reserved_cents",
+      "unknown-reservations": "unknown_reservations"
+    }
+  },
+  "lab": {
+    "heading": "개선 랩",
+    "description": "후보 diff → 봉인 테스트 → 검토 → PR. INCONCLUSIVE는 병합 차단.",
+    "goal-label": "목표",
+    "goal-placeholder": "미션 컨트롤에서 입력한 목표",
+    "candidate-diff": "후보 diff",
+    "tests-heading": "테스트 ({count})",
+    "server-run-heading": "서버 실행 (POST /v1/runs)",
+    "server-run-description": "위생 샌드박스에서 diff를 적용하고 후보 테스트(visible)와 Critic 봉인 테스트(held-out)를 서버가 실행합니다. 저장소는 서버의 EVO_REPO_ROOTS 안에 있어야 합니다. Review를 먼저 실행해 봉인 테스트를 받으세요.",
+    "repo-path-label": "repo path",
+    "repo-path-placeholder": "C:/repos/project",
+    "base-sha-label": "base sha",
+    "run-on-server": "서버에서 실행 (held-out {count})",
+    "running": "실행 중…",
+    "review-button": "검토 (POST /v1/candidates/review)",
+    "reviewing": "검토 중…",
+    "create-pr": "PR 생성 (POST /v1/pr/create)",
+    "creating-pr": "생성 중…",
+    "merge": "병합",
+    "merge-blocked": "병합 (차단됨)",
+    "merge-blocked-description": "INCONCLUSIVE/FAIL 게이트가 있어 Merge가 비활성화됩니다. 예외 승인이 필요합니다.",
+    "sealed-tests-heading": "봉인 테스트 ({count})",
+    "sealed-suites-heading": "Sealed v0 + X_SINGLE (읽기 전용)",
+    "sealed-suites-description": "서버 측정 기준 카탈로그. 카탈로그는 GET으로만 로드; 봉인된 작업 코드는 서버를 벗어나지 않습니다.",
+    "run-info": "visible {visPass}/{visN}{visTimeout} · held-out {heldPass}/{heldN}{heldTimeout} · base {base}",
+    "review-verdict": "검토 결과: {verdict}",
+    "pr-created": "PR: {url}",
+    "error-prefix": "오류: "
+  },
+  "evidence": {
+    "heading": "증거 타임라인",
+    "description": "GET /v1/evidence/{id} · ObjectiveVersion→Task→Candidate→Gate→Review→PR→Outcome",
+    "input-placeholder": "증거 / 명령 id",
+    "fetch-button": "증거 가져오기",
+    "loading": "로딩 중…",
+    "error-prefix": "오류: ",
+    "evidence-missing": "증거 부족",
+    "event-label": "이벤트 {id}",
+    "loading-event": "이벤트 로딩 중…",
+    "stages": {
+      "ObjectiveVersion": "목표 버전",
+      "Task": "작업",
+      "Candidate": "후보",
+      "Gate": "게이트",
+      "Review": "검토",
+      "PR": "PR",
+      "Outcome": "결과"
+    }
+  },
+  "login": {
+    "heading": "소유자 로그인",
+    "username-label": "사용자명",
+    "password-label": "비밀번호",
+    "sign-in": "로그인",
+    "signing-in": "로그인 중...",
+    "error-invalid-credentials": "잘못된 자격 증명",
+    "error-too-many-attempts": "로그인 시도 횟수가 너무 많습니다. 나중에 다시 시도하세요.",
+    "error-login-failed": "로그인 실패. 다시 시도하세요."
+  },
+  "layout": {
+    "title": "EvoForge — 미션 컨트롤",
+    "description": "해커톤 인디 트랙 UI: generate → gate → review → PR → evidence.",
+    "footer": "빌더: Muse Spark 1.3 (Meta Model API 사용) · 게이트: GH_INTEGRITY (oracle_ast + 임시 D-054) · 비용은 GET /v1/ledger에서 센트 단위의 provider_billed 실제 값; UNKNOWN 보류는 별도로 나열"
+  },
+  "errors": {
+    "budget-exhausted": "예산 소진: 미션 단계가 402로 거부됨",
+    "rate-limit": "속도 제한 초과. 잠시 후 다시 시도하세요.",
+    "network-error": "네트워크 연결 오류. 연결을 확인하고 다시 시도하세요.",
+    "unauthorized": "인증되지 않음. 로그인하세요.",
+    "forbidden": "액세스 금지.",
+    "not-found": "리소스를 찾을 수 없습니다.",
+    "server-error": "서버 오류. 나중에 다시 시도하세요.",
+    "unknown": "알 수 없는 오류가 발생했습니다.",
+    "status-code": "HTTP {code}: {message}"
+  }
+}

@@ -1,0 +1,132 @@
+{
+  "common": {
+    "app-name": "EvoForge",
+    "api-label": "API",
+    "loading": "Loading...",
+    "error": "Error",
+    "cancel": "Cancel",
+    "save": "Save",
+    "close": "Close"
+  },
+  "languages": {
+    "english": "English",
+    "korean": "한국어"
+  },
+  "navigation": {
+    "mission-control": "Mission Control",
+    "improvement-lab": "Improvement Lab",
+    "evidence": "Evidence"
+  },
+  "mission-control": {
+    "heading": "Mission Control",
+    "description": "POST /api/evoforge/v1/missions · single-command lifecycle",
+    "objective-label": "Objective",
+    "objective-placeholder": "Fix flaky login retry",
+    "repo-ref-label": "repo_ref",
+    "run-mission": "Run mission",
+    "stop-mission": "Stop",
+    "running-mission": "Running mission…",
+    "mission-id": "mission_id",
+    "evidence-label": "evidence",
+    "error-prefix": "Error: ",
+    "evidence-link": "Evidence Timeline →",
+    "metrics": {
+      "active-missions": "Active missions",
+      "blocked-merges": "Blocked merges",
+      "spent": "Spent",
+      "reserved": "Reserved",
+      "unknown-holds": "Unknown holds",
+      "missions-prefix": "Missions: "
+    },
+    "states": {
+      "CREATED": "Created",
+      "GENERATED": "Generated",
+      "REVIEWED": "Reviewed",
+      "RAN": "Ran",
+      "PR_OPENED": "PR Opened",
+      "CANCELLED": "Cancelled",
+      "FAILED": "Failed"
+    },
+    "ledger": {
+      "heading": "Ledger snapshot (GET /v1/ledger)",
+      "spent-cents": "spent_cents",
+      "reserved-cents": "reserved_cents",
+      "unknown-reservations": "unknown_reservations"
+    }
+  },
+  "lab": {
+    "heading": "Improvement Lab",
+    "description": "candidate diff → sealed tests → review → PR. INCONCLUSIVE blocks merge.",
+    "goal-label": "goal",
+    "goal-placeholder": "Goal from Mission Control",
+    "candidate-diff": "Candidate diff",
+    "tests-heading": "Tests ({count})",
+    "server-run-heading": "Server run (POST /v1/runs)",
+    "server-run-description": "Apply diff in hygiene sandbox and run candidate tests (visible) and Critic sealed tests (held-out) on server. Repo must be in server's EVO_REPO_ROOTS. Run Review first to get sealed tests.",
+    "repo-path-label": "repo path",
+    "repo-path-placeholder": "C:/repos/project",
+    "base-sha-label": "base sha",
+    "run-on-server": "Run on server (held-out {count})",
+    "running": "Running…",
+    "review-button": "Review (POST /v1/candidates/review)",
+    "reviewing": "Reviewing…",
+    "create-pr": "Create PR (POST /v1/pr/create)",
+    "creating-pr": "Creating…",
+    "merge": "Merge",
+    "merge-blocked": "Merge (blocked)",
+    "merge-blocked-description": "INCONCLUSIVE/FAIL gates prevent merge. Exception approval required.",
+    "sealed-tests-heading": "Sealed tests ({count})",
+    "sealed-suites-heading": "Sealed v0 + X_SINGLE (read-only)",
+    "sealed-suites-description": "Server-measured baseline catalogue. Catalogue loads over GET only; sealed task code never leaves the server.",
+    "run-info": "visible {visPass}/{visN}{visTimeout} · held-out {heldPass}/{heldN}{heldTimeout} · base {base}",
+    "review-verdict": "review verdict: {verdict}",
+    "pr-created": "PR: {url}",
+    "error-prefix": "Error: "
+  },
+  "evidence": {
+    "heading": "Evidence Timeline",
+    "description": "GET /v1/evidence/{id} · ObjectiveVersion→Task→Candidate→Gate→Review→PR→Outcome",
+    "input-placeholder": "evidence / command id",
+    "fetch-button": "Fetch evidence",
+    "loading": "Loading…",
+    "error-prefix": "Error: ",
+    "evidence-missing": "Evidence missing",
+    "event-label": "Event {id}",
+    "loading-event": "Loading event…",
+    "stages": {
+      "ObjectiveVersion": "Objective Version",
+      "Task": "Task",
+      "Candidate": "Candidate",
+      "Gate": "Gate",
+      "Review": "Review",
+      "PR": "PR",
+      "Outcome": "Outcome"
+    }
+  },
+  "login": {
+    "heading": "Owner login",
+    "username-label": "Username",
+    "password-label": "Password",
+    "sign-in": "Sign in",
+    "signing-in": "Signing in...",
+    "error-invalid-credentials": "Invalid credentials",
+    "error-too-many-attempts": "Too many login attempts. Please try again later.",
+    "error-login-failed": "Login failed. Please try again."
+  },
+  "layout": {
+    "title": "EvoForge — Mission Control",
+    "description": "Hackathon Indie-track UI: generate → gate → review → PR → evidence.",
+    "footer": "Builder: Muse Spark 1.3 via Meta Model API · Gates: GH_INTEGRITY (oracle_ast + provisional D-054) · costs are provider_billed actuals in cents from GET /v1/ledger; UNKNOWN holds listed separately"
+  },
+  "errors": {
+    "budget-exhausted": "Budget exhausted: mission step refused with 402",
+    "rate-limit": "Rate limit exceeded. Please wait before trying again.",
+    "network-error": "Network connection error. Please check your connection and try again.",
+    "unauthorized": "Unauthorized. Please log in.",
+    "forbidden": "Access forbidden.",
+    "not-found": "Resource not found.",
+    "server-error": "Server error. Please try again later.",
+    "unknown": "An unknown error occurred.",
+    "status-code": "HTTP {code}: {message}"
+  }
+}
