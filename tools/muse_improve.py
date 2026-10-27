@@ -205,8 +205,16 @@ def _opencode_round(task: dict, feedback: str, session: str | None, log) -> str 
     cmd = [_opencode_bin(), "run", "-m", model, "--auto", "--format", "json",
            "--title", f"evoforge {task['id']}"] + (["-s", session] if session else []) + [prompt]
     t0 = time.time()
-    r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
-                       errors="replace", timeout=int(os.getenv("MUSE_OPENCODE_TIMEOUT", "2400")))
+    try:
+        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=int(os.getenv("MUSE_OPENCODE_TIMEOUT", "3600")))
+    except subprocess.TimeoutExpired as e:
+        # A stuck or slow Builder call is a failed round, not a crash: checks run on whatever it left.
+        log({"event": "builder_call", "via": "opencode", "model": model, "session": session,
+             "ms": int((time.time() - t0) * 1000), "exit": "timeout", "tool_calls": 0, "tokens": {},
+             "summary": "builder call exceeded MUSE_OPENCODE_TIMEOUT"})
+        return session
+
     texts, tools, tokens = [], 0, {}
     for ln in r.stdout.splitlines():
         try:
