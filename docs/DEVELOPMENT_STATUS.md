@@ -24,6 +24,7 @@
 - [x] Next 15.5.28·PostCSS 8.5.32로 웹 의존성 수정. npm audit 0건, 프로덕션 빌드와 standalone HTTP 검사 통과.
 - [x] Builder 전용 패킷·공급사 동의·agent/task fencing과 비용 예약 원자적 연결을 main에 반영·검증. 실제 전송기 연결은 남아 있다.
 - [x] Context Mesh(L1–L5 로그 게이트·Vault·Folder 복원·Packet v2 컴파일러·캐시 네임스페이스 솔트·온라인 결정 규칙), 400KB 대형 Diff 분할·Review Coverage 원장·리뷰어 자격 시험 풀, 공급망/BSL-1.1/SBOM 스캐너·테넌트 공정 큐·플랫폼 키 KMS 격리 가드(`ebfeb95`) main 반영·검증. API 465개·참조 112개·신규 CR 15개 통과.
+- [x] 정본 0원 정산·추정 영수증 KPI 제외(CR-13)·추정→실청구 단일 역분개 대사(CR-40)·부작용 intent 전이(CR-47) 및 UNKNOWN 예약 자동 대사 잡(CR-39), 5좌석 적응형 Collective·12개 정본 MCP 도구·가역 에포크 접기(ReFold)+압축 경계 3턴 continuation 평가(CR-75)·M6 GEPA 하네스 최적화 루프(CR-76)(`defc4c9`) main 반영·검증. API 478개·참조 112개·신규 CR 8개 통과.
 
 ## 이어서 수행할 작업
 
@@ -119,6 +120,17 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Antigravity (완료·클레임 해제·main 반영 `defc4c9`) / `agy/collective-and-reconciler`:**
+  상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
+  미구현 대사 정책(CR-13/39/40/47, 0원 정산·추정→실청구 단일 역분개·UNKNOWN 예약 대사 잡)과
+  적응형 멀티에이전트/압축 경계 continuation 수집/하네스 최적화 루프(CR-59/60/61/65/70/71/72/73/75/76, MCP 12 도구·ReFold 접기·GEPA 최적화기)를 구현·검증하고 main에 fast-forward 반영했다.
+  반영 파일: `services/api/evoforge/reconciler_policy.py`, `services/api/evoforge/collective_runtime.py`,
+  `services/api/tests/test_reconciler_policy_cr.py`, `services/api/tests/test_collective_runtime_cr.py`,
+  `docs/COLLECTIVE_AND_RECONCILER.md`. `main.py`·웹·DB 마이그레이션·github.py·정본(`docs/evoforge-v4.2/`)은 수정하지 않았다.
+- **Codex (PR 기준 snapshot·기존 분기 보호) / `codex/pg-integration` / `C:\evo_forge_codex`:**
+  상위 T22 편집 목록 밖의 github.py·새 test_github_snapshot.py·관련 문서/검증 manifest를 수정한다.
+  검증된 기준 SHA의 명시적 조회 경로와 ref 이동 검사, 이미 존재하는 작업 분기의 쓰기 거부를 보강한다.
+  기존 승격 Critic 테스트·T22 main/평가/UI·정본과 모델 기본값은 보존한다. 공개 core의 기준 SHA 전달은 T22 병합 후 연결한다.
 - **Codex (DB 영수증/예약 해제 직렬화 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:**
   새 확장 `009_usage_release_guards.sql`·Codex 소유 postgres_kernel.py/test_postgres_kernel.py·환경 예제/관련 문서를 수정한다.
   별도 ctx 적재와 직접 core 예약 해제도 같은 예약 행 잠금 및 영수증 검사로 보호하고 가드 비활성 상태는 전송 전에 거부한다.
@@ -524,3 +536,14 @@ source 38개와 로그 해시는 지원 브랜치 `docs/validation/2026-10-27-db
 과거 충돌 청구·0원 정산·추정→실청구 정정 정책, 공개 명령/Broker 비용·전체 승인 연결은 계속 미완료다.
 상위 T22 main/평가/UI·봉인 테스트를 보존했으며 그 병합 후 공개 접점을 이어간다.
 지원 코드는 main 미반영이고 전체 개발은 미완료다. Muse Spark `muse-spark-1.3`과 자동 재개를 유지한다.
+
+## 0원/추정→실청구 대사 정책·UNKNOWN 대사 잡 및 5-좌석 Collective·압축 경계·M6 하네스 최적화 런타임 (main 반영 완료)
+
+`defc4c9`는 상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`)와 분리된 런타임 모듈 2종과 수용 테스트 8개로
+남은 대사 정책(`CR-13`, `CR-39`, `CR-40`, `CR-47`) 및 멀티에이전트·압축 경계·하네스 진화 시나리오(`CR-59~61`, `CR-65`, `CR-70~73`, `CR-75`, `CR-76`)를 구현·검증했다. 상세 매핑은 [COLLECTIVE_AND_RECONCILER.md](COLLECTIVE_AND_RECONCILER.md).
+
+- `evoforge/reconciler_policy.py`: 정본을 우회하지 않는 0원(`customer_price_micros=0`) 정산(`COMMITTED, actual_micros=0` + `adjustment, customer_micros=0` 감사 기록), `source="estimated"` 영수증의 공식 KPI 집계 제외(CR-13) 및 `source="provider_billed"` 도착 시 단일 역분개(`reverses_entry_id`) 정정·대사(CR-40), `UNKNOWN_EXTERNAL_OUTCOME -> SENT` 직접 재시도 차단(CR-47) 및 `UnknownReservationReconciler` 배치 대사 워커(CR-39).
+- `evoforge/collective_runtime.py`: 명시적 에포크 경계 전용 가역 접기(ReFold)와 `N=3` 턴 paired continuation 수집·4조건 평가기(CR-75), `harness-patch/v1` 스키마·Trust Kernel 보호·편집 예산 선형 감쇠(`120 -> 20`줄)·`GEPA` 기준선·`OPEN -> FROZEN -> CLOSED` 단 1회 `D_test` 평가를 강제하는 M6 하네스 최적화 루프(CR-76), 5좌석(`Navigator`, `Builder Alpha`, `Builder Beta`, `Critic`, `Integrator`) 및 12개 정본 MCP 도구·리스 펜싱(`STALE_WRITE`)·파티셔닝·합성 게이트/AST 공지·후보 선택·읽기 전용 투기 실행·등위 회귀 cascade·PPI·경험 기억 코디네이터(CR-59/60/61/65/70/71/72/73).
+
+근거: API **478 passed·1 skipped**(신규 CR 수용 테스트 8개 포함), 참조 **112개**·`validate_package.py` **0 failure** 통과.
+기존 `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 변경하지 않았다. 운영 DB 트리거/크론 스케줄러와의 직접 연결은 상위 병합 후 이어간다.

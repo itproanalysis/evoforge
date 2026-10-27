@@ -25,6 +25,7 @@ visible 3/3·held-out 3/3) → 게이트 `GH_INTEGRITY`·`GC_COMPOSITION`·`G2_R
 | 웹 | Mission Control(실제 원장), Improvement Lab(Review→서버 Run→PR), Evidence 드릴다운 | — |
 | PostgreSQL 커널 | 정본 함수 어댑터·영수증 저장·내부 `/v1/kernel` API (Codex) — **요청 경로 미연결** | CR-37~48(DB) |
 | Context Mesh & 런타임 가드 | `log.text` L1–L5 게이트, Vault 왕복/용량/crypto-shred, Folder 복원, Packet v2 컴파일러(솔트·인젝션·라우팅), 온라인 결정(70% 손익분기·5-Agent A/B), 400KB Diff 분할·Review Coverage·리뷰어 자격/Canary 풀, BSL/SBOM 스캔·공정 큐·KMS Broker 키 격리 (`context_mesh.py`, `review_qualification.py`, `runtime_guards.py`) | CR-01·06~21·23~26·28·32·34·35·49·50·58·66·68, L1–L5 |
+| 영수증 대사 & 5-좌석/압축/최적화 런타임 | 0원 정산·추정 영수증 KPI 제외·추정→실청구 단일 역분개·UNKNOWN 대사 잡(`reconciler_policy.py`), 5좌석·12 MCP 도구·리스 펜싱·파티셔닝·합성/AST 공지·선택·투기·cascade·PPI·경험 기억·가역 에포크 접기(ReFold)+압축 경계 평가·M6 GEPA 하네스 최적화 루프(`collective_runtime.py`) | CR-13·39·40·47·59~61·65·70~73·75·76 |
 
 ## 3. 정식 출시 갭
 
