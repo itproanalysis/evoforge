@@ -73,8 +73,13 @@ Cloud Build 배포 단계에도 확장 적용을 추가했으나 실제 클라�
 - 동시 정산 회귀는 수정 전 실제 DB에서 실패했고, 예약 잠금과 intent 조회 분리 후 통과했다.
   RFC3339 경계 2건도 선택 의존성 누락 상태에서 실패를 확인한 뒤 수정했다.
 
-상위 Muse round3 작업이 main에 먼저 반영된 후 동기화한다. 이 결과는 지원 브랜치 결과이며,
-전체 서비스·실제 모델 실행·배포의 완료 근거가 아니다.
+상위 Muse round3의 main 반영을 확인한 뒤 `89dbc71`에서 동기화했다.
+상위 provider fixture를 채택하고 상위 구현·봉인 수용 테스트·정본을 그대로 보존했다.
+동기화 후 **API 291 passed·1 skipped**, 실제 DB **46 passed**, 참조 **112개**·SQL **96개**와
+기본/실제 PG 패키지 검사가 다시 통과했다. 웹 보안 의존성의 빌드 검증은
+[WEB_DEPENDENCY_SECURITY.md](WEB_DEPENDENCY_SECURITY.md)에 기록했다.
+main 반영 기록은 [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)를 따른다.
+전체 서비스·실제 모델 실행·배포의 완료 근거는 아니다.
 
 정본 영수증은 0원도 허용하지만 `core.usage_ledger`의 model_usage는 음수 청구만 허용한다.
 0원 문서는 보존하고 정산을 거부해 예약을 열어 둔다. 가짜 청구·환불·adjustment로 우회하지 않는다.
