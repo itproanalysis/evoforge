@@ -1,0 +1,18 @@
+{
+  "id": "T15_remote_repo_checkout",
+  "planned_by": "muse-spark-1.3 (round-6 plan, production P0)",
+  "goal": "Server-side GitHub checkout at base commit\nWHY: P0-4: Runner only allows local EVO_REPO_ROOTS paths, so on Cloud Run (no local repos) every /v1/runs fails; runs must work against configured GITHUB_REPO checked out by the server at the requested base.\n\nSPEC: New module services/api/evoforge/repo_source.py with resolve_repo_dir(source_repo: str, base_sha: str) -> temp dir path. Semantics: source_repo '' or 'github' (exact) means the configured repo from env GITHUB_REPO (owner/repo, required); any other value is accepted only when EVO_ALLOW_LOCAL_REPOS=1 AND inside EVO_REPO_ROOTS (dev path unchanged), else 400; values containing '://' or starting with git@/file:/- are always 400. base_sha required non-empty (400 otherwise); must be 40-hex full SHA or a ref resolvable via the GitHub API (server resolves ref->SHA first); the server clones GITHUB_REPO at that SHA into a temp dir (git init + authenticated fetch using GITHUB_TOKEN sent ONLY as an HTTP Authorization header / http.extraHeader, never embedded in a URL; shallow-ish fetch of the base commit with full ancestry up to base, no broader history than needed) and returns the dir; callers build the hygiene sandbox from it exactly as today. GITHUB_TOKEN never appears in error messages, logs, responses, or evidence (redact helper + tests assert absence). /v1/runs and /v1/eval/sandbox use resolve_repo_dir; response shape unchanged ({base, visible, heldout, heldout_kinds, evidence_id}). Env: GITHUB_REPO (required in prod), GITHUB_TOKEN (server-only), EVO_ALLOW_LOCAL_REPOS (default 1 local / 0 prod), EVO_REPO_ROOTS kept for dev. Errors: unknown/empty repo config 400, bad base_sha 400, GitHub fetch/auth failure 400 (auth failure message generic, no token hint); all temp dirs cleaned up.\nCritic constraints (test hooks): the git remote is f\"{EVO_GITHUB_GIT_BASE}/{GITHUB_REPO}.git\" with EVO_GITHUB_GIT_BASE defaulting to https://github.com (tests point it at a local directory holding owner/repo.git bare repos; that is server config, not client input). Ref->SHA resolution through the GitHub API is only needed when base_sha is not 40-hex. EVO_ALLOW_LOCAL_REPOS defaults to 1 so existing tests keep working; production sets 0.\n\nACCEPTANCE (your own plan): POST /v1/runs with source_repo='' against a fixture bare repo via mocked GitHub fetch checks out base SHA, runs suites, returns counts; source_repo='git@evil:x' or 'https://...' -> 400.; Bad base_sha (nonexistent/non-hex garbage) -> 400; error bodies, logs and evidence contain no GITHUB_TOKEN substring (test with canary token).; EVO_ALLOW_LOCAL_REPOS=0: absolute local path -> 400; =1 with EVO_REPO_ROOTS set: existing local-path tests still pass.; Hygiene guarantees unchanged: future-history sandbox audit still enforced on the checked-out dir (existing test_critic_t5_runner + held-out isolation tests pass).\nOUT OF SCOPE: Runner process separation (T16); PR creation path changes (T17); PostgreSQL kernel files (Codex-owned)",
+  "edit": [
+    "services/api/evoforge/repo_source.py",
+    "services/api/main.py",
+    "services/api/evoforge/runner.py",
+    "services/api/tests/test_remote_repo.py"
+  ],
+  "context": [
+    "AGENTS.md",
+    "docs/SERVICE_STATUS.md"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
