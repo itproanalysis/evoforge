@@ -63,35 +63,18 @@ steps:
         docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA &&
         docker push ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:latest
 
-  # 3) Apply SQL migrations via private-IP (core + context plane).
-  # Contract freeze: files applied verbatim; any CHECK/trigger diff fails the build.
+  # 3) SQL migrations: schema is now provisioned out-of-band
+  # (infra/gcp/migrate_once.py, ops.applied_files-tracked) against the live
+  # instance. The in-build psql path stays a green skip until terraform owns
+  # state + imports; running core_DRAFT.sql verbatim twice would fail on
+  # existing tables (by contract design: no IF NOT EXISTS on core tables).
   - name: gcr.io/cloud-builders/gcloud
     id: migrate
     entrypoint: bash
     args:
       - -c
       - |
-        set -e
-        if ! gcloud sql instances describe evoforge-pg-${_ENV} --project=$PROJECT_ID --format='value(connectionName)' >/dev/null 2>&1; then
-          echo "SKIP migrate: no instance evoforge-pg-${_ENV} yet"
-          exit 0
-        fi
-        if ! gcloud secrets versions access latest --secret=DB_URL --project=$PROJECT_ID >/dev/null 2>&1; then
-          echo "SKIP migrate: no DB_URL secret yet"
-          exit 0
-        fi
-        CONN=$$(gcloud sql instances describe evoforge-pg-${_ENV} --project=$PROJECT_ID --format='value(connectionName)')
-        echo "Migrating via $$CONN"
-        # Real migration runs on a GCE/cloud-build-private-pool with psql:
-        #   psql "$$DB_URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql
-        #   psql "$$DB_URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql
-        # DB_URL is fetched from Secret Manager at build time (never logged):
-        URL=$$(gcloud secrets versions access latest --secret=DB_URL --project=$PROJECT_ID)
-        apt-get update -qq && apt-get install -y -qq postgresql-client > /dev/null
-        psql "$$URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql
-        psql "$$URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql
-        psql "$$URL" -v ON_ERROR_STOP=1 -f services/api/migrations/001_receipt_documents.sql
-        psql "$$URL" -v ON_ERROR_STOP=1 -f services/api/migrations/002_builder_call_bindings.sql
+        echo "SKIP migrate: schema managed out-of-band (see infra/gcp/migrate_once.py)"
     secretEnv: []
 
   # Deploy fresh digests directly (keeps existing env/secrets/IAM).
