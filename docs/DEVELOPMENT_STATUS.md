@@ -118,14 +118,19 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex / `codex/runner-core-evidence` / `C:\evo_forge_codex`:** 상위 API 진입점 편집과 분리해 실제 Runner의 입력/빌드 식별자와 저장된 실행 증거를 기존 core 후보·G2_REQUIRED에 연결한다.
+- **Codex / `codex/pg-integration` / `C:\evo_forge_codex`:** 두 준비된 지원 브랜치를 별도 통합 브랜치에서 합친다.
+  명령 완료 응답과 같은 scope의 서버 생성 증거를 원자적으로 연결하도록 `postgres_commands.py`·확장 004·Codex 테스트·문서를 보강한다.
+  상위 round7이 main에 반영되기 전에는 main/commands facade·mission·봉인 테스트를 편집하거나 지원 코드를 main에 병합하지 않는다.
+- **Codex (지원 검증 완료·상위 병합 대기) / `codex/runner-core-evidence` / `C:\evo_forge_codex`:** 상위 API 진입점 편집과 분리해 실제 Runner의 입력/빌드 식별자와 저장된 실행 증거를 기존 core 후보·G2_REQUIRED에 연결한다.
   `postgres_run_evidence.py`, `runner_attestation.py`, Runner/Runner client의 선택적 메타데이터, `kernel_api.py`, 확장 005,
   Codex 소유 테스트·문서/환경 예제만 수정한다. 구체적 head를 빈 diff로 다시 실행한 증거와 정산된 Builder 바인딩을 요구한다.
   없는 게이트·리뷰·승인은 생성하지 않고 `core.authorize_merge`를 유지한다. 공개 main·mission과 상위 봉인 테스트는 편집하지 않는다.
-- **Codex / `codex/commands-persistence` / `C:\evo_forge_codex`:** P0-2 명령의 canonical PostgreSQL 접수·상태·히스토리·완료 응답 영속화를 맡는다.
+  구현 `3526ae0`, 내부 인증 테스트 `21707ed`, 검증 manifest `75ca7f8`을 준비했다. main 반영은 상위 round7 이후다.
+- **Codex (지원 준비·공개 연결 대기) / `codex/commands-persistence`:** P0-2 명령의 canonical PostgreSQL 접수·상태·히스토리·완료 응답 영속화를 맡는다.
   우선 `postgres_commands.py`·확장 004·Codex DB 테스트·문서/환경 예제만 수정한다.
   상위 round7의 `commands.py`/main 변경이 main에 먼저 반영된 뒤 호환 연결·재검증한다. 비용 원장 변경은 이번 단계와 별도다.
   별도 저장 계층은 `9bfe0bc`로 검증·커밋했으며 공개 경로 연결과 main 병합은 아직 대기 중이다. 아래 검증 기록을 따른다.
+  검증 폴더 `C:\evo_forge_codex`의 현재 체크아웃은 위 Runner 지원 브랜치다. 명령 지원 브랜치와 커밋은 그대로 보존했다.
 - **Codex (증거 단계 완료·클레임 해제) / `codex/evidence-persistence` / `C:\evo_forge_codex`:** P0-2 중 서버 증거·비공개 봉인 리뷰·이벤트/체인의 PostgreSQL 영속화를 실제 요청 경로에 연결한다.
   `postgres_state.py`, `evidence.py`, main의 저장소 선택/오류 경계·예약 전 가용성 확인, 확장 003, Codex DB 테스트와 관련 문서·환경 예제를 수정한다.
   상위 Muse round6의 인증·원격 checkout·Runner·Builder/PR 구현은 보존한다. 명령·비용 원장의 PG 요청 연결은 별도 잔여 항목이다.
@@ -218,3 +223,26 @@ Muse round7은 main/mission 인터페이스를 수정 중이므로 상위 브랜
 현재 main의 공개 명령·원장은 계속 메모리다. 공개 Generate의 dispatch/완료 hook·HTTP 재시도 검증,
 운영 DB 확장 적용과 canonical 비용·mission 저장은 남아 있으며 전체 개발·P0-2 완료를 선언하지 않는다.
 이번 검증은 공급사를 호출하지 않았고 기본 모델 `muse-spark-1.3`은 그대로 유지했다.
+
+## Runner 증거 → core 후보/G2 지원 (상위 작업 병합 대기)
+
+`codex/runner-core-evidence`의 `3526ae0`는 내부 `/v1/kernel/candidate-runs`에서
+기존 canonical 후보·정산된 Builder 바인딩·서버에 보존된 실제 Runner 결과를 대조하고 G2_REQUIRED를 저장한다.
+커밋된 head를 빈 diff로 다시 실행한 증거만 허용하고, 입력/결과 해시·서버 봉인 원본·현재 fencing과 모델/동의를 확인한다.
+API/Runner에 구성하는 image digest는 운영자가 승인한 배포 식별자이며 독립 측정·서명이 아니다.
+원격 클라이언트는 불가능한 실행 수·잘못된 해시/image·hygiene 실패를 502로 거부한다.
+
+실제 로컬/번들 Runner → API client → PostgreSQL 연결, 다른 scope의 404, append-only/RLS,
+동시 재전송과 실패 저장의 원자성, 이후 FAIL을 과거 PASS 재전송이 덮지 않는 것을 확인했다.
+다른 필수 게이트·리뷰·승인은 만들지 않으며 후보 상태도 바꾸지 않는다. `core.authorize_merge`의 거부도 확인했다.
+내부 읽기/쓰기 경로 모두 서비스 자격 증명 없이 DB를 만들지 않는 회귀 테스트는 `21707ed`다.
+
+API **414 passed·1 skipped**, 실제 PostgreSQL **91 passed**, 참조 **112개**·SQL **96개**·패키지 검사와 웹 빌드 통과.
+Dockerfile의 두 Python 파일만 별도 `python -I` 프로세스에서 실행해 API 패키지 없이 Runner가 동작하는 것도 확인했다.
+Docker 실행 파일이 없어 컨테이너 빌드는 수행하지 않았다. Critic·영수증·등록 image는 합성 fixture이며 실제 공급사 청구 검증이 아니다.
+원본 로그 6개는 `C:\evo_forge\.local\evidence\runner-core-20261027-m9gl2ykz`에 보존했다.
+해당 지원 브랜치의 `docs/RUNNER_CORE_EVIDENCE.md`, `docs/validation/2026-10-27-runner-core-evidence.json`(`75ca7f8`)을 따른다.
+
+상위 round7이 main/mission/평가 경로를 편집 중이므로 main 병합은 아직 하지 않았다.
+공개 요청의 canonical 후보 생성·나머지 검증/독립 리뷰·비용/승인 연결, 운영 확장 005와 실제 Runner digest 설정·배포 검증은 남아 있다.
+전체 개발과 P0-2는 미완료이며 현재 채팅의 자동 재개를 유지한다.
