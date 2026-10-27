@@ -22,7 +22,7 @@
 - [x] 서비스 토큰·서버 소유 스코프의 내부 FastAPI DB 경로 연결. API 139개, 실제 PostgreSQL HTTP 포함 25개 통과.
 - [x] 정본 v1 영수증 검증·원자적 보존·저장 금액 정산 내부 경로. round3 동기화 후 API 291개, 실제 DB 46개 통과.
 - [x] Next 15.5.28·PostCSS 8.5.32로 웹 의존성 수정. npm audit 0건, 프로덕션 빌드와 standalone HTTP 검사 통과.
-- [x] Builder 전용 패킷·공급사 동의·agent/task fencing과 비용 예약 원자적 연결을 지원 브랜치에서 검증. 실제 전송기 연결은 남아 있다.
+- [x] Builder 전용 패킷·공급사 동의·agent/task fencing과 비용 예약 원자적 연결을 main에 반영·검증. 실제 전송기 연결은 남아 있다.
 
 ## 이어서 수행할 작업
 
@@ -110,7 +110,7 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex 지원 / `codex/builder-preflight` / `C:\evo_forge_codex`:** Builder 호출의 기존 패킷·공급사 동의·agent/task lease 검증과 비용 예약의 원자적 바인딩을 맡는다.
+- **Codex 지원 (완료·클레임 해제) / `codex/builder-preflight` / `C:\evo_forge_codex`:** Builder 호출의 기존 패킷·공급사 동의·agent/task lease 검증과 비용 예약의 원자적 바인딩을 맡는다.
   `evoforge/postgres_builder.py`·`postgres_kernel.py`·`kernel_api.py`, 확장 마이그레이션 002, Codex 소유 DB/API 테스트와 관련 문서·환경 예제를 수정한다.
   전송 직전 재검증과 영수증 packet/model/가격표 버전 일치를 확인한다. 가격 계산·실제 모델 실행 완료를 주장하지 않는다.
   Muse round4 T10–T12의 main/critic/runner/gates/evidence/web와 봉인 수용 테스트는 편집하지 않는다. 상위 작업이 먼저 main에 반영된 뒤 동기화한다.
@@ -152,7 +152,7 @@ standalone 서버의 `/`, `/lab`, `/evidence`와 정적 JS HTTP 응답 및 검�
 대상 저장소 PR 권한을 비밀 저장소로 주입해야 한다. 다른 세션·OpenCode·클라우드의 설정 여부는 이 확인으로 판단하지 않는다.
 새 비밀 값을 채팅에 붙여 넣을 필요는 없다. 독립 개발과 자동 재개는 계속한다.
 
-## Builder 호출 전 검사 지원 (통합 준비 완료)
+## Builder 호출 전 검사 지원 (main 반영 완료)
 
 `codex/builder-preflight`의 `094b4aa`는 기존 Gateway 패킷·run/task·agent·공급사 동의를 검증하고
 정본 비용 예약·intent·불변 Builder 바인딩을 함께 기록한다. 전송 직전에 상태와 fencing을 다시 검사하며,
@@ -163,4 +163,6 @@ standalone 서버의 `/`, `/lab`, `/evidence`와 정적 JS HTTP 응답 및 검�
 상위 Muse round4를 먼저 보존해 `0851454`에서 동기화한 뒤 API **317 passed·1 skipped**,
 실제 PostgreSQL **77 passed**, 참조 **112개**·SQL **96개**·계약 검사와 웹 프로덕션 빌드를 통과했다.
 원본 로그·해시는 `docs/validation/2026-10-27-builder-preflight.json`이 가리키는 main의 `.local/evidence` 폴더에 보존했다.
+`0551fbe`로 main에 fast-forward 반영했다. main 작업 폴더에서도 API 모듈 컴파일·health/OpenAPI,
+정본 패키지 검사와 웹 프로덕션 빌드가 통과했다. 상위 main/critic/runner/gates/evidence/web·봉인 테스트·정본은 그대로 보존했다.
 이는 Builder 호출 준비·전송 전 상태 검사다. SDK 전송기·실제 요율/청구·사용자 인증·Runner/core 증거 연결·배포는 남아 있다.

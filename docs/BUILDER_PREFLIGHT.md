@@ -69,7 +69,8 @@ API 모듈 컴파일·시작·health/OpenAPI도 확인했다. 잠금 대기 회�
 상위 Muse round4를 `0851454`에서 보존해 동기화한 뒤 **API 317 passed·1 skipped**, 실제 DB **77 passed**,
 참조 112·SQL 96·전체 계약 검증과 Next 15.5.28 프로덕션 빌드를 통과했다.
 검증 로그 해시와 정확한 미검증 플래그는 `docs/validation/2026-10-27-builder-preflight.json`에 저장했다.
-컨테이너 이미지·외부 모델·배포 실행은 미검증이다. main 반영 여부는 STATUS를 따른다.
+`0551fbe`로 main에 반영했고 main의 API 시작/health/OpenAPI, 패키지 검사와 웹 빌드도 통과했다.
+컨테이너 이미지·외부 모델·배포 실행은 미검증이다.
 
 아직 기존 Generate/Review와 개발 CLI의 메모리 추정 원장을 교체하지 않았다.
 실제 SDK 전송기는 바인딩된 모델과 call ID를 사용해 이 경계를 호출하도록 연결해야 한다.

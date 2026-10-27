@@ -28,6 +28,11 @@
     "validation-preflight-api.log": "75fe1a24ebae0dff3704f2603f25f8478c53cbb9f489275f72e90ea024e220c2",
     "validation-kernel.log": "b24be639b1cdb0f3cc16f7705b79a248c6cc5b5d9384725b24242d5799c8825a",
     "validation-postgres.log": "2da21c04e14fabf93a6c6c0fdec827e9f97306140cdbea056428064015385882",
-    "validation-preflight-web.log": "11a2a670da758fdc4784bc7b22c98bf605cdffdd691d52a6619ba20a0dda5552"
-  }
+    "validation-preflight-web.log": "11a2a670da758fdc4784bc7b22c98bf605cdffdd691d52a6619ba20a0dda5552",
+    "main-validation-preflight-web.log": "8a3f359cc90bdb6ecdf294b70070190ee1741d23a8b047ef0ab91d4976d2297c"
+  },
+  "main_integration_revision": "0551fbe",
+  "main_api_startup_and_openapi": "passed",
+  "main_package_validation": "passed",
+  "main_web_production_build": "passed"
 }
