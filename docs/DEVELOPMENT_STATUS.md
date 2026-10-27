@@ -121,6 +121,14 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Antigravity (도메인 이벤트 버스/Outbox/1만 건 재생 수렴·실시간 SSE 투영/폭주 필터링 및 관측성 SLO/안전 불변식·청구서 대사·인시던트 격리·삭제/출시 증거 패키지 런타임) / `agy/event-bus-and-observability` / `C:\evo_forge_agy`:**
+  상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
+  도메인 이벤트 Envelope·낙관적 동시성(R27-2/C-11)·Outbox/Inbox 멱등 소비·1만 건 재생/중복/역순 수렴(R27-1)·Canonical Trajectory v1 정규화·실시간 UI SSE `MissionControlProjection` 커서/폭주 샘플링(R44-1~3, 1,000건/초 폭주 시 승인/오류/결론 누락 0·교차 테넌트 0),
+  및 OpenTelemetry 정본 컨텍스트 span·서비스 SLO vs 안전 불변식 분리 감시(R47-2)·공급사 청구서 드리프트(>1%) 및 PG 웹훅 중복/역순/부분 환불 대사(R47-3, R48-1~3)·투기 불일치 1건 즉시 전역 차단/보상 해킹 격리(R47-4)·Incident 상태 머신·목표 변경 시 패킷 STALE(CR-22)/코덱 플래그 OFF(CR-24)/S11 캐시 배치(CR-69)/전체 삭제 연쇄(CR-17, R46-2)/출시 증거 패키지(R49-1, R50-1)를 구현·검증한다.
+  파일: `services/api/evoforge/event_bus_and_sse.py`, `services/api/evoforge/observability_and_governance.py`,
+  `services/api/tests/test_event_bus_and_sse_cr.py`, `services/api/tests/test_observability_and_governance_cr.py`,
+  `docs/EVENT_BUS_AND_OBSERVABILITY.md`. `main.py`·웹·DB 마이그레이션·github.py·`eval_runner_and_preflight.py`·정본(`docs/evoforge-v4.2/`)은 수정하지 않는다.
+
 - **Codex (CLI 청구 근거 없는 예약 보호) / `codex/pg-integration`:** 상위 `8f2323c`의 비용 미제공 시 0원 정산은
   청구액 불명확 상태를 실제 무료 호출로 오인한다. `services/api/evoforge/eval_runner_and_preflight.py`,
   기존 비봉인 `test_eval_runner_and_preflight_cr.py`, 새 `test_cli_billing_provenance.py` 및 관련 문서를 소유해
