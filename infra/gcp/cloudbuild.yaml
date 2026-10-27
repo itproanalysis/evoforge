@@ -94,21 +94,27 @@ steps:
         psql "$$URL" -v ON_ERROR_STOP=1 -f services/api/migrations/002_builder_call_bindings.sql
     secretEnv: []
 
-  # Terraform apply (infra) -- deploys Cloud Run pointing at fresh digests.
-  - name: hashicorp/terraform:1.9
-    id: tf-apply
-    entrypoint: sh
+  # Deploy fresh digests directly (keeps existing env/secrets/IAM).
+  # Full terraform converge stays out of the critical path until state +
+  # imports for the hand-built resources exist (see infra/gcp/).
+  - name: gcr.io/cloud-builders/gcloud
+    id: deploy-api
     args:
-      - -c
-      - |
-        cd infra/gcp
-        terraform init -input=false
-        terraform apply -input=false -auto-approve \
-          -var="project=$PROJECT_ID" \
-          -var="region=${_REGION}" \
-          -var="env=${_ENV}" \
-          -var="api_image=${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:$COMMIT_SHA" \
-          -var="web_image=${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA"
+      - run
+      - deploy
+      - evoforge-api
+      - --project=$PROJECT_ID
+      - --region=${_REGION}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:$COMMIT_SHA
+  - name: gcr.io/cloud-builders/gcloud
+    id: deploy-web
+    args:
+      - run
+      - deploy
+      - evoforge-web
+      - --project=$PROJECT_ID
+      - --region=${_REGION}
+      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/web:$COMMIT_SHA
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/evoforge/api:$COMMIT_SHA
