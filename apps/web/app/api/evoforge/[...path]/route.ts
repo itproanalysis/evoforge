@@ -1,31 +1,12 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
+import { resolveApiPath } from "@/lib/proxyPolicy";
 
 const COOKIE_NAME = "__Host-evoforge-session";
 const METADATA_BASE = "http://metadata.google.internal";
-
-const EXACT_ALLOW = new Set([
-  "/v1/commands/generate",
-  "/v1/objectives",
-  "/v1/candidates/review",
-  "/v1/gates/evaluate",
-  "/v1/runs",
-  "/v1/pr/create",
-  "/v1/ledger",
-  "/v1/ledger/reconcile",
-  "/v1/eval/sandbox",
-]);
-
-const PREFIX_ALLOW = ["/v1/evidence/", "/v1/events/", "/v1/commands/"];
-
-function isAllowed(apiPath: string): boolean {
-  if (EXACT_ALLOW.has(apiPath)) return true;
-  for (const p of PREFIX_ALLOW) {
-    if (apiPath.startsWith(p) && apiPath.length > p.length) return true;
-  }
-  return false;
-}
+// Path policy (exact paths such as /v1/ledger plus /v1/evidence/{id} families)
+// lives in @/lib/proxyPolicy and is enforced via resolveApiPath() below.
 
 function verifySession(value: string, secret: string): boolean {
   if (!value || !secret) return false;
@@ -88,13 +69,15 @@ async function handle(req: NextRequest, params: { path?: string[] }) {
   }
 
   const segs = params.path ?? [];
-  const apiPath = `/${segs.join("/")}`;
-  if (!isAllowed(apiPath)) {
+  const apiPath = resolveApiPath(segs);
+  if (apiPath === null) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
   }
 
   const base = apiBase();
-  const qs = req.nextUrl.search ?? "";
+  const isAdvance =
+    segs.length === 4 && segs[0] === "v1" && segs[1] === "commands" && segs[3] === "advance";
+  const qs = isAdvance ? (req.nextUrl.search ?? "") : "";
   const target = `${base}${apiPath}${qs}`;
 
   const idToken = await fetchIdToken(base);
