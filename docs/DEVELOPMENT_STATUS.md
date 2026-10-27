@@ -121,7 +121,7 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 ## 현재 작업 클레임
 
 - **Codex (PR 테스트 파일명·서버 실행 증거와 canonical 후보 연결) / `codex/pg-integration`:**
-  `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·관련 문서를 수정한다.
+  `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·환경 예제/관련 문서를 수정한다.
   상위 main `dca4709`의 증거별 생성 테스트 이름을 보존하고, 같은 Builder 출력/기준과 일치하는 서버 실행 증거를 확인한다.
   기존 후보 binding과 정본 승인·예약/영수증 경로, 상위 T22/승격 Critic 테스트는 보존한다.
 - **Codex (로컬 DB 검증 시간 제한 보강 완료) / `codex/pg-integration`:** `tools/validate_local_pg.py`의
