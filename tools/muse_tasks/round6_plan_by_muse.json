@@ -1,0 +1,105 @@
+{
+  "rationale": "P0-1 auth first (public API+web today; blocks everything else), then P0-4 remote checkout (Cloud Run has no local repos, so /v1/runs is dead in prod without it), then P0-3 Runner extraction (API holds Meta key and metadata-server access; build on the T15 checkout so the API can ship a base-only bundle), then P0-5+P0-6 together (both touch generate->run->PR payload shape: file context in, builder tests out in the PR). P0-2/P0-7 excluded by ownership (Codex/Claude).",
+  "tasks": [
+    {
+      "id": "T14_web_auth_bff",
+      "title": "Owner login + web-origin-only API access",
+      "why": "P0-1: API and web are unauthenticated today and the browser calls the API directly (NEXT_PUBLIC_API_BASE); in prod the API must accept only the web service account's Google ID token, and there is no org/IAP so the app must do owner login itself.",
+      "spec": "Web (Next.js, apps/web): POST /api/login takes {username,password} JSON (never query string), verifies against server-only env EVO_OWNER_USER and EVO_OWNER_PASSWORD_HASH (format scrypt$N$r$p$saltHex$hashHex, compared with crypto.timingSafeEqual) with a short in-memory rate limit (429 after 10 fails/10min/IP); on success sets a single session cookie __Host-evoforge-session=base64url(random 256-bit).HMAC(EVO_SESSION_SECRET).expiry (~12h) with HttpOnly, Secure, SameSite=Lax, Path=/, Max-Age=43200; POST /api/logout clears it; GET /api/me returns 200 {user} or 401. Add /login page; proxy route /api/evoforge/[...path] requires a valid session (else 401) and forwards only allowlisted paths /v1/commands/generate, /v1/objectives, /v1/candidates/review, /v1/gates/evaluate, /v1/runs, /v1/pr/create, /v1/evidence/*, /v1/events/*, /v1/commands/*, /v1/ledger, /v1/ledger/reconcile, /v1/eval/sandbox (else 404), fetching a Google-signed ID token server-side from the metadata server (http://metadata.google.internal, audience=EVO_API_BASE, i.e. API URL) and sending Authorization: Bearer <idtoken>; returns API status/body verbatim, 502 if API unreachable. lib/api.ts base becomes same-origin /api/evoforge (no NEXT_PUBLIC_API_BASE at runtime). No secret in any NEXT_PUBLIC_* var (build must pass with NEXT_PUBLIC_* unset/empty). API (services/api): when EVO_REQUIRE_ID_TOKEN=1, every /v1/* except GET /healthz requires Authorization: Bearer <Google ID token> with iss accounts.google.com|https://accounts.google.com, aud == EVO_API_URL (fallback EVO_API_AUDIENCE), valid exp/iat/signature via Google certs (cache certs 1h); failures 401 missing/invalid/expired, 403 wrong-aud/wrong-service-account (optional allowlist EVO_WEB_SERVICE_ACCOUNT checked via email claim when present). When 0 (local dev default) behavior unchanged. Tighten CORS: default EVO_WEB_ORIGINS empty (same-origin via proxy only); explicit origins only when set. Status codes: web login 200/401/429, proxy 401/404/502, API 401/403.",
+      "edit": [
+        "apps/web/app/login/page.tsx",
+        "apps/web/app/api/login/route.ts",
+        "apps/web/app/api/logout/route.ts",
+        "apps/web/app/api/me/route.ts",
+        "apps/web/app/api/evoforge/[...path]/route.ts",
+        "apps/web/lib/api.ts",
+        "apps/web/.env.example",
+        "services/api/main.py",
+        "services/api/evoforge/auth.py",
+        "services/api/tests/test_web_auth_bff.py"
+      ],
+      "acceptance": [
+        "Login with wrong password -> 401 and no Set-Cookie; right password -> 200 with HttpOnly+Secure+SameSite cookie; cookie is HMAC-bound (tampered value -> proxy 401); timingSafeEqual used (no early-exit string compare).",
+        "Proxy without cookie -> 401; with cookie forwards method/body to API with Bearer ID token and returns API status verbatim; non-allowlisted path -> 404; no NEXT_PUBLIC_* secret required (grep NEXT_PUBLIC_ shows only same-origin default).",
+        "API with EVO_REQUIRE_ID_TOKEN=1: no token -> 401, wrong-aud token -> 403, valid token (test key) -> 200; GET /healthz stays 200 without token; existing suite passes with EVO_REQUIRE_ID_TOKEN=0.",
+        "Credentials never appear in URLs/logs; token/secret values never in responses."
+      ],
+      "out_of_scope": [
+        "GCP IAM/Terraform/IAP/org policy and Secret Manager wiring (Claude, P0-7)",
+        "PostgreSQL/DB session storage (sessions are stateless HMAC cookies; Codex owns persistence)",
+        "Multi-user/project membership (owner-only single account)"
+      ]
+    },
+    {
+      "id": "T15_remote_repo_checkout",
+      "title": "Server-side GitHub checkout at base commit",
+      "why": "P0-4: Runner only allows local EVO_REPO_ROOTS paths, so on Cloud Run (no local repos) every /v1/runs fails; runs must work against configured GITHUB_REPO checked out by the server at the requested base.",
+      "spec": "New module services/api/evoforge/repo_source.py with resolve_repo_dir(source_repo: str, base_sha: str) -> temp dir path. Semantics: source_repo '' or 'github' (exact) means the configured repo from env GITHUB_REPO (owner/repo, required); any other value is accepted only when EVO_ALLOW_LOCAL_REPOS=1 AND inside EVO_REPO_ROOTS (dev path unchanged), else 400; values containing '://' or starting with git@/file:/- are always 400. base_sha required non-empty (400 otherwise); must be 40-hex full SHA or a ref resolvable via the GitHub API (server resolves ref->SHA first); the server clones GITHUB_REPO at that SHA into a temp dir (git init + authenticated fetch using GITHUB_TOKEN sent ONLY as an HTTP Authorization header / http.extraHeader, never embedded in a URL; shallow-ish fetch of the base commit with full ancestry up to base, no broader history than needed) and returns the dir; callers build the hygiene sandbox from it exactly as today. GITHUB_TOKEN never appears in error messages, logs, responses, or evidence (redact helper + tests assert absence). /v1/runs and /v1/eval/sandbox use resolve_repo_dir; response shape unchanged ({base, visible, heldout, heldout_kinds, evidence_id}). Env: GITHUB_REPO (required in prod), GITHUB_TOKEN (server-only), EVO_ALLOW_LOCAL_REPOS (default 1 local / 0 prod), EVO_REPO_ROOTS kept for dev. Errors: unknown/empty repo config 400, bad base_sha 400, GitHub fetch/auth failure 400 (auth failure message generic, no token hint); all temp dirs cleaned up.",
+      "edit": [
+        "services/api/evoforge/repo_source.py",
+        "services/api/main.py",
+        "services/api/evoforge/runner.py",
+        "services/api/tests/test_remote_repo.py"
+      ],
+      "acceptance": [
+        "POST /v1/runs with source_repo='' against a fixture bare repo via mocked GitHub fetch checks out base SHA, runs suites, returns counts; source_repo='git@evil:x' or 'https://...' -> 400.",
+        "Bad base_sha (nonexistent/non-hex garbage) -> 400; error bodies, logs and evidence contain no GITHUB_TOKEN substring (test with canary token).",
+        "EVO_ALLOW_LOCAL_REPOS=0: absolute local path -> 400; =1 with EVO_REPO_ROOTS set: existing local-path tests still pass.",
+        "Hygiene guarantees unchanged: future-history sandbox audit still enforced on the checked-out dir (existing test_critic_t5_runner + held-out isolation tests pass)."
+      ],
+      "out_of_scope": [
+        "Runner process separation (T16)",
+        "PR creation path changes (T17)",
+        "PostgreSQL kernel files (Codex-owned)"
+      ]
+    },
+    {
+      "id": "T16_runner_service",
+      "title": "Isolated Runner service with bundle protocol",
+      "why": "P0-3: candidate code runs as subprocess inside the API process, which holds MODEL_API_KEY and can reach the metadata server/network; production needs a separate secretless Runner that receives only a base-only bundle + diff + suites and returns counts.",
+      "spec": "New service services/runner/app.py (FastAPI, PORT default 8081): POST /run takes {bundle_b64: str (git bundle of history up to base, max 50MB decoded), base_sha: str (40-hex, required), diff: str (<=1MB), visible: [{code}] (<=64 entries, each <=64KB non-empty str), sealed: [{code, kind}] (same caps), timeout_s: int 1..600} -> 200 {base, visible: {pass,n,timed_out,exit_code}, heldout: {pass,n,timed_out,exit_code}, heldout_kinds: [str]} (counts only, never code/logs). Behavior: reconstruct repo from bundle (git clone <bundle> + checkout base_sha, verify HEAD==base), reuse the exact strict diff-path checks, scrubbed-env subprocess execution, visible-first ordering, sealed run with python -I + Runner-owned ini + --noconftest + PYTEST_DISABLE_PLUGIN_AUTOLOAD, junit pre-exist refusal, per-suite timeout; violations 400/409 with same semantics as today. The Runner image/process reads NO secrets: must not reference MODEL_API_KEY/GITHUB_TOKEN/DATABASE_URL/EVO_KERNEL_TOKEN (startup assert warns if present; request schema has no secret fields) and runs with no IAM secret access. API side services/api/evoforge/runner_client.py: when EVO_RUNNER_URL is set, /v1/runs builds (git bundle create --all up to base from the T15-resolved repo dir) + diff + visible + server-stored sealed suite and POSTs to {EVO_RUNNER_URL}/run (timeout timeout_s+30s); maps result into the existing run dict and gate evaluation (response shape unchanged); runner unreachable/bad payload -> 502; when unset, falls back to in-process runner.run_candidate (dev). Sealed suite still comes only from server-stored review_evidence_id (client heldout_tests still 422). Env: API EVO_RUNNER_URL (empty=local fallback); Runner RUNNER_MAX_BUNDLE_MB/RUNNER_MAX_DIFF_KB/RUNNER_MAX_TESTS/RUNNER_MAX_TEST_KB with the defaults above. New Dockerfile services/runner/Dockerfile (python:3.12-slim, no secret mounts).",
+      "edit": [
+        "services/runner/app.py",
+        "services/runner/requirements.txt",
+        "services/runner/Dockerfile",
+        "services/api/evoforge/runner_client.py",
+        "services/api/evoforge/runner.py",
+        "services/api/main.py",
+        "services/api/tests/test_runner_service.py"
+      ],
+      "acceptance": [
+        "With EVO_RUNNER_URL pointed at a test Runner (TestClient or local uvicorn), POST /v1/runs executes via HTTP and returns identical shape; killing the Runner -> 502 (not 500); malformed runner reply -> 502.",
+        "Runner rejects: diff with absolute/.git/'..' path -> 409/400; sealed suite that reads visible files still isolated (port of conftest/ini/sitecustomize/file-tamper isolation tests passes against services/runner).",
+        "Runner source contains no os.getenv for MODEL_API_KEY/GITHUB_TOKEN/DATABASE_URL and its request/response schemas contain no code echo (only counts+kinds); oversized bundle/diff/suite -> 413/400 before execution.",
+        "All existing tests pass in both modes (EVO_RUNNER_URL unset)."
+      ],
+      "out_of_scope": [
+        "Cloud Run service/terraform/IAM for the Runner (Claude infra)",
+        "GitHub checkout logic itself (T15; this task only bundles its result)",
+        "PostgreSQL wiring (Codex)"
+      ]
+    },
+    {
+      "id": "T17_builder_context_pr_tests",
+      "title": "Builder file context + PR includes new tests",
+      "why": "P0-5+P0-6 (one payload-shape round): Builder gets only the goal sentence so patches are blind, and PRs ship only the diff while the Builder's tests are dropped; feed capped target-file snapshots into the Builder and commit its visible tests as new files in the PR.",
+      "spec": "Generate (POST /v1/commands/generate): accept optional target_paths: list[str] (<=10 entries; each relative POSIX, no absolute/drive/.. segments, no .git prefix, <=120 chars, UTF-8 text files only); server reads each at the run base from the T15-resolved repo dir with caps 32KB/file and 128KB total (binary/non-UTF8 entries skipped with a {path, skipped: 'binary/too-large'} marker; over-cap request -> 413 with which path blew the budget). broker_meta.call_builder(goal, repo_sha, file_context: list[{path, content|skipped}] | None = None) (backward compatible); with a key, the user message becomes goal + base + fenced snapshots ('# path: <p>\\n<content, truncated marker if cut>'); stub (no key) unchanged. Response shape unchanged. PR (POST /v1/pr/create + evoforge/github.py create_pr(diff, title, body, branch, base, extra_files: dict[path, text] | None = None)): after the existing all-PASS server-run check, commit each stored visible test (req.tests from the /v1/runs evidence, [{code}]) as a new file tests/evoforge_gen/test_gen_<i>.py (i=1-based, code as-is, must be non-empty str else skipped); refuse with 409 if any target path already exists at base, is touched by the diff, or escapes tests/evoforge_gen/; commit test files to the same branch before opening the PR (same contents-API flow) and append a 'Tests: <paths>' line to the PR body. Empty tests -> diff-only PR as today. Sealed held-out code is never written to the PR. Status: bad target path 400, over cap 413, test-path collision 409; existing gate/PR rules (404 unknown evidence, 409 not-a-run/gates-blocked) unchanged.",
+      "edit": [
+        "services/api/main.py",
+        "services/api/evoforge/broker_meta.py",
+        "services/api/evoforge/github.py",
+        "services/api/tests/test_builder_context_pr_tests.py"
+      ],
+      "acceptance": [
+        "Generate with target_paths=['a.py'] and mocked broker: prompt sent to the model contains the file snapshot with path header; '../x', '/abs', '.git/config' -> 400; 33KB file or 129KB total -> 413.",
+        "PR with mocked GitHub transport PUTs both diff paths and tests/evoforge_gen/test_gen_1..N.py then opens the pull; diff touching tests/evoforge_gen/test_gen_1.py -> 409; sealed code strings absent from all PUT bodies and the PR body.",
+        "No-key stub generate and all-PASS-gated PR semantics unchanged; existing critic/PR/gate tests pass."
+      ],
+      "out_of_scope": [
+        "Remote checkout and Runner transport (T15/T16; this task consumes them)",
+        "Review coverage/diff-splitting and P1/P2 items",
+        "Codex-owned postgres_*.py and kernel_api.py (untouched)"
+      ]
+    }
+  ]
+}
