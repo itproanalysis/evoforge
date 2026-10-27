@@ -491,7 +491,8 @@ def runs(req: RunRequest):
                                    req.tests, normalized,
                                    timeout_s=req.timeout_s)
     except runner.RunnerError as e:
-        raise HTTPException(400, str(e))
+        from evoforge import repo_source as _rs
+        raise HTTPException(400, _rs.redact(str(e)))
     except PatchError as e:
         raise HTTPException(409, str(e))
     verdicts = evaluate_full(req.diff, req.tests,
@@ -545,16 +546,39 @@ def pr_create(req: PRRequest):
 
 @app.post("/v1/eval/sandbox")
 def eval_sandbox(req: SandboxRequest):
-    from evoforge import runner
+    import shutil
+    import subprocess
+    from evoforge import repo_source, runner
     from evoforge.hygiene_api import run_sandbox
     try:
-        runner.allowed_repo(req.source_repo)
-    except runner.RunnerError as e:
-        raise HTTPException(400, str(e))
-    try:
-        out = run_sandbox(req.source_repo, req.base_sha, req.future_shas)
+        resolved = repo_source.resolve_repo_dir(req.source_repo, req.base_sha)
     except Exception as e:
-        raise HTTPException(400, f"sandbox failed: {e}")
+        raise HTTPException(400, repo_source.redact(str(e)))
+    is_temp = isinstance(req.source_repo, str) and req.source_repo in ("", "github")
+    effective_base = req.base_sha
+    if is_temp:
+        try:
+            _hp = subprocess.run(["git", "rev-parse", "HEAD"], cwd=resolved,
+                                 capture_output=True, text=True, timeout=30)
+            _head = (_hp.stdout or "").strip()
+            if _hp.returncode == 0 and _head:
+                effective_base = _head
+        except Exception:
+            pass
+    try:
+        try:
+            out = run_sandbox(resolved, effective_base, req.future_shas)
+        except Exception as e:
+            raise HTTPException(400, repo_source.redact(f"sandbox failed: {e}"))
+    finally:
+        if is_temp:
+            try:
+                runner._remove_tree(resolved)
+            except Exception:
+                try:
+                    shutil.rmtree(resolved, ignore_errors=True)
+                except Exception:
+                    pass
     eid = _store_evidence({"sandbox": out})
     return {**out, "evidence_id": eid}
 

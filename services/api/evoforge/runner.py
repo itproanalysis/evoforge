@@ -56,12 +56,21 @@ def _roots() -> list[str]:
     return [p.strip() for p in raw.split(os.pathsep) if p.strip()]
 
 
+def _allow_local() -> bool:
+    raw = os.getenv("EVO_ALLOW_LOCAL_REPOS", "1")
+    if raw is None:
+        return True
+    return raw.strip().lower() not in ("0", "false", "no", "off", "")
+
+
 def allowed_repo(source_repo: str) -> str:
     """Validate `source_repo` against EVO_REPO_ROOTS. Returns the resolved path."""
     if not isinstance(source_repo, str) or not source_repo:
         raise RunnerError(f"refused repo spec: {source_repo!r}")
     if ("://" in source_repo or source_repo.startswith(("git@", "file:", "-"))):
         raise RunnerError(f"refused remote repo spec: {source_repo!r}")
+    if not _allow_local():
+        raise RunnerError(f"repo outside allowed roots: {source_repo!r}")
     roots = _roots()
     if not roots:
         raise RunnerError("no allowed repo roots (EVO_REPO_ROOTS unset or empty)")
@@ -235,12 +244,27 @@ def run_candidate(source_repo, base_sha, diff, visible_tests, heldout_tests,
     """Build a hygiene sandbox, apply `diff`, run both suites, return counts."""
     visible_tests = list(visible_tests or [])
     heldout_tests = list(heldout_tests or [])
-    source = allowed_repo(source_repo)
+    from evoforge import repo_source as _repo_source
+    try:
+        source = _repo_source.resolve_repo_dir(source_repo, base_sha)
+    except Exception as e:
+        raise RunnerError(_repo_source.redact(str(e)))
+    is_temp = isinstance(source_repo, str) and source_repo in ("", "github")
+    effective_base = base_sha
+    if is_temp:
+        try:
+            _hp = subprocess.run(["git", "rev-parse", "HEAD"], cwd=source,
+                                 capture_output=True, text=True, timeout=30)
+            _head = (_hp.stdout or "").strip()
+            if _hp.returncode == 0 and _head:
+                effective_base = _head
+        except Exception:
+            pass
     tmpbase = tempfile.mkdtemp(prefix="evoforge-run-")
     dest = os.path.join(tmpbase, "sandbox")
     try:
         try:
-            base = eval_hygiene.build_sandbox_repo(source, base_sha, dest)
+            base = eval_hygiene.build_sandbox_repo(source, effective_base, dest)
         except RunnerError:
             raise
         except Exception as e:
@@ -277,3 +301,5 @@ def run_candidate(source_repo, base_sha, diff, visible_tests, heldout_tests,
                 "heldout_kinds": [str(t.get("kind", "")) for t in heldout_tests]}
     finally:
         _remove_tree(tmpbase)
+        if is_temp:
+            _remove_tree(source)
