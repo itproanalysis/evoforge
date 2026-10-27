@@ -742,3 +742,11 @@ Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.
 관련 42 passed. 원본: `.local/evidence/runner-bundle-ownership-20261028-w4esi1fq`.
 실제 PostgreSQL 169개·정본 SQL 96개·참조 112개가 통과했고 전체 API는 검증 중이며 main 미반영이다.
 기존 미커밋 runner/승격 테스트는 보존한다.
+
+## 원격 Runner 수집 수·종류 바인딩
+
+`codex/runner-count-binding`의 `f894b30`은 전달하지 않은 스위트가 수집됐다고 하거나,
+전달한 스니펫 수보다 적게 수집한 성공·0이 아닌/누락된 종료 코드의 성공·요청과 다른 봉인 종류를 거부한다.
+실패한 수집은 실패 결과로 유지한다. 수정 전 회귀 8 failed·2 passed, 수정 후 실제 Runner 서비스 포함 52 passed.
+원본: `.local/evidence/runner-count-binding-20261028-svzs_kqd`; 전체 API·실제 PostgreSQL 검증 중·main 미반영.
+스니펫 수 하한은 파일별 수집 증거가 아니며 로컬 Runner와 공개 게이트의 별도 확인도 남아 있다.

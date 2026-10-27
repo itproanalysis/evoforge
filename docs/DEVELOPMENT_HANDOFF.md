@@ -395,3 +395,10 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 참조 이동 시 bundle을 거부하며 변경된 참조를 보존한다. 수정 전 3 failed, 수정 후 실제 Runner 서비스 포함
 42 passed. 원본 `.local/evidence/runner-bundle-ownership-20261028-w4esi1fq`; 실제 PostgreSQL 169개·SQL 96개·
 참조 112개 통과, 전체 API 검증 중·main 미반영.
+
+## 2026-10-28 원격 Runner 수집 결과 보강
+
+`codex/runner-count-binding` `f894b30`은 미전달 스위트 수집, 부족한 성공 수집, 부정확한 종료 코드 및
+전달한 봉인 종류와 다른 결과를 거부한다. 수정 전 8 failed·2 passed, 수정 후 실제 Runner 서비스 포함 52 passed.
+원본 `.local/evidence/runner-count-binding-20261028-svzs_kqd`; 전체 API/DB 검증 중, main 미반영.
+스니펫 수 하한만으로 각 파일의 수집을 증명하지 않으며 로컬 경로도 별도 확인해야 한다.
