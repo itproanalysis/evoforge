@@ -1,0 +1,15 @@
+# Never upload secrets, local state or dependencies to Cloud Build.
+.git
+.gitignore
+#!include:.gitignore
+.env
+**/.env
+**/.env.*
+!**/.env.example
+**/node_modules/
+**/.next/
+**/__pycache__/
+**/.pytest_cache/
+.venv/
+tools/muse_runs/
+EvoForge_v4.2/
