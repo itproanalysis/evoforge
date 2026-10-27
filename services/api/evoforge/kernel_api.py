@@ -68,6 +68,19 @@ class SettleRequest(InternalRequest):
     customer_micros: StrictInt = Field(gt=0, le=2**63 - 1)
 
 
+class BuilderCallRequest(ReserveRequest):
+    packet_id: UUID
+
+
+def builder_configuration():
+    from evoforge.postgres_builder import identity
+    try:
+        return (identity(os.getenv("EVO_PRICE_TABLE_VERSION", "")),
+                identity(os.getenv("MODEL_BUILDER", "muse-spark-1.3")))
+    except ValueError:
+        raise HTTPException(503, "Builder price version or model is not configured") from None
+
+
 class MergeAuthorizationRequest(InternalRequest):
     candidate_id: UUID
     head_sha: str = Field(pattern=r"^(?:[a-f0-9]{40}|[a-f0-9]{64})$")
@@ -86,7 +99,7 @@ def reservation(call_id: UUID, kernel: PostgresKernel = Depends(authenticated_ke
 
 @router.post("/reservations/{call_id}/sent")
 def sent(call_id: UUID, kernel: PostgresKernel = Depends(authenticated_kernel)):
-    return invoke(kernel.mark_sent, call_id)
+    return invoke(kernel.mark_sent, call_id, os.getenv("MODEL_BUILDER", "muse-spark-1.3"))
 
 
 @router.post("/reservations/{call_id}/unknown")
@@ -128,3 +141,15 @@ def settle_receipt(receipt_id: UUID, req: InternalRequest,
                    kernel: PostgresKernel = Depends(authenticated_kernel)):
     # An empty object is required so amount/scope overrides are rejected.
     return invoke(kernel.settle_from_receipt, receipt_id)
+
+
+@router.post("/builder-calls")
+def prepare_builder_call(req: BuilderCallRequest, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    price_version, model = builder_configuration()
+    return invoke(kernel.prepare_builder_call, req.call_id, req.period_start, req.amount_micros,
+                  req.packet_id, price_version, model)
+
+
+@router.get("/builder-calls/{call_id}")
+def builder_call(call_id: UUID, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    return invoke(kernel.builder_call, call_id)

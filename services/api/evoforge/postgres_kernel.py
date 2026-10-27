@@ -131,30 +131,35 @@ class PostgresKernel:
         if type(period) is not date:
             raise ValueError("period must be a date")
         with self._transaction() as conn:
-            # Same lock as core.reserve_cost, acquired before its idempotency
-            # lookup so concurrent retries of one call also remain idempotent.
-            conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
-                         (f"core.credit:{self.scope.tenant_id}",))
-            exists = conn.execute("SELECT 1 FROM core.cost_reservations WHERE tenant_id=%s "
-                                  "AND project_id=%s AND request_key=%s",
-                                  (self.scope.tenant_id, self.scope.project_id, str(call_id))).fetchone()
-            if exists:
-                previous = self._read(conn, call_id, lock=True)
-                if previous.period_start != period or previous.reserved_micros != amount_micros:
-                    raise KernelRejected("call id reused with different reservation parameters")
-                return previous
-            conn.execute("SELECT core.reserve_cost(%s,%s,%s,%s,%s)",
-                         (self.scope.tenant_id, self.scope.project_id, period, str(call_id), amount_micros))
-            conn.execute("INSERT INTO core.side_effect_intents (tenant_id,kind,idempotency_key) "
-                         "VALUES (%s,'provider.call',%s)", (self.scope.tenant_id, self._intent_key(call_id)))
-            return self._read(conn, call_id)
+            return self._reserve(conn, call_id, period, amount_micros)
 
-    def mark_sent(self, call_id: UUID) -> ReservationState:
+    def _reserve(self, conn, call_id: UUID, period: date, amount_micros: int) -> ReservationState:
+        # Same lock as core.reserve_cost, acquired before its idempotency
+        # lookup so concurrent retries of one call also remain idempotent.
+        conn.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                     (f"core.credit:{self.scope.tenant_id}",))
+        exists = conn.execute("SELECT 1 FROM core.cost_reservations WHERE tenant_id=%s "
+                              "AND project_id=%s AND request_key=%s",
+                              (self.scope.tenant_id, self.scope.project_id, str(call_id))).fetchone()
+        if exists:
+            previous = self._read(conn, call_id, lock=True)
+            if previous.period_start != period or previous.reserved_micros != amount_micros:
+                raise KernelRejected("call id reused with different reservation parameters")
+            return previous
+        conn.execute("SELECT core.reserve_cost(%s,%s,%s,%s,%s)",
+                     (self.scope.tenant_id, self.scope.project_id, period, str(call_id), amount_micros))
+        conn.execute("INSERT INTO core.side_effect_intents (tenant_id,kind,idempotency_key) "
+                     "VALUES (%s,'provider.call',%s)", (self.scope.tenant_id, self._intent_key(call_id)))
+        return self._read(conn, call_id)
+
+    def mark_sent(self, call_id: UUID, expected_builder_model: str = "muse-spark-1.3") -> ReservationState:
         call_id = UUID(str(call_id))
         with self._transaction() as conn:
             previous = self._read(conn, call_id, lock=True)
             if previous.status != "RESERVED" or previous.outcome != "RESERVED":
                 raise KernelRejected("provider call already sent or reservation closed")
+            from evoforge.postgres_builder import validate_dispatch
+            validate_dispatch(conn, self.scope, call_id, expected_builder_model)
             conn.execute("UPDATE core.side_effect_intents SET status='SENT' WHERE tenant_id=%s "
                          "AND kind='provider.call' AND idempotency_key=%s",
                          (self.scope.tenant_id, self._intent_key(call_id)))
@@ -202,6 +207,8 @@ class PostgresKernel:
                 raise KernelRejected("settlement replay differs from committed receipt")
             if previous.status != "RESERVED" or previous.outcome not in {"SENT", "UNKNOWN_EXTERNAL_OUTCOME"}:
                 raise KernelRejected("reservation is not an in-flight provider call")
+            from evoforge.postgres_builder import binding, check_document
+            bound = binding(conn, self.scope, call_id)
             conn.execute("SET LOCAL ROLE ctx_gateway")
             receipt = conn.execute("SELECT cost_micros, price_table_version, provider_request_id "
                                    "FROM ctx.provider_usage_receipts WHERE tenant_id=%s AND project_id=%s "
@@ -218,6 +225,9 @@ class PostgresKernel:
                 if (digest != quoted["document_sha256"]
                         or document["customer_price_micros"] != customer_micros):
                     raise KernelRejected("settlement amount differs from stored customer quote")
+                check_document(bound, document)
+            elif bound:
+                raise KernelRejected("bound Builder call requires a canonical receipt document")
             conn.execute("SET LOCAL ROLE core_app")
             conn.execute("SELECT core.settle_reservation(%s,%s,%s,%s,%s,%s,%s)",
                          (self.scope.tenant_id, self.scope.project_id, str(call_id), customer_micros,
@@ -247,6 +257,8 @@ class PostgresKernel:
         with self._transaction() as conn:
             from psycopg.types.json import Json, Jsonb
             state = self._read(conn, call_id, lock=True)
+            from evoforge.postgres_builder import binding, check_document
+            check_document(binding(conn, self.scope, call_id), record)
             reserved_at = conn.execute("SELECT created_at FROM core.cost_reservations WHERE tenant_id=%s "
                                        "AND project_id=%s AND request_key=%s",
                                        (self.scope.tenant_id, self.scope.project_id, str(call_id))).fetchone()["created_at"]
@@ -310,3 +322,12 @@ class PostgresKernel:
         record = self.receipt_document(receipt_id)
         return self.settle_reservation(UUID(record["call_id"]), UUID(record["receipt_id"]),
                                        record["customer_price_micros"])
+
+    def prepare_builder_call(self, call_id, period, amount_micros, packet_id, price_table_version,
+                             expected_model="muse-spark-1.3"):
+        from evoforge.postgres_builder import prepare
+        return prepare(self, call_id, period, amount_micros, packet_id, price_table_version, expected_model)
+
+    def builder_call(self, call_id):
+        from evoforge.postgres_builder import read
+        return read(self, call_id)

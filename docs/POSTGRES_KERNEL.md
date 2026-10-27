@@ -71,3 +71,6 @@ Generate/Review의 패킷·영수증 연결은 계속 남아 있다.
 
 후속 영수증 문서 검증·원자적 보존과 저장 금액 정산은
 [RECEIPT_PERSISTENCE.md](RECEIPT_PERSISTENCE.md)에 기록했다.
+
+Builder 패킷·동의·task fencing과 예약을 함께 확인하는 지원 경로는
+[BUILDER_PREFLIGHT.md](BUILDER_PREFLIGHT.md)에 기록했다.

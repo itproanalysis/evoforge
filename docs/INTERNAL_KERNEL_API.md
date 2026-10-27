@@ -35,6 +35,8 @@ uvicorn main:app --env-file .env --reload --port 8080
 | `POST /v1/kernel/receipts` | 정본 영수증 문서 검증·원자적 저장 |
 | `GET /v1/kernel/receipts/{receipt_id}` | 해당 스코프의 문서와 원장 entry ID 조회 |
 | `POST /v1/kernel/receipts/{receipt_id}/settle` | 본문 `{}`, 저장 금액으로 정산 |
+| `POST /v1/kernel/builder-calls` | 기존 패킷·동의·lease 검증과 예약의 원자적 바인딩 |
+| `GET /v1/kernel/builder-calls/{call_id}` | Builder 바인딩·예약 상태 조회 |
 
 위의 `...`는 `/v1/kernel/reservations`다. 병합 승인은 후보 상태나 GitHub를 변경하지 않는다.
 현재 head·정책·증거가 바뀌면 실제 병합 직전에 다시 DB 승인을 거쳐야 한다.
@@ -46,6 +48,9 @@ DB 오류를 메모리 원장으로 대체하지 않는다.
 
 영수증 확장 마이그레이션·계약·저장 금액 정산의 범위와 제한은
 [영수증 문서 연결](RECEIPT_PERSISTENCE.md)을 따른다. 스키마와 digest는 공급사 청구 입증이 아니다.
+
+Builder 바인딩은 `EVO_PRICE_TABLE_VERSION`과 확장 002를 요구한다.
+전송 전 재검증과 정확한 범위는 [BUILDER_PREFLIGHT.md](BUILDER_PREFLIGHT.md)를 따른다.
 
 ## 검증
 

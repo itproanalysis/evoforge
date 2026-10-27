@@ -10,6 +10,7 @@ from datetime import date
 import os
 from pathlib import Path
 import sys
+import time
 from uuid import UUID, uuid4
 
 import pytest
@@ -48,9 +49,10 @@ def database():
             with psycopg.connect(test_dsn, autocommit=True) as connection:
                 connection.execute((folder / "context_plane_DRAFT.sql").read_text(encoding="utf-8"))
                 connection.execute((folder / "core_DRAFT.sql").read_text(encoding="utf-8"))
-                migration = (ROOT / "services/api/migrations/001_receipt_documents.sql").read_text(encoding="utf-8")
-                connection.execute(migration)
-                connection.execute(migration)  # extension reapplication is safe
+                migrations = sorted((ROOT / "services/api/migrations").glob("*.sql"))
+                for _ in range(2):  # extensions can be reapplied in order
+                    for migration in migrations:
+                        connection.execute(migration.read_text(encoding="utf-8"))
             yield test_dsn
         finally:
             admin.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name)))
@@ -497,3 +499,250 @@ def test_http_receipt_ingestion_scope_and_quote_bound_settlement(funded, http_ke
     foreign = http_kernel.get(f'/v1/kernel/receipts/{rid}')
     missing = http_kernel.get(f'/v1/kernel/receipts/{uuid4()}')
     assert foreign.status_code == missing.status_code == 404 and foreign.json() == missing.json()
+
+
+def _builder_packet(funded, *, role="builder", model="muse-spark-1.3", expires_s=3600):
+    """Real claim_task/fence plus a synthetic trusted Gateway packet/consent."""
+    scope = funded["scope"]
+    agent, run, task, packet = (uuid4() for _ in range(4))
+    with psycopg.connect(funded["dsn"], autocommit=True) as connection:
+        connection.execute("INSERT INTO core.agents(tenant_id,agent_id,kind,join_state,connection_state) "
+                           "VALUES (%s,%s,'provider_api','AUTHORIZED','READY')", (scope.tenant_id, agent))
+        connection.execute("INSERT INTO core.runs(tenant_id,project_id,run_id,objective_version,topology,harness_version,policy_hash) "
+                           "VALUES (%s,%s,%s,1,'SINGLE','test',repeat('1',64))", (scope.tenant_id, scope.project_id, run))
+        for state in ("QUEUED", "RUNNING"):
+            connection.execute("UPDATE core.runs SET status=%s WHERE run_id=%s", (state, run))
+        connection.execute("INSERT INTO core.tasks(tenant_id,project_id,task_id,run_id,risk_level,base_sha) "
+                           "VALUES (%s,%s,%s,%s,'LOW',repeat('a',40))", (scope.tenant_id, scope.project_id, task, run))
+        epoch = connection.execute("SELECT core.claim_task(%s,%s,%s,%s,interval '1 hour')",
+                                   (scope.tenant_id, scope.project_id, task, agent)).fetchone()[0]
+        connection.execute("UPDATE core.tasks SET status='RUNNING' WHERE task_id=%s", (task,))
+        connection.execute("""INSERT INTO ctx.context_packets
+            (tenant_id,project_id,packet_id,run_id,task_id,task_attempt_id,idempotency_key,
+             seat_id,function_role,agent_id,candidate_id,is_author_of_candidate,channel,profile,repo_sha,
+             contract_version,policy_version,policy_hash,tool_schema_hash,evidence_manifest_hash,
+             lease_epoch,provider,model,cache_mode,packet_sha256,issued_at,expires_at)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,1,%s,%s,%s,%s,'api','SAFE',repeat('a',40),
+                    1,'test',repeat('1',64),repeat('2',64),repeat('3',64),%s,'meta',%s,'NONE',repeat('4',64),
+                    now()+%s*interval '1 second',now()+%s*interval '1 second')""",
+            (scope.tenant_id, scope.project_id, packet, run, task, uuid4(), str(packet), role, agent,
+             uuid4() if role in {"critic", "verifier"} else None, role not in {"critic", "verifier"}, epoch, model,
+             -7200 if expires_s < 0 else 0, expires_s))
+        connection.execute("INSERT INTO core.provider_allowlist "
+                           "(tenant_id,project_id,provider,model_glob,data_consent_at,consented_by) "
+                           "VALUES (%s,%s,'meta','muse-spark-*',now(),%s) ON CONFLICT DO NOTHING",
+                           (scope.tenant_id, scope.project_id, uuid4()))
+    return {"packet": packet, "agent": agent, "run": run, "task": task, "epoch": epoch}
+
+
+def _prepare(funded, packet, call=None, **kwargs):
+    return funded["kernel"].prepare_builder_call(call or uuid4(), PERIOD, 100, packet,
+                                                "synthetic-test-v1", **kwargs)
+
+
+def test_builder_context_reservation_dispatch_and_document_settlement_are_durable(funded):
+    context, kernel, call = _builder_packet(funded), funded["kernel"], uuid4()
+    prepared = _prepare(funded, context["packet"], call)
+    assert prepared["model"] == "muse-spark-1.3" and prepared["provider"] == "meta"
+    assert prepared["reservation"].outcome == "RESERVED" and prepared["lease_epoch"] == 1
+    restarted = PostgresKernel(funded["dsn"], funded["scope"])
+    assert restarted.builder_call(call) == prepared
+    assert _prepare(funded, context["packet"], call) == prepared
+    assert restarted.mark_sent(call).outcome == "SENT"
+    assert _prepare(funded, context["packet"], call)["reservation"].outcome == "SENT"
+    with pytest.raises(KernelRejected):
+        restarted.mark_sent(call)
+    scope = funded["scope"]
+    document = receipt_document(tenant=scope.tenant_id, project=scope.project_id, packet=context["packet"], call=call)
+    restarted.record_receipt(document)
+    assert restarted.settle_from_receipt(document["receipt_id"]).status == "COMMITTED"
+    assert restarted.receipt_document(document["receipt_id"])["ledger_entry_id"] is not None
+
+
+@pytest.mark.parametrize("problem", ["consent", "future-consent", "model", "role", "expired", "agent", "lease", "epoch", "base", "policy", "objective", "paused", "task"])
+def test_builder_preflight_refusal_rolls_back_budget_intent_and_binding(funded, problem):
+    context = _builder_packet(funded, model="other-model" if problem == "model" else "muse-spark-1.3",
+                              role="critic" if problem == "role" else "builder", expires_s=-1 if problem == "expired" else 3600)
+    with psycopg.connect(funded["dsn"], autocommit=True) as connection:
+        if problem == "consent":
+            connection.execute("UPDATE core.provider_allowlist SET revoked_at=now() WHERE tenant_id=%s", (funded["scope"].tenant_id,))
+        elif problem == "future-consent":
+            connection.execute("UPDATE core.provider_allowlist SET data_consent_at=now()+interval '1 hour' WHERE tenant_id=%s", (funded["scope"].tenant_id,))
+        elif problem == "agent":
+            connection.execute("UPDATE core.agents SET connection_state='OFFLINE' WHERE agent_id=%s", (context["agent"],))
+        elif problem == "lease":
+            connection.execute("UPDATE core.tasks SET lease_expires_at=now()-interval '1 hour' WHERE task_id=%s", (context["task"],))
+        elif problem == "epoch":
+            connection.execute("UPDATE core.tasks SET lease_epoch=lease_epoch+1 WHERE task_id=%s", (context["task"],))
+        elif problem == "base":
+            connection.execute("UPDATE core.tasks SET base_sha=repeat('b',40) WHERE task_id=%s", (context["task"],))
+        elif problem == "policy":
+            connection.execute("UPDATE core.runs SET policy_hash=repeat('2',64) WHERE run_id=%s", (context["run"],))
+        elif problem == "objective":
+            connection.execute("UPDATE core.runs SET objective_version=2 WHERE run_id=%s", (context["run"],))
+        elif problem == "paused":
+            for state in ("PAUSING", "PAUSED"):
+                connection.execute("UPDATE core.runs SET status=%s WHERE run_id=%s", (state, context["run"]))
+        elif problem == "task":
+            connection.execute("UPDATE core.tasks SET status='BLOCKED' WHERE task_id=%s", (context["task"],))
+    with pytest.raises(KernelRejected):
+        _prepare(funded, context["packet"])
+    with psycopg.connect(funded["dsn"]) as connection:
+        for table in ("core.cost_reservations", "core.side_effect_intents", "runtime.builder_call_bindings"):
+            assert connection.execute(sql.SQL("SELECT count(*) FROM {} WHERE tenant_id=%s").format(sql.SQL(table)),
+                                      (funded["scope"].tenant_id,)).fetchone()[0] == 0
+
+
+@pytest.mark.parametrize("change", ["consent", "packet", "lease", "epoch", "model"])
+def test_dispatch_rechecks_changes_after_reservation_without_sending_or_refunding(funded, change):
+    context, call, kernel = _builder_packet(funded), uuid4(), funded["kernel"]
+    _prepare(funded, context["packet"], call)
+    with psycopg.connect(funded["dsn"], autocommit=True) as connection:
+        if change == "consent":
+            connection.execute("UPDATE core.provider_allowlist SET revoked_at=now() WHERE tenant_id=%s", (funded["scope"].tenant_id,))
+        elif change == "packet":
+            connection.execute("UPDATE ctx.context_packets SET status='STALE',status_reason='goal_changed' WHERE packet_id=%s", (context["packet"],))
+        elif change == "lease":
+            connection.execute("UPDATE core.tasks SET lease_expires_at=now()-interval '1 second' WHERE task_id=%s", (context["task"],))
+        elif change == "epoch":
+            connection.execute("UPDATE core.tasks SET lease_epoch=lease_epoch+1 WHERE task_id=%s", (context["task"],))
+    with pytest.raises(KernelRejected):
+        kernel.mark_sent(call, "unapproved-replacement" if change == "model" else "muse-spark-1.3")
+    state = kernel.reservation(call)
+    assert state.status == state.outcome == "RESERVED"
+    assert kernel.release_not_accepted(call).status == "RELEASED"
+
+
+def test_builder_call_cannot_change_packet_or_price_version_on_replay(funded):
+    first, second, call = _builder_packet(funded), _builder_packet(funded), uuid4()
+    _prepare(funded, first["packet"], call)
+    with pytest.raises(KernelRejected):
+        _prepare(funded, second["packet"], call)
+    with pytest.raises(KernelRejected):
+        funded["kernel"].prepare_builder_call(call, PERIOD, 100, first["packet"], "new-price")
+
+
+@pytest.mark.parametrize("change", ["packet", "price", "purpose"])
+def test_bound_builder_receipt_cannot_use_another_context_or_price(funded, change):
+    first, second, call, kernel = _builder_packet(funded), _builder_packet(funded), uuid4(), funded["kernel"]
+    _prepare(funded, first["packet"], call)
+    kernel.mark_sent(call)
+    scope = funded["scope"]
+    document = receipt_document(tenant=scope.tenant_id, project=scope.project_id, packet=first["packet"], call=call)
+    if change == "packet":
+        document["packet_id"] = str(second["packet"])
+    elif change == "price":
+        document["price_table_version"] = "other-price"
+    else:
+        document["call_purpose"] = "review_chunk"
+    with pytest.raises(KernelRejected):
+        kernel.record_receipt(document)
+    assert kernel.reservation(call).outcome == "SENT"
+
+
+def test_bound_builder_call_cannot_settle_through_ctx_only_legacy_receipt(funded):
+    context, call, kernel = _builder_packet(funded), uuid4(), funded["kernel"]
+    _prepare(funded, context["packet"], call)
+    kernel.mark_sent(call)
+    bare = _receipt(funded, call)
+    with pytest.raises(KernelRejected):
+        kernel.settle_reservation(call, bare, 110)
+    assert kernel.reservation(call).status == "RESERVED"
+
+
+def test_builder_preparation_is_concurrent_idempotent_and_scope_isolated(funded):
+    context, call = _builder_packet(funded), uuid4()
+    with ThreadPoolExecutor(max_workers=6) as workers:
+        rows = list(workers.map(lambda _: _prepare(funded, context["packet"], call), range(6)))
+    assert all(row == rows[0] for row in rows)
+    for scope in (KernelScope(uuid4(), funded["scope"].project_id), KernelScope(funded["scope"].tenant_id, uuid4())):
+        with pytest.raises(KernelNotFound):
+            PostgresKernel(funded["dsn"], scope).builder_call(call)
+
+
+def test_context_cannot_be_attached_after_call_was_already_sent(funded):
+    context, call, kernel = _builder_packet(funded), uuid4(), funded["kernel"]
+    kernel.reserve_cost(call, PERIOD, 100)
+    kernel.mark_sent(call)
+    with pytest.raises(KernelRejected):
+        _prepare(funded, context["packet"], call)
+
+
+def test_http_builder_policy_is_server_owned_and_dispatch_refuses_revoked_packet(funded, http_kernel, monkeypatch):
+    monkeypatch.setenv("EVO_PRICE_TABLE_VERSION", "synthetic-test-v1")
+    context, call = _builder_packet(funded), uuid4()
+    body = {'call_id': str(call), 'packet_id': str(context['packet']), 'period_start': PERIOD.isoformat(), 'amount_micros': 100}
+    response = http_kernel.post('/v1/kernel/builder-calls', json=body)
+    assert response.status_code == 200, response.text
+    assert response.json()['model'] == 'muse-spark-1.3'
+    assert http_kernel.get(f'/v1/kernel/builder-calls/{call}').json()['reservation']['outcome'] == 'RESERVED'
+    assert http_kernel.post('/v1/kernel/builder-calls', json={**body, 'price_table_version': 'forged'}).status_code == 422
+    with psycopg.connect(funded['dsn'], autocommit=True) as connection:
+        connection.execute("UPDATE ctx.context_packets SET status='REVOKED',status_reason='revoked' WHERE packet_id=%s", (context['packet'],))
+    assert http_kernel.post(f'/v1/kernel/reservations/{call}/sent').status_code == 409
+    assert funded['kernel'].reservation(call).outcome == 'RESERVED'
+
+
+def test_builder_budget_refusal_and_missing_packet_leave_no_binding(funded):
+    context, kernel = _builder_packet(funded), funded["kernel"]
+    with pytest.raises(BudgetRefused):
+        kernel.prepare_builder_call(uuid4(), PERIOD, 10_000_001, context["packet"], "synthetic-test-v1")
+    with pytest.raises(KernelNotFound):
+        _prepare(funded, uuid4())
+    with psycopg.connect(funded["dsn"]) as connection:
+        assert connection.execute("SELECT count(*) FROM runtime.builder_call_bindings WHERE tenant_id=%s",
+                                  (funded["scope"].tenant_id,)).fetchone()[0] == 0
+        assert connection.execute("SELECT count(*) FROM core.cost_reservations WHERE tenant_id=%s",
+                                  (funded["scope"].tenant_id,)).fetchone()[0] == 0
+
+
+def test_builder_packet_created_after_cost_reservation_cannot_retroactively_bind(funded):
+    kernel, call = funded["kernel"], uuid4()
+    kernel.reserve_cost(call, PERIOD, 100)
+    context = _builder_packet(funded)
+    with pytest.raises(KernelRejected):
+        _prepare(funded, context["packet"], call)
+    with pytest.raises(KernelNotFound):
+        kernel.builder_call(call)
+    assert kernel.reservation(call).outcome == "RESERVED"
+
+
+def test_builder_bindings_are_immutable_and_rls_scoped(funded):
+    context, call = _builder_packet(funded), uuid4()
+    _prepare(funded, context["packet"], call)
+    foreign = PostgresKernel(funded["dsn"], KernelScope(funded["scope"].tenant_id, uuid4()))
+    with foreign._transaction() as connection:
+        assert connection.execute("SELECT count(*) FROM runtime.builder_call_bindings").fetchone()["count"] == 0
+    with psycopg.connect(funded["dsn"], autocommit=True) as connection:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            connection.execute("UPDATE runtime.builder_call_bindings SET price_table_version='changed' WHERE call_id=%s", (call,))
+
+
+def test_preflight_uses_wall_clock_after_waiting_for_tenant_reservation_lock(funded):
+    context = _builder_packet(funded)
+    with psycopg.connect(funded["dsn"]) as control:
+        control.execute("SELECT pg_advisory_xact_lock(hashtextextended(%s,0))",
+                        (f"core.credit:{funded['scope'].tenant_id}",))
+        with ThreadPoolExecutor(max_workers=1) as worker:
+            pending = worker.submit(_prepare, funded, context["packet"])
+            try:
+                deadline = time.monotonic() + 5
+                while time.monotonic() < deadline:
+                    # pg_stat_activity caches a snapshot for this transaction;
+                    # pg_locks is live and shows the newly connected worker.
+                    waiting = control.execute("SELECT EXISTS(SELECT 1 FROM pg_locks l "
+                                              "WHERE l.database=(SELECT oid FROM pg_database "
+                                              "WHERE datname=current_database()) AND l.locktype='advisory' "
+                                              "AND NOT l.granted)").fetchone()[0]
+                    if waiting:
+                        break
+                    time.sleep(0.01)
+                assert waiting, "worker must begin its transaction before expiry is changed"
+                # now() in the waiting transaction predates this expiry. Using
+                # only core.assert_fencing's transaction clock would accept it.
+                control.execute("UPDATE core.tasks SET lease_expires_at=clock_timestamp() WHERE task_id=%s",
+                                (context["task"],))
+            finally:
+                control.commit()  # always release the worker, even on assertion failure
+            with pytest.raises(KernelRejected):
+                pending.result(timeout=10)

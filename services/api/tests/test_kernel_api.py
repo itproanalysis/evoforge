@@ -138,3 +138,32 @@ def test_invalid_receipt_returns_sanitized_422(api):
     api['kernel'].record_receipt.side_effect = ReceiptInvalid('must-not-leak-provider-or-token-data')
     response = api['client'].post('/v1/kernel/receipts', json={'bad': 'must-not-leak'}, headers=api['headers'])
     assert response.status_code == 422 and 'must-not-leak' not in response.text
+
+
+def test_builder_preparation_uses_only_server_model_and_price_version(api, monkeypatch):
+    monkeypatch.setenv('EVO_PRICE_TABLE_VERSION', 'approved-v1')
+    monkeypatch.setenv('MODEL_BUILDER', 'muse-spark-1.3')
+    packet = uuid4()
+    body = {**api['body'], 'packet_id': str(packet)}
+    api['kernel'].prepare_builder_call.return_value = {'model': 'muse-spark-1.3'}
+    response = api['client'].post('/v1/kernel/builder-calls', headers=api['headers'], json=body)
+    assert response.status_code == 200
+    api['kernel'].prepare_builder_call.assert_called_once_with(api['call'], date(2026, 10, 1), 100,
+                                                              packet, 'approved-v1', 'muse-spark-1.3')
+
+
+@pytest.mark.parametrize('override', ['model', 'provider', 'price_table_version', 'tenant_id', 'project_id'])
+def test_builder_request_cannot_choose_its_model_price_or_scope(api, monkeypatch, override):
+    monkeypatch.setenv('EVO_PRICE_TABLE_VERSION', 'approved-v1')
+    response = api['client'].post('/v1/kernel/builder-calls', headers=api['headers'], json={
+        **api['body'], 'packet_id': str(uuid4()), override: 'forged'})
+    assert response.status_code == 422
+    api['kernel'].prepare_builder_call.assert_not_called()
+
+
+def test_missing_builder_price_configuration_does_not_reserve(api, monkeypatch):
+    monkeypatch.delenv('EVO_PRICE_TABLE_VERSION', raising=False)
+    response = api['client'].post('/v1/kernel/builder-calls', headers=api['headers'], json={
+        **api['body'], 'packet_id': str(uuid4())})
+    assert response.status_code == 503
+    api['kernel'].prepare_builder_call.assert_not_called()
