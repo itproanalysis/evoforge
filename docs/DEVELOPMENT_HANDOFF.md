@@ -210,3 +210,19 @@ manifest: 지원 브랜치의 `docs/validation/2026-10-27-review-recovery.json`.
 이 기록은 기존 추정 원장 감사 자료이며 canonical 정산으로 계산하지 않는다.
 T22의 상위 병합 뒤 공유 core·공개 명령/비용 연결을 이어가고, 그 전까지 같은 main 파일을 편집하지 않는다.
 지원 코드의 main 반영·전체 개발·운영 DB/실청구 통합은 미완료이며 자동 재개를 유지한다.
+
+## 2026-10-27 테넌트 전체 선불 예약 보호
+
+지원 브랜치 `codex/pg-integration`의 `5b5b253`은 프로젝트 RLS 때문에 다른 프로젝트 예약이 숨겨져
+테넌트 선불을 초과하던 문제를 확장 007의 비공개 hold 합계로 차단한다. 정본 함수와 프로젝트 RLS는 변경하지 않았다.
+UNKNOWN을 유지하고 정상 종료에만 hold를 해제하며, 가드가 실행되지 않으면 새 예약을 503으로 거부한다.
+기존 예약 백필과 반복 적용, FORCE RLS 복원, 실제 core_app 세션의 private 테이블 접근 거부도 확인했다.
+
+API 463 passed·1 skipped, 실제 DB 139 passed(신규 8개), 참조 112·SQL 96·계약 0 failure·웹 빌드 통과.
+수정 전 재현 1 failed, 병렬 24건 중 10건만 잔액 내 예약을 허용했다.
+manifest는 지원 브랜치 `docs/validation/2026-10-27-tenant-credit-guard.json`, 원본 8개는
+main `.local/evidence/tenant-credit-guard-20261027-ezvkqtpw`, 범위는 `docs/TENANT_CREDIT_GUARD.md`에 있다.
+
+DB에 확장 007을 먼저 적용한 뒤 새 API를 배포해야 한다. 이번 검증은 운영 DB/실청구/배포를 수행하지 않았다.
+Muse T22를 먼저 main에 반영한 다음 지원 브랜치에 동기화한다. 공개 명령/비용·전체 승인 연결은 계속 미완료이며,
+기본 Muse Spark와 자동 재개를 유지한다.

@@ -118,6 +118,11 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (테넌트 비용 예약 가드 검증 완료·T22 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 프로젝트 RLS가 다른 프로젝트의 open 예약을 숨겨
+  선불 20,000,000µUSD에서 24,000,000µUSD를 허용하던 실패를 재현하고 `5b5b253`의 확장 007로 차단했다.
+  정본 reserve/settle 함수와 RLS 정책은 보존하고 모델/main/T22 파일은 변경하지 않는다.
+  새 SQL 확장·postgres_kernel.py의 가드 준비 검사·Codex 테스트·환경 예제/관련 문서만 변경했다.
+  API 463개·실제 DB 139개(신규 8개)·SQL 96개·참조 112개·계약·웹 빌드 통과. 지원 코드는 main 미반영이다.
 - **Codex (mission 호출 증거 복구 검증 완료·공유 core 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** T22의 main/평가/UI 편집과 분리해
   `postgres_missions.py`, `missions.py`의 선택 backend, 확장 006, Codex 테스트·관련 문서를 수정한다.
   `50ffc5b`에서 API가 이미 사용하는 mission facade의 상태/단계 증거 복원·RLS·봉인 코드 비노출을 구현했다.
@@ -329,3 +334,27 @@ Phase A 조기 종료의 단일 spec 기록은 보존한다. Runner의 봉인 su
 저장된 리뷰 aggregate가 없는 UNKNOWN 호출은 이 복원 대상이 아니다. 기존 추정 원장의 호출 감사 기록을
 canonical 청구 영수증으로 취급하지 않는다. T22 상위 병합·공유 core 실행권·명령/비용·운영 통합은 계속 대기하며,
 전체 개발은 미완료이고 Muse Spark 기본값과 자동 재개를 유지한다.
+
+## 테넌트 전체 선불 예약 가드 (지원 검증 완료)
+
+`codex/pg-integration`의 `5b5b253`은 프로젝트 RLS 아래에서 정본 예약 함수가 다른 프로젝트의 open 예약을
+보지 못하던 초과 예약을 재현하고, 확장 007의 비공개 hold 이벤트로 테넌트 전체 합계를 추가 검사한다.
+정본 reserve/settle 함수와 프로젝트 RLS 정책은 그대로이며 core.authorize_merge를 변경하지 않았다.
+SENT/UNKNOWN은 예약을 유지하고 정상 정산/해제 때만 hold를 닫는다. 실패 시 같은 트랜잭션에서 롤백한다.
+core_app은 원본 private hold 테이블을 읽거나 수정하지 못하며 현재 tenant의 합계만 조회할 수 있다.
+
+가드가 없거나 비활성화/replica 설정으로 실행되지 않으면 새 예약은 503으로 거부한다.
+기존 데이터는 소유자의 DDL 트랜잭션 안에서 백필하고 원본/hold의 FORCE RLS를 복원한 뒤 커밋한다.
+반복 적용은 이벤트를 중복 생성하지 않으며 과거 초과 예약을 임의 환불하지 않는다.
+운영 적용 순서는 DB 확장 007 다음 새 API 배포다. 운영 DB에는 이번 턴에 적용하지 않았다.
+
+수정 전 초과 예약 회귀 **1 failed**, 수정 후 API **463 passed·1 skipped**,
+실제 PostgreSQL **139 passed**(신규 8개), 참조 **112개**·SQL **96개**·계약 **0 failure**·웹 빌드 통과.
+같은 테넌트의 24개 병렬 예약 중 선불 잔액에 해당하는 10개만 허용했고,
+UNKNOWN/정산/해제·롤백·닫힌 예약 재개방 금지·테넌트 격리·실제 core_app 권한·백필과 RLS 보존도 확인했다.
+
+원본 로그 8개는 `C:\evo_forge\.local\evidence\tenant-credit-guard-20261027-ezvkqtpw`에 보존했다.
+지원 브랜치의 `docs/validation/2026-10-27-tenant-credit-guard.json`에 source/로그 해시를 기록했고,
+설정과 한계는 `docs/TENANT_CREDIT_GUARD.md`를 따른다.
+상위 T22의 main/평가/UI·봉인 테스트는 보존했다. 공개 명령/비용 통합·실제 청구·운영 반영은 계속 미완료이며
+Muse Spark `muse-spark-1.3`과 현재 채팅의 자동 재개를 유지한다.
