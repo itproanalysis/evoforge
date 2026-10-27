@@ -706,4 +706,6 @@ source 79개·원본 로그 24개의 SHA-256은 `docs/validation/2026-10-28-pref
 `codex/preflight-policy`의 `3740307`은 명시적인 빈 allowlist를 전체 거부로 해석하고,
 잘못된 allowlist와 boolean이 아닌 동의를 거부한다. 저장된 동의도 오직 `true`일 때만 인정한다.
 수정 전 12 failed·5 passed, 수정 후 관련 집중 94 passed·계약 0 failure.
-원본: `.local/evidence/preflight-policy-20261028-2noz3me8`. 전체 API/DB 재검증과 main 반영은 미완료다.
+원본: `.local/evidence/preflight-policy-20261028-2noz3me8`. 실제 PostgreSQL 169개·SQL 96개·참조 112개와
+동일 웹 소스의 npm ci/tsc/build가 통과했다. 전체 API는 검증 중이며 main 반영은 미완료다.
+사용자 작업 파일을 보존하기 위해 별도 통합 브랜치 `5d4def9`을 준비했고 해당 코드의 집중 94개도 통과했다.

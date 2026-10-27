@@ -368,4 +368,6 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 
 `codex/preflight-policy` `3740307`은 빈 allowlist가 기본 허용 목록으로 대체되거나 문자열 동의가 참으로
 취급되는 경로를 차단한다. 수정 전 12 failed, 수정 후 관련 집중 94 passed·계약 0 failure.
-원본 `.local/evidence/preflight-policy-20261028-2noz3me8`. 전체 API/DB 및 main 반영은 계속 필요하다.
+원본 `.local/evidence/preflight-policy-20261028-2noz3me8`. 실제 PostgreSQL 169개·SQL 96개·참조 112개 및
+동일 웹 소스 npm ci/tsc/build가 통과했고 전체 API는 검증 중이다. main 반영은 계속 필요하다.
+기존 작업 파일과 겹치지 않도록 통합 브랜치 `5d4def9`을 준비했고 집중 94개도 통과했다.
