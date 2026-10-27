@@ -2239,3 +2239,49 @@ def test_registered_candidate_binding_failure_rolls_back_core_candidate(funded,b
     assert _propose(ctx).status_code==200
     assert funded['kernel'].reservation(ctx['call']).status=='COMMITTED'
     assert all(not clone.exists() for clone in ctx['clones'])
+
+
+def test_project_cap_rechecks_settlement_that_commits_after_initial_reserve_check(funded):
+    kernel=funded['kernel']
+    prior,incoming=uuid4(),uuid4()
+    pause='evo.test.cap:'+uuid4().hex
+    with psycopg.connect(funded['dsn'],autocommit=True) as control:
+        control.execute('UPDATE core.budgets SET cap_micros=1000 WHERE tenant_id=%s AND project_id=%s',
+                        (funded['scope'].tenant_id,funded['scope'].project_id))
+        kernel.reserve_cost(prior,PERIOD,100)
+        kernel.mark_sent(prior)
+        receipt=_receipt(funded,prior,cost=900)
+        control.execute("CREATE FUNCTION runtime.test_pause_cap_insert() RETURNS trigger LANGUAGE plpgsql AS $$ "
+                        f"BEGIN IF NEW.request_key='{incoming}' THEN "
+                        f"PERFORM pg_advisory_xact_lock(hashtextextended('{pause}',0)); END IF; RETURN NEW; END $$")
+        control.execute('CREATE TRIGGER test_pause_cap_insert BEFORE INSERT ON core.cost_reservations '
+                        'FOR EACH ROW EXECUTE FUNCTION runtime.test_pause_cap_insert()')
+        control.execute('SELECT pg_advisory_lock(hashtextextended(%s,0))',(pause,))
+        try:
+            with ThreadPoolExecutor(max_workers=1) as workers:
+                queued=workers.submit(kernel.reserve_cost,incoming,PERIOD,900)
+                try:
+                    deadline=time.monotonic()+8
+                    while time.monotonic()<deadline:
+                        waiting=control.execute("SELECT EXISTS(SELECT 1 FROM pg_locks l JOIN pg_stat_activity a USING(pid) "
+                                                "WHERE l.locktype='advisory' AND NOT l.granted AND a.datname=current_database())").fetchone()[0]
+                        if waiting:
+                            break
+                        time.sleep(0.02)
+                    assert waiting,'new reservation did not reach the post-cap-check pause'
+                    # The request passed the original 100 + 900 <= 1000 check.
+                    # Now settle the old reservation at 900 before INSERT finishes.
+                    assert kernel.settle_reservation(prior,receipt,900).actual_micros==900
+                finally:
+                    control.execute('SELECT pg_advisory_unlock(hashtextextended(%s,0))',(pause,))
+                with pytest.raises(BudgetRefused):
+                    queued.result(timeout=10)
+        finally:
+            control.execute('DROP TRIGGER test_pause_cap_insert ON core.cost_reservations')
+            control.execute('DROP FUNCTION runtime.test_pause_cap_insert()')
+    assert kernel.reservation(prior).status=='COMMITTED'
+    with pytest.raises(KernelNotFound):
+        kernel.reservation(incoming)
+    assert _open_credit_holds(kernel)==0
+    assert kernel.reserve_cost(uuid4(),PERIOD,100).reserved_micros==100
+    assert _open_credit_holds(kernel)==100

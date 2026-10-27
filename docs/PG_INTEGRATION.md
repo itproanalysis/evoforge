@@ -37,6 +37,7 @@ Google 인증 연동 테스트의 서명 검증기는 fixture로 대체하므로
 리뷰 복구의 호출별 증거 누락 보강은 `docs/validation/2026-10-27-review-recovery.json`을 따른다.
 테넌트 전체 예약 보강과 적용 요구사항은 [TENANT_CREDIT_GUARD.md](TENANT_CREDIT_GUARD.md),
 별도 검증은 `docs/validation/2026-10-27-tenant-credit-guard.json`을 따른다.
+정산 경합 중 프로젝트 cap을 다시 확인하는 후속 보강은 `docs/validation/2026-10-27-project-cap-race.json`을 따른다.
 확장 008의 후보 등록 범위는 [CANDIDATE_REGISTRATION.md](CANDIDATE_REGISTRATION.md),
 검증은 `docs/validation/2026-10-27-candidate-registration.json`을 따른다.
 

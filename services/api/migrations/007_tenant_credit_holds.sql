@@ -53,7 +53,7 @@ GRANT EXECUTE ON FUNCTION runtime.tenant_open_reserved_micros() TO core_app;
 
 CREATE OR REPLACE FUNCTION runtime.track_tenant_credit_hold() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE credit bigint; held numeric;
+DECLARE credit bigint; held numeric; project_cap bigint; project_used numeric;
 BEGIN
   IF TG_RELID<>'core.cost_reservations'::regclass OR TG_TABLE_SCHEMA<>'core'
      OR TG_TABLE_NAME<>'cost_reservations' OR NEW.tenant_id IS DISTINCT FROM core.current_tenant() THEN
@@ -65,8 +65,19 @@ BEGIN
     PERFORM pg_advisory_xact_lock(hashtextextended('core.credit:'||NEW.tenant_id::text,0));
     -- One statement snapshot keeps credit and releases coherent when another
     -- transaction settles concurrently. Releases need no additional credit lock.
-    SELECT core.credit_balance(NEW.tenant_id),coalesce(sum(amount_micros),0)
-      INTO credit,held FROM runtime.tenant_credit_hold_events WHERE tenant_id=NEW.tenant_id;
+    SELECT core.credit_balance(NEW.tenant_id),coalesce(sum(amount_micros),0),
+      (SELECT b.cap_micros FROM core.budgets b WHERE b.tenant_id=NEW.tenant_id
+        AND b.project_id=NEW.project_id AND b.period_start=NEW.period_start),
+      (SELECT coalesce(sum(CASE WHEN r.status='RESERVED' THEN r.reserved_micros ELSE r.actual_micros END),0)
+        FROM core.cost_reservations r WHERE r.tenant_id=NEW.tenant_id AND r.project_id=NEW.project_id
+          AND r.period_start=NEW.period_start AND r.status IN ('RESERVED','COMMITTED'))
+      INTO credit,held,project_cap,project_used FROM runtime.tenant_credit_hold_events WHERE tenant_id=NEW.tenant_id;
+    IF project_cap IS NULL THEN
+      RAISE EXCEPTION 'BUDGET_MISSING current project cap' USING ERRCODE='check_violation'; END IF;
+    -- NEW is already inserted. Recheck the actual project total after the
+    -- canonical function's earlier check, which may precede a settlement.
+    IF project_used>project_cap THEN
+      RAISE EXCEPTION 'BUDGET_EXCEEDED current project usage' USING ERRCODE='check_violation'; END IF;
     IF credit-held<NEW.reserved_micros THEN
       RAISE EXCEPTION 'CREDIT_EXHAUSTED tenant-wide open reservations' USING ERRCODE='check_violation'; END IF;
     INSERT INTO runtime.tenant_credit_hold_events
