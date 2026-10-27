@@ -1,5 +1,7 @@
-export const API_BASE =
-  process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8080";
+// Same-origin API access via the Next.js proxy route.
+// The browser never calls the API directly and no API base URL is exposed
+// to the client at runtime.
+export const API_BASE = "/api/evoforge";
 
 export type GateResult = "PASS" | "FAIL" | "INCONCLUSIVE";
 

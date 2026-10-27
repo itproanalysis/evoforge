@@ -14,10 +14,12 @@ import uuid
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "docs", "evoforge-v4.2", "reference_impl"))
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, StrictInt, model_validator
 
+from evoforge import auth as auth_module
 from evoforge import broker_meta, evidence as evidence_chain, ledger
 from evoforge.patch import PatchError
 from evoforge.kernel_api import router as kernel_router
@@ -28,17 +30,62 @@ ledger.configure({"default": int(os.getenv("EVO_PROJECT_BUDGET_CENTS", "50000"))
 app = FastAPI(title="EvoForge API", version="0.2.0-hackathon")
 app.include_router(kernel_router)
 # Web (Mission Control) is a separate origin locally and on Cloud Run; no cookies, so no credentials.
+# Explicit origins apply when EVO_WEB_ORIGINS / EVO_WEB_ORIGIN_REGEX are set.
+_WEB_ORIGINS = [o.strip() for o in os.getenv(
+    "EVO_WEB_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if o.strip()]
+_WEB_ORIGIN_REGEX = os.getenv(
+    "EVO_WEB_ORIGIN_REGEX", r"https://evoforge-web-[a-z0-9-]+\.(a\.run\.app|[a-z0-9-]+\.run\.app)").strip() or None
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in os.getenv(
-        "EVO_WEB_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if o.strip()],
-    allow_origin_regex=os.getenv(
-        "EVO_WEB_ORIGIN_REGEX", r"https://evoforge-web-[a-z0-9-]+\.(a\.run\.app|[a-z0-9-]+\.run\.app)"),
+    allow_origins=_WEB_ORIGINS,
+    allow_origin_regex=_WEB_ORIGIN_REGEX,
     allow_methods=["GET", "POST"],
-    allow_headers=["Content-Type"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 _evidence: dict[str, dict] = {}  # in-memory evidence store
 COST_CENTS = 120  # conservative per-model-call estimate (int cents)
+
+
+def _expected_api_audience() -> str:
+    return (os.getenv("EVO_API_URL", "").strip()
+            or os.getenv("EVO_API_AUDIENCE", "").strip())
+
+
+@app.middleware("http")
+async def _require_google_id_token(request: Request, call_next):
+    path = request.url.path
+    if os.getenv("EVO_REQUIRE_ID_TOKEN", "0") == "1" and path.startswith("/v1/"):
+        authz = request.headers.get("authorization", "")
+        if not authz or not authz.lower().startswith("bearer "):
+            return JSONResponse({"detail": "missing ID token"}, status_code=401)
+        token = authz[7:].strip()
+        if not token:
+            return JSONResponse({"detail": "missing ID token"}, status_code=401)
+        audience = _expected_api_audience()
+        try:
+            claims = auth_module.verify_id_token(token, audience)
+        except ValueError as e:
+            msg = str(e).lower()
+            if "audience" in msg or "aud" in msg:
+                return JSONResponse({"detail": "invalid token audience"}, status_code=403)
+            return JSONResponse({"detail": "invalid ID token"}, status_code=401)
+        except Exception:
+            return JSONResponse({"detail": "invalid ID token"}, status_code=401)
+        if audience:
+            aud = claims.get("aud")
+            if isinstance(aud, list):
+                ok = audience in aud
+            else:
+                ok = aud == audience
+            if not ok:
+                return JSONResponse({"detail": "invalid token audience"}, status_code=403)
+        allow_svc = os.getenv("EVO_WEB_SERVICE_ACCOUNT", "").strip()
+        if allow_svc:
+            email = claims.get("email")
+            if email is not None and email != allow_svc:
+                return JSONResponse({"detail": "forbidden service account"}, status_code=403)
+        request.state.id_token_claims = claims
+    return await call_next(request)
 
 
 class GenerateRequest(BaseModel):

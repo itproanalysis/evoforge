@@ -1,0 +1,73 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const COOKIE_NAME = "__Host-evoforge-session";
+
+function hexToBytes(hex: string): Uint8Array | null {
+  if (hex.length % 2 !== 0) return null;
+  const out = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    const b = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+    if (Number.isNaN(b)) return null;
+    out[i] = b;
+  }
+  return out;
+}
+
+async function validSession(raw: string | undefined, secret: string): Promise<boolean> {
+  if (!raw || !secret) return false;
+  const parts = raw.split(".");
+  if (parts.length !== 3) return false;
+  const [random, sigHex, expStr] = parts;
+  if (!random || !sigHex || !expStr) return false;
+  const expiry = Number(expStr);
+  if (!Number.isInteger(expiry)) return false;
+  if (expiry <= Math.floor(Date.now() / 1000)) return false;
+  const expectedSig = hexToBytes(sigHex);
+  if (!expectedSig) return false;
+  try {
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"],
+    );
+    const data = new TextEncoder().encode(`${random}.${expiry}`);
+    const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, data));
+    if (mac.length !== expectedSig.length) return false;
+    let diff = 0;
+    for (let i = 0; i < mac.length; i++) diff |= mac[i] ^ expectedSig[i];
+    return diff === 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function middleware(req: NextRequest) {
+  const p = req.nextUrl.pathname;
+  if (
+    p === "/login" ||
+    p.startsWith("/login/") ||
+    p === "/api/login" ||
+    p.startsWith("/_next/") ||
+    p === "/favicon.ico" ||
+    p === "/favicon.png"
+  ) {
+    return NextResponse.next();
+  }
+  if (p.startsWith("/api/")) {
+    return NextResponse.next();
+  }
+  const raw = req.cookies.get(COOKIE_NAME)?.value;
+  const secret = process.env.EVO_SESSION_SECRET ?? "";
+  if (await validSession(raw, secret)) {
+    return NextResponse.next();
+  }
+  const url = req.nextUrl.clone();
+  url.pathname = "/login";
+  return NextResponse.redirect(url);
+}
+
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+};
