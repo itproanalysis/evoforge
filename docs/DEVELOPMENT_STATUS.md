@@ -121,6 +121,7 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 - **Codex / `codex/commands-persistence` / `C:\evo_forge_codex`:** P0-2 명령의 canonical PostgreSQL 접수·상태·히스토리·완료 응답 영속화를 맡는다.
   우선 `postgres_commands.py`·확장 004·Codex DB 테스트·문서/환경 예제만 수정한다.
   상위 round7의 `commands.py`/main 변경이 main에 먼저 반영된 뒤 호환 연결·재검증한다. 비용 원장 변경은 이번 단계와 별도다.
+  별도 저장 계층은 `9bfe0bc`로 검증·커밋했으며 공개 경로 연결과 main 병합은 아직 대기 중이다. 아래 검증 기록을 따른다.
 - **Codex (증거 단계 완료·클레임 해제) / `codex/evidence-persistence` / `C:\evo_forge_codex`:** P0-2 중 서버 증거·비공개 봉인 리뷰·이벤트/체인의 PostgreSQL 영속화를 실제 요청 경로에 연결한다.
   `postgres_state.py`, `evidence.py`, main의 저장소 선택/오류 경계·예약 전 가용성 확인, 확장 003, Codex DB 테스트와 관련 문서·환경 예제를 수정한다.
   상위 Muse round6의 인증·원격 checkout·Runner·Builder/PR 구현은 보존한다. 명령·비용 원장의 PG 요청 연결은 별도 잔여 항목이다.
@@ -195,3 +196,21 @@ Next 15.5.28 프로덕션 빌드가 통과했다. DB 오류 시 메모리로 우
 main의 API 모듈 컴파일·health/OpenAPI도 통과했다. 검증 원본은
 `C:\evo_forge\.local\evidence\api-evidence-20261027-f29wjim1`에 별도 보존했고
 `docs/validation/2026-10-27-api-evidence.json`에 각 로그 SHA-256을 기록했다.
+
+## Canonical 명령 저장 지원 (상위 작업 병합 대기)
+
+`codex/commands-persistence`의 `9bfe0bc`는 정본 `core.accept_command`와 상태 전이 제약으로 접수하고,
+확장 004에 이력·완료 응답을 원자적·불변으로 보존한다. 동시 요청은 한 명령과 한 dispatch만 허용하며,
+실행 중 종료된 명령을 새 API 프로세스에서 다시 dispatch하지 않는다.
+완료 응답 저장 실패는 상태·이력과 함께 롤백하고, 조회는 서로 다른 시점의 상태를 섞지 않는다.
+일반 advance로 완료를 위조할 수 없으며 DB도 APPLIED인 명령과 일치하는 응답만 허용한다.
+
+API **403 passed·1 skipped**, 실제 PostgreSQL **91 passed**, 참조 **112개**·SQL **96개**·패키지 검사와 웹 빌드 통과.
+원본 로그 6개와 SHA-256은 `C:\evo_forge\.local\evidence\api-commands-20261027-9e7itreq`에 보존했다.
+설정·다음 연결은 해당 지원 브랜치의 `docs/COMMAND_PERSISTENCE.md`, manifest는
+`docs/validation/2026-10-27-api-commands.json`(`b94a16a`)에 있다.
+
+Muse round7은 main/mission 인터페이스를 수정 중이므로 상위 브랜치가 main에 먼저 반영될 때까지 해당 파일은 편집하지 않았다.
+현재 main의 공개 명령·원장은 계속 메모리다. 공개 Generate의 dispatch/완료 hook·HTTP 재시도 검증,
+운영 DB 확장 적용과 canonical 비용·mission 저장은 남아 있으며 전체 개발·P0-2 완료를 선언하지 않는다.
+이번 검증은 공급사를 호출하지 않았고 기본 모델 `muse-spark-1.3`은 그대로 유지했다.

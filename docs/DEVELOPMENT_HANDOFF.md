@@ -132,3 +132,15 @@ API 403 passed·1 skipped, 실제 DB 81 passed, 참조 112·SQL 96·패키지 �
 명령·공개 원장은 아직 메모리이고, 운영 DB 적용·전체 P0-2 완료는 별도다.
 [설정과 경계](EVIDENCE_PERSISTENCE.md), main 반영 기록과 원본 로그는 STATUS를 따른다.
 `1554547`로 main에 반영했고 main API 시작/health/OpenAPI도 확인했다. 선택 모드는 운영에 자동 활성화하지 않았다.
+
+## 2026-10-27 Canonical 명령 저장 지원 준비
+
+`codex/commands-persistence` (`C:\evo_forge_codex`)의 `9bfe0bc`는 정본 명령 접수·상태 전이,
+확장 004의 이력·완료 응답과 단일 dispatch를 실제 PostgreSQL에서 검증했다.
+API 403 passed·1 skipped, 실제 DB 91 passed, 참조 112·SQL 96·패키지 검사·웹 빌드 통과.
+검증 manifest는 해당 브랜치의 `b94a16a`, 원본은 main `.local/evidence/api-commands-20261027-9e7itreq`에 보존했다.
+
+상위 Muse round7의 main/mission 편집과 겹치지 않도록 현재는 별도 모듈 단계다.
+상위 작업을 먼저 main에 반영한 후 `commands.py` 위임과 Generate의 예약 전 dispatch·성공 응답 저장을 연결한다.
+이미 전송된 미완료 명령은 재호출 없이 409/대사 대상으로 유지하고, memory 기본 모드는 보존한다.
+공개 경로 연결·main 병합·운영 DB 적용·canonical 비용/mission 영속화는 완료되지 않았다.
