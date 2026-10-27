@@ -1,0 +1,92 @@
+{
+  "date": "2026-10-27",
+  "revision": "c479487185cc0f5ae47fea3c44b37b8082af1876",
+  "prior_implementation_revision": "f490e1b",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Recheck current project cap/usage and tenant credit/holds in one INSERT-trigger snapshot after concurrent settlement",
+  "checks": {
+    "pre_fix_regression_subset": {
+      "failed": 1,
+      "deselected": 144
+    },
+    "api": {
+      "passed": 465,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 145,
+      "new_project_cap_race_cases": 1
+    },
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "race_fixture": {
+    "cap_micros": 1000,
+    "previous_reservation_micros": 100,
+    "actual_settlement_micros": 900,
+    "rejected_incoming_micros": 900,
+    "subsequent_allowed_micros": 100,
+    "prior_charge_preserved": true,
+    "controlled_pause": "BEFORE INSERT after canonical initial cap check; settlement commits before INSERT resumes"
+  },
+  "limitations": [
+    "Support branch only; active Muse T22 main/evaluation/UI and sealed tests preserved",
+    "Frozen SQL source, canonical reserve/settle and merge authorization functions unchanged",
+    "New reservations are constrained at the checked snapshot; later actual usage overruns retain canonical settlement semantics",
+    "Reapply extension 007 on test databases that used the prior unpublished guard draft",
+    "Real PostgreSQL concurrency and synthetic receipt; no actual provider bill, production migration or deployment",
+    "Public command/Broker/cost/approval integration remains incomplete; muse-spark-1.3 and active heartbeat retained"
+  ],
+  "source_sha256": {
+    "services/api/migrations/007_tenant_credit_holds.sql": "36e211e5bb45282d84a5d8e215e869aa4e6745b8e9c13fc3704de90087bc44e2",
+    "services/api/tests/test_postgres_kernel.py": "777a441ee014a887b7a2555aeace196f3d694e1e72f44404dfea4add0d535d69",
+    "services/api/evoforge/postgres_kernel.py": "d5ddf587472e6976dc82eccbfba0c901e6ca6210bc6ceb6eda44a7f6122ffecc",
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767",
+    "services/api/evoforge/broker_meta.py": "f50d55a3a54355db474c63ebbc99f53db878917680d055c5135847d72e5ea29c",
+    "docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql": "294f2961b3012ac18ade1efacb324fbb14721c76a41782864a0c0d977a262636"
+  },
+  "logs": {
+    "validation-project-cap-before.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\project-cap-race-20261027-4io029zf\\validation-project-cap-before.log",
+      "sha256": "1b5f9fa6176ae325df23a8c402d9822e8606c02dc7067738d70f468fdf8704ca"
+    },
+    "validation-project-cap-focused.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\project-cap-race-20261027-4io029zf\\validation-project-cap-focused.log",
+      "sha256": "924c3540dfc15fde5fcaeddbf2568f02fb5b50c8d07f7c04a2ad89b8391edc1b"
+    },
+    "validation-project-cap-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\project-cap-race-20261027-4io029zf\\validation-project-cap-api.log",
+      "sha256": "afbcfc01976b9cb06301c6c8fb5712aa388058f58243b42f2a5be65aabb71643"
+    },
+    "validation-project-cap-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\project-cap-race-20261027-4io029zf\\validation-project-cap-postgres.log",
+      "sha256": "997299803dc32106a3d08a1d17861903690d96f20398c646251039ffb385f093"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\project-cap-race-20261027-4io029zf\\validation-kernel.log",
+      "sha256": "93b0aaa2ffe419b902342b15ddc765e583c07ae5966b03333b97b867fdb0112f"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\project-cap-race-20261027-4io029zf\\validation-postgres.log",
+      "sha256": "8042720baef2017504164419a1aaaf80fdaa2a0ac9db8abdcaca0836f8b0adb6"
+    },
+    "validation-project-cap-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\project-cap-race-20261027-4io029zf\\validation-project-cap-contract.log",
+      "sha256": "30bffd75608f47ae583c7bbf4ce5d1e596853f3d9d808f55a69c01c1061a48d3"
+    },
+    "validation-project-cap-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\project-cap-race-20261027-4io029zf\\validation-project-cap-web.log",
+      "sha256": "12c0043ad60c373156e8e1a28c8e710bc8fae12c91923493563389058d1daed6"
+    }
+  }
+}
