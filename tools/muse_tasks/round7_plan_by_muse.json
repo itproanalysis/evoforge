@@ -1,0 +1,74 @@
+{
+  "rationale": "P0 is done except Codex-owned persistence; biggest owner-visible gap is manual Generate->Review->Run->PR with hard-coded Mission Control cards, then broken Review linkage in run chain plus false estimate footer, then Phase 4 sealed v0+X_SINGLE baseline. Order by product leverage while avoiding Codex files.",
+  "tasks": [
+    {
+      "id": "T18_mission_lifecycle",
+      "title": "Single command lifecycle + real Mission Control state",
+      "why": "Owner must click Generate, Lab Review, type repo path, Run, PR by hand; Running seats/Active tasks/Bottleneck are hard-coded local counters. This is the stated product gap and P1 first bullet.",
+      "spec": "New mission resource in services/api/main.py (+ new module services/api/evoforge/missions.py, may extend services/api/evoforge/commands.py): POST /v1/missions {goal, repo_ref, target_paths?, risk} -> 201 {mission_id, state=CREATED, evidence_id}; POST /v1/missions/{id}/advance {to: GENERATED|REVIEWED|RAN|PR_OPENED|CANCELLED|FAILED} executed server-side by calling existing generate->review->runs->pr/create chain with same auth/validation/gate rules, or POST /v1/missions/{id}/cancel -> 200 {state=CANCELLED} from any non-terminal state; terminal states PR_OPENED/CANCELLED/FAILED reject further advance with 409; unknown id 404; HIGH/CRITICAL risk still requires confirm=true else 409. GET /v1/missions lists {mission_id, state, goal, updated_at, evidence_ids} and GET /v1/missions/{id} returns full stage pointers; GET /v1/dashboard returns {missions_by_state, active_missions, blocked_merges, spent_cents, reserved_cents, unknown_holds} computed only from server commands/missions store + GET /v1/ledger snapshot, no client counters. Web: Mission Control (apps/web/app/page.tsx + apps/web/lib/api.ts) gets one objective input + Run mission button polling GET /v1/missions/{id} with visible state chip and Stop/Cancel button; cards render only GET /v1/dashboard; remove local runs+1 and localStorage candidate handoff as state source. Invariants: one mission_id maps to one generate/review/run/PR evidence chain; cancel never deletes evidence; sealed code never in HTTP; proxy allowlist covers new paths with '..'/prefix bypass tests.",
+      "edit": [
+        "services/api/main.py",
+        "services/api/evoforge/missions.py",
+        "services/api/evoforge/commands.py",
+        "apps/web/lib/api.ts",
+        "apps/web/app/page.tsx",
+        "services/api/tests/test_critic_t18_*.py"
+      ],
+      "acceptance": [
+        "TestClient real HTTP (no provider mocks except MODEL_API_KEY-absent stub path): create->advance through GENERATED->REVIEWED->RAN->PR_OPENED with stub-blocked run still transitions correctly or 409 with reason; cancel from REVIEWED blocks later advance with 409",
+        "GET /v1/dashboard after 2 missions + ledger snapshot matches server counts; Mission Control renders dashboard values, no hard-coded Running seats/Active tasks strings",
+        "Auth parity: no session 401, wrong-aud 403 on new endpoints; proxy rejects '..' and non-allowlisted prefix; no token in argv/logs; pytest services/api -q and validate_package.py pass"
+      ],
+      "out_of_scope": [
+        "evoforge/postgres_*.py, evoforge/evidence.py, kernel_api.py (Codex-owned, link from main.py only)",
+        "PostgreSQL persistence of missions (memory store + P0-2 min=max=1 stays)",
+        "Changing quality_gates.json thresholds or sealed-test redaction rules"
+      ]
+    },
+    {
+      "id": "T19_review_chain_ledger",
+      "title": "Link Review into run chain + fix ledger footer wording",
+      "why": "SERVICE_STATUS 2.45: run evidence chain has no Review stage; layout footer says costs are estimates although ledger records real provider_billed cents.",
+      "spec": "In services/api/main.py POST /v1/runs only: after validating review_evidence_id, copy that review evidence's Review-stage event_id into the new run evidence via evidence_chain.link(run_eid,'Review',review_event_id) (idempotent same-event; never re-record or mutate review evidence; do not edit evoforge/evidence.py). GET /v1/evidence/{run_eid} chain then shows non-null Review event whose GET /v1/events/{id} drilldown returns the review summary; POST /v1/pr/create already copies chain and must preserve the Review link. Web: apps/web/app/layout.tsx footer changes to real-ledger wording (e.g. costs are provider_billed actuals in cents from GET /v1/ledger; UNKNOWN holds listed separately), removing 추정치/estimates claim; apps/web/app/evidence/page.tsx shows Review row linked to drilldown. Invariants: link() append-only violation still 500->mapped 409/500 today unchanged; stub/invalid reviews still 409 before any link; sealed code still redacted in all HTTP views.",
+      "edit": [
+        "services/api/main.py",
+        "apps/web/app/layout.tsx",
+        "apps/web/app/evidence/page.tsx",
+        "services/api/tests/test_critic_t19_*.py"
+      ],
+      "acceptance": [
+        "Real TestClient chain traversal: review -> run -> pr/create where GET /v1/evidence/{run_id} has Review event_id equal to GET /v1/evidence/{review_id} Review event_id, and GET /v1/events/{review_event} returns stage=Review with sealed counts but no code",
+        "Stub review run still 409 and creates no run evidence with Review link; missing Review stage still renders null (not 500)",
+        "Footer contains no 추정치/estimate wording; pytest services/api -q and validate_package.py pass"
+      ],
+      "out_of_scope": [
+        "evoforge/evidence.py, evoforge/postgres_*.py, kernel_api.py",
+        "Backfilling old run evidences",
+        "Receipt/label display changes beyond footer string"
+      ]
+    },
+    {
+      "id": "T20_sealed_eval_baseline",
+      "title": "Sealed evaluation set v0 + X_SINGLE baseline harness",
+      "why": "Phase 4 M0-d exit requires sealed eval set v0 (6 families, held-out>=3 incl compositional+negative) + X_SINGLE measurement; SERVICE_STATUS P1 second bullet.",
+      "spec": "New server-only module services/api/evoforge/sealed_eval.py + endpoints in services/api/main.py: GET /v1/eval/suites returns [{family, task_count, heldout_kinds}] with exactly 6 families each heldout>=3 including >=1 compositional and >=1 negative (kinds from vocabulary.json, no deprecated ids); POST /v1/eval/baseline {suite_version=v0, model=muse-spark-1.3} -> 201 {baseline_id, evidence_id, X_SINGLE: {pass_rate, n, cost_cents}} executed only via reference_impl/eval_hygiene.py sandbox pattern (reconstruct base-only + 7-item audit) and score_record() rules via reference_impl/quality_gate.py semantics, egress-deny/timeout mapped to 502/504 not 500; sealed task code never leaves server (returns only {kind, code_sha256, code_len}); result stored as server evidence with Gate+Outcome stages linked from main.py. Web: apps/web/app/lab/page.tsx adds read-only Sealed v0 + X_SINGLE panel (GET only, no code display). Invariants: no change to contracts/sql, schemas, quality_gates.json numbers; no LiteLLM/BYOK/caveman paths; provider calls go through reserve->settle ledger path.",
+      "edit": [
+        "services/api/evoforge/sealed_eval.py",
+        "services/api/main.py",
+        "apps/web/app/lab/page.tsx",
+        "apps/web/lib/api.ts",
+        "services/api/tests/test_critic_t20_*.py"
+      ],
+      "acceptance": [
+        "Real-filesystem test: suite fixture files on disk have 6 families x >=3 held-out with compositional+negative kinds verified by reading files, not mocks; baseline run on one family in sandbox records evidence with X_SINGLE counts matching score_record() recomputation",
+        "HTTP redaction: baseline/suite responses contain no code strings, only sha256/len; oversized/timeout runner failure returns 413/502/504 per existing runner mapping, never raw traceback",
+        "pytest services/api -q and validate_package.py pass; deprecated-identifier grep stays 0"
+      ],
+      "out_of_scope": [
+        "evoforge/postgres_*.py, evoforge/evidence.py, kernel_api.py",
+        "X_ADAPTIVE5, Tier A verdicts, reviewer qualification exams (Phase 6)",
+        "microVM/host network hardening beyond current runner sandbox"
+      ]
+    }
+  ]
+}

@@ -187,6 +187,9 @@ def _tracked(rel: str) -> bool:
 def _allowed_change(task: dict, rel: str) -> bool:
     if rel in task["edit"]:
         return True
+    # an edit entry ending with "/" grants a whole directory (e.g. new data files under evals/sealed_v0/)
+    if any(e.endswith("/") and rel.startswith(e) and ".." not in Path(rel).parts for e in task["edit"]):
+        return True
     p = Path(rel)
     return (p.parent.as_posix() == "services/api/tests" and p.name.startswith("test_muse_")
             and not _tracked(rel)) or rel.startswith("tools/muse_runs/")

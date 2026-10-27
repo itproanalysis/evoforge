@@ -1,0 +1,56 @@
+{
+ "family": "chat_dropout",
+ "suite_version": "v0",
+ "tasks": [
+  {
+   "id": "SV0-CD-01",
+   "goal": "Dropped chat sessions resume from the saved cursor",
+   "files": {
+    "chatretry.py": "\"\"\"Resume chat sessions after a dropped connection.\"\"\"\n\n\ndef should_resume(had_drop, saved_cursor):\n    return False\n\n\ndef replay(messages, cursor):\n    return list(messages)\n"
+   },
+   "reference_fix": "--- a/chatretry.py\n+++ b/chatretry.py\n@@ -2,8 +2,10 @@\n \n \n def should_resume(had_drop, saved_cursor):\n-    return False\n+    return bool(had_drop) and isinstance(saved_cursor, int) and saved_cursor >= 0\n \n \n def replay(messages, cursor):\n-    return list(messages)\n+    if cursor < 0:\n+        raise ValueError(\"bad cursor\")\n+    return list(messages[cursor:])\n",
+   "heldout": [
+    {
+     "id": "H1",
+     "kind": "compositional",
+     "code": "import chatretry\n\n\ndef test_cd01_compositional_resume_then_replay():\n    assert chatretry.should_resume(True, 1) is True\n    assert chatretry.replay([\"a\", \"b\", \"c\"], 1) == [\"b\", \"c\"]\n"
+    },
+    {
+     "id": "H2",
+     "kind": "negative",
+     "code": "import chatretry\n\n\ndef test_cd01_negative_clean_disconnect_stays_put():\n    assert chatretry.should_resume(False, 1) is False\n    assert chatretry.should_resume(True, -1) is False\n"
+    },
+    {
+     "id": "H3",
+     "kind": "boundary",
+     "code": "import chatretry\n\n\ndef test_cd01_boundary_cursor_edges():\n    assert chatretry.replay([\"a\", \"b\"], 0) == [\"a\", \"b\"]\n    assert chatretry.replay([\"a\", \"b\"], 2) == []\n"
+    }
+   ]
+  },
+  {
+   "id": "SV0-CD-02",
+   "goal": "Saved and live transcripts merge without loss or duplication",
+   "files": {
+    "session.py": "\"\"\"Merge saved and live chat transcripts.\"\"\"\n\n\ndef merge_turns(saved, live):\n    return list(live)\n"
+   },
+   "reference_fix": "--- a/session.py\n+++ b/session.py\n@@ -2,4 +2,6 @@\n \n \n def merge_turns(saved, live):\n-    return list(live)\n+    if not isinstance(saved, list) or not isinstance(live, list):\n+        raise ValueError(\"bad transcript\")\n+    return list(saved) + [m for m in live if m not in saved]\n",
+   "heldout": [
+    {
+     "id": "H1",
+     "kind": "compositional",
+     "code": "import session\n\n\ndef test_cd02_compositional_merge_overlap():\n    assert session.merge_turns([1, 2], [2, 3]) == [1, 2, 3]\n"
+    },
+    {
+     "id": "H2",
+     "kind": "negative",
+     "code": "import session\n\n\ndef test_cd02_negative_bad_transcript_rejected():\n    try:\n        session.merge_turns(\"nope\", [])\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+    },
+    {
+     "id": "H3",
+     "kind": "boundary",
+     "code": "import session\n\n\ndef test_cd02_boundary_empty_transcripts():\n    assert session.merge_turns([], []) == []\n"
+    }
+   ]
+  }
+ ]
+}

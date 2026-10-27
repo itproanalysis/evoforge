@@ -129,19 +129,26 @@ export default function EvidencePage() {
               >
                 <strong style={{ minWidth: 150 }}>{l.stage}</strong>
                 {l.event_id ? (
-                  <button
-                    onClick={() => fetchEvent(l.event_id as string)}
-                    style={{
-                      background: "transparent",
-                      border: "1px solid #33405c",
-                      borderRadius: 6,
-                      padding: "2px 8px",
-                      cursor: "pointer",
-                      color: "#93c5fd",
-                    }}
-                  >
-                    <code>{l.event_id}</code>
-                  </button>
+                  <>
+                    <button
+                      onClick={() => fetchEvent(l.event_id as string)}
+                      style={{
+                        background: "transparent",
+                        border: "1px solid #33405c",
+                        borderRadius: 6,
+                        padding: "2px 8px",
+                        cursor: "pointer",
+                        color: "#93c5fd",
+                      }}
+                    >
+                      <code>{l.event_id}</code>
+                    </button>
+                    {l.stage === "Review" ? (
+                      <span style={{ fontSize: 12, color: "#8b96ad" }}>
+                        Review sealed summary via GET /v1/events/{l.event_id}
+                      </span>
+                    ) : null}
+                  </>
                 ) : (
                   <span
                     style={{
