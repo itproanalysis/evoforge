@@ -8,7 +8,9 @@
 - API: https://evoforge-api-230852112787.asia-northeast3.run.app (private IAM, 웹 same-origin 프록시 경유)
 - **PASS 체인 → 실제 PR**: Mission `msn_5af789b9a5a4` ("calc.py add 수정") CREATED→GENERATED→REVIEWED→RAN→PR_OPENED
   - Builder 실측 1줄 패치 (`a - b` → `a + b`), Critic PASS (sealed 3종), 위생 샌드박스 visible 3/3 + held-out 3/3
-  - GH_INTEGRITY/GC_COMPOSITION/G2 전부 PASS → https://github.com/itproanalysis/evoforge-target/pull/4 (OPEN, +10/-1)
+  - GH_INTEGRITY/GC_COMPOSITION/G2 전부 PASS → https://github.com/itproanalysis/evoforge-target/pull/4 (MERGED, 07c19dde)
+- **CLOSED LOOP (WVI=1)**: Mission `msn_d283eebba020` ("calc.py sub 수정") 전 체인 → https://github.com/itproanalysis/evoforge-target/pull/5 → MERGED (d9f579eb) → `POST /v1/outcomes` → `outcome_status: VALIDATED`, dashboard `validated_improvements: 1`
+  - 재현 중 blind diff(`hunk does not apply`)·테스트 파일명 충돌을 잡아 `target_paths` 컨텍스트 주입·증거 기반 고유 파일명으로 수정 (둘 다 테스트 추가)
 - **FAIL 체인 (차단 증명)**: Mission `msn_f74933cc7eda` ("webhook 403") — Critic FAIL + held-out 0/3 → gap +1.000 → GH_INTEGRITY FAIL → PR 차단, Dashboard blocked_merges 1
 - Ledger: spent 360¢·unknown 0 · base == target main HEAD (실제 repo 실행)
 
