@@ -86,12 +86,32 @@ class PRRequest(BaseModel):
 
 
 class RunRequest(BaseModel):
+    """Runs execute only the server-stored Critic sealed suite (T10).
+
+    heldout_tests is deprecated and will be removed: it must be empty;
+    any non-empty value is rejected with 422. The held-out suite comes
+    solely from review_evidence_id (POST /v1/candidates/review evidence).
+    """
     source_repo: str
     base_sha: str
     diff: str = ""
     tests: list[dict] = []
-    heldout_tests: list[dict] = []
+    heldout_tests: list[dict] = Field(
+        default=[],
+        description="Deprecated, for removal: must be empty; non-empty is 422. "
+        "Held-out suite comes from review_evidence_id.",
+    )
+    review_evidence_id: str
     timeout_s: int = Field(120, ge=1, le=600)
+
+    @model_validator(mode="after")
+    def _no_client_heldout(self):
+        if self.heldout_tests:
+            raise ValueError(
+                "heldout_tests is deprecated and must be empty; "
+                "pass review_evidence_id pointing at server-stored review evidence"
+            )
+        return self
 
 
 class SandboxRequest(BaseModel):
@@ -236,10 +256,29 @@ def gates_evaluate(req: EvaluateRequest):
 @app.post("/v1/runs")
 def runs(req: RunRequest):
     from evoforge import runner
+    from evoforge.critic import ensure_sealed_suite
     from evoforge.gates import apply_run, evaluate_full
+    if req.heldout_tests:
+        # Defense in depth: the model validator already 422s non-empty
+        # client suites; never fall back to them here.
+        raise HTTPException(422, "heldout_tests is deprecated and must be empty; "
+                                 "pass review_evidence_id pointing at server-stored review evidence")
+    src = _evidence.get(req.review_evidence_id)
+    if src is None:
+        raise HTTPException(404, "unknown review evidence id")
+    inner = src.get("review")
+    if not isinstance(inner, dict):
+        raise HTTPException(409, f"evidence {req.review_evidence_id} is not a review")
+    if inner.get("stub") is True:
+        raise HTTPException(409, f"evidence {req.review_evidence_id} is a stub review "
+                                 "and cannot back a run")
+    sealed = inner.get("sealed_tests")
+    ok, normalized, _findings = ensure_sealed_suite(sealed)
+    if not ok:
+        raise HTTPException(409, f"evidence {req.review_evidence_id} has an invalid sealed suite")
     try:
         run = runner.run_candidate(req.source_repo, req.base_sha, req.diff,
-                                   req.tests, req.heldout_tests,
+                                   req.tests, normalized,
                                    timeout_s=req.timeout_s)
     except runner.RunnerError as e:
         raise HTTPException(400, str(e))
@@ -253,7 +292,8 @@ def runs(req: RunRequest):
     gates = [v.__dict__ for v in apply_run(verdicts, run)]
     eid = _store_evidence({"diff": req.diff, "tests": req.tests, "gates": gates,
                            "run": run, "source_repo": req.source_repo,
-                           "base_sha": req.base_sha})
+                           "base_sha": req.base_sha,
+                           "review_evidence_id": req.review_evidence_id})
     _link_stages(eid, ("Candidate", "Gate"))
     return {"gates": gates, "run": run, "evidence_id": eid}
 

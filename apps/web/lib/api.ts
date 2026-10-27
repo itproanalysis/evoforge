@@ -120,11 +120,11 @@ export function postRun(
   base_sha: string,
   diff: string,
   tests: string[],
-  heldout_tests: SealedTest[],
+  review_evidence_id: string,
 ) {
   return req<RunResponse>("/v1/runs", {
     method: "POST",
-    body: JSON.stringify({ source_repo, base_sha, diff, tests: tests.map((code) => ({ code })), heldout_tests }),
+    body: JSON.stringify({ source_repo, base_sha, diff, tests: tests.map((code) => ({ code })), review_evidence_id }),
   });
 }
 

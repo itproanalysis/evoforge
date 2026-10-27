@@ -37,6 +37,7 @@ export default function Lab() {
   const [busy, setBusy] = useState<"review" | "eval" | "pr" | null>(null);
   const [err, setErr] = useState("");
   const [sealedTests, setSealedTests] = useState<SealedTest[]>([]);
+  const [reviewEvidenceId, setReviewEvidenceId] = useState("");
   const [repo, setRepo] = useState("");
   const [baseSha, setBaseSha] = useState("HEAD");
   const [runInfo, setRunInfo] = useState("");
@@ -68,7 +69,7 @@ export default function Lab() {
     setBusy("eval");
     setErr("");
     try {
-      const out = await postRun(repo, baseSha, diff, tests, sealedTests);
+      const out = await postRun(repo, baseSha, diff, tests, reviewEvidenceId);
       setGates(out.gates);
       setEvalId(out.evidence_id);
       const v = out.run.visible;
@@ -91,6 +92,7 @@ export default function Lab() {
       const result = out.review?.result ?? "INCONCLUSIVE";
       const n = out.review?.findings?.length ?? 0;
       setReview(`verdict=${result} findings=${n}${out.stub ? " (stub, no MODEL_API_KEY)" : ""}`);
+      setReviewEvidenceId(out.evidence_id ?? "");
       const st = (out.sealed_tests ?? []).map((t) =>
         typeof t === "string" ? { code: t, kind: "" } : { code: t.code ?? "", kind: t.kind ?? "" },
       );
@@ -101,6 +103,7 @@ export default function Lab() {
       setErr(`review API: ${e instanceof Error ? e.message : String(e)}`);
       setSealed([]);
       setSealedTests([]);
+      setReviewEvidenceId("");
       setReview("verdict=INCONCLUSIVE reason=review endpoint unavailable, human needed");
     } finally {
       setBusy(null);
@@ -182,8 +185,8 @@ export default function Lab() {
         <div>
           <button
             onClick={doRun}
-            disabled={busy !== null || !repo || sealedTests.length === 0}
-            title={sealedTests.length === 0 ? "Review로 봉인 테스트를 먼저 받으세요" : ""}
+            disabled={busy !== null || !repo || !reviewEvidenceId}
+            title={!reviewEvidenceId ? "Review로 봉인 테스트를 먼저 받으세요" : ""}
             style={{ marginTop: 10, padding: "8px 16px", borderRadius: 6, background: "#0891b2", color: "#fff", border: 0, cursor: "pointer" }}
           >
             {busy === "eval" ? "Running…" : `Run on server (held-out ${sealedTests.length})`}
