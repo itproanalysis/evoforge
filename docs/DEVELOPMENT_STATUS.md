@@ -127,8 +127,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   `services/api/evoforge/runtime_guards.py` (BSL-1.1/Caveman/LiteLLM 공급망·SBOM 스캐너, 테넌트 가중 공정 큐 DRR, 플랫폼 키 KMS Broker 전용 복호화 CR-23/35/49/50),
   신규 테스트 `services/api/tests/test_context_mesh_cr.py`, `services/api/tests/test_review_qualification_cr.py`, `services/api/tests/test_runtime_guards_cr.py`,
   문서 `docs/CR_CLOSURE_ADVANCEMENT.md`. `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 수정하지 않는다.
-- **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — 정산/예약 경합의 프로젝트 cap 검사:** 확장 007·Codex DB 테스트·관련 문서에서
-  정본 함수의 한도 검사 뒤 기존 호출이 정산되는 경합을 재현하고, 새 예약 저장 시점의 cap 재검사를 보강한다.
+- **Codex (프로젝트 cap 경합 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 확장 007·Codex DB 테스트·관련 문서에서
+  정본 함수의 한도 검사 뒤 기존 호출이 정산되는 경합을 재현하고 `c479487`에서 저장 시점의 cap을 재검사한다.
+  API 465개·실제 DB 145개·SQL 96개·참조 112개·계약·웹 빌드 통과. 지원 코드는 main 미반영이다.
   상위 T22 프로세스는 실행 중이므로 main/평가/UI·봉인 테스트를 편집하지 않는다. 정본 SQL 파일과 정산/승인 함수는 유지한다.
 - **Codex (후보 등록 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 새 `postgres_candidates.py`·확장 008·
   Codex 소유 kernel_api.py/test_kernel_api.py/test_postgres_kernel.py·관련 문서를 수정한다.
@@ -401,3 +402,22 @@ Builder/Critic/영수증/원격 checkout transport는 합성 fixture이며 실�
 상위 T22의 main/평가/UI·봉인 수용 테스트는 보존했고 지원 코드는 main 미반영이다.
 공개 Generate/mission/PR의 명령·Broker 예약/영수증·후보 등록 호출·PR base 전달과 전체 승인·운영 배포는 계속 미완료다.
 Muse Spark 기본값과 현재 채팅의 자동 재개를 유지한다.
+
+## 정산과 새 예약의 프로젝트 cap 경합 보강 (지원 검증 완료)
+
+`codex/pg-integration`의 `c479487`은 초기 예산 확인 뒤 기존 호출이 더 높은 실제 금액으로 정산될 때,
+초기 사용액을 기준으로 새 예약이 한도를 초과하던 경합을 확장 007에서 차단한다.
+INSERT 시점의 테넌트 잔액/hold와 프로젝트 현재 cap/사용액을 같은 snapshot으로 확인하며 새 예약도 사용액에 포함한다.
+이미 발생한 정산·청구는 보존하고, 거부된 새 예약과 intent/hold는 커밋하지 않는다.
+
+회귀는 cap 1000µUSD·기존 예약 100µUSD에서 새 900µUSD 예약을 초기 cap 검사 뒤 대기시킨다.
+기존 호출을 900µUSD로 정산한 뒤 새 요청을 재개해 거부하고, 남은 100µUSD는 예약을 허용했다.
+수정 전 **1 failed**, 수정 후 API **465 passed·1 skipped**·실제 PostgreSQL **145 passed**,
+참조 **112개**·SQL **96개**·계약 **0 failure**·웹 프로덕션 빌드 통과.
+정본 SQL·reserve/settle·core.authorize_merge와 프로젝트 RLS 정책은 변경하지 않았다.
+
+원본 로그 8개는 `C:\evo_forge\.local\evidence\project-cap-race-20261027-4io029zf`에 보존했다.
+지원 브랜치의 `docs/validation/2026-10-27-project-cap-race.json`에 source/로그 해시,
+`docs/TENANT_CREDIT_GUARD.md`에 007 재적용과 한계를 기록했다.
+실제 공급사 호출·운영 DB 적용/배포는 수행하지 않았다. T22 Muse 실행 프로세스가 동작 중인 것을 확인했고 중복 실행하지 않았다.
+공개 명령·Broker 비용/영수증·전체 승인·운영 연결은 계속 미완료이며 Muse Spark와 자동 재개를 유지한다.
