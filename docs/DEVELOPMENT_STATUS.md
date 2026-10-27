@@ -119,9 +119,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex (영수증 저장 후 예약 해제 경합 보강) / `codex/pg-integration` / `C:\evo_forge_codex`:**
+- **Codex (영수증 저장 후 예약 해제 보강 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:**
   Codex 소유 `postgres_kernel.py`·`test_postgres_kernel.py`와 관련 문서/검증 manifest를 수정한다.
-  정산 전 영수증이 이미 저장된 호출을 미접수로 예약 해제하는 경로를 실제 DB에서 재현하고 차단한다.
+  정산 전 영수증이 이미 저장된 호출을 미접수로 예약 해제하는 경로를 실제 DB에서 재현하고 차단했다(`61c608b`).
+  API 485개·실제 DB 155개(신규 8개)·SQL 96개·참조 112개·계약·웹 빌드 통과. 지원 코드는 main 미반영이다.
   정본 reserve/settle·RLS·모델 기본값과 상위 T22의 main/평가/UI·봉인 테스트는 변경하지 않는다.
 - **Codex (병합 정책/자격·상위 동기화 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** Codex 소유 postgres_kernel.py와
   test_postgres_kernel.py·관련 문서에서 현재 policy와 HIGH/CRITICAL 자격을 대조한다(`1441518`).
@@ -474,3 +475,24 @@ source 33개와 로그의 SHA-256은 지원 브랜치 `docs/validation/2026-10-2
 새 독립 모듈의 공개 경로 연결·실 GCP KMS·실청구·Docker 이미지/운영 배포는 이 검증으로 완료 처리하지 않는다.
 Muse T22의 main/평가/UI·봉인 테스트를 보존했으며 그 상위 병합 후 공개 명령/Broker 비용·전체 승인 연결을 이어간다.
 지원 코드는 main 미반영이고 전체 개발은 미완료다. Muse Spark `muse-spark-1.3`과 현재 채팅의 자동 재개를 유지한다.
+
+## 영수증 저장 후 미접수 해제 차단 (지원 검증 완료)
+
+`codex/pg-integration`의 `61c608b`는 같은 tenant/project/call에 영수증이 저장됐으면 정산 전에도
+`release_not_accepted`를 409로 거부한다. 문서 없는 ctx 영수증·추정/0원·공급사 참조 누락도 예약을 유지한다.
+영수증 저장과 해제가 같은 예약 행을 잠그고, 잠금 대기 뒤 새 statement로 커밋된 영수증을 확인한다.
+다른 호출/프로젝트의 영수증은 정상 미접수 해제를 막지 않으며 정상 견적의 멱등 정산도 유지한다.
+
+수정 전 회귀 **7 failed·1 passed**, 수정 후 집중 사례 **8 passed**, API **485 passed·1 skipped**,
+실제 PostgreSQL **155 passed**(신규 8개), 참조 **112개**·SQL **96개**·계약 **0 failure**·웹 빌드 통과.
+실제 PostgreSQL에서 영수증 저장 트랜잭션이 잠금을 유지하는 동안 해제 요청의 대기를 확인한 뒤,
+저장 커밋 후 해제가 거부되고 정상 정산으로 이어지는 것도 검증했다.
+
+원본 로그 8개는 `C:\evo_forge\.local\evidence\receipt-release-20261027-tp1nltz3`에 보존했다.
+source 36개·로그의 SHA-256은 지원 브랜치 `docs/validation/2026-10-27-receipt-release.json`에 기록했다.
+정본 reserve/settle/authorize·RLS·기존 금전 기록은 변경하지 않았다. 별도 영수증 적재 서비스도 같은 예약 잠금 규약이 필요하다.
+청구 증거는 합성 fixture이며 실제 공급사 호출/운영 반영은 수행하지 않았다. 0원 정산·추정→실청구 정정 정책도 계속 미완료다.
+
+Muse T22의 실행 프로세스와 OpenCode 자식 프로세스가 동작 중인 것을 확인했고 중복 실행하거나 상위 파일을 변경하지 않았다.
+상위 병합 뒤 공개 명령/Broker 비용·전체 승인 연결을 이어간다. 지원 코드는 main 미반영이고 전체 개발은 미완료이며,
+Muse Spark 기본값과 현재 채팅의 자동 재개를 유지한다.
