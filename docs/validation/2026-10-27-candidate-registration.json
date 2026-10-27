@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-27",
+  "revision": "e947cbf1cdbe22785a32a8f8ebf58b3b482a4e05",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Receipt/request-ID/Git-tree bound canonical Builder candidate registration; current fencing recheck and registered-head drift refusal for G2",
+  "checks": {
+    "api": {
+      "passed": 465,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 144,
+      "new_registration_cases": 5
+    },
+    "concurrent_first_registration": {
+      "requests": 8,
+      "candidates": 1,
+      "included_in_postgresql_count": true
+    },
+    "restart_read_real_git_runner_g2_and_merge_refusal": "passed; missing other merge evidence remains refused",
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "limitations": [
+    "Support branch only; Muse T22 main/evaluation/UI and sealed acceptance tests preserved",
+    "Real Git, PostgreSQL and local Runner; Builder/Critic/receipt and checkout transport are explicit synthetic fixtures",
+    "Configured GitHub checkout currently supports immutable 40-character SHA-1 commits only",
+    "Registration creates PROPOSED only; no candidate state promotion, review, approval or extra gate inference",
+    "Existing manually created or non-Builder core candidates retain their existing path; new registration bindings constrain registered heads",
+    "Public command/mission Broker dispatch, canonical cost/receipt integration and PR base propagation remain pending",
+    "No paid model execution, actual provider bill verification, production migration, Docker build or GCP deployment",
+    "Apply extension 008 before the new API; main model muse-spark-1.3 and heartbeat remain unchanged"
+  ],
+  "source_sha256": {
+    "services/api/evoforge/postgres_candidates.py": "d6463307ba76f35d2bfd3230ba7f67ee7a384d0cd1893c475c0b45bd16cf276f",
+    "services/api/migrations/008_builder_candidates.sql": "ee2b9f7dedb6c5e3d20bf8a1f13c2906792ad3b7c25c456365261f85f6afb616",
+    "services/api/evoforge/kernel_api.py": "86c0919f008e4d99f997f4f67afb3b2f8411536dacd62cb8cfbe59062f074de1",
+    "services/api/evoforge/postgres_run_evidence.py": "aceb2901625ef5aec7c1875987cd844e0d8108c030414d6debfdea28983ec4ca",
+    "services/api/tests/test_postgres_kernel.py": "d673370d0fa572836f804897784690050a4b56a884e8b5d2b18c789393f71673",
+    "services/api/tests/test_kernel_api.py": "7ab315968e1cd8285c027a448b4f1e461074b58751c48dc0c579fcf88cf9400a",
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767",
+    "services/api/evoforge/broker_meta.py": "f50d55a3a54355db474c63ebbc99f53db878917680d055c5135847d72e5ea29c",
+    "services/api/.env.example": "5ac5f8e947605f0c97ba43ef0f45526f889a1ea0c7db930e4a215ee42b1058ee",
+    "docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql": "294f2961b3012ac18ade1efacb324fbb14721c76a41782864a0c0d977a262636"
+  },
+  "logs": {
+    "validation-candidates-focused.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\candidate-registration-20261027-u3iva17t\\validation-candidates-focused.log",
+      "sha256": "2913fd9f8206b05335194913966e7d17056ad7680075d167dda5fc42e56ddb3e"
+    },
+    "validation-candidates-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\candidate-registration-20261027-u3iva17t\\validation-candidates-api.log",
+      "sha256": "87f86185bf285e7835bf40e40eb7b50e26e284d7bafc74a02704ba7f0d01a403"
+    },
+    "validation-candidates-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\candidate-registration-20261027-u3iva17t\\validation-candidates-postgres.log",
+      "sha256": "7470f924cd7bc914da0d8645e466d2ee7981680c501806e64688c2f390f1a496"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\candidate-registration-20261027-u3iva17t\\validation-kernel.log",
+      "sha256": "fd9df488aac8cc6ff1aca9a2a7d02922650317409f58410ec0ca9d71868d5cd4"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\candidate-registration-20261027-u3iva17t\\validation-postgres.log",
+      "sha256": "711167e328b361c97f92b43c0fba2cf679f06051111afd95f8e7a7aa92a35fbb"
+    },
+    "validation-candidates-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\candidate-registration-20261027-u3iva17t\\validation-candidates-contract.log",
+      "sha256": "d125a441065093e125051fa2aee8ce0852ecc1521e86d6898bc7a627e4618c13"
+    },
+    "validation-candidates-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\candidate-registration-20261027-u3iva17t\\validation-candidates-web.log",
+      "sha256": "0dc6e0288f8502875f943a3ce30a63e3c7ed0dc8c878df9662372256d5c13ab6"
+    }
+  }
+}
