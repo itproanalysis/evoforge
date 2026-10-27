@@ -12,7 +12,8 @@ const link: React.CSSProperties = {
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
-  const apiBase = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8080";
+  const raw = (process.env.NEXT_PUBLIC_API_BASE ?? "").trim();
+  const apiBase = raw === "" ? "/api/evoforge (same-origin)" : raw;
   return (
     <html lang="ko">
       <body
