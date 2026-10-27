@@ -16,9 +16,11 @@ API_URL="https://evoforge-api-${NUM}.${REGION}.run.app"
 RUNNER_URL="https://evoforge-runner-${NUM}.${REGION}.run.app"
 SA() { echo "evoforge-$1@${PROJECT}.iam.gserviceaccount.com"; }
 
-echo "== build (tests gate the images)"
-"$GCLOUD" builds submit --project "$PROJECT" --config infra/gcp/cloudbuild.prod.yaml \
-  --substitutions "_REGION=${REGION},_TAG=${TAG}" .
+if [ "${SKIP_BUILD:-0}" != "1" ]; then
+  echo "== build (tests gate the images)"
+  "$GCLOUD" builds submit --project "$PROJECT" --config infra/gcp/cloudbuild.prod.yaml \
+    --substitutions "_REGION=${REGION},_TAG=${TAG}" .
+fi
 
 echo "== runner: no secrets, no roles, private, one job per instance"
 "$GCLOUD" run deploy evoforge-runner --project "$PROJECT" --region "$REGION" --image "${REG}/runner:${TAG}" \
@@ -31,7 +33,7 @@ echo "== api: private; only the web SA may invoke; Meta key + GitHub token from 
   --service-account "$(SA api)" --no-allow-unauthenticated --port 8080 \
   --cpu 1 --memory 1Gi --min-instances 1 --max-instances 1 --timeout 900 \
   --set-secrets "MODEL_API_KEY=MODEL_API_KEY:latest,GITHUB_TOKEN=GITHUB_TOKEN:latest" \
-  --set-env-vars "^@^MODEL_API_BASE=https://api.meta.ai/v1@MODEL_BUILDER=muse-spark-1.3@MODEL_CRITIC=muse-spark-1.3@GITHUB_REPO=${GITHUB_REPO}@EVO_REQUIRE_ID_TOKEN=1@EVO_API_URL=${API_URL}@EVO_WEB_SERVICE_ACCOUNT=$(SA web)@EVO_RUNNER_URL=${RUNNER_URL}@EVO_RUNNER_AUDIENCE=${RUNNER_URL}@EVO_ALLOW_LOCAL_REPOS=0@EVO_WEB_ORIGINS=" \
+  --set-env-vars "^|^MODEL_API_BASE=https://api.meta.ai/v1|MODEL_BUILDER=muse-spark-1.3|MODEL_CRITIC=muse-spark-1.3|GITHUB_REPO=${GITHUB_REPO}|EVO_REQUIRE_ID_TOKEN=1|EVO_API_URL=${API_URL}|EVO_WEB_SERVICE_ACCOUNT=$(SA web)|EVO_RUNNER_URL=${RUNNER_URL}|EVO_RUNNER_AUDIENCE=${RUNNER_URL}|EVO_ALLOW_LOCAL_REPOS=0|EVO_WEB_ORIGINS=" \
   --quiet
 
 echo "== web: public origin, app-level owner login; calls the API server-side with its ID token"
