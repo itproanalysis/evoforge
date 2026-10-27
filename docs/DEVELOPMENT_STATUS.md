@@ -55,6 +55,14 @@
 
 > **우선권 (프로젝트 소유자 지정, 2026-10-27): Muse Spark 1 > Claude 2 > Codex 3.** 규칙은 [`AGENTS.md`](../AGENTS.md).
 
+> **실 Meta 키 통합 검증 (Claude, 2026-10-27, main `12b9c47`):** 소유자 키를 gitignore된 `services/api/.env`에 두고
+> `uvicorn main:app --env-file .env`로 실행(테스트는 키를 쓰지 않음). 실호출 결과: Builder(muse-spark-1.3) diff+강한 테스트 3개 →
+> Critic 봉인 스위트 3종·리뷰 PASS → 실 샌드박스 visible 3/3·held-out 3/3 → GH_INTEGRITY/GC_COMPOSITION/G2_REQUIRED 전부 PASS →
+> `/v1/pr/create`는 `GITHUB_TOKEN/GITHUB_REPO` 없음으로만 400. 원장 실지출 240¢, UNKNOWN 0.
+> 실호출로 발견·수정(T13, Builder Muse Spark): 추론 모델이 `max_tokens=1500`을 추론에 다 써 빈 응답 → 봉인 없음으로 오인되던 버그.
+> 남은 항목(다음 라운드 후보): 실제 GitHub PR(토큰·대상 저장소 필요), Builder에 저장소 파일 문맥 제공(현재 목표 문장만 전달),
+> run 증거 체인에 Review 단계 연결, layout 하단 "추정치" 문구.
+
 > **Round 3·4 main 병합 완료 (Muse Spark 계획·구현, Claude Critic, 2026-10-27, `9887efe`):**
 > R3: T7 증거 체인, T8 봉인 스위트 형식(≥3, compositional·negative·boundary), T9 Mission Control 실제 원장.
 > R4(Critic 지적 F1–F3 반영, 계획은 Muse): T10 `/v1/runs`는 서버 저장 Critic 리뷰(`review_evidence_id`)의 봉인 스위트만 실행 —
