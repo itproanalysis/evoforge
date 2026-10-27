@@ -29,15 +29,20 @@ visible 3/3·held-out 3/3) → 게이트 `GH_INTEGRITY`·`GC_COMPOSITION`·`G2_R
 
 ### P0 — 출시 차단
 
-| # | 갭 | 현재 | 필요한 것 |
+| # | 갭 | 상태 (2026-10-27) | 근거 |
 |---|---|---|---|
-| P0-1 | 인증·권한 | API·웹 무인증 | 웹 로그인 세션, API 비공개(웹 서버만 ID 토큰으로 호출), 허용 계정 제한 |
-| P0-2 | 영속성 | 증거·비공개 리뷰·이벤트/체인은 PostgreSQL 선택 모드 연결. 명령·공개 원장은 메모리 | canonical 명령·비용 커널 연결과 운영 Cloud SQL 검증. [현재 범위](EVIDENCE_PERSISTENCE.md) |
-| P0-3 | Runner 격리 | API 프로세스 안 subprocess, 메타데이터 서버·네트워크 접근 가능 | 비밀·권한 없는 별도 Runner 서비스, API가 base 번들만 전달 |
-| P0-4 | 원격 저장소 | Runner가 로컬 경로만 허용 | 구성된 GitHub 저장소를 base에서 서버가 체크아웃 |
-| P0-5 | Builder 문맥 | 목표 문장만 전달(파일 내용 없음) | 대상 파일 내용(크기 상한·경로 제한)을 Builder에 전달 |
-| P0-6 | PR 내용 | 수정 diff만, Builder 테스트 미포함 | 새 테스트 파일도 PR에 포함 |
-| P0-7 | 비밀 | 환경 변수 | Secret Manager(Broker 신원만 접근), 최소 권한 서비스 계정 |
+| P0-1 | 인증·권한 | **완료** — 소유자 로그인(scrypt, `__Host-` HttpOnly Secure 쿠키, 시도 제한), 페이지 middleware, `/api/evoforge` 프록시(경로 정책), API는 web SA의 Google ID 토큰만 허용 | T14·T14b·T14c, GCP: API 직접 403, 소유자 본인 토큰도 401, 프록시 무세션 401 |
+| P0-2 | 영속성 | **부분 구현(Codex 진행 중)** — 증거·비공개 리뷰·이벤트/체인은 PostgreSQL 선택 모드 연결. 명령·공개 원장은 메모리이므로 API `min=max=1` 유지 | [현재 범위](EVIDENCE_PERSISTENCE.md), 운영 Cloud SQL·canonical 명령/비용 연결은 남음 |
+| P0-3 | Runner 격리 | **완료** — 별도 `evoforge-runner`(무권한 SA, 비밀 없음, api SA만 호출), base-only git bundle | T16, GCP: Runner 직접 403 |
+| P0-4 | 원격 저장소 | **완료** — 구성된 GitHub 저장소를 base(또는 ref)로 서버 체크아웃, 토큰은 env의 Basic 헤더 | T15·T15b, 실 비공개 저장소 체크아웃 |
+| P0-5 | Builder 문맥 | **완료** — `target_paths` 파일 내용(32KB/128KB 상한·경로 제한)을 Builder에 전달 | T17 |
+| P0-6 | PR 내용 | **완료** — Builder 테스트를 `tests/evoforge_gen/`로 PR에 커밋, 봉인 코드는 제외 | T17, [#2](https://github.com/itproanalysis/evoforge-target/pull/2)·[#3](https://github.com/itproanalysis/evoforge-target/pull/3) |
+| P0-7 | 비밀 | **완료(토큰 교체 필요)** — Secret Manager, 서비스별 접근(api: Meta 키·GitHub, web: 세션·해시, runner: 없음). `GITHUB_TOKEN`은 소유자 gh 토큰 → 대상 저장소 한정 토큰으로 교체 필요 | `docs/DEPLOY_PRODUCTION.md` |
+
+**GCP 정식 운영 검증 (2026-10-27, `evoforge-prod-4ff3`):** 공개 web 출처로만 소유자 로그인 → Generate(Muse Spark, `calc.py` 문맥) →
+Critic 봉인 3종(HTTP 코드 비노출) → Cloud Run Runner 실행 visible 4/4·held-out 3/3 → 게이트 전부 PASS →
+PR [evoforge-target#3](https://github.com/itproanalysis/evoforge-target/pull/3) (수정 + 테스트). 원장 360¢, 프록시로 `/v1/kernel` 404.
+알려진 사항: Cloud Run은 `z`로 끝나는 경로(`/healthz`)를 예약해 404를 돌려준다(헬스 프로브 미사용). run 증거 체인에 Review 단계 미연결.
 
 ### P1 — 출시 직후
 
