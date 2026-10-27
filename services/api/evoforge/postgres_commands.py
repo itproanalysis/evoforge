@@ -9,7 +9,7 @@ import os
 from uuid import UUID
 
 from evoforge.commands import NeedsConfirmation, TransitionError
-from evoforge.postgres_kernel import KernelUnavailable
+from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
 
 _KINDS = {"BUILD": "ASK", "ASK": "ASK", "FEEDBACK": "FEEDBACK",
           "STOP_ALL": "STOP_ALL", "PAUSE": "PAUSE", "CANCEL": "CANCEL"}
@@ -38,14 +38,23 @@ class CommandStore:
         history = [(h['state'], h['occurred_at'].timestamp()) for h in conn.execute(
             "SELECT state,occurred_at FROM runtime.api_command_history WHERE tenant_id=%s AND project_id=%s "
             "AND command_id=%s ORDER BY ordinal", (*self.scope, cid))]
-        result = conn.execute("SELECT document FROM runtime.api_command_results WHERE tenant_id=%s AND project_id=%s "
-                              "AND command_id=%s", (*self.scope, cid)).fetchone()
+        result = conn.execute("SELECT r.document,e.document AS proof FROM runtime.api_command_results r "
+                              "LEFT JOIN runtime.api_evidence_records e ON e.tenant_id=r.tenant_id "
+                              "AND e.project_id=r.project_id AND e.id=r.document #>> '{evidence,id}' "
+                              "WHERE r.tenant_id=%s AND r.project_id=%s AND r.command_id=%s", (*self.scope, cid)).fetchone()
         data = {'command_id': 'cmd_'+cid.hex, 'goal': payload.get('goal',''),
                 'kind': payload.get('api_kind',row['kind']), 'risk': payload.get('risk','LOW'),
                 'state': row['status'], 'idempotency_key': payload.get('api_key',row['idempotency_key']),
                 'history': history}
         if result:
+            proof, response = result['proof'],result['document']
+            if (row['status'] != 'APPLIED' or not proof or response.get('command_id') != data['command_id']
+                    or proof.get('command_id') != data['command_id']
+                    or any(proof.get(field) != response.get(field) for field in ('candidate','gates'))):
+                raise KernelRejected('cached command response has no matching server evidence')
             data['served'] = result['document']
+        elif row['status']=='APPLIED' and payload.get('api_kind')=='BUILD':
+            raise KernelRejected('completed API command has no stored server response')
         return CommandView(data, self)
 
     def _history(self, conn, command_id, state):
@@ -158,7 +167,10 @@ class CommandStore:
             data = json.loads(json.dumps(document,allow_nan=False))
             if not isinstance(data,dict) or data.get('command_id') != command_id:
                 raise ValueError()
-        except (ValueError,TypeError):
+            evidence_id = data['evidence']['id']
+            if not isinstance(evidence_id,str) or not evidence_id:
+                raise ValueError()
+        except (ValueError,TypeError,KeyError):
             raise TransitionError('invalid command response document') from None
         with self.kernel._transaction() as conn:
             row = self._row(conn,_uuid(command_id),True)
@@ -174,6 +186,14 @@ class CommandStore:
                 return self._view(conn,row)
             if row['status'] not in {'DISPATCHED','APPLYING'}:
                 raise TransitionError('only a dispatched command can complete')
+            # Evidence is append-only. Row-locking it would require UPDATE
+            # privileges that the application deliberately does not have.
+            proof = conn.execute('SELECT document FROM runtime.api_evidence_records '
+                                 'WHERE tenant_id=%s AND project_id=%s AND id=%s',
+                                 (*self.scope,evidence_id)).fetchone()
+            if (not proof or proof['document'].get('command_id') != command_id
+                    or any(proof['document'].get(field) != data.get(field) for field in ('candidate','gates'))):
+                raise TransitionError('command response differs from stored server evidence')
             if row['status']=='DISPATCHED':
                 row=self._advance(conn,row,'APPLYING')
             row=self._advance(conn,row,'APPLIED')

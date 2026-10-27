@@ -9,10 +9,13 @@ from datetime import date
 import hmac
 import os
 from uuid import UUID
+from typing import Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel, ConfigDict, Field, StrictInt
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
+
+from evoforge.commands import NeedsConfirmation, TransitionError
 
 from evoforge.postgres_kernel import (
     BudgetRefused, KernelNotFound, KernelRejected, KernelScope,
@@ -49,6 +52,10 @@ def invoke(operation, *args):
         raise HTTPException(409, "Trust Kernel rejected the operation") from None
     except KernelUnavailable:
         raise HTTPException(503, "PostgreSQL Trust Kernel unavailable") from None
+    except NeedsConfirmation:
+        raise HTTPException(409, 'command requires confirmation') from None
+    except TransitionError:
+        raise HTTPException(409, 'canonical command transition refused') from None
     except ValueError:
         raise HTTPException(422, "invalid kernel operation parameters") from None
 
@@ -91,6 +98,54 @@ class CandidateRunRequest(InternalRequest):
     candidate_id: UUID
     call_id: UUID
     evidence_id: str = Field(min_length=1, max_length=256)
+
+
+class CommandRequest(InternalRequest):
+    goal: str = Field(min_length=1,max_length=100000)
+    idempotency_key: str = Field(min_length=1,max_length=4096)
+    risk: Literal['LOW','MEDIUM','HIGH','CRITICAL'] = 'LOW'
+    confirm: StrictBool = False
+    expected_version: StrictInt | None = Field(default=None,ge=0,le=2**63-1)
+
+
+class CommandResponseRequest(InternalRequest):
+    response: dict
+
+
+def existing_command(kernel,command_id):
+    from evoforge.postgres_commands import CommandStore
+    store=CommandStore(kernel)
+    command=invoke(store.get,command_id)
+    if command is None:
+        raise HTTPException(404,'resource not found in scope')
+    return store,command
+
+
+@router.post('/commands')
+def accept_command(req: CommandRequest, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_commands import CommandStore
+    # This is BUILD/ASK acceptance only, never a structured approval shortcut.
+    return invoke(CommandStore(kernel).create,req.goal,req.idempotency_key,'BUILD',req.risk,
+                  req.confirm,req.expected_version)
+
+
+@router.get('/commands/{command_id}')
+def command(command_id: str, kernel: PostgresKernel = Depends(authenticated_kernel)):
+    return existing_command(kernel,command_id)[1]
+
+
+@router.post('/commands/{command_id}/dispatch')
+def dispatch_command(command_id: str, req: InternalRequest,
+                     kernel: PostgresKernel = Depends(authenticated_kernel)):
+    store,_=existing_command(kernel,command_id)
+    return invoke(store.dispatch,command_id)
+
+
+@router.post('/commands/{command_id}/complete')
+def complete_command(command_id: str, req: CommandResponseRequest,
+                     kernel: PostgresKernel = Depends(authenticated_kernel)):
+    store,_=existing_command(kernel,command_id)
+    return invoke(store.complete,command_id,req.response)
 
 
 @router.post("/reservations")

@@ -72,6 +72,17 @@ def test_runner_evidence_ingestion_and_reads_require_the_internal_service_creden
     api['factory'].assert_not_called()
 
 
+def test_canonical_command_lifecycle_requires_service_auth_before_creating_adapter(api):
+    cid='cmd_'+uuid4().hex
+    client=api['client']
+    responses=[client.post('/v1/kernel/commands',json={'goal':'g','idempotency_key':'k'}),
+               client.get('/v1/kernel/commands/'+cid),
+               client.post('/v1/kernel/commands/'+cid+'/dispatch',json={}),
+               client.post('/v1/kernel/commands/'+cid+'/complete',json={'response':{'command_id':cid}})]
+    assert all(r.status_code==401 and TOKEN not in r.text for r in responses)
+    api['factory'].assert_not_called()
+
+
 @pytest.mark.parametrize("missing", ["EVO_TENANT_ID", "EVO_PROJECT_ID", "DATABASE_URL", "EVO_KERNEL_TOKEN"])
 def test_missing_server_configuration_fails_closed(api, monkeypatch, missing):
     monkeypatch.delenv(missing, raising=False)

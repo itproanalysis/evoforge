@@ -1098,6 +1098,15 @@ def command_store(funded, monkeypatch):
     return CommandStore(funded['kernel'])
 
 
+def _command_response_evidence(funded, response):
+    from evoforge.postgres_state import EvidenceStore
+    eid=response['evidence']['id']
+    document={'id':eid,'command_id':response['command_id'],
+              **{key:response[key] for key in ('candidate','gates') if key in response}}
+    EvidenceStore(funded['kernel']).write('records',eid,document)
+    return response
+
+
 def test_canonical_command_response_and_history_survive_new_store_and_process(funded, command_store):
     from evoforge.postgres_commands import CommandStore
     created = command_store.create('한글 goal', 'arbitrary / key with spaces')
@@ -1106,6 +1115,7 @@ def test_canonical_command_response_and_history_survive_new_store_and_process(fu
     dispatched = command_store.dispatch(cid)
     assert dispatched['state'] == 'DISPATCHED'
     body = {'command_id': cid, 'candidate': {'diff': 'verified fixture'}, 'evidence': {'id': 'ev_fixture'}}
+    _command_response_evidence(funded,body)
     dispatched['served'] = body
     assert dispatched['state'] == 'APPLIED'
     restarted = CommandStore(funded['kernel']).create('한글 goal', 'arbitrary / key with spaces')
@@ -1185,7 +1195,8 @@ def test_command_results_are_immutable_and_commands_are_scope_isolated(funded, c
     from evoforge.postgres_commands import CommandStore
     cmd = command_store.create('g','result-key')
     command_store.dispatch(cmd['command_id'])
-    result = {'command_id': cmd['command_id'], 'candidate': {'diff': 'x'}}
+    result = _command_response_evidence(funded,{'command_id':cmd['command_id'],'candidate':{'diff':'x'},
+                                                'evidence':{'id':'ev_result'}})
     command_store.complete(cmd['command_id'],result)
     assert command_store.complete(cmd['command_id'],result)['served'] == result
     with pytest.raises(TransitionError):
@@ -1221,17 +1232,30 @@ def test_database_refuses_responses_for_unapplied_or_mismatched_commands(funded,
         with funded['kernel']._transaction() as conn:
             conn.execute('INSERT INTO runtime.api_command_results(tenant_id,project_id,command_id,document) '
                          'VALUES (%s,%s,%s,%s)', (*command_store.scope,cid,Jsonb(document)))
+    result=_command_response_evidence(funded,{'command_id':cmd['command_id'],'candidate':{'diff':'stored'},
+                                             'gates':[{'gate':'GH_INTEGRITY','result':'INCONCLUSIVE'}],
+                                             'evidence':{'id':'ev_response_constraints'}})
     with pytest.raises(KernelRejected):
-        insert({'command_id': cmd['command_id']})  # RECEIVED is not complete
+        insert(result)  # RECEIVED is not complete
     command_store.dispatch(cmd['command_id'])
-    # Exercise the SQL constraint directly with the trusted application role;
-    # the public adapter requires complete() and refuses this manual advance.
+    # Even a direct application SQL update cannot commit false completion.
+    with pytest.raises(KernelRejected):
+        with funded['kernel']._transaction() as conn:
+            conn.execute("UPDATE core.commands SET status='APPLIED' WHERE command_id=%s", (cid,))
+    assert command_store.get(cmd['command_id'])['state']=='DISPATCHED'
+    # A trusted controller must save the matching result in that transaction.
     with funded['kernel']._transaction() as conn:
         conn.execute("UPDATE core.commands SET status='APPLIED' WHERE command_id=%s", (cid,))
-    for document in ({}, {'command_id':'cmd_'+uuid4().hex}):
-        with pytest.raises(KernelRejected):
-            insert(document)
-    insert({'command_id':cmd['command_id']})
+        for document in ({}, {'command_id':'cmd_'+uuid4().hex},
+                         {**result,'evidence':{'id':'missing'}},
+                         {**result,'candidate':{'diff':'forged'}},
+                         {**result,'gates':[{'gate':'GH_INTEGRITY','result':'PASS'}]}):
+            with pytest.raises(psycopg.errors.CheckViolation):
+                with conn.transaction():  # savepoint keeps the completion transaction usable
+                    conn.execute('INSERT INTO runtime.api_command_results(tenant_id,project_id,command_id,document) '
+                                 'VALUES (%s,%s,%s,%s)', (*command_store.scope,cid,Jsonb(document)))
+        conn.execute('INSERT INTO runtime.api_command_results(tenant_id,project_id,command_id,document) '
+                     'VALUES (%s,%s,%s,%s)', (*command_store.scope,cid,Jsonb(result)))
     with funded['kernel']._transaction() as conn:
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute('UPDATE runtime.api_command_results SET document=%s WHERE command_id=%s',
@@ -1242,6 +1266,7 @@ def test_command_status_read_does_not_mix_states_across_completion(funded, comma
     from threading import Event
     cmd = command_store.create('g','consistent-status')
     command_store.dispatch(cmd['command_id'])
+    response=_command_response_evidence(funded,{'command_id':cmd['command_id'],'evidence':{'id':'ev_consistent'}})
     entered, release = Event(), Event()
     original = command_store._view
     def pause_view(conn,row):
@@ -1253,7 +1278,7 @@ def test_command_status_read_does_not_mix_states_across_completion(funded, comma
     with ThreadPoolExecutor(max_workers=2) as workers:
         reading = workers.submit(command_store.get,cmd['command_id'])
         assert entered.wait(5)
-        completing = workers.submit(command_store.complete,cmd['command_id'],{'command_id':cmd['command_id']})
+        completing = workers.submit(command_store.complete,cmd['command_id'],response)
         try:
             with psycopg.connect(funded['dsn'],autocommit=True) as control:
                 deadline = time.monotonic()+5
@@ -1276,16 +1301,123 @@ def test_command_status_read_does_not_mix_states_across_completion(funded, comma
     assert new['state'] == 'APPLIED' and new['served']['command_id'] == cmd['command_id']
 
 
-def test_command_completion_failure_rolls_back_state_history_and_response(command_store, monkeypatch):
+def test_command_completion_failure_rolls_back_state_history_and_response(funded,command_store, monkeypatch):
     from evoforge.postgres_kernel import KernelUnavailable
     cmd = command_store.create('g','completion-rollback')
     command_store.dispatch(cmd['command_id'])
+    response=_command_response_evidence(funded,{'command_id':cmd['command_id'],'evidence':{'id':'ev_rollback'}})
     def fail_after_insert(*args):
         raise KernelUnavailable('injected failure')
     with monkeypatch.context() as patch:
         patch.setattr(command_store,'_view',fail_after_insert)
         with pytest.raises(KernelUnavailable):
-            command_store.complete(cmd['command_id'],{'command_id':cmd['command_id']})
+            command_store.complete(cmd['command_id'],response)
     row = command_store.get(cmd['command_id'])
     assert row['state']=='DISPATCHED' and 'served' not in row
     assert [state for state,_ in row['history']] == ['RECEIVED','VALIDATING','PLANNED','DISPATCHED']
+    # Completion can safely reuse the existing proof after recovery; dispatch
+    # remains single-flight and no provider invocation is needed.
+    assert command_store.complete(cmd['command_id'],response)['state']=='APPLIED'
+
+
+def test_command_completion_rejects_missing_other_command_and_foreign_evidence(funded,command_store):
+    from evoforge.commands import TransitionError
+    from evoforge.postgres_state import EvidenceStore
+    first=command_store.create('g','first-response')
+    second=command_store.create('other','second-response')
+    cid=first['command_id']
+    command_store.dispatch(cid)
+    evidence=_command_response_evidence(funded,{'command_id':second['command_id'],'evidence':{'id':'ev_other_command'}})
+    for body in ({'command_id':cid}, {'command_id':cid,'evidence':{'id':'missing'}},
+                 {**evidence,'command_id':cid}):
+        with pytest.raises(TransitionError):
+            command_store.complete(cid,body)
+    project=uuid4()
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute("INSERT INTO core.projects(tenant_id,project_id,name) VALUES (%s,%s,'foreign')",
+                     (funded['scope'].tenant_id,project))
+    foreign=PostgresKernel(funded['dsn'],KernelScope(funded['scope'].tenant_id,project))
+    EvidenceStore(foreign).write('records','ev_foreign',{'id':'ev_foreign','command_id':cid})
+    with pytest.raises(TransitionError):
+        command_store.complete(cid,{'command_id':cid,'evidence':{'id':'ev_foreign'}})
+    remaining=command_store.get(cid)
+    assert remaining['state']=='DISPATCHED' and 'served' not in remaining
+    assert [state for state,_ in remaining['history']][-1]=='DISPATCHED'
+
+
+def test_http_canonical_command_lifecycle_persists_once_across_new_api_process(funded,http_kernel,monkeypatch):
+    monkeypatch.setenv('EVO_COMMAND_ACTOR_ID',str(uuid4()))
+    request={'goal':'verified command fixture','idempotency_key':'http-command','risk':'HIGH','confirm':True}
+    refused=http_kernel.post('/v1/kernel/commands',json={**request,'confirm':False})
+    assert refused.status_code==409
+    replies=[http_kernel.post('/v1/kernel/commands',json=request) for _ in range(20)]
+    assert all(r.status_code==200 for r in replies)
+    assert len({r.json()['command_id'] for r in replies})==1
+    cid=replies[0].json()['command_id']
+    path='/v1/kernel/commands/'+cid
+    assert http_kernel.post(path+'/dispatch',json={}).json()['state']=='DISPATCHED'
+    assert http_kernel.post(path+'/dispatch',json={}).status_code==409
+    response=_command_response_evidence(funded,{'command_id':cid,'candidate':{'diff':'fixture'},
+                                               'gates':[{'gate':'GH_INTEGRITY','result':'INCONCLUSIVE'}],
+                                               'evidence':{'id':'ev_http_command'}})
+    wrong={**response,'gates':[{'gate':'GH_INTEGRITY','result':'PASS'}]}
+    assert http_kernel.post(path+'/complete',json={'response':wrong}).status_code==409
+    applied=http_kernel.post(path+'/complete',json={'response':response})
+    assert applied.status_code==200 and applied.json()['state']=='APPLIED'
+    assert applied.json()['served']==response and '_store' not in applied.text
+    assert http_kernel.post(path+'/complete',json={'response':response}).json()==applied.json()
+    script="""import os
+import main
+from fastapi.testclient import TestClient
+with TestClient(main.app) as c:
+    r=c.get('/v1/kernel/commands/'+os.environ['CHECK_COMMAND_ID'],
+            headers={'Authorization':'Bearer '+os.environ['EVO_KERNEL_TOKEN']})
+    assert r.status_code==200 and r.json()['state']=='APPLIED'
+    assert r.json()['served']['evidence']['id']=='ev_http_command'
+    print('restored')
+"""
+    child=subprocess.run([sys.executable,'-c',script],cwd=ROOT/'services/api',
+                         env={**os.environ,'CHECK_COMMAND_ID':cid},capture_output=True,text=True,timeout=20,
+                         creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    assert child.returncode==0 and child.stdout.strip()=='restored'
+
+
+def test_http_commands_are_scoped_and_missing_actor_never_falls_back_to_memory(funded,http_kernel,monkeypatch):
+    from evoforge import commands
+    request={'goal':'g','idempotency_key':'http-missing-actor'}
+    monkeypatch.delenv('EVO_COMMAND_ACTOR_ID',raising=False)
+    assert http_kernel.post('/v1/kernel/commands',json=request).status_code==503
+    assert request['idempotency_key'] not in commands._by_key
+    monkeypatch.setenv('EVO_COMMAND_ACTOR_ID',str(uuid4()))
+    cid=http_kernel.post('/v1/kernel/commands',json=request).json()['command_id']
+    monkeypatch.setitem(commands._by_id,cid,{'command_id':cid,'state':'APPLIED','served':{'private':'memory'}})
+    monkeypatch.setenv('EVO_PROJECT_ID',str(uuid4()))
+    read=http_kernel.get('/v1/kernel/commands/'+cid)
+    absent=http_kernel.get('/v1/kernel/commands/cmd_'+uuid4().hex)
+    assert read.status_code==absent.status_code==404 and read.json()==absent.json()
+    assert http_kernel.post('/v1/kernel/commands/'+cid+'/dispatch',json={}).status_code==404
+
+
+def test_http_command_inputs_do_not_grant_approval_or_accept_loose_confirmation(http_kernel,monkeypatch):
+    monkeypatch.setenv('EVO_COMMAND_ACTOR_ID',str(uuid4()))
+    request={'goal':'g','idempotency_key':'strict-http-command'}
+    for invalid in ({'confirm':'true'},{'expected_version':True},{'expected_version':1.5},
+                    {'kind':'APPROVE_MERGE'},{'actor_user_id':str(uuid4())},{'tenant_id':str(uuid4())}):
+        assert http_kernel.post('/v1/kernel/commands',json={**request,**invalid}).status_code==422
+    cid=http_kernel.post('/v1/kernel/commands',json=request).json()['command_id']
+    assert http_kernel.post('/v1/kernel/commands/'+cid+'/dispatch',json={'to_state':'APPLIED'}).status_code==422
+    assert http_kernel.post('/v1/kernel/commands/'+cid+'/complete',json={
+        'response':{'command_id':cid,'evidence':{'id':'missing'}}}).status_code==409
+
+
+def test_deferred_command_completion_works_with_session_role_and_rls(funded,command_store):
+    from evoforge.postgres_commands import CommandStore
+    # The session remains core_app when SET LOCAL ROLE unwinds, so deferred
+    # checks cannot accidentally rely on the test administrator's RLS bypass.
+    dsn=make_conninfo(funded['dsn'],options='-c role=core_app')
+    restricted=CommandStore(PostgresKernel(dsn,funded['scope']))
+    cid=restricted.create('strict role','strict-role-completion')['command_id']
+    restricted.dispatch(cid)
+    response=_command_response_evidence(funded,{'command_id':cid,'evidence':{'id':'ev_strict_role'}})
+    assert restricted.complete(cid,response)['state']=='APPLIED'
+    assert restricted.get(cid)['served']==response
