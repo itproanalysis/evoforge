@@ -148,7 +148,10 @@ def _apply_diff(sandbox: str, diff: str | None) -> None:
         else:
             parent = os.path.dirname(full)
             if parent:
-                os.makedirs(parent, exist_ok=True)
+                try:
+                    os.makedirs(parent, exist_ok=True)
+                except OSError as e:
+                    raise RunnerError(f"cannot create directory for {p}: {e}")
             try:
                 with open(full, "w", encoding="utf-8", newline="") as fh:
                     fh.write(text)

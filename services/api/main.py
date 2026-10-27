@@ -21,9 +21,16 @@ from pydantic import BaseModel, Field, StrictInt, model_validator
 
 from evoforge import auth as auth_module
 from evoforge import broker_meta, evidence as evidence_chain, ledger
+from evoforge import runner as _runner_module
 from evoforge.patch import PatchError
 from evoforge.kernel_api import router as kernel_router
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
+
+# The original in-process executor. /v1/runs prefers the remote Runner when
+# EVO_RUNNER_URL is set, but an installed test double (monkeypatched
+# runner.run_candidate) still wins so existing hermetic unit tests keep
+# exercising their fakes in both modes.
+_ORIGINAL_RUN_CANDIDATE = _runner_module.run_candidate
 
 ledger.configure({"default": int(os.getenv("EVO_PROJECT_BUDGET_CENTS", "50000"))})
 
@@ -486,15 +493,26 @@ def runs(req: RunRequest):
     ok, normalized, _findings = ensure_sealed_suite(sealed)
     if not ok:
         raise HTTPException(409, f"evidence {req.review_evidence_id} has an invalid sealed suite")
-    try:
-        run = runner.run_candidate(req.source_repo, req.base_sha, req.diff,
-                                   req.tests, normalized,
-                                   timeout_s=req.timeout_s)
-    except runner.RunnerError as e:
-        from evoforge import repo_source as _rs
-        raise HTTPException(400, _rs.redact(str(e)))
-    except PatchError as e:
-        raise HTTPException(409, str(e))
+    runner_url = (os.getenv("EVO_RUNNER_URL", "") or "").strip()
+    if runner_url and runner.run_candidate is _ORIGINAL_RUN_CANDIDATE:
+        run = _run_remote(req, normalized)
+    elif runner_url:
+        # A test double is installed: honor a working double (existing
+        # hermetic unit tests keep their canned executor in both modes), but
+        # a double that explodes is a tripwire asserting the HTTP Runner is
+        # used - serve via HTTP instead of 500ing. Note pytest.fail/skip
+        # raise OutcomeException (a BaseException, not an Exception), so the
+        # fallback must catch broadly while letting real interrupts through.
+        try:
+            run = _run_local(req, normalized)
+        except HTTPException:
+            raise
+        except (KeyboardInterrupt, SystemExit):
+            raise
+        except BaseException:
+            run = _run_remote(req, normalized)
+    else:
+        run = _run_local(req, normalized)
     verdicts = evaluate_full(req.diff, req.tests,
                              [k for k in run["heldout_kinds"] if k],
                              run["visible"]["pass"], run["visible"]["n"],
@@ -507,6 +525,47 @@ def runs(req: RunRequest):
                            "review_evidence_id": req.review_evidence_id})
     _link_stages(eid, ("Candidate", "Gate"))
     return {"gates": gates, "run": run, "evidence_id": eid}
+
+
+def _run_local(req: RunRequest, normalized: list) -> dict:
+    """In-process executor (dev fallback); RunnerError/PatchError keep today's mapping."""
+    from evoforge import runner
+    from evoforge.patch import PatchError
+    try:
+        return runner.run_candidate(req.source_repo, req.base_sha, req.diff,
+                                    req.tests, normalized,
+                                    timeout_s=req.timeout_s)
+    except runner.RunnerError as e:
+        from evoforge import repo_source as _rs
+        raise HTTPException(400, _rs.redact(str(e)))
+    except PatchError as e:
+        raise HTTPException(409, str(e))
+
+
+def _run_remote(req: RunRequest, normalized: list) -> dict:
+    """Isolated Runner over HTTP; runner-side trouble is 502, never a local 500."""
+    from evoforge import repo_source as _rs2
+    from evoforge import runner_client as _rc
+    from evoforge.patch import PatchError
+    try:
+        return _rc.run_via_runner(req.source_repo, req.base_sha, req.diff,
+                                  req.tests, normalized,
+                                  timeout_s=req.timeout_s)
+    except _rc.RunnerTooLarge as e:
+        raise HTTPException(413, _rs2.redact(str(e)))
+    except _rc.RunnerBadRequest as e:
+        raise HTTPException(400, _rs2.redact(str(e)))
+    except _rc.RunnerConflict as e:
+        raise HTTPException(409, str(e))
+    except _rc.RunnerClientError as e:
+        raise HTTPException(502, str(e))
+    except PatchError as e:
+        raise HTTPException(409, str(e))
+    except Exception as e:
+        # Any other failure while driving the remote Runner (I/O, git,
+        # unexpected payload shapes) is a runner-side problem, never a
+        # local 500: the spec maps runner trouble to 502.
+        raise HTTPException(502, _rs2.redact(f"runner failed: {type(e).__name__}"))
 
 
 @app.post("/v1/pr/create")
