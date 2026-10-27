@@ -118,6 +118,15 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Antigravity / `agy/cr-closure` / `C:\evo_forge_agy` — Context Mesh·리뷰어 자격/대형 Diff·공급망/공정 큐/키 격리 고도화:**
+  상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 파일과 전혀 겹치지 않는 독립 모듈로 수용 매트릭스(`Acceptance_Test_Matrix.md`)와
+  `SERVICE_STATUS.md` P1의 미구현 항목을 구현·검증한다.
+  대상 파일: `services/api/evoforge/context_mesh.py` (L1–L5 로그 Fidelity Gate, Vault 왕복/용량 상한/crypto-shred, Folder 복원 어댑터,
+  Context Packet v2 컴파일러·테넌트 캐시 네임스페이스 솔트·런타임 인젝션/민감도/기능 플래그 가드, 온라인 컨텍스트 결정 규칙 CR-01/11/12/15/17/18/19/20/24/25/26/28),
+  `services/api/evoforge/review_qualification.py` (400KB 대형 Diff 분할·chunk 리뷰 바이트 커버리지 합산·seeded-defect canary 및 리뷰어 자격 시험 풀 CR-08/10/32/34/58/66/68),
+  `services/api/evoforge/runtime_guards.py` (BSL-1.1/Caveman/LiteLLM 공급망·SBOM 스캐너, 테넌트 가중 공정 큐 DRR, 플랫폼 키 KMS Broker 전용 복호화 CR-23/35/49/50),
+  신규 테스트 `services/api/tests/test_context_mesh_cr.py`, `services/api/tests/test_review_qualification_cr.py`, `services/api/tests/test_runtime_guards_cr.py`,
+  문서 `docs/CR_CLOSURE_ADVANCEMENT.md`. `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 수정하지 않는다.
 - **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — 정산/예약 경합의 프로젝트 cap 검사:** 확장 007·Codex DB 테스트·관련 문서에서
   정본 함수의 한도 검사 뒤 기존 호출이 정산되는 경합을 재현하고, 새 예약 저장 시점의 cap 재검사를 보강한다.
   상위 T22 프로세스는 실행 중이므로 main/평가/UI·봉인 테스트를 편집하지 않는다. 정본 SQL 파일과 정산/승인 함수는 유지한다.
