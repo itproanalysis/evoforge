@@ -1,0 +1,8 @@
+{
+  "id": "T14b_real_id_token",
+  "planned_by": "Critic review of T14 (production defect)",
+  "goal": "PRODUCTION DEFECT in your T14 services/api/evoforge/auth.py: verify_id_token calls google.oauth2.id_token.verify_token(token, req, audience=aud, certs=certs), but google-auth 2.35.0's signature is verify_token(id_token, request, audience=None, certs_url=..., clock_skew_in_seconds=0) — there is no certs parameter. In production _fetch_certs returns Google's v3 JWKS, the call raises TypeError, it is wrapped as 'invalid ID token', and EVERY real request is rejected (the sealed T14 tests mocked verify_id_token, so they could not see it; google-auth was not even installed locally).\nSPEC: keep the public contract verify_id_token(token: str, audience: str) -> dict claims (signature via Google certs, exp/iat, iss accounts.google.com|https://accounts.google.com; ValueError on any failure). Use the official google-auth API correctly: google.oauth2.id_token.verify_token(token, google.auth.transport.requests.Request(), audience=audience) (it fetches and caches Google certs itself; you may keep a cached transport Request/session) — or verify_oauth2_token. Remove the custom urllib cert fetch/cache if no longer needed. Add cryptography==43.0.3 to services/api/requirements.txt (RS256 backend; also used by tests). Never log or return the token.",
+  "edit": ["services/api/evoforge/auth.py", "services/api/requirements.txt"],
+  "context": ["services/api/tests/test_critic_t14_auth.py"],
+  "check": ["python -m pytest services/api -q -p no:cacheprovider"]
+}
