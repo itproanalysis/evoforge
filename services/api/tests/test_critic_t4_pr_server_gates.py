@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
 from evoforge import github  # noqa: E402
+from critic_helpers import sealed_suite, server_review  # noqa: E402
 
 c = TestClient(main.app, raise_server_exceptions=False)
 HELDOUT = ["compositional", "negative", "boundary"]
@@ -36,14 +37,20 @@ def fake_runner(monkeypatch):
                 "heldout_kinds": [str(t.get("kind", "")) for t in heldout_tests]}
 
     monkeypatch.setattr(runner, "run_candidate", fake)
+    MP.append(monkeypatch)
+    yield
+    MP.clear()
+
+
+MP: list = []
 
 
 def _evaluate(diff=DIFF, heldout_kinds=HELDOUT, **kw):
     RUN.clear()
     RUN.update({"vis_pass": 10, "vis_n": 10, "held_pass": 10, "held_n": 10, **kw})
-    heldout = [{"kind": k, "code": "def test_h():\n    assert 1 == 1\n"} for k in heldout_kinds]
+    review = server_review(c, MP[-1], sealed_suite(kinds=heldout_kinds))  # T10: held-out from the server
     r = c.post("/v1/runs", json={"source_repo": "C:/repos/proj", "base_sha": "b" * 40, "diff": diff,
-                                 "tests": STRONG, "heldout_tests": heldout})
+                                 "tests": STRONG, "review_evidence_id": review})
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -113,7 +120,7 @@ def test_pr_refused_when_any_gate_not_pass(captured):
 
 
 def test_pr_refused_for_inconclusive(captured):
-    out = _evaluate(heldout_kinds=[])
+    out = _evaluate(vis_pass=0, vis_n=0)  # no execution evidence -> INCONCLUSIVE
     assert any(g["result"] == "INCONCLUSIVE" for g in out["gates"])
     r = c.post("/v1/pr/create", json={"evidence_id": out["evidence_id"], "title": "t"})
     assert r.status_code == 409 and captured == []
