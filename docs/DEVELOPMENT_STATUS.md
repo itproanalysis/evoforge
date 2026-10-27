@@ -118,6 +118,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — 병합 승인 시점의 정책/자격 검사:** Codex 소유 postgres_kernel.py와
+  test_postgres_kernel.py·관련 문서에서 실행의 현재 policy hash와 HIGH/CRITICAL 리뷰어의 실제 시각 자격 만료를 대조한다.
+  정본 core.authorize_merge는 그대로 호출하고 추가 거부 조건만 보강한다. main/상위 T22·Agy 자격 시험 모듈·봉인 테스트는 수정하지 않는다.
 - **Antigravity / `agy/cr-closure` / `C:\evo_forge_agy` — Context Mesh·리뷰어 자격/대형 Diff·공급망/공정 큐/키 격리 고도화:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 파일과 전혀 겹치지 않는 독립 모듈로 수용 매트릭스(`Acceptance_Test_Matrix.md`)와
   `SERVICE_STATUS.md` P1의 미구현 항목을 구현·검증한다.
