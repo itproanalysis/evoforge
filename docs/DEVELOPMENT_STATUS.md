@@ -122,6 +122,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (빈 공급사 allowlist·엄격한 동의) / `codex/preflight-policy`:** `eval_runner_and_preflight.py`와
+  새 `test_preflight_policy.py`·관련 문서를 소유한다. 빈 허용 목록과 boolean이 아닌 동의가
+  허용으로 해석되는 재현을 수정하고 예약/전송 전에 fail-closed를 검증한다.
+
 - **Antigravity (완료·클레임 해제·main 반영 `4426de9`) / `agy/web-live-dashboard`:**
   1. `next.config.ts`에 `createNextIntlPlugin("./i18n.ts")` 연결 및 `apps/web/app/[locale]/performance/page.tsx` 라우트 추가로 프로덕션 standalone 서버에서 `/`, `/ko`, `/performance`, `/ko/performance`, `/lab`, `/ko/lab`, `/evidence`, `/ko/evidence` 전 경로가 500/404 없이 모두 **HTTP 200**으로 응답함을 검증했다.
   2. 사용자 확인 웹페이지(`apps/web/app/[locale]/page.tsx`, `apps/web/app/page.tsx`, `apps/web/app/[locale]/evidence/page.tsx`, `apps/web/app/evidence/page.tsx`)를 실제 서버 라이브 상황을 즉시 확인할 수 있도록 고도화했다:
