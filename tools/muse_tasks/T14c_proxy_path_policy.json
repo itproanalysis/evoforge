@@ -1,0 +1,10 @@
+{
+  "id": "T14c_proxy_path_policy",
+  "planned_by": "Critic review of T14 (production defect)",
+  "goal": "PRODUCTION DEFECT in your T14 proxy apps/web/app/api/evoforge/[...path]/route.ts: isAllowed() checks prefixes on the joined decoded segments, so /api/evoforge/v1/evidence/../kernel/reservations passes the '/v1/evidence/' prefix and fetch() then normalizes the target to /v1/kernel/reservations (internal kernel API, must never be reachable from the browser). Encoded variants (%2e%2e, %2f, backslashes) behave the same.\nSPEC: move the path policy into a pure module apps/web/lib/proxyPolicy.ts exporting resolveApiPath(segments: string[]): string | null and use it in the route. Return null (route answers 404 before any upstream fetch) when any segment is empty, '.', '..', contains '/', '\\\\', '%', a control character, or any character outside [A-Za-z0-9._~-]; then build '/' + segments.join('/') and allow only the exact paths and the prefix families already in the allowlist, where a prefix family accepts exactly ONE extra segment for /v1/evidence/{id} and /v1/events/{id}, and for /v1/commands/{id} or /v1/commands/{id}/advance. Query strings: forward only for paths that already take them (/v1/commands/{id}/advance?to_state=...). Never forward to /v1/kernel/*. Also add a tiny runnable self-check apps/web/scripts/check-proxy-policy.mjs that imports the compiled logic is NOT required; instead write the same rules as a JSON table of cases in apps/web/lib/proxyPolicy.cases.json ({path_segments, expected}) and make resolveApiPath satisfy every case (the Critic runs these cases against a live server).",
+  "edit": ["apps/web/lib/proxyPolicy.ts", "apps/web/lib/proxyPolicy.cases.json", "apps/web/app/api/evoforge/[...path]/route.ts"],
+  "context": [],
+  "check": ["python -m pytest services/api -q -p no:cacheprovider",
+            "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
+            "git checkout -- apps/web/tsconfig.tsbuildinfo"]
+}
