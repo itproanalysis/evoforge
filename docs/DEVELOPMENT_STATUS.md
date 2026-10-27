@@ -118,6 +118,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — 정산/예약 경합의 프로젝트 cap 검사:** 확장 007·Codex DB 테스트·관련 문서에서
+  정본 함수의 한도 검사 뒤 기존 호출이 정산되는 경합을 재현하고, 새 예약 저장 시점의 cap 재검사를 보강한다.
+  상위 T22 프로세스는 실행 중이므로 main/평가/UI·봉인 테스트를 편집하지 않는다. 정본 SQL 파일과 정산/승인 함수는 유지한다.
 - **Codex (후보 등록 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 새 `postgres_candidates.py`·확장 008·
   Codex 소유 kernel_api.py/test_kernel_api.py/test_postgres_kernel.py·관련 문서를 수정한다.
   저장된 Builder 출력과 정산된 call/receipt/request ID를 대조하고, 기준 SHA에 적용한 diff/visible 테스트가 실제 head의 Git tree와
