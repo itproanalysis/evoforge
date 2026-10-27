@@ -153,9 +153,139 @@ def _call_provider(rsv: str, fn, *args):
     return out
 
 
+def _stage_summary(eid: str, stage: str) -> dict:
+    """Per-stage facts already stored server-side; never includes test code."""
+    stored = _evidence.get(eid, {})
+    if stage == "ObjectiveVersion":
+        return {
+            "objective_id": stored.get("objective_id"),
+            "goal": stored.get("goal"),
+            "risk": stored.get("risk"),
+        }
+    if stage == "Task":
+        return {"command_id": stored.get("command_id")}
+    if stage == "Candidate":
+        cand = stored.get("candidate")
+        diff = ""
+        tests: list = []
+        stub = None
+        if isinstance(cand, dict):
+            d = cand.get("diff")
+            if isinstance(d, str):
+                diff = d
+            t = cand.get("tests")
+            if isinstance(t, list):
+                tests = t
+            stub = cand.get("stub")
+        if not diff and isinstance(stored.get("diff"), str):
+            diff = stored["diff"]
+        if not tests and isinstance(stored.get("tests"), list):
+            tests = stored["tests"]
+        return {
+            "tests_count": len(tests),
+            "diff_chars": len(diff),
+            "stub": stub,
+        }
+    if stage == "Gate":
+        gates = stored.get("gates") if isinstance(stored.get("gates"), list) else []
+        verdicts = [
+            {"gate": g.get("gate"), "result": g.get("result"), "reason": g.get("reason", "")}
+            for g in gates if isinstance(g, dict)
+        ]
+        summary: dict = {"verdicts": verdicts, "gates": verdicts}
+        run = stored.get("run")
+        if isinstance(run, dict):
+            vis = run.get("visible") if isinstance(run.get("visible"), dict) else {}
+            held = run.get("heldout") if isinstance(run.get("heldout"), dict) else {}
+            summary["visible"] = {"pass": vis.get("pass"), "n": vis.get("n")}
+            summary["heldout"] = {"pass": held.get("pass"), "n": held.get("n")}
+            summary["run_counts"] = {
+                "vis_pass": vis.get("pass"), "vis_n": vis.get("n"),
+                "held_pass": held.get("pass"), "held_n": held.get("n"),
+            }
+            kinds = run.get("heldout_kinds")
+            if isinstance(kinds, list):
+                summary["heldout_kinds"] = [k for k in kinds if isinstance(k, str)]
+        return summary
+    if stage == "Review":
+        inner = stored.get("review")
+        sealed: list = []
+        review_doc: dict = {}
+        stub = None
+        model = None
+        if isinstance(inner, dict):
+            s = inner.get("sealed_tests")
+            if isinstance(s, list):
+                sealed = s
+            r = inner.get("review")
+            if isinstance(r, dict):
+                review_doc = r
+            stub = inner.get("stub")
+            model = inner.get("model")
+        result = review_doc.get("result")
+        findings = review_doc.get("findings") if isinstance(review_doc.get("findings"), list) else []
+        kinds = sorted({t.get("kind") for t in sealed if isinstance(t, dict) and isinstance(t.get("kind"), str)})
+        return {
+            "result": result,
+            "review_result": result,
+            "review": {"result": result},
+            "findings_count": len(findings),
+            "sealed_count": len(sealed),
+            "sealed_kinds": kinds,
+            "stub": stub,
+            "model": model,
+        }
+    if stage == "PR":
+        pr_url = stored.get("pr")
+        return {
+            "pr": pr_url,
+            "pr_url": pr_url,
+            "html_url": pr_url,
+            "title": stored.get("title"),
+            "source_evidence_id": stored.get("source_evidence_id"),
+        }
+    return {}
+
+
 def _link_stages(eid: str, stages) -> None:
     for stage in stages:
-        evidence_chain.link(eid, stage, evidence_chain.record(stage, {"evidence_id": eid}))
+        event_id = evidence_chain.record(stage, None, evidence_id=eid, summary=_stage_summary(eid, stage))
+        evidence_chain.link(eid, stage, event_id)
+
+
+def _redact_value(value):
+    """Public copy helper: strip sealed test code and provider response bodies."""
+    if isinstance(value, dict):
+        if "response_document" in value:
+            out = {}
+            for k, v in value.items():
+                if k == "response_document":
+                    out[k] = {"redacted": True}
+                else:
+                    out[k] = _redact_value(v)
+            if isinstance(value.get("sealed_tests"), list):
+                out["sealed_tests"] = [
+                    {kk: _redact_value(vv) for kk, vv in t.items() if kk != "code"}
+                    if isinstance(t, dict) else _redact_value(t)
+                    for t in value["sealed_tests"]
+                ]
+            return out
+        if isinstance(value.get("sealed_tests"), list):
+            out = {}
+            for k, v in value.items():
+                if k == "sealed_tests":
+                    out[k] = [
+                        {kk: _redact_value(vv) for kk, vv in t.items() if kk != "code"}
+                        if isinstance(t, dict) else _redact_value(t)
+                        for t in v
+                    ]
+                else:
+                    out[k] = _redact_value(v)
+            return out
+        return {k: _redact_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact_value(x) for x in value]
+    return value
 
 
 def _store_evidence(payload: dict) -> str:
@@ -354,8 +484,17 @@ def evidence(eid: str):
     if eid not in _evidence:
         raise HTTPException(404, "unknown evidence id")
     stored = _evidence[eid]
-    data = {k: v for k, v in stored.items() if k not in ("chain", "data")}
-    return {**stored, "chain": evidence_chain.chain(eid), "data": data}
+    public = _redact_value(stored)
+    data = {k: v for k, v in public.items() if k not in ("chain", "data")}
+    return {**public, "chain": evidence_chain.chain(eid), "data": data}
+
+
+@app.get("/v1/events/{event_id}")
+def event(event_id: str):
+    view = evidence_chain.view(event_id)
+    if view is None:
+        raise HTTPException(404, "unknown event id")
+    return view
 
 
 @app.get("/v1/commands/{command_id}")

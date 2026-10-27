@@ -154,6 +154,18 @@ export function getEvidence(id: string) {
   );
 }
 
+export interface ChainEvent {
+  id: string;
+  stage: string;
+  kind: string;
+  evidence_id: string;
+  summary: Record<string, unknown>;
+}
+
+export function getEvent(event_id: string) {
+  return req<ChainEvent>(`/v1/events/${encodeURIComponent(event_id)}`);
+}
+
 export const EVIDENCE_STAGES = [
   "ObjectiveVersion",
   "Task",

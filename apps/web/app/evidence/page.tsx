@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { EVIDENCE_STAGES, getEvidence } from "../../lib/api";
+import { EVIDENCE_STAGES, getEvent, getEvidence } from "../../lib/api";
 
 const card: React.CSSProperties = {
   background: "#141b2d",
@@ -46,6 +46,10 @@ export default function EvidencePage() {
   const [raw, setRaw] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<string | null>(null);
+  const [detail, setDetail] = useState("");
+  const [detailErr, setDetailErr] = useState("");
+  const [detailLoading, setDetailLoading] = useState(false);
 
   const fetchOne = async () => {
     setLoading(true);
@@ -54,12 +58,30 @@ export default function EvidencePage() {
       const out = await getEvidence(id);
       setLinks(normalize(out, id));
       setRaw(JSON.stringify(out, null, 2));
+      setSelected(null);
+      setDetail("");
+      setDetailErr("");
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
       setLinks(normalize(null, id));
       setRaw("");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchEvent = async (eventId: string) => {
+    setSelected(eventId);
+    setDetailLoading(true);
+    setDetailErr("");
+    try {
+      const out = await getEvent(eventId);
+      setDetail(JSON.stringify(out, null, 2));
+    } catch (e) {
+      setDetailErr(e instanceof Error ? e.message : String(e));
+      setDetail("");
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -107,7 +129,19 @@ export default function EvidencePage() {
               >
                 <strong style={{ minWidth: 150 }}>{l.stage}</strong>
                 {l.event_id ? (
-                  <code>{l.event_id}</code>
+                  <button
+                    onClick={() => fetchEvent(l.event_id as string)}
+                    style={{
+                      background: "transparent",
+                      border: "1px solid #33405c",
+                      borderRadius: 6,
+                      padding: "2px 8px",
+                      cursor: "pointer",
+                      color: "#93c5fd",
+                    }}
+                  >
+                    <code>{l.event_id}</code>
+                  </button>
                 ) : (
                   <span
                     style={{
@@ -125,6 +159,18 @@ export default function EvidencePage() {
               </li>
             ))}
           </ol>
+          {selected ? (
+            <div style={{ marginTop: 12 }}>
+              <h3 style={{ fontSize: 13 }}>Event {selected}</h3>
+              {detailLoading ? <p style={{ fontSize: 12 }}>Loading event…</p> : null}
+              {detailErr ? <p style={{ color: "#ef4444", fontSize: 13 }}>Error: {detailErr}</p> : null}
+              {detail ? (
+                <pre style={{ background: "#0b0e14", border: "1px solid #263048", borderRadius: 8, padding: 12, fontSize: 12, overflow: "auto" }}>
+                  {detail}
+                </pre>
+              ) : null}
+            </div>
+          ) : null}
           {raw ? (
             <pre style={{ background: "#0b0e14", border: "1px solid #263048", borderRadius: 8, padding: 12, fontSize: 12, overflow: "auto" }}>
               {raw}
