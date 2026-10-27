@@ -716,3 +716,15 @@ API 635 passed·1 skipped, 실제 PostgreSQL 169 passed·SQL 96·참조 112·정
 다른 작업의 미커밋 `runner.py`·`test_critic_t5_runner.py`는 내용이 보존되었고 이 검증에 포함되지 않았다.
 어댑터의 청구 출처 주장은 공급사 실청구의 독립 증명이 아니며, 공개 Broker·실행·운영 배포 전체는 미완료다.
 Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.
+
+## 원격 Runner 기준 커밋 고정 진행
+
+`codex/runner-base-binding`의 `446e940`은 Git ref를 불변 커밋으로 한 번 해석해 bundle/요청에
+사용하고 원격 checkout HEAD 또는 Runner 응답의 기준이 요청과 다르면 거부한다. 실제 로컬 Git 객체·번들과
+합성 원격 응답 재현은 수정 전 4 failed·1 passed, 수정 후 집중 17 passed, 실제 Runner 서비스 포함 37 passed.
+정본 검사는 0 failure이며 전체 API·실제 PostgreSQL 검증은 진행 중이다.
+원본: `.local/evidence/runner-base-binding-20261028-srrygk3d`. 현재 수정 중인 runner와 승격 Critic 테스트는 보존했다.
+
+공개 `_pr_core`의 서버 검증 SHA 전달은 기존 승격 `test_critic_t17_context_pr_tests.py`가 허구의 `basesha`와
+서로 다른 Runner SHA로 성공을 요구하므로 안전한 강제 검사와 충돌한다. 승격 테스트를 고치거나 우회하지 않았으며
+공개 PR 경로의 최종 연결은 별도 해결이 필요하다.

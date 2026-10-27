@@ -380,3 +380,11 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 다른 작업의 미커밋 runner와 승격 Critic 테스트는 보존했고 검증본에는 포함되지 않았다.
 실제 공급사 청구 출처 검증, 공개 명령/Broker·DB 전체 연결 및 운영 배포는 계속 미완료다.
 자동 재개와 Muse Spark 기본값을 유지한다.
+
+## 2026-10-28 원격 Runner 기준 고정
+
+`codex/runner-base-binding` `446e940`은 Git ref를 불변 커밋으로 고정한 bundle을 사용하고
+요청 SHA와 다른 checkout 또는 응답 base를 거부한다. 수정 전 4 failed·1 passed, 수정 후 집중 17개 및
+실제 Runner 서비스 포함 37개 통과·정본 0 failure. 전체 API·실제 DB 검증 중.
+원본 `.local/evidence/runner-base-binding-20261028-srrygk3d`; main의 미커밋 runner/승격 테스트는 보존했다.
+공개 PR 경로의 SHA 전달은 기존 승격 T17 테스트가 유효하지 않은 가짜 SHA로 성공을 요구하여 별도 조정이 필요하다.
