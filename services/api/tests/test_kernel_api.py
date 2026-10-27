@@ -59,6 +59,19 @@ def test_unauthenticated_requests_cannot_create_database_adapter(api, authorizat
     assert TOKEN not in response.text
 
 
+def test_runner_evidence_ingestion_and_reads_require_the_internal_service_credential(api):
+    candidate=uuid4()
+    body={'candidate_id':str(candidate),'call_id':str(api['call']),'evidence_id':'ev_private'}
+    for authorization in (None,'Bearer wrong-token','Basic wrong-token'):
+        headers={'Authorization':authorization} if authorization else {}
+        writes=api['client'].post('/v1/kernel/candidate-runs',json=body,headers=headers)
+        reads=api['client'].get(f'/v1/kernel/candidates/{candidate}/runner-evidence/ev_private',headers=headers)
+        assert writes.status_code==reads.status_code==401
+        assert writes.headers['www-authenticate']==reads.headers['www-authenticate']=='Bearer'
+        assert TOKEN not in writes.text+reads.text
+    api['factory'].assert_not_called()
+
+
 @pytest.mark.parametrize("missing", ["EVO_TENANT_ID", "EVO_PROJECT_ID", "DATABASE_URL", "EVO_KERNEL_TOKEN"])
 def test_missing_server_configuration_fails_closed(api, monkeypatch, missing):
     monkeypatch.delenv(missing, raising=False)

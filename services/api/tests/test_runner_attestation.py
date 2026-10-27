@@ -1,6 +1,5 @@
 """Runner metadata binds exact inputs/results; hashes do not replace trusted transport."""
 from copy import deepcopy
-import importlib.util
 from pathlib import Path
 import sys
 import base64
@@ -65,15 +64,6 @@ def test_runner_bad_image_configuration_and_impossible_remote_counts_fail_closed
         provenance.prepare(BASE,'',VISIBLE,SEALED)
     with pytest.raises(RunnerClientError):
         _validate_counts({'pass':2,'n':1,'timed_out':False,'exit_code':0},'visible')
-
-
-def test_isolated_runner_hashing_utility_loads_without_the_api_package():
-    """The Docker COPY target is a standalone module with stdlib imports only."""
-    path=Path(provenance.__file__)
-    spec=importlib.util.spec_from_file_location('standalone_runner_provenance',path)
-    module=importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    assert module.input_digest(BASE,'',VISIBLE,SEALED) == provenance.input_digest(BASE,'',VISIBLE,SEALED)
 
 
 def test_runner_container_file_set_executes_with_provenance_without_api_sources(tmp_path,monkeypatch):
