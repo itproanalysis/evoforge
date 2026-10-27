@@ -29,7 +29,7 @@ import sys
 import tempfile
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Callable
 
 _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -45,7 +45,7 @@ import eval_hygiene  # noqa: E402
 import jsonschema  # noqa: E402
 import validate_package  # noqa: E402
 
-from evoforge import gates, hygiene_api, runner  # noqa: E402
+from evoforge import gates, hygiene_api, provider_capabilities, runner  # noqa: E402
 from evoforge.reconciler_policy import ReconcilerLedger, ReservationPolicyError  # noqa: E402
 
 _SCHEMAS_DIR = os.path.join(_V42_ROOT, "contracts", "schemas")
@@ -316,11 +316,13 @@ class PreflightCallBroker:
         allowed_providers: set[str] | None = None,
         price_table_version: str = "pt_2026_10_v1",
         default_period_start: str = "2026-10-01",
+        capability_today: Callable[[], date] | None = None,
     ):
         self.ledger = ledger
         self.allowed_providers = allowed_providers or {"meta", "anthropic", "openai", "google", "other"}
         self.price_table_version = price_table_version
         self.default_period_start = default_period_start
+        self._capability_today = capability_today or (lambda: datetime.now(timezone.utc).date())
         self.provider_consents: dict[tuple[str, str], bool] = {}
         self.leases: dict[tuple[str, str], AgentLease] = {}
         self.bindings: dict[str, PreboundCallBinding] = {}
@@ -353,11 +355,21 @@ class PreflightCallBroker:
         errs = list(_PACKET_VALIDATOR.iter_errors(packet))
         if errs:
             raise PreflightError("PACKET_SCHEMA_INVALID", errs[0].message)
-        sem = validate_package.semantic(packet)
+        cp = packet["cache_plan"]
+        semantic_validator = validate_package
+        if cp["provider"] == "meta" and cp["model"] == "muse-spark-1.3":
+            try:
+                semantic_validator = provider_capabilities.muse_semantic_validator(
+                    os.getenv("MODEL_API_BASE", "https://api.meta.ai/v1"),
+                    self._capability_today(), cp["registry_verified_at"],
+                )
+            except provider_capabilities.CapabilityError as exc:
+                raise PreflightError(exc.code, exc.detail) from exc
+        sem = semantic_validator.semantic(packet)
         if sem:
             if "S6" in sem:
                 cp = packet.get("cache_plan", {})
-                entry = validate_package.registry_entry(
+                entry = semantic_validator.registry_entry(
                     cp.get("provider", ""), cp.get("model", ""), cp.get("registry_entry_id")
                 )
                 if isinstance(entry, dict):
