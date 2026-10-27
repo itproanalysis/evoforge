@@ -292,3 +292,18 @@ def test_dev_builder_cli_guard_budget_governed_cr38() -> None:
     assert res["receipt"]["customer_price_micros"] == 8_500
     assert res["settlement"]["settlement"]["actual_micros"] == 8_500
     assert eng.tenant_open_reserved_micros(TENANT_ID) == 0
+
+    # Empty or unverified CLI output must NEVER synthesize a provider_billed receipt or charge the ledger;
+    # it must retain the open reservation in UNKNOWN_EXTERNAL_OUTCOME for reconciliation.
+    with pytest.raises(PreflightError) as exc_unverified:
+        cli_guard.run_cli_task(
+            task_spec={"id": "synthetic-no-usage"},
+            packet=packet,
+            reserved_micros=20_000,
+            cli_runner=lambda _task: {},
+            period_start=PERIOD,
+        )
+    assert exc_unverified.value.code == "UNVERIFIED_CLI_OUTCOME"
+    assert eng.tenant_open_reserved_micros(TENANT_ID) == 20_000
+    assert sum(1 for row in eng._ledger if row.entry_kind == "model_usage") == 1
+
