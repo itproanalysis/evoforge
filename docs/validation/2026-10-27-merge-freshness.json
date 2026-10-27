@@ -1,0 +1,85 @@
+{
+  "date": "2026-10-27",
+  "revision": "14415180632e58231057baabddbb501e23489a66",
+  "prior_implementation_revision": "4657bc9",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Merge authorization checks server-owned current head/run policy under shared locks and actual-time HIGH/CRITICAL reviewer qualification after canonical authorization",
+  "checks": {
+    "pre_fix_regression_subset": {
+      "failed": 2,
+      "deselected": 145
+    },
+    "api": {
+      "passed": 465,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 147,
+      "new_authorization_cases": 2
+    },
+    "expired_qualification_refusal_and_valid_requalification_acceptance": "passed",
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "limitations": [
+    "Canonical core.authorize_merge still called for every successful authorization; frozen source and qualification exam algorithms unchanged",
+    "Only additional denial checks; no gate, approval, review, qualification or candidate-state records created by authorization",
+    "Source gate/review/human approval/qualification evidence is synthetic DB fixture data, not actual operational approval",
+    "Authorization is a point-in-time check; actual external merge requires a fresh check and matching expected head",
+    "Support branch only; active Muse T22 and Antigravity module claims preserved",
+    "No paid provider execution, production migration, actual GitHub merge or deployment; public pipeline integration incomplete",
+    "muse-spark-1.3 and heartbeat retained"
+  ],
+  "source_sha256": {
+    "services/api/evoforge/postgres_kernel.py": "9a1e1789c6fdad2192453235f4afc0f62ed5d607e9e16795a491092b3a662321",
+    "services/api/tests/test_postgres_kernel.py": "13e08e740a8a6c968c9a8c982fe3618dbf54b80981be326014169b74551a61cb",
+    "services/api/evoforge/kernel_api.py": "86c0919f008e4d99f997f4f67afb3b2f8411536dacd62cb8cfbe59062f074de1",
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767",
+    "services/api/evoforge/broker_meta.py": "f50d55a3a54355db474c63ebbc99f53db878917680d055c5135847d72e5ea29c",
+    "docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql": "294f2961b3012ac18ade1efacb324fbb14721c76a41782864a0c0d977a262636"
+  },
+  "logs": {
+    "validation-merge-freshness-before.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\merge-freshness-20261027-jomlv8hr\\validation-merge-freshness-before.log",
+      "sha256": "fb3e92f61448967aa8202e7a7ec242ad189ae91b53951e7c301a73a07afaf098"
+    },
+    "validation-merge-freshness-focused.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\merge-freshness-20261027-jomlv8hr\\validation-merge-freshness-focused.log",
+      "sha256": "a7806935b04f3133374bf68a50b5a6198613923a2238476fbbe9d064b5069e29"
+    },
+    "validation-merge-freshness-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\merge-freshness-20261027-jomlv8hr\\validation-merge-freshness-api.log",
+      "sha256": "096b49340cf62887f0384843ac40b21684f282c239e3b24deaa89bcfb3c1d52d"
+    },
+    "validation-merge-freshness-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\merge-freshness-20261027-jomlv8hr\\validation-merge-freshness-postgres.log",
+      "sha256": "e4bd1a5eda1a2b44e925386f763d69f229f26a94a5c4e3e812a0b55d6f75b002"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\merge-freshness-20261027-jomlv8hr\\validation-kernel.log",
+      "sha256": "47682251dcbc2651c602f2d89fd8dc8be95957bd37f7c61521996165748c7716"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\merge-freshness-20261027-jomlv8hr\\validation-postgres.log",
+      "sha256": "736f9b51f8951d07df70cc841a956c9bfef825ba04076ca75e1e2f94a3880336"
+    },
+    "validation-merge-freshness-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\merge-freshness-20261027-jomlv8hr\\validation-merge-freshness-contract.log",
+      "sha256": "71f13b417fe139b50dba270678afb492f94b7421d9b81dc36b011bef6f41c7ce"
+    },
+    "validation-merge-freshness-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\merge-freshness-20261027-jomlv8hr\\validation-merge-freshness-web.log",
+      "sha256": "e49e3ae3b91e10cd94ea9bc6ca17ff7acd0066a0701dbcc0e656fdd3f89ebc91"
+    }
+  }
+}
