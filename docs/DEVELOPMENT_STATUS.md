@@ -119,9 +119,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex (DB 영수증/예약 해제 직렬화 보강) / `codex/pg-integration` / `C:\evo_forge_codex`:**
-  새 확장 `009_usage_release_guards.sql`·Codex 소유 postgres_kernel.py/test_postgres_kernel.py·관련 문서를 수정한다.
+- **Codex (DB 영수증/예약 해제 직렬화 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:**
+  새 확장 `009_usage_release_guards.sql`·Codex 소유 postgres_kernel.py/test_postgres_kernel.py·환경 예제/관련 문서를 수정한다.
   별도 ctx 적재와 직접 core 예약 해제도 같은 예약 행 잠금 및 영수증 검사로 보호하고 가드 비활성 상태는 전송 전에 거부한다.
+  구현 `afecb31`: API 485개·실제 DB 166개(신규 11개)·SQL 96개·참조 112개·계약·웹 빌드 통과. 지원 코드는 main 미반영이다.
   정본 SQL·RLS 정책·기존 금전 기록과 상위 T22 main/평가/UI·봉인 테스트는 변경하지 않는다.
 - **Codex (영수증 저장 후 예약 해제 보강 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:**
   Codex 소유 `postgres_kernel.py`·`test_postgres_kernel.py`와 관련 문서/검증 manifest를 수정한다.
@@ -500,3 +501,26 @@ source 36개·로그의 SHA-256은 지원 브랜치 `docs/validation/2026-10-27-
 Muse T22의 실행 프로세스와 OpenCode 자식 프로세스가 동작 중인 것을 확인했고 중복 실행하거나 상위 파일을 변경하지 않았다.
 상위 병합 뒤 공개 명령/Broker 비용·전체 승인 연결을 이어간다. 지원 코드는 main 미반영이고 전체 개발은 미완료이며,
 Muse Spark 기본값과 현재 채팅의 자동 재개를 유지한다.
+
+## DB 영수증/예약 해제 직렬화 (지원 검증 완료)
+
+`codex/pg-integration`의 `afecb31`과 확장 009는 별도 ctx_gateway 영수증 INSERT와 직접 core_app 예약 해제도
+같은 예약 행에서 직렬화한다. 영수증이 먼저 저장되면 해제가, 해제가 먼저 완료되면 뒤늦은 INSERT가 거부된다.
+실패 시 intent·hold·영수증 변경이 함께 롤백된다. 기존 정상 정산/해제와 다른 scope/call 격리는 유지한다.
+
+새 예약·전송·실제 해제는 두 트리거의 함수·시점·행 단위·활성 상태를 확인한다.
+가드가 없거나 disabled/replica 설정이면 503으로 거부하고 새 예약·전송·해제를 만들지 않는다.
+정본 함수/정책·FORCE RLS·기존 금전 기록은 그대로이며 적재 계정에 core 테이블 권한을 추가하지 않았다.
+새 trigger helper의 PUBLIC/app/gateway EXECUTE를 차단하고 임시 schema CREATE 권한을 원래대로 복원한다.
+
+수정 전 회귀 **10 failed**, 수정 후 집중 **11 passed**, API **485 passed·1 skipped**,
+실제 PostgreSQL **166 passed**(신규 11개), 참조 **112개**·SQL **96개**·계약 **0 failure**·웹 빌드 통과.
+실제 core_app/ctx_gateway 세션을 분리한 양방향 경합·직접 SQL 거부·가드 삭제/비활성/replica·반복 DDL·권한 보존을 확인했다.
+원본 로그 8개는 `C:\evo_forge\.local\evidence\db-usage-guard-20261027-ur5bi8s3`,
+source 38개와 로그 해시는 지원 브랜치 `docs/validation/2026-10-27-db-usage-guard.json`에 기록했다.
+설치/범위는 지원 브랜치 `docs/USAGE_RELEASE_GUARDS.md`를 따른다. 새 API 전에 DB 확장 009를 적용해야 한다.
+
+운영 DB에는 적용하지 않았고 실제 공급사 호출/청구·Docker 이미지/배포 검증은 수행하지 않았다.
+과거 충돌 청구·0원 정산·추정→실청구 정정 정책, 공개 명령/Broker 비용·전체 승인 연결은 계속 미완료다.
+상위 T22 main/평가/UI·봉인 테스트를 보존했으며 그 병합 후 공개 접점을 이어간다.
+지원 코드는 main 미반영이고 전체 개발은 미완료다. Muse Spark `muse-spark-1.3`과 자동 재개를 유지한다.

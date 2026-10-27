@@ -302,3 +302,18 @@ manifest: 지원 브랜치 `docs/validation/2026-10-27-receipt-release.json`(sou
 외부 영수증 적재 서비스에도 같은 예약 잠금 규약이 필요하다. 실제 청구/배포는 미검증이고 0원·실청구 정정 정책은 계속 미완료다.
 T22 Muse/OpenCode 실행이 동작 중이므로 중복 실행하지 않았다. 상위 main 반영 후 공개 명령/Broker 비용·전체 승인 연결을 이어간다.
 전체 개발은 미완료이고 Muse Spark 기본값·자동 재개를 유지한다. 지원 코드는 main 미반영이다.
+
+## 2026-10-27 DB 영수증 적재/해제 경합 보호
+
+지원 브랜치 `codex/pg-integration`의 `afecb31`·확장 009가 별도 ctx_gateway 적재와 직접 core_app 해제를
+같은 예약 행 잠금으로 직렬화한다. 양방향 경합에서 충돌하는 두 번째 작업을 거부하며 실패 변경을 원자적으로 롤백한다.
+가드 삭제/비활성/replica 설정이면 새 예약·전송·실제 해제는 503이다. 정본 함수/정책·RLS·기존 금전 기록은 보존했다.
+
+수정 전 10 failed, 수정 후 집중 11 passed·API 485 passed·1 skipped·실제 DB 166 passed·
+참조 112·SQL 96·계약 0 failure·웹 빌드 통과. 실제 분리된 DB 계정과 행 잠금 대기·반복 DDL/권한 보존을 검증했다.
+manifest: 지원 브랜치 `docs/validation/2026-10-27-db-usage-guard.json`(source 38개·로그 8개 해시).
+원본: main `.local/evidence/db-usage-guard-20261027-ur5bi8s3`. 적용/범위: 지원 브랜치 `docs/USAGE_RELEASE_GUARDS.md`.
+
+새 API 전에 확장 009까지 적용해야 한다. 운영 DB/실청구·Docker 이미지/배포는 미검증이며 기존 충돌 청구·0원/정정 정책은 별도다.
+상위 T22 main/평가/UI·봉인 테스트를 보존했다. 상위 main 반영 뒤 공개 명령/Broker 비용·전체 승인 연결을 이어간다.
+전체 개발은 미완료이고 Muse Spark 기본값·자동 재개를 유지한다. 지원 코드는 main 미반영이다.
