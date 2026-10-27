@@ -25,11 +25,15 @@ export interface GenerateResponse {
 }
 
 export interface ReviewResponse {
-  sealed_tests?: Array<{ code?: string; kind?: string } | string>;
+  sealed_tests?: Array<{ kind?: string; code_sha256?: string; code_len?: number } | string>;
+  sealed_count?: number;
+  sealed_tests_count?: number;
+  sealed_kinds?: string[];
   review?: { result: string; findings?: unknown[] };
   stub?: boolean;
   model?: string;
   evidence_id?: string;
+  provider_evidence_ids?: string[];
   raw?: unknown;
 }
 
@@ -98,8 +102,9 @@ export function postEvaluate(diff: string, tests: string[], stats: RunStats) {
 }
 
 export interface SealedTest {
-  code: string;
   kind: string;
+  code_sha256: string;
+  code_len: number;
 }
 
 export interface SuiteResult {

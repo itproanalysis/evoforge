@@ -6,6 +6,7 @@ Amounts are integer cents, never float.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import time
@@ -253,34 +254,64 @@ def _link_stages(eid: str, stages) -> None:
         evidence_chain.link(eid, stage, event_id)
 
 
+def _redact_sealed_entry(entry):
+    """One sealed test -> {kind, code_sha256, code_len}; raw code never leaves."""
+    if isinstance(entry, dict):
+        kind = entry.get("kind")
+        code = entry.get("code")
+        if isinstance(code, str):
+            digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
+            ln = len(code)
+        else:
+            digest = ""
+            ln = 0
+        return {"kind": kind, "code_sha256": digest, "code_len": ln}
+    if isinstance(entry, str):
+        return {"kind": "", "code_sha256": hashlib.sha256(entry.encode("utf-8")).hexdigest(),
+                "code_len": len(entry)}
+    return {"kind": "", "code_sha256": "", "code_len": 0}
+
+
+def _redact_sealed_list(tests: list) -> list:
+    return [_redact_sealed_entry(t) for t in tests]
+
+
+def _sealed_counts(tests: list) -> dict:
+    kinds = sorted({t.get("kind") for t in tests
+                    if isinstance(t, dict) and isinstance(t.get("kind"), str)})
+    return {"sealed_count": len(tests), "sealed_tests_count": len(tests),
+            "sealed_kinds": kinds}
+
+
 def _redact_value(value):
-    """Public copy helper: strip sealed test code and provider response bodies."""
+    """Public copy helper: strip sealed test code and provider response bodies.
+
+    Raw records stay in the server store; this builds a redacted copy for HTTP.
+    Every sealed_tests list becomes [{kind, code_sha256, code_len}] plus counts.
+    """
     if isinstance(value, dict):
         if "response_document" in value:
             out = {}
             for k, v in value.items():
                 if k == "response_document":
                     out[k] = {"redacted": True}
+                elif k == "sealed_tests" and isinstance(v, list):
+                    out[k] = _redact_sealed_list(v)
                 else:
                     out[k] = _redact_value(v)
             if isinstance(value.get("sealed_tests"), list):
-                out["sealed_tests"] = [
-                    {kk: _redact_value(vv) for kk, vv in t.items() if kk != "code"}
-                    if isinstance(t, dict) else _redact_value(t)
-                    for t in value["sealed_tests"]
-                ]
+                for ck, cv in _sealed_counts(value["sealed_tests"]).items():
+                    out.setdefault(ck, cv)
             return out
         if isinstance(value.get("sealed_tests"), list):
             out = {}
             for k, v in value.items():
                 if k == "sealed_tests":
-                    out[k] = [
-                        {kk: _redact_value(vv) for kk, vv in t.items() if kk != "code"}
-                        if isinstance(t, dict) else _redact_value(t)
-                        for t in v
-                    ]
+                    out[k] = _redact_sealed_list(v)
                 else:
                     out[k] = _redact_value(v)
+            for ck, cv in _sealed_counts(value["sealed_tests"]).items():
+                out.setdefault(ck, cv)
             return out
         return {k: _redact_value(v) for k, v in value.items()}
     if isinstance(value, list):
@@ -365,12 +396,14 @@ def review(req: ReviewRequest):
         out = broker_meta.call_critic(req.goal_contract, req.diff, req.ci, dispatch=dispatch)
         eid = _store_evidence({"review": out, "provider_evidence_ids": phase_evidence_ids})
         _link_stages(eid, ("Review",))
-        return {**out, "evidence_id": eid, "provider_evidence_ids": phase_evidence_ids}
+        public = _redact_value(out)
+        return {**public, "evidence_id": eid, "provider_evidence_ids": phase_evidence_ids}
     rsv = _reserve_or_402()
     out = _call_provider(rsv, broker_meta.call_critic, req.goal_contract, req.diff, req.ci)
     eid = _store_evidence({"review": out})
     _link_stages(eid, ("Review",))
-    return {**out, "evidence_id": eid}
+    public = _redact_value(out)
+    return {**public, "evidence_id": eid}
 
 
 @app.post("/v1/gates/evaluate")
@@ -485,6 +518,14 @@ def evidence(eid: str):
         raise HTTPException(404, "unknown evidence id")
     stored = _evidence[eid]
     public = _redact_value(stored)
+    # Surface sealed metadata at the top level too (mirrors POST shape) so
+    # clients need not dig into data/review payloads; counts included.
+    inner = public.get("review")
+    if isinstance(inner, dict) and isinstance(inner.get("sealed_tests"), list):
+        public.setdefault("sealed_tests", inner["sealed_tests"])
+        for ck in ("sealed_count", "sealed_tests_count", "sealed_kinds"):
+            if ck in inner:
+                public.setdefault(ck, inner[ck])
     data = {k: v for k, v in public.items() if k not in ("chain", "data")}
     return {**public, "chain": evidence_chain.chain(eid), "data": data}
 

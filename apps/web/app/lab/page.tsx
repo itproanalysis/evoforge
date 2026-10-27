@@ -93,11 +93,17 @@ export default function Lab() {
       const n = out.review?.findings?.length ?? 0;
       setReview(`verdict=${result} findings=${n}${out.stub ? " (stub, no MODEL_API_KEY)" : ""}`);
       setReviewEvidenceId(out.evidence_id ?? "");
-      const st = (out.sealed_tests ?? []).map((t) =>
-        typeof t === "string" ? { code: t, kind: "" } : { code: t.code ?? "", kind: t.kind ?? "" },
+      const st: SealedTest[] = (out.sealed_tests ?? []).map((t) =>
+        typeof t === "string"
+          ? { kind: "", code_sha256: "", code_len: t.length }
+          : { kind: t.kind ?? "", code_sha256: t.code_sha256 ?? "", code_len: t.code_len ?? 0 },
       );
       setSealedTests(st);
-      setSealed(st.map((t) => (t.kind ? `[${t.kind}] ${t.code}` : t.code)));
+      setSealed(
+        st.map(
+          (t) => `[${t.kind}] sha256:${t.code_sha256.slice(0, 12)} len:${t.code_len}`,
+        ),
+      );
     } catch (e) {
       // Builder tests must never stand in for the sealed held-out suite.
       setErr(`review API: ${e instanceof Error ? e.message : String(e)}`);
