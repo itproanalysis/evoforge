@@ -120,6 +120,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (로컬 DB 검증 시간 제한 보강) / `codex/pg-integration`:** `tools/validate_local_pg.py`의
+  전체 PostgreSQL 테스트 제한이 실제 동시 개발 부하에서 180초에 도달해 300초로 조정하고 전체 검증을 재실행한다.
+  개별 테스트의 판정과 정본 검사는 변경하지 않는다.
 - **Antigravity (M0 위생 평가 러너·Broker/CLI 사전 바인딩/예약 가드 및 다중 코덱/섀도 감사/승격 게이트 런타임) / `agy/eval-and-preflight` / `C:\evo_forge_agy`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
   M0 위생 평가 러너 통합(CR-74, 전후 7항목 감사·5필드 scaffold score_record·GH_INTEGRITY·G2_REQUIRED),
