@@ -1,0 +1,8 @@
+{
+  "id": "T15b_git_basic_auth_env",
+  "planned_by": "Critic live check of T15 (production defect)",
+  "goal": "PRODUCTION DEFECT in your T15 services/api/evoforge/repo_source.py: _run_git sends `-c http.extraHeader=Authorization: Bearer <token>`. A live fetch of the real private repo failed ('GitHub fetch failed'); `git ls-remote` with the Bearer header fails ('could not read Username'), while `Authorization: Basic base64(\"x-access-token:<token>\")` succeeds. Second issue: passing the header with -c puts the token in the process argv (visible to anything that can list processes).\nSPEC: (1) git authentication header = 'Authorization: Basic ' + base64('x-access-token:' + GITHUB_TOKEN). (2) Pass it ONLY through the subprocess environment using git's GIT_CONFIG_COUNT / GIT_CONFIG_KEY_<n> / GIT_CONFIG_VALUE_<n> mechanism (key http.extraheader), never in argv; also keep GIT_TERMINAL_PROMPT=0 and disable credential helpers. No token -> no header. (3) redact() must also strip the base64 Basic form. (4) The GitHub REST call in resolve_ref_to_sha keeps 'Authorization: Bearer' (REST accepts it). Nothing else changes.",
+  "edit": ["services/api/evoforge/repo_source.py"],
+  "context": ["services/api/tests/test_critic_t15_remote_repo.py"],
+  "check": ["python -m pytest services/api -q -p no:cacheprovider"]
+}
