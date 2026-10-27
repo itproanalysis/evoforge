@@ -122,6 +122,11 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (원격 Runner 기준 커밋 고정·응답 검증) / `codex/runner-base-binding`:**
+  `services/api/evoforge/runner_client.py`, 새 `test_runner_base_binding.py` 및 관련 문서를 소유한다.
+  기준 ref를 실제 Git 커밋으로 고정해 bundle을 만들고 Runner 응답의 기준과 일치하지 않으면 거부한다.
+  현재 수정 중인 `runner.py`·승격 Critic 테스트와 정본은 변경하지 않는다.
+
 - **Codex (공급사 allowlist·동의 검증 완료·클레임 해제):** `f07089a`가 빈 허용 목록과 boolean이 아닌 동의를 차단한다.
 
 - **Antigravity (완료·클레임 해제·main 반영 `4426de9`) / `agy/web-live-dashboard`:**
