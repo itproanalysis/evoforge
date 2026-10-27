@@ -126,6 +126,8 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   전송 시간 초과 뒤 intent가 UNKNOWN이 아닌 SENT로 남는 문제가 각각 재현됐다. 실제 모델 호출·키·운영 원장은 사용하지 않았다.
   재현/원본: `C:\evo_forge\.local\evidence\cli-usage-provenance-20261027-w1q9mifd`의 `unverified_cost.py`, `unknown_exception.py`.
   정본 registry seed에 Meta/Muse 항목이 없어 합성 Muse 패킷은 의미 검증에서 거부된다(`muse_registry_probe.py`).
+  [Meta Model API 공식 문서](https://dev.meta.ai/docs/prompt-caching)는 프롬프트 캐싱을 자동으로 설명하며,
+  캐시 비활성화 방법은 확인하지 못했다. 따라서 `NONE` 가능 여부를 추정하지 말고 검증된 capability를 별도 입력으로 관리한다.
   해당 모듈은 다른 개발자의 활성 클레임이므로 보존하며, 정본을 수정하거나 다른 모델로 자동 대체하지 않는다.
 - **Codex (PR 테스트 파일명·서버 실행 증거와 canonical 후보 연결) / `codex/pg-integration`:**
   `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·환경 예제/관련 문서를 수정한다.
