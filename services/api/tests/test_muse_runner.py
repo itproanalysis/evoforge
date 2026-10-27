@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -18,9 +19,8 @@ from evoforge.patch import PatchError  # noqa: E402
 from evoforge.runner import RunnerError, allowed_repo, run_candidate  # noqa: E402
 from critic_helpers import sealed_suite, server_review  # noqa: E402
 
-git = pytest.mark.skipif(subprocess.run(
-    ["git", "--version"], capture_output=True).returncode != 0,
-    reason="git CLI required")
+git = pytest.mark.skipif(shutil.which("git") is None,
+                          reason="git CLI required")
 
 
 def _repo(root: Path, name: str = "proj") -> tuple[str, str]:
