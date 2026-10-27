@@ -23,7 +23,8 @@
 4. Dashboard: spent/reserved/unknown_holds, 증거 체인 드릴다운 (0:30)
 
 ## 아키텍처 1p
-`Next.js (Run, same-origin 프록시) → FastAPI (Run, private IAM) → Meta Model API (muse-spark-1.3) / GitHub / GCS evidence / Secret Manager`. 모든 모델 호출: allowlist → reserve_cost → side_effect_intents → 호출 → receipt → settle. 금액 정수 cents. LiteLLM 없음, BYOK 없음. Cloud SQL은 terraform 준비됨 (현재 fallback 스토어, 다음 빌드에서 마이그레이션).
+`Next.js (Run, same-origin 프록시) → FastAPI (Run, private IAM) → Meta Model API (muse-spark-1.3) / GitHub / Cloud SQL PG15 (core+context_plane+001~010, RLS 강제, `EVO_STATE_BACKEND=postgres`) / Secret Manager`. 모든 모델 호출: allowlist → reserve_cost → side_effect_intents → 호출 → receipt → settle. 금액 정수 cents. LiteLLM 없음, BYOK 없음.
+- 영속성 실측: 동일 이미지 재배포 후 evidence 조회 성공 (메모리 시대에는 매 배포 초기화됐음). 마이그레이션은 `infra/gcp/migrate_once.py` (ops.applied_files 추적, 1회성), 빌드 내 psql은 green-skip.
 
 ## 재현
 ```bash
