@@ -14,6 +14,7 @@
 - 공개 mission facade의 선택 PostgreSQL 저장. 불변 입력·버전별 상태·단계 증거를 보존하고 완료된 서버 출력만 복원한다.
 - 확장 007의 테넌트 전체 예약 가드. 프로젝트 RLS를 넓히지 않고 다른 프로젝트의 미정산 예약도 선불 한도에 포함한다.
 - 정산된 Builder 요청 ID·저장 출력·immutable Git tree를 대조한 내부 canonical 후보 등록과 기존 G2 연결의 head drift 검사.
+- 병합 승인에서 현재 run의 정책과 실제 시각의 HIGH/CRITICAL 검증자 자격을 추가 대조한다. 정본 승인은 계속 호출한다.
 
 클라이언트가 보낸 실행 수나 모델 JSON만으로 게이트를 만들지 않는다.
 다른 필수 게이트·독립 리뷰·승인은 누락 상태를 유지하며 `core.authorize_merge`의 거부를 확인한다.
@@ -40,6 +41,7 @@ Google 인증 연동 테스트의 서명 검증기는 fixture로 대체하므로
 정산 경합 중 프로젝트 cap을 다시 확인하는 후속 보강은 `docs/validation/2026-10-27-project-cap-race.json`을 따른다.
 확장 008의 후보 등록 범위는 [CANDIDATE_REGISTRATION.md](CANDIDATE_REGISTRATION.md),
 검증은 `docs/validation/2026-10-27-candidate-registration.json`을 따른다.
+병합 승인 시점 보강은 `docs/validation/2026-10-27-merge-freshness.json`을 따른다.
 
 ## 남은 공개 경로와 운영 연결
 

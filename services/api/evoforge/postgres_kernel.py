@@ -249,8 +249,33 @@ class PostgresKernel:
         if not re.fullmatch(r"(?:[a-f0-9]{40}|[a-f0-9]{64})", head_sha) or not re.fullmatch(r"[a-f0-9]{64}", policy_hash):
             raise ValueError("immutable head SHA and policy hash required")
         with self._transaction() as conn:
+            anchor = conn.execute("SELECT c.head_sha,c.author_agent_id,t.risk_level,r.policy_hash,r.harness_version "
+                                  "FROM core.candidates c JOIN core.tasks t USING(tenant_id,project_id,task_id) "
+                                  "JOIN core.runs r USING(tenant_id,project_id,run_id) "
+                                  "WHERE c.tenant_id=%s AND c.project_id=%s AND c.candidate_id=%s "
+                                  "FOR SHARE OF c,t,r",
+                                  (self.scope.tenant_id,self.scope.project_id,candidate_id)).fetchone()
+            if not anchor:
+                raise KernelNotFound('candidate not found in scope')
+            if anchor['head_sha']!=head_sha or anchor['policy_hash']!=policy_hash:
+                raise KernelRejected('merge head or policy differs from the current run')
             conn.execute("SELECT core.authorize_merge(%s,%s,%s,%s,%s)",
                          (self.scope.tenant_id, self.scope.project_id, candidate_id, head_sha, policy_hash))
+            if anchor['risk_level'] in {'HIGH','CRITICAL'}:
+                # now() stays fixed at transaction start, including lock waits.
+                # Qualification must still be valid at the actual decision time.
+                current = conn.execute("WITH instant AS MATERIALIZED (SELECT clock_timestamp() AS checked_at) "
+                    "SELECT EXISTS(SELECT 1 FROM core.reviews v JOIN core.reviewer_qualifications q "
+                    "ON q.tenant_id=v.tenant_id AND q.agent_id=v.reviewer_agent_id CROSS JOIN instant "
+                    "WHERE v.tenant_id=%s AND v.project_id=%s AND v.candidate_id=%s AND v.head_sha=%s "
+                    "AND v.verdict='approve' AND v.reviewer_agent_id<>%s AND v.context_independent "
+                    "AND v.spec_tests_sealed_at IS NOT NULL AND v.diff_first_read_at IS NOT NULL "
+                    "AND q.risk_level=%s AND q.harness_version=%s "
+                    "AND q.qualified_at<=instant.checked_at AND q.expires_at>instant.checked_at) AS qualified",
+                    (self.scope.tenant_id,self.scope.project_id,candidate_id,head_sha,anchor['author_agent_id'],
+                     anchor['risk_level'],anchor['harness_version'])).fetchone()['qualified']
+                if not current:
+                    raise KernelRejected('reviewer qualification is no longer current')
 
     def record_receipt(self, document: dict) -> dict:
         """Atomically store a canonical Broker/reconciler receipt and its ctx row."""

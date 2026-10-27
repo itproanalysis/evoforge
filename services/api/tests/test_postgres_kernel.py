@@ -2285,3 +2285,69 @@ def test_project_cap_rechecks_settlement_that_commits_after_initial_reserve_chec
     assert _open_credit_holds(kernel)==0
     assert kernel.reserve_cost(uuid4(),PERIOD,100).reserved_micros==100
     assert _open_credit_holds(kernel)==100
+
+
+def _merge_ready(funded,risk='LOW'):
+    """Synthetic gate/review/approval evidence, only for deterministic DB authorization checks."""
+    scope=funded['scope']
+    author,reviewer,run,task,candidate=(uuid4() for _ in range(5))
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        for agent in (author,reviewer):
+            conn.execute("INSERT INTO core.agents(tenant_id,agent_id,kind) VALUES (%s,%s,'provider_api')",(scope.tenant_id,agent))
+        conn.execute("INSERT INTO core.runs(tenant_id,project_id,run_id,objective_version,topology,harness_version,policy_hash) "
+                     "VALUES (%s,%s,%s,1,'SINGLE','test',%s)",(scope.tenant_id,scope.project_id,run,'1'*64))
+        conn.execute('INSERT INTO core.tasks(tenant_id,project_id,task_id,run_id,risk_level) VALUES (%s,%s,%s,%s,%s)',
+                     (scope.tenant_id,scope.project_id,task,run,risk))
+        conn.execute('INSERT INTO core.candidates(tenant_id,project_id,candidate_id,task_id,author_agent_id,base_sha,head_sha) '
+                     'VALUES (%s,%s,%s,%s,%s,%s,%s)',(scope.tenant_id,scope.project_id,candidate,task,author,'a'*40,'b'*40))
+        for gate in ('G0_SCOPE','G1_IMPACTED','G2_REQUIRED','GH_INTEGRITY','GR_REVIEW','G4_MERGE_HEAD'):
+            conn.execute('INSERT INTO core.gate_results(tenant_id,project_id,candidate_id,gate,result,head_sha,policy_hash,'
+                         "runner_image_digest,evidence_sha256) VALUES (%s,%s,%s,%s,'PASS',%s,%s,'sha256:fixture',%s)",
+                         (scope.tenant_id,scope.project_id,candidate,gate,'b'*40,'1'*64,'e'*64))
+        conn.execute('INSERT INTO core.reviews(tenant_id,project_id,candidate_id,reviewer_agent_id,verdict,head_sha,'
+                     'context_independent,spec_tests_sealed_at,diff_first_read_at) '
+                     "VALUES (%s,%s,%s,%s,'approve',%s,true,now()-interval '2 seconds',now()-interval '1 second')",
+                     (scope.tenant_id,scope.project_id,candidate,reviewer,'b'*40))
+        if risk in ('HIGH','CRITICAL'):
+            conn.execute('INSERT INTO core.approvals(tenant_id,project_id,subject_kind,subject_id,resource_sha,approver_user_id,reauthenticated) '
+                         "VALUES (%s,%s,'merge',%s,%s,%s,true)",(scope.tenant_id,scope.project_id,candidate,'b'*40,uuid4()))
+    return {'candidate':candidate,'reviewer':reviewer,'run':run,'risk':risk}
+
+
+def test_merge_authorization_rejects_old_policy_after_run_policy_changes(funded,http_kernel):
+    ctx=_merge_ready(funded)
+    body={'candidate_id':str(ctx['candidate']),'head_sha':'b'*40,'policy_hash':'1'*64}
+    assert http_kernel.post('/v1/kernel/merge-authorizations',json=body).status_code==200
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute('UPDATE core.runs SET policy_hash=%s WHERE run_id=%s',('2'*64,ctx['run']))
+    assert http_kernel.post('/v1/kernel/merge-authorizations',json=body).status_code==409
+    # The current policy also needs its own gates; the old PASS rows cannot be reused.
+    assert http_kernel.post('/v1/kernel/merge-authorizations',json={**body,'policy_hash':'2'*64}).status_code==409
+
+
+def test_merge_authorization_rejects_qualification_expired_during_transaction(funded,monkeypatch):
+    from contextlib import contextmanager
+    ctx=_merge_ready(funded,'HIGH')
+    kernel=funded['kernel']
+    original=kernel._transaction
+    @contextmanager
+    def delayed():
+        with original() as conn:
+            started=conn.execute('SELECT now() AS ts').fetchone()['ts']
+            with psycopg.connect(funded['dsn'],autocommit=True) as issuer:
+                issuer.execute('INSERT INTO core.reviewer_qualifications(tenant_id,agent_id,risk_level,harness_version,'
+                               'qualified_at,expires_at,evidence_sha256) '
+                               "VALUES (%s,%s,'HIGH','test',%s,clock_timestamp()+interval '200 milliseconds',%s)",
+                               (funded['scope'].tenant_id,ctx['reviewer'],started,'e'*64))
+            conn.execute('SELECT pg_sleep(0.4)')
+            yield conn
+    monkeypatch.setattr(kernel,'_transaction',delayed)
+    with pytest.raises(KernelRejected):
+        kernel.authorize_merge(ctx['candidate'],'b'*40,'1'*64)
+    monkeypatch.setattr(kernel,'_transaction',original)
+    with psycopg.connect(funded['dsn'],autocommit=True) as issuer:
+        issuer.execute('INSERT INTO core.reviewer_qualifications(tenant_id,agent_id,risk_level,harness_version,'
+                       'qualified_at,expires_at,evidence_sha256) '
+                       "VALUES (%s,%s,'HIGH','test',clock_timestamp(),clock_timestamp()+interval '1 hour',%s)",
+                       (funded['scope'].tenant_id,ctx['reviewer'],'f'*64))
+    kernel.authorize_merge(ctx['candidate'],'b'*40,'1'*64)
