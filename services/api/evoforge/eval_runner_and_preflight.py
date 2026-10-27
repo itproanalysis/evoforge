@@ -537,17 +537,36 @@ class DevBuilderCLIGuard:
         cli_runner: Callable[[dict[str, Any]], dict[str, Any]],
         actual_micros: int = 12_000,
         call_id: str | None = None,
+        period_start: str | None = None,
     ) -> dict[str, Any]:
         resolved_call_id = call_id or str(uuid.uuid5(uuid.NAMESPACE_OID, f"cli:{task_spec.get('id', packet['task_id'])}"))
 
         def _transport(_pkt: dict[str, Any], binding: PreboundCallBinding) -> tuple[dict[str, Any], dict[str, Any]]:
             cli_out = cli_runner(task_spec)
+            if not isinstance(cli_out, dict):
+                self.broker.ledger.mark_call_unknown(binding.tenant_id, binding.project_id, binding.call_id)
+                raise PreflightError(
+                    "UNVERIFIED_CLI_OUTCOME",
+                    "CLI output is not a dict; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
+                )
+            req_id = cli_out.get("provider_request_id")
+            if (
+                not isinstance(req_id, str)
+                or not req_id.strip()
+                or "uncached_input_tokens" not in cli_out
+                or "output_tokens" not in cli_out
+            ):
+                self.broker.ledger.mark_call_unknown(binding.tenant_id, binding.project_id, binding.call_id)
+                raise PreflightError(
+                    "UNVERIFIED_CLI_OUTCOME",
+                    "CLI output lacks verified provider_request_id and token usage; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
+                )
             now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             receipt_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"rcpt:{resolved_call_id}"))
-            uncached_in = int(cli_out.get("uncached_input_tokens", 1200))
-            cached_read = int(cli_out.get("cached_read_tokens", 400))
+            uncached_in = int(cli_out["uncached_input_tokens"])
+            cached_read = int(cli_out.get("cached_read_tokens", 0))
             cache_write = int(cli_out.get("cache_write_tokens", 0))
-            out_tok = int(cli_out.get("output_tokens", 300))
+            out_tok = int(cli_out["output_tokens"])
             receipt = {
                 "schema_version": "provider-usage-receipt/v1",
                 "receipt_id": receipt_id,
@@ -558,7 +577,7 @@ class DevBuilderCLIGuard:
                 "call_purpose": "task_turn",
                 "provider": binding.provider,
                 "model": binding.model,
-                "provider_request_id": str(cli_out.get("provider_request_id") or f"req_{binding.call_id}"),
+                "provider_request_id": req_id.strip(),
                 "source": "provider_billed",
                 "billing_owner": "platform",
                 "tokens": {
@@ -588,4 +607,5 @@ class DevBuilderCLIGuard:
             packet=packet,
             reserved_micros=reserved_micros,
             transport=_transport,
+            period_start=period_start,
         )
