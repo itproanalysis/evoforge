@@ -15,6 +15,8 @@ RUN pip install --no-cache-dir -r /app/services/api/requirements.txt
 COPY services/api/ /app/services/api/
 COPY docs/evoforge-v4.2/reference_impl/ /app/docs/evoforge-v4.2/reference_impl/
 COPY docs/evoforge-v4.2/contracts/ /app/docs/evoforge-v4.2/contracts/
+# Sealed eval set v0 (server-only; HTTP view is redacted by sealed_eval.public_suites).
+COPY evals/sealed_v0/ /app/evals/sealed_v0/
 
 WORKDIR /app/services/api
 USER evoforge
