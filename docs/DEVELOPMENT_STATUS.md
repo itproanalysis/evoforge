@@ -119,6 +119,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (PR 기준 snapshot·기존 분기 보호) / `codex/pg-integration` / `C:\evo_forge_codex`:**
+  상위 T22 편집 목록 밖의 github.py·새 test_github_snapshot.py·관련 문서/검증 manifest를 수정한다.
+  검증된 기준 SHA의 명시적 조회 경로와 ref 이동 검사, 이미 존재하는 작업 분기의 쓰기 거부를 보강한다.
+  기존 승격 Critic 테스트·T22 main/평가/UI·정본과 모델 기본값은 보존한다. 공개 core의 기준 SHA 전달은 T22 병합 후 연결한다.
 - **Codex (DB 영수증/예약 해제 직렬화 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:**
   새 확장 `009_usage_release_guards.sql`·Codex 소유 postgres_kernel.py/test_postgres_kernel.py·환경 예제/관련 문서를 수정한다.
   별도 ctx 적재와 직접 core 예약 해제도 같은 예약 행 잠금 및 영수증 검사로 보호하고 가드 비활성 상태는 전송 전에 거부한다.
