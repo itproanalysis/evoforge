@@ -100,6 +100,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex 지원 / `codex/builder-preflight` / `C:\evo_forge_codex`:** Builder 호출의 기존 패킷·공급사 동의·agent/task lease 검증과 비용 예약의 원자적 바인딩을 맡는다.
+  `evoforge/postgres_builder.py`·`postgres_kernel.py`·`kernel_api.py`, 확장 마이그레이션 002, Codex 소유 DB/API 테스트와 관련 문서·환경 예제를 수정한다.
+  전송 직전 재검증과 영수증 packet/model/가격표 버전 일치를 확인한다. 가격 계산·실제 모델 실행 완료를 주장하지 않는다.
+  Muse round4 T10–T12의 main/critic/runner/gates/evidence/web와 봉인 수용 테스트는 편집하지 않는다. 상위 작업이 먼저 main에 반영된 뒤 동기화한다.
 - **Codex 추가 지원 (완료·클레임 해제) / `codex/receipt-support`:** npm 설치에서 확인한 Next.js 중대 취약점 수정.
   `apps/web/package.json`·`package-lock.json`만 수정해 Next 15 계열 보안 릴리스와 필요 전이 의존성을 고정하고 빌드·audit를 검증한다.
   Muse의 T9 화면 코드는 보존한다.
