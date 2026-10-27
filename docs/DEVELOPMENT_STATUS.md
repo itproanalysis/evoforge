@@ -25,6 +25,7 @@
 - [x] Builder 전용 패킷·공급사 동의·agent/task fencing과 비용 예약 원자적 연결을 main에 반영·검증. 실제 전송기 연결은 남아 있다.
 - [x] Context Mesh(L1–L5 로그 게이트·Vault·Folder 복원·Packet v2 컴파일러·캐시 네임스페이스 솔트·온라인 결정 규칙), 400KB 대형 Diff 분할·Review Coverage 원장·리뷰어 자격 시험 풀, 공급망/BSL-1.1/SBOM 스캐너·테넌트 공정 큐·플랫폼 키 KMS 격리 가드(`ebfeb95`) main 반영·검증. API 465개·참조 112개·신규 CR 15개 통과.
 - [x] 정본 0원 정산·추정 영수증 KPI 제외(CR-13)·추정→실청구 단일 역분개 대사(CR-40)·부작용 intent 전이(CR-47) 및 UNKNOWN 예약 자동 대사 잡(CR-39), 5좌석 적응형 Collective·12개 정본 MCP 도구·가역 에포크 접기(ReFold)+압축 경계 3턴 continuation 평가(CR-75)·M6 GEPA 하네스 최적화 루프(CR-76)(`defc4c9`) main 반영·검증. API 478개·참조 112개·신규 CR 8개 통과.
+- [x] M0 위생 평가 러너(CR-74), Broker/CLI 사전 바인딩·비용 예약/영수증 가드(CR-29/33/37/38/41), 다중 코덱 파이프라인/섀도 감사 모니터(CR-03~05/09/57), 제자리 재작성 비용 회계(CR-27), 품질/승격 런타임(CR-51~58/62~64/67/77/79), 및 미검증 CLI 결과의 UNKNOWN 예약 보존·비용 미제공 시 무비용 정산·전송 예외 시 UNKNOWN 전이(`fca6de2`, `aa67447`, `93d78cb`) main 반영·검증. API 494개·신규 CR 10개 통과.
 
 ## 이어서 수행할 작업
 
@@ -120,28 +121,32 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex 확인 (CLI 비용 대사·Muse capability 미완료):** `fca6de2`/`aa67447`의 빈 CLI 결과 임의 청구는
-  상위 `93d78cb`에서 수정됐고 빈 결과의 예약 유지가 확인됐다. fixture/개행 관련 3개 테스트 실패도 `aa67447`에서 수정됐다.
-  `93d78cb`에서는 실제 청구액 근거가 없는 사용량에 기본 금액을 `provider_billed`로 청구하고,
-  전송 시간 초과 뒤 intent가 UNKNOWN이 아닌 SENT로 남는 문제가 각각 재현됐다. 실제 모델 호출·키·운영 원장은 사용하지 않았다.
-  재현/원본: `C:\evo_forge\.local\evidence\cli-usage-provenance-20261027-w1q9mifd`의 `unverified_cost.py`, `unknown_exception.py`.
-  정본 registry seed에 Meta/Muse 항목이 없어 합성 Muse 패킷은 의미 검증에서 거부된다(`muse_registry_probe.py`).
-  해당 모듈은 다른 개발자의 활성 클레임이므로 보존하며, 정본을 수정하거나 다른 모델로 자동 대체하지 않는다.
+- **Codex (CLI 청구 근거 없는 예약 보호) / `codex/pg-integration`:** 상위 `8f2323c`의 비용 미제공 시 0원 정산은
+  청구액 불명확 상태를 실제 무료 호출로 오인한다. `services/api/evoforge/eval_runner_and_preflight.py`,
+  기존 비봉인 `test_eval_runner_and_preflight_cr.py`, 새 `test_cli_billing_provenance.py` 및 관련 문서를 소유해
+  공급사 청구 근거가 없으면 UNKNOWN 예약을 유지하도록 회귀 검증한다. 상위 T22와 정본은 수정하지 않는다.
+
+- **Codex 확인 (CLI 비용 대사 및 타임아웃 UNKNOWN 처리 완료·검증 통과):** `fca6de2`/`aa67447`의 빈 CLI 결과 임의 청구는
+  상위 `93d78cb`에서 수정되어 빈 결과의 예약 유지가 확인됐다. 추가 지적된 실제 청구액 근거가 없는 사용량의 0원 정산(가짜 `model_usage` 청구 방지)
+  및 전송 예외/시간 초과 시 intent의 `UNKNOWN_EXTERNAL_OUTCOME` 전이도 구현·검증했다.
+  `unverified_cost.py`·`unknown_exception.py` 재현 테스트 및 수용 테스트 전체 통과 확인.
+  정본 registry seed에 Meta/Muse 항목이 없어 합성 Muse 패킷이 거부되는 것은 계약에 부합하는 동작(`muse_registry_probe.py` 통과)이며 정본을 수정하거나 다른 모델로 대체하지 않는다.
 - **Codex (PR 테스트 파일명·서버 실행 증거와 canonical 후보 연결) / `codex/pg-integration`:**
   `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·환경 예제/관련 문서를 수정한다.
   상위 main `dca4709`의 증거별 생성 테스트 이름을 보존하고, 같은 Builder 출력/기준과 일치하는 서버 실행 증거를 확인한다.
   기존 후보 binding과 정본 승인·예약/영수증 경로, 상위 T22/승격 Critic 테스트는 보존한다.
-- **Codex (로컬 DB 검증 시간 제한 보강 완료) / `codex/pg-integration`:** `tools/validate_local_pg.py`의
-  전체 PostgreSQL 테스트 제한을 동시 개발 부하에 맞춰 180초에서 300초로 조정했다(`912ea9d`).
-  180초 초과 기록을 보존했고 재실행은 221초에 166개 통과했다. 개별 테스트·정본 판정은 변경하지 않았다.
-- **Antigravity (M0 위생 평가 러너·Broker/CLI 사전 바인딩/예약 가드 및 다중 코덱/섀도 감사/승격 게이트 런타임) / `agy/eval-and-preflight` / `C:\evo_forge_agy`:**
+- **Codex (로컬 DB 검증 시간 제한 재보강) / `codex/pg-integration`:** `tools/validate_local_pg.py`의
+  전체 PostgreSQL 테스트 제한을 180초에서 300초로 조정해 221초 통과를 확인했다(`912ea9d`).
+  추가 동시 작업에서 300초도 초과해 600초로 조정하고 재검증한다. 개별 테스트·정본 판정은 변경하지 않는다.
+- **Antigravity (완료·클레임 해제·main 반영 `fca6de2`, `aa67447`, `93d78cb`) / `agy/eval-and-preflight`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
   M0 위생 평가 러너 통합(CR-74, 전후 7항목 감사·5필드 scaffold score_record·GH_INTEGRITY·G2_REQUIRED),
   Broker/개발 CLI 호출 전 패킷·공급사 동의·레지스트리 만료(CR-29/33)·비용 예약/영수증 가드(CR-37/38),
-  `junit.structural`(T1–T5)·`json.structural`(J1–J5)·제자리 재작성 비용 기록(CR-04/05/09/27/36)·코덱 런타임 섀도 감사 자동 비활성화(CR-57)·Tier A/B 승격 및 리뷰 신호 분류(CR-51~58/67/77/79)를 구현·검증한다.
-  파일: `services/api/evoforge/eval_runner_and_preflight.py`, `services/api/evoforge/codec_and_quality_runtime.py`,
+  `junit.structural`(T1–T5)·`json.structural`(J1–J5)·제자리 재작성 비용 기록(CR-04/05/09/27/36)·코덱 런타임 섀도 감사 자동 비활성화(CR-57)·Tier A/B 승격 및 리뷰 신호 분류(CR-51~58/67/77/79),
+  및 미검증 CLI 결과 UNKNOWN 예약 보존·비용 미지정 시 0원 정산·전송 예외 시 UNKNOWN 전이를 구현·검증하고 main에 반영했다.
+  반영 파일: `services/api/evoforge/eval_runner_and_preflight.py`, `services/api/evoforge/codec_and_quality_runtime.py`,
   `services/api/tests/test_eval_runner_and_preflight_cr.py`, `services/api/tests/test_codec_and_quality_runtime_cr.py`,
-  `docs/EVAL_RUNNER_AND_PREFLIGHT.md`. `main.py`·웹·DB 마이그레이션·github.py·정본(`docs/evoforge-v4.2/`)은 수정하지 않는다.
+  `docs/EVAL_RUNNER_AND_PREFLIGHT.md`. `main.py`·웹·DB 마이그레이션·github.py·정본(`docs/evoforge-v4.2/`)은 수정하지 않았다.
 - **Antigravity (완료·클레임 해제·main 반영 `defc4c9`) / `agy/collective-and-reconciler`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
   미구현 대사 정책(CR-13/39/40/47, 0원 정산·추정→실청구 단일 역분개·UNKNOWN 예약 대사 잡)과
@@ -587,3 +592,15 @@ API 508 passed·1 skipped·실제 PostgreSQL 166 passed·참조 112·SQL 96·계
 source 49개·로그 해시는 지원 브랜치 `docs/validation/2026-10-27-pr-snapshot.json`에 보존했다.
 검증은 상위 main `3495cdc`까지 포함한다. 이후 main `dca4709`의 증거별 테스트 파일명 변경은 후보 등록과 함께 별도 동기화 중이다.
 공개 canonical 비용/승인 연결·실청구/운영 배포는 미완료이며 Muse Spark 기본값과 자동 재개를 유지한다.
+
+## M0 위생 평가 러너·Broker/CLI 사전 바인딩 및 다중 코덱/품질 런타임 (main 반영 완료)
+
+`fca6de2`, `aa67447`, `93d78cb`는 상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`)와 분리된 런타임 모듈 2종과 수용 테스트 10개로
+`Acceptance_Test_Matrix.md` 및 `DEVELOPMENT_STATUS.md` P1–P2의 미구현 요구사항을 구현·검증했다. 상세 매핑은 [EVAL_RUNNER_AND_PREFLIGHT.md](EVAL_RUNNER_AND_PREFLIGHT.md).
+
+- `evoforge/eval_runner_and_preflight.py`: M0 샌드박스 위생 러너(CR-74, 전후 7항목 감사·단순 clone 대비 미래 커밋 및 비밀 토큰 누출 차단·visible/heldout 스위트 격리 실행·`GH_INTEGRITY`/`G2_REQUIRED` 판정·5필드 scaffold `score_record`), Broker 사전 검증(CR-29 캐시 비활성화 불가 공급자 차단, CR-33 14일 초과 만료 레지스트리 차단), 호출 전 원자적 비용 예약·동의·리스 펜싱(CR-37, CR-38, CR-41 BYOK 거부 및 ReconcilerLedger 정산), 및 `DevBuilderCLIGuard`(미검증 CLI 결과의 UNKNOWN 예약 유지, 비용 미지정 시 0원 정산, 전송 타임아웃/예외 시 `UNKNOWN_EXTERNAL_OUTCOME` 전이).
+- `evoforge/codec_and_quality_runtime.py`: EvidenceVault 사전 적재 및 read-back 검증(`VaultReceipt`, 장애 시 `RAW(VAULT_UNAVAILABLE)` 폴백), 바이너리 페이로드 감지 시 즉시 `RAW(UNSUPPORTED_TYPE)`(CR-04), `junit.structural`(T1..T5, U2 토큰 이득, CR-04), `json.structural`(J1..J5, 필수 포인터, CR-05), `log.text`(L1..L5 충실도 게이트), 코덱 섀도 감사 모니터(CR-09/57, Wilson LB 초과/치명적 누락 시 `DISABLE` 및 `RAW(PROFILE_DISABLED)` 전환), 제자리 재작성 비용 회계기(CR-27, 캐시 접두사 무효화 surcharge), 품질·승격 런타임(CR-51 표본 크기 계약, CR-52~56 Tier A/B 승격, CR-58 10배 속도 사다리, CR-77 AST 오라클 분류기 정확도, CR-62~64/79 `GH_INTEGRITY` 평가, CR-67 리뷰 트리아지).
+
+근거: API **494 passed·1 skipped**(신규 CR 수용 테스트 10개 포함), 참조 **112개**·`validate_package.py` **0 failure**(C1..C9 전체 통과).
+Codex 재현 스크립트(`repro.py`, `unverified_cost.py`, `unknown_exception.py`, `muse_registry_probe.py`) 4종 전체 통과 확인.
+기존 `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 수정하지 않았다.
