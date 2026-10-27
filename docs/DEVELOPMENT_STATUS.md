@@ -120,9 +120,13 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex (로컬 DB 검증 시간 제한 보강) / `codex/pg-integration`:** `tools/validate_local_pg.py`의
-  전체 PostgreSQL 테스트 제한이 실제 동시 개발 부하에서 180초에 도달해 300초로 조정하고 전체 검증을 재실행한다.
-  개별 테스트의 판정과 정본 검사는 변경하지 않는다.
+- **Codex (PR 테스트 파일명·서버 실행 증거와 canonical 후보 연결) / `codex/pg-integration`:**
+  `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·관련 문서를 수정한다.
+  상위 main `dca4709`의 증거별 생성 테스트 이름을 보존하고, 같은 Builder 출력/기준과 일치하는 서버 실행 증거를 확인한다.
+  기존 후보 binding과 정본 승인·예약/영수증 경로, 상위 T22/승격 Critic 테스트는 보존한다.
+- **Codex (로컬 DB 검증 시간 제한 보강 완료) / `codex/pg-integration`:** `tools/validate_local_pg.py`의
+  전체 PostgreSQL 테스트 제한을 동시 개발 부하에 맞춰 180초에서 300초로 조정했다(`912ea9d`).
+  180초 초과 기록을 보존했고 재실행은 221초에 166개 통과했다. 개별 테스트·정본 판정은 변경하지 않았다.
 - **Antigravity (M0 위생 평가 러너·Broker/CLI 사전 바인딩/예약 가드 및 다중 코덱/섀도 감사/승격 게이트 런타임) / `agy/eval-and-preflight` / `C:\evo_forge_agy`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
   M0 위생 평가 러너 통합(CR-74, 전후 7항목 감사·5필드 scaffold score_record·GH_INTEGRITY·G2_REQUIRED),
@@ -138,9 +142,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   반영 파일: `services/api/evoforge/reconciler_policy.py`, `services/api/evoforge/collective_runtime.py`,
   `services/api/tests/test_reconciler_policy_cr.py`, `services/api/tests/test_collective_runtime_cr.py`,
   `docs/COLLECTIVE_AND_RECONCILER.md`. `main.py`·웹·DB 마이그레이션·github.py·정본(`docs/evoforge-v4.2/`)은 수정하지 않았다.
-- **Codex (PR 기준 snapshot·기존 분기 보호) / `codex/pg-integration` / `C:\evo_forge_codex`:**
+- **Codex (PR 기준 snapshot·기존 분기 보호 검증 완료·공개 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:**
   상위 T22 편집 목록 밖의 github.py·새 test_github_snapshot.py·관련 문서/검증 manifest를 수정한다.
   검증된 기준 SHA의 명시적 조회 경로와 ref 이동 검사, 이미 존재하는 작업 분기의 쓰기 거부를 보강한다.
+  구현 `f11f0ae`·검증 revision `912ea9d`: API 508개·실제 DB 166개·SQL 96개·참조 112개·계약·웹 빌드 통과.
   기존 승격 Critic 테스트·T22 main/평가/UI·정본과 모델 기본값은 보존한다. 공개 core의 기준 SHA 전달은 T22 병합 후 연결한다.
 - **Codex (DB 영수증/예약 해제 직렬화 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:**
   새 확장 `009_usage_release_guards.sql`·Codex 소유 postgres_kernel.py/test_postgres_kernel.py·환경 예제/관련 문서를 수정한다.
@@ -558,3 +563,20 @@ source 38개와 로그 해시는 지원 브랜치 `docs/validation/2026-10-27-db
 
 근거: API **478 passed·1 skipped**(신규 CR 수용 테스트 8개 포함), 참조 **112개**·`validate_package.py` **0 failure** 통과.
 기존 `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 변경하지 않았다. 운영 DB 트리거/크론 스케줄러와의 직접 연결은 상위 병합 후 이어간다.
+
+## PR 기준 SHA·작업 브랜치 보호 (지원 검증 완료)
+
+`codex/pg-integration`의 `f11f0ae`는 서버가 확인한 `expected_base_sha`를 받으면 모든 원본/추가 테스트 충돌 확인을
+해당 immutable 커밋에서 수행하고 그 커밋으로 작업 브랜치를 만든다. 확인 전후 기준 브랜치가 다르거나 이미 작업 브랜치가 있으면 거부한다.
+기존 호출은 브랜치 ref 읽기 전후 SHA를 검사한다. ref가 중간에 이동했다 돌아오는 경우에는 고정 보장이 없으므로,
+공개 `_pr_core`가 서버 증거의 기준 SHA를 명시적으로 전달하는 연결은 상위 T22 반영 후 계속해야 한다.
+
+수정 전 신규 회귀 9 failed, 수정 후 신규·기존 승격 Critic 포함 집중 34 passed,
+API 508 passed·1 skipped·실제 PostgreSQL 166 passed·참조 112·SQL 96·계약 0 failure·웹 빌드 통과.
+실제 로컬 Git 커밋과 합성 GitHub HTTP를 사용했다. 실제 GitHub PR을 이 변경으로 생성하거나 배포하지 않았다.
+첫 DB 전체 검증의 180초 초과와 제한 300초 재실행 221초 통과를 모두 기록했다(`912ea9d`).
+
+원본 로그 9개는 `C:\evo_forge\.local\evidence\pr-snapshot-20261027-6wq9831x`,
+source 49개·로그 해시는 지원 브랜치 `docs/validation/2026-10-27-pr-snapshot.json`에 보존했다.
+검증은 상위 main `3495cdc`까지 포함한다. 이후 main `dca4709`의 증거별 테스트 파일명 변경은 후보 등록과 함께 별도 동기화 중이다.
+공개 canonical 비용/승인 연결·실청구/운영 배포는 미완료이며 Muse Spark 기본값과 자동 재개를 유지한다.
