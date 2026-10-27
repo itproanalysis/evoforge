@@ -43,6 +43,15 @@ Google 인증 연동 테스트의 서명 검증기는 fixture로 대체하므로
 검증은 `docs/validation/2026-10-27-candidate-registration.json`을 따른다.
 병합 승인 시점 보강은 `docs/validation/2026-10-27-merge-freshness.json`을 따른다.
 
+상위 main `2cb3627`까지 동기화한 통합 revision `41949da`의 후속 검증은
+API **485 passed·1 skipped**, 실제 PostgreSQL **147 passed**, 참조 **112개**·SQL **96개**·
+계약 **0 failure**·웹 프로덕션 빌드 통과다. Context Mesh/자격 시험/런타임 가드(`ebfeb95`),
+Critic 출력 예산(`fa02e57`), 웹 배포(`25480fd`) 및 Git 설치/CI 변경을 보존해 함께 검증했다.
+원본 로그 6개는 `C:\evo_forge\.local\evidence\upstream-sync-20261027-n32bxlnp`,
+source·로그 SHA-256은 `docs/validation/2026-10-27-upstream-sync.json`에 기록했다.
+이 집계가 이전 통합 집계보다 최신이며, 각 기능의 수정 전 실패 근거는 기존 manifest에 남아 있다.
+독립 모듈의 운영 연결·실 KMS·실제 모델 청구·Docker 이미지/운영 배포 검증을 뜻하지 않는다.
+
 ## 남은 공개 경로와 운영 연결
 
 공개 Generate와 mission은 현재 메모리 명령·추정 원장을 사용한다. 내부 HTTP 명령 경로는 항상 PostgreSQL을 사용한다.
