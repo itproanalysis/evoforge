@@ -1,0 +1,20 @@
+{
+  "id": "T12_redact_sealed_code_http",
+  "planned_by": "muse-spark-1.3 (round-4 plan)",
+  "goal": "Redact sealed test code from HTTP evidence surfaces\nWHY: Closes F3 note: GET /v1/evidence/{review_id} and provider-call audit records hand the held-out code to any client (the same party that submits the candidate), defeating held-out purpose even after T10.\n\nSPEC: HTTP layer only (direct critic.call_critic() Python return shape unchanged): POST /v1/candidates/review response and GET /v1/evidence/{id} (including nested provider_call records and data/review payloads) strip each sealed test code and return [{kind, code_sha256, code_len}] plus counts; raw code never appears in any HTTP body. Full code stays in the private server store keyed by evidence_id and is the copy T10's runner executes. Chain entries and T11 event summaries already carry ids/metadata only.\nCritic constraints: (1) existing tests read main._evidence directly (provider-call audits keep the raw response_document there), so keep raw records in the server store and redact only when serializing HTTP responses (POST /v1/candidates/review, GET /v1/evidence/{id}, anything else that echoes evidence). (2) Tracked tests were already moved to the redacted HTTP shape (test_provider_accounting.py, test_critic_t8_sealed_suite_shape.py). (3) The web Lab displays sealed tests: apps/web/app/lab/page.tsx must show kind + short sha256 + length instead of code, and keep Run enabled from review_evidence_id.\n\nACCEPTANCE (your own plan): HTTP POST /v1/candidates/review and GET /v1/evidence/{review_id} bodies contain no 'def test_' code but contain per-test kind plus sha256/len and total count; Provider-call audit entries in evidence bodies contain no sealed code; Server run via review_evidence_id still executes the full unstripped suite (passing candidate still PASSes); python -m pytest services/api -q passes (T8 HTTP-shape expectations updated by Critic to redacted form; Python-level critic shape tests unchanged)\nOUT OF SCOPE: services/api/evoforge/postgres_kernel.py; services/api/evoforge/kernel_api.py; docs/POSTGRES_KERNEL.md; docs/INTERNAL_KERNEL_API.md; changing the Python-internal sealed-suite shape validator",
+  "edit": [
+    "services/api/main.py",
+    "services/api/evoforge/critic.py",
+    "apps/web/lib/api.ts",
+    "apps/web/app/lab/page.tsx"
+  ],
+  "context": [
+    "services/api/tests/test_provider_accounting.py",
+    "services/api/tests/critic_helpers.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
+    "git checkout -- apps/web/tsconfig.tsbuildinfo"
+  ]
+}

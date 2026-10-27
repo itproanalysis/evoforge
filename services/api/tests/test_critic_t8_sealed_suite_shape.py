@@ -59,7 +59,9 @@ def test_stub_is_deterministic():
 def test_stub_via_api_is_200_and_shaped():
     c = TestClient(main.app, raise_server_exceptions=False)
     r = c.post("/v1/candidates/review", json={"goal_contract": "spec", "diff": "d"})
-    assert r.status_code == 200 and _valid_suite(r.json()["sealed_tests"])
+    assert r.status_code == 200
+    st = r.json()["sealed_tests"]  # T12: redacted over HTTP
+    assert len(st) >= 3 and KINDS <= {t["kind"] for t in st} and all("code" not in t for t in st)
 
 
 # ---- model path with a fake OpenAI client ----
