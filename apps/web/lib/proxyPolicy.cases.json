@@ -61,11 +61,76 @@
 ]
 },
 {
-"expected": "/v1/eval/sandbox",
+"expected": null,
 "path_segments": [
 "v1",
 "eval",
 "sandbox"
+]
+},
+{
+"expected": "/v1/performance",
+"path_segments": [
+"v1",
+"performance"
+]
+},
+{
+"expected": "/v1/eval/suites",
+"path_segments": [
+"v1",
+"eval",
+"suites"
+]
+},
+{
+"expected": "/v1/eval/baseline",
+"path_segments": [
+"v1",
+"eval",
+"baseline"
+]
+},
+{
+"expected": "/v1/eval/pipeline",
+"path_segments": [
+"v1",
+"eval",
+"pipeline"
+]
+},
+{
+"expected": null,
+"path_segments": [
+"v1",
+"eval",
+"unknown"
+]
+},
+{
+"expected": null,
+"path_segments": [
+"v1",
+"eval",
+"baseline",
+"extra"
+]
+},
+{
+"expected": null,
+"path_segments": [
+"v1",
+"eval",
+"pipeline",
+"extra"
+]
+},
+{
+"expected": null,
+"path_segments": [
+"v1",
+"performance",
+"x"
 ]
 },
 {

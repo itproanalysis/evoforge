@@ -6,9 +6,11 @@ import {
   type LedgerSnapshot,
   type MissionDetail,
   type MissionState,
+  type PerformanceSnapshot,
   getDashboard,
   getLedger,
   getMission,
+  getPerformance,
   postMission,
   postMissionAdvance,
   postMissionCancel,
@@ -48,6 +50,7 @@ export default function MissionControl() {
   const [mission, setMission] = useState<MissionDetail | null>(null);
   const [dashboard, setDashboard] = useState<DashboardSnapshot | null>(null);
   const [ledger, setLedger] = useState<LedgerSnapshot | null>(null);
+  const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
   const stopRef = useRef(false);
 
   const refreshState = async (missionId: string | null) => {
@@ -66,6 +69,9 @@ export default function MissionControl() {
 
   useEffect(() => {
     void refreshState(null);
+    getPerformance()
+      .then(setPerf)
+      .catch(() => {});
   }, []);
 
   // Poll the mission and the dashboard while a mission is active.
@@ -89,7 +95,6 @@ export default function MissionControl() {
         })),
         { k: "Active missions", v: String(dashboard.active_missions) },
         { k: "Blocked merges", v: String(dashboard.blocked_merges) },
-        { k: "Validated (WVI)", v: String(dashboard.validated_improvements ?? 0) },
         { k: "Spent", v: fmtCents(dashboard.spent_cents) },
         { k: "Reserved", v: fmtCents(dashboard.reserved_cents) },
         { k: "Unknown holds", v: String(dashboard.unknown_holds) },
@@ -160,6 +165,27 @@ export default function MissionControl() {
             <div style={value}>{m.v}</div>
           </div>
         ))}
+      </section>
+
+      <section style={{ ...card, marginTop: 16 }}>
+        <div style={label}>Performance (GET /v1/performance)</div>
+        <div style={{ fontSize: 13, marginTop: 4 }}>
+          {perf && perf.comparison.status === "measured" && perf.comparison.verdict ? (
+            <>
+              비교: <code>{perf.comparison.verdict}</code>{" "}
+              {typeof perf.comparison.delta_pp === "number"
+                ? `Δ${perf.comparison.delta_pp.toFixed(1)}%p`
+                : ""}
+            </>
+          ) : (
+            "not measured yet"
+          )}
+        </div>
+        <p style={{ marginBottom: 0 }}>
+          <a href="/performance" style={{ color: "#7db4ff" }}>
+            Performance →
+          </a>
+        </p>
       </section>
 
       <section style={{ ...card, marginTop: 16 }}>

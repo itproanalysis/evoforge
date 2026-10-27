@@ -291,6 +291,107 @@ export function getEvalSuites() {
   return req<EvalSuitesResponse>("/v1/eval/suites");
 }
 
+export interface MeasurementRecord {
+  measurement_id: string;
+  kind: string;
+  suite_version: string;
+  model: string;
+  harness_version: string;
+  n: number;
+  passed: number;
+  pass_rate: number;
+  wilson95: [number, number];
+  cost_cents: number;
+  created_at: number;
+  per_family: Record<string, { n: number; passed: number }>;
+  evidence_id: string;
+  attempts_total?: number;
+  usage_missing?: boolean;
+}
+
+export interface MeasurementView {
+  status: "measured" | "not_measured";
+  reason: string;
+  record: MeasurementRecord | null;
+  kind?: string;
+  measurement_id?: string;
+  suite_version?: string;
+  model?: string;
+  harness_version?: string;
+  n?: number;
+  passed?: number;
+  pass_rate?: number;
+  wilson95?: [number, number];
+  cost_cents?: number;
+  created_at?: number;
+  per_family?: Record<string, { n: number; passed: number }>;
+  evidence_id?: string;
+  attempts_total?: number;
+  usage_missing?: boolean;
+}
+
+export interface PerformanceComparison {
+  status: "measured" | "not_measured";
+  reason: string;
+  delta_pp: number | null;
+  verdict: "improved" | "no_clear_difference" | "worse" | null;
+}
+
+export interface ProductionStats {
+  runs: number;
+  gate_pass: number;
+  gate_fail: number;
+  gate_inconclusive: number;
+  heldout_pass_rate_pct: number | null;
+  sample_note: string;
+}
+
+export interface PerformanceSnapshot {
+  baseline: MeasurementView;
+  pipeline: MeasurementView;
+  comparison: PerformanceComparison;
+  cost_per_solved_cents: { baseline: number | null; pipeline: number | null };
+  history: MeasurementRecord[];
+  production: ProductionStats;
+  storage: string;
+}
+
+export interface BaselineResponse {
+  baseline_id: string;
+  evidence_id: string;
+  measurement_id: string;
+  measurement: MeasurementRecord;
+  suite_version: string;
+  model: string;
+}
+
+export interface PipelineResponse {
+  pipeline_id: string;
+  evidence_id: string;
+  measurement_id: string;
+  measurement: MeasurementRecord;
+  suite_version: string;
+  model: string;
+}
+
+export function getPerformance() {
+  return req<PerformanceSnapshot>("/v1/performance");
+}
+
+export function runBaseline(suite_version = "v0", model = "muse-spark-1.3") {
+  return req<BaselineResponse>("/v1/eval/baseline", {
+    method: "POST",
+    body: JSON.stringify({ suite_version, model }),
+  });
+}
+
+export function runPipeline(suite_version = "v0", model = "muse-spark-1.3") {
+  return req<PipelineResponse>("/v1/eval/pipeline", {
+    method: "POST",
+    body: JSON.stringify({ suite_version, model }),
+  });
+}
+
 export const EVIDENCE_STAGES = [
   "ObjectiveVersion",
   "Task",
