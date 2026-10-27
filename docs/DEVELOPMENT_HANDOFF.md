@@ -244,3 +244,17 @@ manifest: 지원 브랜치 `docs/validation/2026-10-27-candidate-registration.js
 T22의 상위 main 반영을 먼저 기다리고 지원 브랜치에 동기화한다. 현재 main/commands.py의 공개 접점은 그대로다.
 공개 Broker 전송·비용/명령·후보 등록 호출·PR base 전달·독립 리뷰/전체 승인·실청구/운영 반영은 계속 미완료다.
 Muse Spark 기본값과 자동 재개를 유지한다.
+
+## 2026-10-27 정산/예약 경합의 프로젝트 cap 보호
+
+지원 브랜치 `codex/pg-integration`의 `c479487`은 기존 호출의 정산이 초기 cap 확인 뒤 커밋되는 경합을 재검사한다.
+확장 007이 INSERT 시점에 현재 프로젝트 사용액/cap과 테넌트 잔액/hold를 같은 snapshot에서 확인한다.
+기존 실제 정산은 유지하고 한도를 넘는 새 예약만 거부한다. 정본 함수·RLS·승인 경계는 보존했다.
+
+수정 전 회귀 1 failed, 수정 후 API 465 passed·1 skipped·실제 DB 145 passed·참조 112·SQL 96·계약 0 failure·웹 빌드 통과.
+초기 예약 100→정산 900µUSD(cap 1000) 경합에서 신규 900을 거부하고 잔여 100을 허용했다.
+manifest는 지원 브랜치 `docs/validation/2026-10-27-project-cap-race.json`, 원본 8개는
+main `.local/evidence/project-cap-race-20261027-4io029zf`에 있다. 이전 지원 초안의 007을 쓴 테스트 DB는 재적용한다.
+
+T22의 Muse runner가 실행 중인 것을 확인해 중복 실행하거나 main 파일을 변경하지 않았다.
+상위 T22를 먼저 main에 반영한 뒤 지원 브랜치에 동기화한다. 공개 명령/비용·실청구/운영 통합은 미완료이며 자동 재개를 유지한다.
