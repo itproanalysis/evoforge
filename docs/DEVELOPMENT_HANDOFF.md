@@ -122,3 +122,4 @@ main 작업 폴더의 최종 API **291 passed·1 skipped**, 실제 DB **46 passe
 상위 round4를 보존해 동기화한 뒤 API 317 passed·1 skipped, 실제 DB 77 passed,
 참조 112·SQL 96·패키지 검사와 웹 빌드가 통과했다.
 마이그레이션·설정·남은 통합은 [BUILDER_PREFLIGHT.md](BUILDER_PREFLIGHT.md), main 반영 기록은 STATUS를 따른다.
+`0551fbe`로 main에 반영했다. main의 API 시작/health/OpenAPI·패키지 검사·웹 빌드도 통과했다.
