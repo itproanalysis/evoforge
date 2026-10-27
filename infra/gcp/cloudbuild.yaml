@@ -72,9 +72,16 @@ steps:
       - -c
       - |
         set -e
+        if ! gcloud sql instances describe evoforge-pg-${_ENV} --project=$PROJECT_ID --format='value(connectionName)' >/dev/null 2>&1; then
+          echo "SKIP migrate: no instance evoforge-pg-${_ENV} yet"
+          exit 0
+        fi
+        if ! gcloud secrets versions access latest --secret=DB_URL --project=$PROJECT_ID >/dev/null 2>&1; then
+          echo "SKIP migrate: no DB_URL secret yet"
+          exit 0
+        fi
         CONN=$$(gcloud sql instances describe evoforge-pg-${_ENV} --project=$PROJECT_ID --format='value(connectionName)')
         echo "Migrating via $$CONN"
-        gcloud sql connect evoforge-pg-${_ENV} --project=$PROJECT_ID --user=evoforge --quiet < /dev/null || true
         # Real migration runs on a GCE/cloud-build-private-pool with psql:
         #   psql "$$DB_URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/core_DRAFT.sql
         #   psql "$$DB_URL" -v ON_ERROR_STOP=1 -f docs/evoforge-v4.2/contracts/sql/context_plane_DRAFT.sql
