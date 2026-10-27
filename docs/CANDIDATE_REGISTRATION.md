@@ -64,3 +64,8 @@ API **465 passed·1 skipped**, 실제 PostgreSQL **144 passed**(새 후보 등�
 참조 **112개**·SQL **96개**·계약 **0 failure**·웹 프로덕션 빌드를 통과했다.
 동시 최초 등록 8회·새 API 프로세스 조회·실제 Runner/G2 연결·병합 거부·head drift·fencing 재검사·원자적 롤백을 확인했다.
 상위 Muse T22의 main/평가/UI·봉인 테스트·정본 파일은 수정하지 않는다.
+
+2026-10-27 후속 `b243426`에서는 실행 증거 ID를 포함한 파일명 및 확장 010을 검증했다.
+전체 API 538개(1 skipped), 실제 PostgreSQL 169개, SQL 96개·참조 112개·계약·웹 빌드가 통과했다.
+원본과 소스 해시는 `docs/validation/2026-10-27-candidate-cli-followup.json`에 기록한다.
+공개 PR/Broker 연결과 실제 provider·운영 배포는 계속 미완료다.

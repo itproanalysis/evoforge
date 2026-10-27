@@ -629,6 +629,7 @@ CLI 결과의 비용을 추정하거나 누락 금액을 0원으로 바꾸지 �
 CLI 관련 집중 29개·전체 API 538개(1 skipped)·계약 0 failure 통과. DB/Git/Runner는 실제지만
 모델 응답·청구·리뷰·GitHub transport는 합성 데이터다. 원본: `.local/evidence/cli-billing-20261027-3tagslmg` 및
 `.local/evidence/tagged-candidate-20261027-q6zgkkht`. 외부 운영 배포·실청구는 완료가 아니다.
+검증 소스 59개와 원본 로그 20개의 SHA-256은 `docs/validation/2026-10-27-candidate-cli-followup.json`에 보존한다.
 
 별도 `codex/muse-capabilities`의 `e9a1168`은 Meta 직접 API에 한해 별도 capability 입력으로 정본 S1–S11을
 검사한다. 프록시·만료·미확인 캐시 비활성화/명시적 breakpoint는 거부하며 정본 seed는 변경하지 않았다.

@@ -338,6 +338,7 @@ manifest: 지원 브랜치 `docs/validation/2026-10-27-db-usage-guard.json`(sour
 확장 010, 청구액 미확인 시 UNKNOWN 예약 유지가 포함된다. 실제 PostgreSQL·Git·Runner 169개,
 SQL 96·참조 112·CLI 집중 29개·정본 검사 0 failure를 통과했다. 모델/청구/리뷰/HTTP는 합성 fixture다.
 원본: `.local/evidence/tagged-candidate-20261027-q6zgkkht`, `.local/evidence/cli-billing-20261027-3tagslmg`.
+소스·로그 해시: `docs/validation/2026-10-27-candidate-cli-followup.json`.
 전체 API 538개(1 skipped)도 통과했다. 실제 provider 출처 확인, 공개 명령과 DB 경로의 연결, 운영 배포는 미완료다.
 
 별도 `codex/muse-capabilities`의 `e9a1168`은 Meta 공식 직접 API·Muse Spark의 보수적인 capability를
