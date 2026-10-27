@@ -1,1 +1,0 @@
-{"goal":"In calc.py, fix sub(a, b) which wrongly returns a + b so it returns a - b. Keep the signature sub(a, b). Include runnable pytest tests as code (each test a def test_* function using assert), not prose.","repo_ref":"main","target_paths":["calc.py"]}
