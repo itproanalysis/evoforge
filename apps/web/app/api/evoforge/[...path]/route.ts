@@ -5,8 +5,49 @@ import { resolveApiPath } from "@/lib/proxyPolicy";
 
 const COOKIE_NAME = "__Host-evoforge-session";
 const METADATA_BASE = "http://metadata.google.internal";
+const POST_WINDOW_MS = 60 * 1000;
+const DEFAULT_POST_PER_MIN = 20;
+// Rolling per-IP POST timestamps for "none" auth mode.
+const postHits = new Map<string, number[]>();
 // Path policy (exact paths such as /v1/ledger plus /v1/evidence/{id} families)
 // lives in @/lib/proxyPolicy and is enforced via resolveApiPath() below.
+
+// Server-only auth mode, read at runtime. Any value other than "none"
+// means the default "session" behaviour (owner login required).
+function authDisabled(): boolean {
+  return (process.env.EVO_WEB_AUTH ?? "") === "none";
+}
+
+function clientIp(req: NextRequest): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) {
+    const first = fwd.split(",")[0]?.trim();
+    if (first) return first;
+  }
+  return "unknown";
+}
+
+function postLimitPerMin(): number {
+  const raw = (process.env.EVO_WEB_POST_PER_MIN ?? "").trim();
+  if (raw !== "") {
+    const n = Number(raw);
+    if (Number.isInteger(n) && n >= 0) return n;
+  }
+  return DEFAULT_POST_PER_MIN;
+}
+
+function isPostRateLimited(ip: string, limit: number): boolean {
+  const now = Date.now();
+  let hits = postHits.get(ip);
+  if (!hits) {
+    hits = [];
+    postHits.set(ip, hits);
+  }
+  while (hits.length > 0 && (hits[0] as number) <= now - POST_WINDOW_MS) hits.shift();
+  if (hits.length >= limit) return true;
+  hits.push(now);
+  return false;
+}
 
 function verifySession(value: string, secret: string): boolean {
   if (!value || !secret) return false;
@@ -61,17 +102,26 @@ async function fetchIdToken(audience: string): Promise<string | null> {
 }
 
 async function handle(req: NextRequest, params: { path?: string[] }) {
-  const secret = process.env.EVO_SESSION_SECRET ?? "";
-  const jar = await cookies();
-  const raw = jar.get(COOKIE_NAME)?.value ?? "";
-  if (!verifySession(raw, secret)) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  const noAuth = authDisabled();
+  if (!noAuth) {
+    const secret = process.env.EVO_SESSION_SECRET ?? "";
+    const jar = await cookies();
+    const raw = jar.get(COOKIE_NAME)?.value ?? "";
+    if (!verifySession(raw, secret)) {
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
   }
 
   const segs = params.path ?? [];
   const apiPath = resolveApiPath(segs);
   if (apiPath === null) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+
+  if (noAuth && req.method === "POST") {
+    if (isPostRateLimited(clientIp(req), postLimitPerMin())) {
+      return NextResponse.json({ error: "rate limited" }, { status: 429 });
+    }
   }
 
   const base = apiBase();
