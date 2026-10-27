@@ -43,15 +43,58 @@ def _base_files(c, repo: str, tok: str, paths: list[str], base: str) -> tuple[di
     return texts, shas
 
 
-def create_pr(diff: str, title: str, body: str, branch: str, base: str = "main", client=None) -> dict:
-    """Apply `diff` to `base` (PatchError before any write), commit to `branch`, open PR."""
+def _validate_extra_path(path: str) -> None:
+    """Extra test files must stay inside tests/evoforge_gen/ (PatchError -> 409)."""
+    from evoforge.patch import PatchError
+
+    if not isinstance(path, str) or not path:
+        raise PatchError(f"refused test path: {path!r}")
+    if path.startswith("/") or "\\" in path:
+        raise PatchError(f"refused absolute test path: {path!r}")
+    if len(path) >= 2 and path[1] == ":" and path[0].isalpha():
+        raise PatchError(f"refused absolute test path: {path!r}")
+    parts = path.split("/")
+    if "" in parts or ".." in parts or "." in parts:
+        raise PatchError(f"refused test path outside tests/evoforge_gen/: {path!r}")
+    if len(parts) < 3 or parts[0] != "tests" or parts[1] != "evoforge_gen":
+        raise PatchError(f"refused test path outside tests/evoforge_gen/: {path!r}")
+    if parts[0] == ".git":
+        raise PatchError(f"refused test path under .git: {path!r}")
+
+
+def create_pr(diff: str, title: str, body: str, branch: str, base: str = "main", client=None,
+              extra_files: dict | None = None) -> dict:
+    """Apply `diff` to `base` (PatchError before any write), commit to `branch`, open PR.
+
+    `extra_files` maps new test paths -> text; each is committed as a new file
+    on the same branch before the PR opens. Collisions (exists at base or
+    touched by the diff) raise PatchError; escapes raise PatchError.
+    """
     import httpx
+
+    from evoforge.patch import PatchError
 
     tok, repo = _env()
     paths = paths_in_diff(diff)
+    extra = dict(extra_files or {})
+    for p in extra:
+        _validate_extra_path(p)
+        if p in paths:
+            raise PatchError(f"test file path collides with diff: {p}")
+        if not isinstance(extra[p], str):
+            raise PatchError(f"test file is not text: {p}")
     c = client or httpx.Client(timeout=30)
     try:
         texts, shas = _base_files(c, repo, tok, paths, base)
+        if extra:
+            for p in extra:
+                r = c.get(f"{API}/repos/{repo}/contents/{quote(p)}", headers=_h(tok),
+                          params={"ref": base})
+                if r.status_code == 404:
+                    continue
+                if r.status_code == 200:
+                    raise PatchError(f"test file already exists at base: {p}")
+                raise RuntimeError(f"read {p}@{base} failed: {r.status_code} {r.text[:200]}")
         changed = apply_unified_diff(texts, diff)  # raises PatchError; nothing written yet
         b = c.get(f"{API}/repos/{repo}/git/ref/heads/{base}", headers=_h(tok))
         if b.status_code != 200:
@@ -72,6 +115,14 @@ def create_pr(diff: str, title: str, body: str, branch: str, base: str = "main",
                 if path in shas:
                     payload["sha"] = shas[path]
                 u = c.put(url, headers=_h(tok), json=payload)
+            if u.status_code not in (200, 201):
+                raise RuntimeError(f"write {path} failed: {u.status_code} {u.text[:200]}")
+        for path in sorted(extra):
+            url = f"{API}/repos/{repo}/contents/{quote(path)}"
+            payload = {"message": title,
+                       "content": base64.b64encode(extra[path].encode("utf-8")).decode(),
+                       "branch": branch}
+            u = c.put(url, headers=_h(tok), json=payload)
             if u.status_code not in (200, 201):
                 raise RuntimeError(f"write {path} failed: {u.status_code} {u.text[:200]}")
         p = c.post(f"{API}/repos/{repo}/pulls", headers=_h(tok),

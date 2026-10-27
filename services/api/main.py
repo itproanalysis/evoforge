@@ -101,6 +101,103 @@ class GenerateRequest(BaseModel):
     risk: str = "LOW"
     idempotency_key: str | None = None
     confirm: bool = False
+    target_paths: list | None = None
+
+
+_BUILDER_MAX_PATHS = 10
+_BUILDER_PER_FILE_CAP = 32 * 1024
+_BUILDER_TOTAL_CAP = 128 * 1024
+
+
+def _validate_target_paths(paths) -> list[str]:
+    import re
+
+    if not isinstance(paths, list):
+        raise HTTPException(400, "target_paths must be a list of relative POSIX paths")
+    if len(paths) > _BUILDER_MAX_PATHS:
+        raise HTTPException(400, f"target_paths limited to {_BUILDER_MAX_PATHS} entries")
+    out: list[str] = []
+    for p in paths:
+        if not isinstance(p, str) or not p:
+            raise HTTPException(400, f"bad target path: {p!r}")
+        if len(p) > 120:
+            raise HTTPException(400, f"bad target path (over 120 chars): {p!r}")
+        if "\\" in p or p.startswith("/"):
+            raise HTTPException(400, f"bad target path: {p!r}")
+        if re.match(r"^[A-Za-z]:", p):
+            raise HTTPException(400, f"bad target path: {p!r}")
+        segs = p.split("/")
+        if any(s == "" for s in segs):
+            raise HTTPException(400, f"bad target path: {p!r}")
+        if ".." in segs:
+            raise HTTPException(400, f"bad target path: {p!r}")
+        if segs[0] == ".git":
+            raise HTTPException(400, f"bad target path: {p!r}")
+        out.append(p)
+    return out
+
+
+def _load_builder_context(repo_sha: str, target_paths: list[str]) -> list[dict]:
+    """Read target files at the T15-resolved base; 400 bad/missing, 413 over cap."""
+    import shutil
+
+    from evoforge import repo_source as _rs
+
+    try:
+        resolved = _rs.resolve_repo_dir("", repo_sha)
+    except Exception as e:
+        raise HTTPException(400, _rs.redact(str(e)))
+    try:
+        root = os.path.realpath(resolved)
+        ctx: list[dict] = []
+        total = 0
+        for p in target_paths:
+            full = os.path.join(resolved, p)
+            try:
+                real = os.path.realpath(full)
+                if os.path.commonpath([root, real]) != root:
+                    raise HTTPException(400, f"bad target path: {p!r}")
+            except HTTPException:
+                raise
+            except Exception:
+                raise HTTPException(400, f"bad target path: {p!r}")
+            if not os.path.isfile(real) or os.path.islink(full) and not os.path.isfile(real):
+                raise HTTPException(400, f"target file not found at base: {p}")
+            try:
+                size = os.path.getsize(real)
+            except OSError:
+                raise HTTPException(400, f"target file not found at base: {p}")
+            if size > _BUILDER_PER_FILE_CAP:
+                raise HTTPException(413, f"target file over per-file budget (32KB): {p}")
+            if total + size > _BUILDER_TOTAL_CAP:
+                raise HTTPException(413, f"target files over total budget (128KB) at: {p}")
+            try:
+                with open(real, "rb") as fh:
+                    raw = fh.read()
+            except OSError:
+                raise HTTPException(400, f"target file not found at base: {p}")
+            if len(raw) > _BUILDER_PER_FILE_CAP:
+                raise HTTPException(413, f"target file over per-file budget (32KB): {p}")
+            if total + len(raw) > _BUILDER_TOTAL_CAP:
+                raise HTTPException(413, f"target files over total budget (128KB) at: {p}")
+            if b"\x00" in raw:
+                ctx.append({"path": p, "skipped": "binary/too-large"})
+                continue
+            try:
+                text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                ctx.append({"path": p, "skipped": "binary/too-large"})
+                continue
+            total += len(raw)
+            ctx.append({"path": p, "content": text})
+        return ctx
+    finally:
+        try:
+            base = os.path.basename(resolved.rstrip(os.sep))
+            if base.startswith("evoforge-remote-"):
+                shutil.rmtree(resolved, ignore_errors=True)
+        except Exception:
+            pass
 
 
 class GateVerdict(BaseModel):
@@ -390,7 +487,14 @@ def generate(req: GenerateRequest):
     """Vertical slice H1: reserve budget, call Muse Spark Builder, run GH_INTEGRITY."""
     if not req.goal.strip():
         raise HTTPException(400, "goal required")
-    key = req.idempotency_key or f"gen:{req.goal}:{req.repo_sha}"
+    validated_paths: list[str] | None = None
+    file_context: list[dict] | None = None
+    if req.target_paths is not None:
+        validated_paths = _validate_target_paths(req.target_paths)
+        if validated_paths:
+            file_context = _load_builder_context(req.repo_sha, validated_paths)
+    suffix = f":{','.join(validated_paths)}" if validated_paths else ""
+    key = req.idempotency_key or f"gen:{req.goal}:{req.repo_sha}{suffix}"
     try:
         cmd = create(req.goal, key, kind="BUILD", risk=req.risk, confirm=req.confirm)
     except NeedsConfirmation as e:
@@ -402,7 +506,11 @@ def generate(req: GenerateRequest):
     rsv = _reserve_or_402()
     from evoforge.gates import evaluate_integrity
 
-    candidate = _call_provider(rsv, broker_meta.call_builder, req.goal, req.repo_sha)
+    if file_context:
+        candidate = _call_provider(rsv, broker_meta.call_builder, req.goal, req.repo_sha,
+                                   file_context)
+    else:
+        candidate = _call_provider(rsv, broker_meta.call_builder, req.goal, req.repo_sha)
     verdicts = evaluate_integrity(candidate.get("diff", ""), candidate.get("tests", []))
     eid = _store_evidence({"command_id": cmd["command_id"], "candidate": candidate,
                            "reservation_id": rsv,
@@ -585,11 +693,38 @@ def pr_create(req: PRRequest):
     blocked = [f"{g['gate']}={g['result']}" for g in gates if g.get("result") != "PASS"]
     if blocked:
         raise HTTPException(409, f"PR blocked by gates: {', '.join(blocked)}")
+    extra_files: dict[str, str] = {}
+    stored_tests = src.get("tests")
+    if isinstance(stored_tests, list):
+        for i, t in enumerate(stored_tests, 1):
+            if not isinstance(t, dict):
+                continue
+            code = t.get("code")
+            if not isinstance(code, str) or code == "":
+                continue
+            extra_files[f"tests/evoforge_gen/test_gen_{i}.py"] = code
+    for p in extra_files:
+        segs = p.split("/")
+        if "" in segs or ".." in segs or not p.startswith("tests/evoforge_gen/"):
+            raise HTTPException(409, f"test file path escapes tests/evoforge_gen/: {p}")
+    if extra_files:
+        try:
+            from evoforge.patch import paths_in_diff as _paths_in_diff
+
+            dpaths = set(_paths_in_diff(src["diff"]))
+        except Exception:
+            dpaths = set()
+        for p in extra_files:
+            if p in dpaths:
+                raise HTTPException(409, f"test file path collides with diff: {p}")
     body = "\n".join([req.body, "", *(f"{g['gate']}={g['result']} ({g.get('reason', '')})" for g in gates),
                       f"Evidence: {req.evidence_id}"])
+    if extra_files:
+        body = body + f"\nTests: {', '.join(sorted(extra_files))}"
     try:
         pr = github.create_pr(src["diff"], req.title, body,
-                              req.branch or f"evoforge/{uuid.uuid4().hex[:8]}", req.base)
+                              req.branch or f"evoforge/{uuid.uuid4().hex[:8]}", req.base,
+                              extra_files=extra_files or None)
     except PatchError as e:
         raise HTTPException(409, str(e))
     except RuntimeError as e:

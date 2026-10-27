@@ -106,7 +106,7 @@ def call_metadata(response, model: str, phase: str) -> dict:
     }
 
 
-def call_builder(goal: str, repo_sha: str) -> dict:
+def call_builder(goal: str, repo_sha: str, file_context: list[dict] | None = None) -> dict:
     """Call Muse Spark; without a key return an explicitly marked demo candidate."""
     if not os.getenv("MODEL_API_KEY"):
         # Deterministic stub so UI/evals work without billing; NEVER claim as model output.
@@ -119,12 +119,33 @@ def call_builder(goal: str, repo_sha: str) -> dict:
         }
     model = os.getenv("MODEL_BUILDER", "muse-spark-1.3")
     budget = _output_budget()
+    user_content = f"Goal: {goal}\nBase SHA: {repo_sha}"
+    if file_context:
+        blocks: list[str] = []
+        for entry in file_context:
+            if not isinstance(entry, dict):
+                continue
+            p = entry.get("path", "")
+            if not isinstance(p, str):
+                p = str(p)
+            if "skipped" in entry:
+                blocks.append(f"```\n# path: {p}\n[skipped: {entry['skipped']}]\n```")
+            elif isinstance(entry.get("content"), str):
+                content = entry["content"]
+                raw = content.encode("utf-8")
+                if len(raw) > 32 * 1024:
+                    cut = raw[:32 * 1024].decode("utf-8", errors="ignore")
+                    content = cut + "\n... [truncated]"
+                blocks.append(f"```\n# path: {p}\n{content}\n```")
+        if blocks:
+            user_content = (user_content + "\n\nFile context (target files at base):\n"
+                            + "\n".join(blocks))
     with provider_errors():
         resp = _client().chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": BUILDER_SYSTEM},
-                {"role": "user", "content": f"Goal: {goal}\nBase SHA: {repo_sha}"},
+                {"role": "user", "content": user_content},
             ],
             response_format={"type": "json_object"},
             max_tokens=budget,
