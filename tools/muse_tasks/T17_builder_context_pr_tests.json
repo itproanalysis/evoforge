@@ -1,0 +1,18 @@
+{
+  "id": "T17_builder_context_pr_tests",
+  "planned_by": "muse-spark-1.3 (round-6 plan, production P0)",
+  "goal": "Builder file context + PR includes new tests\nWHY: P0-5+P0-6 (one payload-shape round): Builder gets only the goal sentence so patches are blind, and PRs ship only the diff while the Builder's tests are dropped; feed capped target-file snapshots into the Builder and commit its visible tests as new files in the PR.\n\nSPEC: Generate (POST /v1/commands/generate): accept optional target_paths: list[str] (<=10 entries; each relative POSIX, no absolute/drive/.. segments, no .git prefix, <=120 chars, UTF-8 text files only); server reads each at the run base from the T15-resolved repo dir with caps 32KB/file and 128KB total (binary/non-UTF8 entries skipped with a {path, skipped: 'binary/too-large'} marker; over-cap request -> 413 with which path blew the budget). broker_meta.call_builder(goal, repo_sha, file_context: list[{path, content|skipped}] | None = None) (backward compatible); with a key, the user message becomes goal + base + fenced snapshots ('# path: <p>\\n<content, truncated marker if cut>'); stub (no key) unchanged. Response shape unchanged. PR (POST /v1/pr/create + evoforge/github.py create_pr(diff, title, body, branch, base, extra_files: dict[path, text] | None = None)): after the existing all-PASS server-run check, commit each stored visible test (req.tests from the /v1/runs evidence, [{code}]) as a new file tests/evoforge_gen/test_gen_<i>.py (i=1-based, code as-is, must be non-empty str else skipped); refuse with 409 if any target path already exists at base, is touched by the diff, or escapes tests/evoforge_gen/; commit test files to the same branch before opening the PR (same contents-API flow) and append a 'Tests: <paths>' line to the PR body. Empty tests -> diff-only PR as today. Sealed held-out code is never written to the PR. Status: bad target path 400, over cap 413, test-path collision 409; existing gate/PR rules (404 unknown evidence, 409 not-a-run/gates-blocked) unchanged.\n\nACCEPTANCE (your own plan): Generate with target_paths=['a.py'] and mocked broker: prompt sent to the model contains the file snapshot with path header; '../x', '/abs', '.git/config' -> 400; 33KB file or 129KB total -> 413.; PR with mocked GitHub transport PUTs both diff paths and tests/evoforge_gen/test_gen_1..N.py then opens the pull; diff touching tests/evoforge_gen/test_gen_1.py -> 409; sealed code strings absent from all PUT bodies and the PR body.; No-key stub generate and all-PASS-gated PR semantics unchanged; existing critic/PR/gate tests pass.\nOUT OF SCOPE: Remote checkout and Runner transport (T15/T16; this task consumes them); Review coverage/diff-splitting and P1/P2 items; Codex-owned postgres_*.py and kernel_api.py (untouched)",
+  "edit": [
+    "services/api/main.py",
+    "services/api/evoforge/broker_meta.py",
+    "services/api/evoforge/github.py",
+    "services/api/tests/test_builder_context_pr_tests.py"
+  ],
+  "context": [
+    "AGENTS.md",
+    "docs/SERVICE_STATUS.md"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
