@@ -351,3 +351,13 @@ T22와 다른 작업을 보존하고 완료 전 현재 채팅의 자동 재개�
 `codex/pg-integration` `545b1f6`은 CLI 원본 JSON 사용량을 그대로 보존하고 실청구 출처 명시가 없으면
 UNKNOWN 예약을 유지한다. 수정 전 9 failed, 수정 후 관련 집중 38 passed. 원본은
 `.local/evidence/cli-raw-usage-20261027-8igvgow9`. 실청구 인증·전체 API/DB 재검증·main 반영은 미완료다.
+
+## 2026-10-28 preflight 신선도·권한 재검사
+
+`codex/preflight-freshness` `8437ef5`는 실제 서버 시각의 패킷·참조·리스 만료 및 전송 직전 패킷 digest,
+허용 공급사·동의·리스 소유자/에포크를 확인한다. 수정 전 7+3 failed, 수정 후 집중 77 passed·계약 0 failure.
+원본: `.local/evidence/preflight-freshness-20261028-y7cky9v4`. T22가 main에 반영되어 `f69106a`에 동기화했고
+해당 revision의 전체 API·실제 DB·웹 재검사 중이다. main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
+
+이전 `e9a1168` API 560 passed·1 skipped·실제 PostgreSQL 169 passed·SQL 96·참조 112·웹 npm ci/tsc/build,
+`ca0b584` API 569 passed·1 skipped 통과. 보강은 main 미반영이며 실제 provider 출처 인증 및 공개/운영 연결은 미완료다.

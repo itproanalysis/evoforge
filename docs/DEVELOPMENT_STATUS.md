@@ -680,3 +680,17 @@ T22 우선 작업과 Muse Spark 기본값·현재 채팅 자동 재개를 유지
 수정 후 관련 집중 38 passed. 원본은 `.local/evidence/cli-raw-usage-20261027-8igvgow9`.
 이 표시는 어댑터의 주장일 뿐 공급사 실청구를 독립적으로 인증하지 않으며 운영 연결 전 검증이 필요하다.
 `545b1f6`은 아직 main 미반영이다. 전체 API/DB 및 capability 변경 통합 검증은 계속 진행한다.
+
+## 2026-10-28 사전 전송 신선도 및 권한 재검사
+
+`codex/preflight-freshness`의 `8437ef5`는 패킷 발행·만료/참조 만료 및 리스 만료를 서버 UTC 시각으로
+비교하고, 예약 후 전송 직전에도 패킷 digest·공급사 allowlist·동의·리스 소유자/에포크/만료를 재검사한다.
+전송 전 실패 시 호출하지 않으며 예약을 유지한다. 이 인메모리 검사는 실제 PostgreSQL 원자적 펜싱을 대체하지 않는다.
+수정 전 만료/리스 7 failed와 바인딩/동의 3 failed; 수정 후 관련 집중 77 passed·계약 0 failure.
+원본: `.local/evidence/preflight-freshness-20261028-y7cky9v4`.
+
+`e9a1168`은 별도 Muse capability 검증에서 전체 API 560 passed·1 skipped, 실제 PostgreSQL 169 passed,
+SQL 96·참조 112·계약 및 격리된 웹 npm ci/tsc/프로덕션 빌드가 통과했다.
+`ca0b584`은 CLI 원본 사용량 보강과 함께 전체 API 569 passed·1 skipped를 통과했다.
+이후 T22a/T22b가 main에 반영되어 이를 `f69106a` 지원 브랜치에 동기화했고 전체 API/DB/웹 재검사가 진행 중이다.
+새 보강은 아직 main 미반영이다. 모델/청구는 합성 fixture이며 실 provider 출처 및 공개 경로·운영 연결은 미완료다.
