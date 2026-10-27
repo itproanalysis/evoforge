@@ -1421,3 +1421,27 @@ def test_deferred_command_completion_works_with_session_role_and_rls(funded,comm
     response=_command_response_evidence(funded,{'command_id':cid,'evidence':{'id':'ev_strict_role'}})
     assert restricted.complete(cid,response)['state']=='APPLIED'
     assert restricted.get(cid)['served']==response
+
+
+def test_real_database_command_accepts_separate_google_and_kernel_credentials(http_kernel,monkeypatch):
+    import main
+    audience='https://db-api.test.invalid'
+    service='approved@test.invalid'
+    monkeypatch.setenv('EVO_COMMAND_ACTOR_ID',str(uuid4()))
+    monkeypatch.setenv('EVO_REQUIRE_ID_TOKEN','1')
+    monkeypatch.setenv('EVO_API_URL',audience)
+    monkeypatch.setenv('EVO_WEB_SERVICE_ACCOUNT',service)
+    def identity(token,expected):
+        if token!='trusted-test-id' or expected!=audience:
+            raise ValueError('invalid ID token')
+        return {'aud':audience,'email':service}
+    monkeypatch.setattr(main.auth_module,'verify_id_token',identity)
+    headers={'Authorization':'Bearer trusted-test-id',
+             'X-Evoforge-Kernel-Token':'test-only-live-kernel-token-not-a-real-secret'}
+    request={'goal':'two independent auth gates','idempotency_key':'dual-auth-command'}
+    assert http_kernel.post('/v1/kernel/commands',json=request,headers={
+        'Authorization':headers['Authorization']}).status_code==401
+    accepted=http_kernel.post('/v1/kernel/commands',json=request,headers=headers)
+    assert accepted.status_code==200,accepted.text
+    cid=accepted.json()['command_id']
+    assert http_kernel.get('/v1/kernel/commands/'+cid,headers=headers).json()['state']=='RECEIVED'

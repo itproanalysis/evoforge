@@ -11,7 +11,7 @@ import os
 from uuid import UUID
 from typing import Literal
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, Header, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt
 
@@ -26,12 +26,18 @@ router = APIRouter(prefix="/v1/kernel", tags=["internal-kernel"])
 bearer = HTTPBearer(auto_error=False)
 
 
-def authenticated_kernel(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> PostgresKernel:
+def authenticated_kernel(credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+                         service_token: str | None = Header(default=None,alias='X-Evoforge-Kernel-Token')) -> PostgresKernel:
     expected = os.getenv("EVO_KERNEL_TOKEN", "")
     if len(expected) < 32 or not expected.isascii():
         raise HTTPException(503, "internal kernel authentication is not configured")
-    if (credentials is None or credentials.scheme.lower() != "bearer"
-            or not hmac.compare_digest(credentials.credentials.encode("utf-8"), expected.encode("utf-8"))):
+    # Google IAM/application ID authentication keeps Authorization. The private
+    # kernel credential is independent; an invalid explicit header never falls
+    # back to another credential. Legacy local Bearer use remains compatible.
+    supplied=service_token
+    if supplied is None and credentials is not None and credentials.scheme.lower()=='bearer':
+        supplied=credentials.credentials
+    if (supplied is None or not hmac.compare_digest(supplied.encode('utf-8'),expected.encode('utf-8'))):
         raise HTTPException(401, "internal kernel authentication required", headers={"WWW-Authenticate": "Bearer"})
     dsn = os.getenv("DATABASE_URL", "")
     try:

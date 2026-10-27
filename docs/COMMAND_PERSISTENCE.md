@@ -43,6 +43,11 @@ BUILD 호환 명령은 ASK에 대한 생성 응답의 완료를 뜻한다. 패�
 
 기존 `/v1/kernel` 서비스 토큰과 서버 소유 scope를 그대로 사용한다. 이 경로는 `EVO_STATE_BACKEND`와 독립적으로 PostgreSQL을 사용한다.
 브라우저에는 토큰을 제공하지 않으며 web BFF의 내부 커널 차단 정책을 유지한다.
+운영에서 Google ID 인증을 켜면 `Authorization: Bearer <approved ID token>`과
+`X-Evoforge-Kernel-Token: <internal service token>`을 함께 보낸다. 기존 Google audience/서비스 계정 검사를 우회하지 않는다.
+신뢰된 Worker는 배포에서 이미 허용한 서비스 identity와 호출 권한도 갖춰야 한다.
+ID 인증을 끈 로컬 환경의 기존 `Authorization: Bearer <internal token>`도 호환한다.
+명시한 커널 헤더가 틀리면 다른 헤더로 자동 대체하지 않는다.
 
 - `POST /v1/kernel/commands`: `{goal, idempotency_key, risk?, confirm?, expected_version?}`. 현재 BUILD/ASK만 접수한다.
   actor·scope·kind/승인을 본문으로 바꾸지 못한다. 확인은 strict boolean, 버전은 비음수 int64다.
@@ -66,8 +71,8 @@ BUILD 호환 명령은 ASK에 대한 생성 응답의 완료를 뜻한다. 패�
 `docs/validation/2026-10-27-api-commands.json`의 이전 스냅샷이다.
 Runner 지원과 합친 최신 검증은 `docs/validation/2026-10-27-pg-integration.json`을 따른다.
 
-상위 Muse round7이 `commands.py`와 main/mission 인터페이스를 수정 중이므로,
-현재는 내부 서비스 HTTP 경로 지원이며 공개 Generate 경로 연결 완료가 아니다.
+상위 Muse round7은 `d347b56`으로 main에 먼저 반영되었고 `codex/pg-integration`이 이를 보존해 동기화했다.
+후속 Muse T22가 main을 편집 중이므로 현재는 내부 서비스 HTTP 경로 지원이며 공개 Generate 경로 연결 완료가 아니다.
 상위 작업 반영 후 호환 hook과 dispatch를 연결하고 전체 검증을 갱신한다.
 공개 비용 원장의 canonical 예약·가격표·영수증 연결도 별도로 남아 있다.
 기본 모델 `muse-spark-1.3`과 자동 모델 대체 금지는 유지한다.

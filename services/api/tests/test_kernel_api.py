@@ -83,6 +83,34 @@ def test_canonical_command_lifecycle_requires_service_auth_before_creating_adapt
     api['factory'].assert_not_called()
 
 
+def test_google_id_token_and_kernel_header_must_both_pass_when_id_auth_is_enabled(api,monkeypatch):
+    import main
+    # An explicit wrong header is never rescued by a valid legacy Bearer.
+    assert api['client'].post('/v1/kernel/reservations',json=api['body'],headers={
+        **api['headers'],'X-Evoforge-Kernel-Token':'wrong'}).status_code==401
+    api['factory'].assert_not_called()
+    audience='https://api.test.invalid'
+    service='approved-web@test.invalid'
+    monkeypatch.setenv('EVO_REQUIRE_ID_TOKEN','1')
+    monkeypatch.setenv('EVO_API_URL',audience)
+    monkeypatch.setenv('EVO_WEB_SERVICE_ACCOUNT',service)
+    def identity(token,expected):
+        assert expected==audience
+        if token!='trusted-test-id':
+            raise ValueError('invalid ID token')
+        return {'aud':audience,'email':service}
+    monkeypatch.setattr(main.auth_module,'verify_id_token',identity)
+    valid={'Authorization':'Bearer trusted-test-id','X-Evoforge-Kernel-Token':TOKEN}
+    assert api['client'].post('/v1/kernel/reservations',json=api['body'],headers={
+        **valid,'Authorization':'Bearer invalid-test-id'}).status_code==401
+    assert api['client'].post('/v1/kernel/reservations',json=api['body'],headers={
+        'Authorization':valid['Authorization']}).status_code==401
+    api['factory'].assert_not_called()
+    response=api['client'].post('/v1/kernel/reservations',json=api['body'],headers=valid)
+    assert response.status_code==200 and TOKEN not in response.text
+    api['factory'].assert_called_once()
+
+
 @pytest.mark.parametrize("missing", ["EVO_TENANT_ID", "EVO_PROJECT_ID", "DATABASE_URL", "EVO_KERNEL_TOKEN"])
 def test_missing_server_configuration_fails_closed(api, monkeypatch, missing):
     monkeypatch.delenv(missing, raising=False)
