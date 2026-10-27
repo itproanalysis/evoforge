@@ -144,3 +144,18 @@ API 403 passed·1 skipped, 실제 DB 91 passed, 참조 112·SQL 96·패키지 �
 상위 작업을 먼저 main에 반영한 후 `commands.py` 위임과 Generate의 예약 전 dispatch·성공 응답 저장을 연결한다.
 이미 전송된 미완료 명령은 재호출 없이 409/대사 대상으로 유지하고, memory 기본 모드는 보존한다.
 공개 경로 연결·main 병합·운영 DB 적용·canonical 비용/mission 영속화는 완료되지 않았다.
+
+## 2026-10-27 Runner 실행 증거와 core 후보/G2 지원
+
+`codex/runner-core-evidence` (`C:\evo_forge_codex` 현재 체크아웃)의 `3526ae0`는 정산된 Builder 바인딩과
+커밋된 head의 실제 Runner 재실행 증거를 대조해 G2_REQUIRED를 원자적으로 기록하는 내부 경로다.
+필수 증거가 없는 `core.authorize_merge` 거부를 유지하며 후보 상태·다른 게이트·승인을 만들지 않는다.
+API 414 passed·1 skipped, 실제 DB 91 passed, 참조 112·SQL 96·패키지 검사·웹 빌드 통과.
+인증 경계 회귀 테스트는 `21707ed`, manifest는 `75ca7f8`, 원본은 main `.local/evidence/runner-core-20261027-m9gl2ykz`에 있다.
+실제 로컬/번들 Runner를 사용하되 Critic·영수증·image 식별자는 합성 fixture다. Docker/운영 배포·실청구 검증은 하지 않았다.
+
+상위 round7을 먼저 main에 반영한 후 두 지원 브랜치를 통합한다. `commands-persistence`는 별도 브랜치로 보존했다.
+공유 Codex DB 테스트 끝부분은 두 브랜치의 새 테스트를 모두 보존해 병합해야 한다.
+상위 T19는 `_generate_core`/`_review_core`/`_run_core`/`_pr_core`를 웹·mission이 공유하도록 리팩터링했다.
+명령 dispatch/완료 연결은 endpoint만이 아니라 이 공유 core 호출 경로를 기준으로 검토한다.
+공개 canonical 후보 생성·실제 요율/청구·다른 게이트/독립 리뷰·운영 DB/Runner 설정은 계속 미완료다.
