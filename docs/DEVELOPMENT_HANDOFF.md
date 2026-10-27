@@ -176,3 +176,20 @@ manifest는 `9ce7093`, 원본은 main `.local/evidence/pg-integration-20261027-w
 Muse T22가 새 `muse/round8`에서 main을 편집 중이므로 main.py·commands.py의 공개 접점은 아직 수정하지 않았다.
 T22를 main에 먼저 반영한 뒤 통합 브랜치에 동기화하고, facade 위임과 `_generate_core`/mission의 명시적 dispatch·완료를 연결한다.
 통합 코드의 main 병합·공개 비용/상태·정본 전체 승인·실제 모델 청구·운영 배포는 계속 미완료다.
+
+## 2026-10-27 Mission 상태 PostgreSQL 저장 지원
+
+통합 브랜치 `codex/pg-integration`의 `50ffc5b`는 mission facade와 확장 006에 상태·단계 증거를 저장한다.
+입력·HIGH 확인·상태 전이·증거 불변성과 scope 격리를 DB에서 검사한다.
+완료 출력과 전체 이벤트가 한 개이면 조회가 복원하고, 불완전/중복 출력은 409로 대사를 기다린다.
+모델을 재전송하지 않으며 취소된 상태는 앞으로 복원하지 않는다. 기본 memory 모드는 유지했다.
+
+API 463 passed·1 skipped, 실제 DB 118 passed(mission 신규 11개 포함), 참조 112·SQL 96·계약 0 failure·웹 빌드 통과.
+새 API 프로세스 복원과 실제 로컬 Runner를 검증했고 Builder/Critic/GitHub는 합성 fixture다.
+manifest는 지원 브랜치의 `docs/validation/2026-10-27-mission-persistence.json`,
+원본은 main `.local/evidence/mission-persistence-20261027-04hrzi1i`, 범위는 `docs/MISSION_PERSISTENCE.md`에 있다.
+
+이 코드는 main 미반영이다. Muse T22의 main/평가/UI·봉인 테스트를 보존하고 상위 병합 후 동기화한다.
+공유 `_generate_core`·mission의 호출 전 실행권·canonical 명령/비용·UNKNOWN 대사와 원자적 Objective 기록은 후속 작업이다.
+공개 command/ledger/performance 저장, 전체 승인·실제 청구·운영 마이그레이션/배포도 계속 미완료다.
+API min=max=1·Muse Spark `muse-spark-1.3`과 현재 채팅의 자동 재개를 유지한다.

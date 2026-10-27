@@ -118,9 +118,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — mission 영속화:** T22의 main/평가/UI 편집과 분리해
+- **Codex (mission 지원 검증 완료·공유 core 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** T22의 main/평가/UI 편집과 분리해
   `postgres_missions.py`, `missions.py`의 선택 backend, 확장 006, Codex 테스트·관련 문서를 수정한다.
-  API가 이미 사용하는 mission facade를 통해 상태/단계 증거를 복원하고, 같은 상태 전이와 봉인 코드 비노출을 유지한다.
+  `50ffc5b`에서 API가 이미 사용하는 mission facade의 상태/단계 증거 복원·RLS·봉인 코드 비노출을 구현했다.
+  API 463개·실제 DB 118개·SQL 96개·참조 112개·웹 빌드 통과. 지원 코드는 아직 main 미반영이다.
   main.py·상위 봉인 테스트는 편집하지 않는다. 모델 호출 전 claim·비용/명령의 공유 core 연결은 T22 병합 뒤 이어간다.
 - **Codex (내부 통합 검증 완료·공개 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 두 준비된 지원 브랜치를 별도 통합 브랜치에서 합쳤다.
   명령 완료 응답과 같은 scope의 서버 생성 증거를 원자적으로 연결하도록 `postgres_commands.py`·확장 004·Codex 테스트·문서를 보강한다.
@@ -282,3 +283,25 @@ API **463 passed·1 skipped**, 실제 PostgreSQL **107 passed**, 인증 경계 *
 현재 통합 브랜치의 main.py·commands.py는 round7 main과 코드 차이가 없으며 공개 명령·비용·mission 영속화는 계속 미완료다.
 Critic·영수증·등록 image는 합성 fixture이며 실제 Muse 청구·Google IAM·운영 DB 확장·새 배포 검증은 수행하지 않았다.
 전체 개발과 P0-2를 완료로 표시하거나 자동 재개를 비활성화하지 않는다.
+
+## Mission 상태 영속화 지원 (실제 DB 검증 완료·상위 병합 대기)
+
+`codex/pg-integration`의 `50ffc5b`는 공개 mission facade에 PostgreSQL 선택 backend를 연결한다.
+확장 006의 append-only 버전별 snapshot에 입력·확인·상태·단계 증거를 보존하고 RLS를 유지한다.
+완료된 서버 출력과 단계 이벤트가 한 개로 확인될 때만 조회가 복원하며 모델은 재호출하지 않는다.
+불완전하거나 중복된 출력은 409로 거부한다. HIGH 확인, 병렬 attach/mark 멱등성,
+다른 DB 연결의 view 격리, 다른 scope의 404, DB 실패 시 메모리 우회 금지도 확인했다.
+실제 로컬 Runner로 Generate→Review→Run→PR 저장을 확인했으며 Builder/Critic/GitHub는 합성 transport다.
+봉인 원본은 서버에만 보존하고 HTTP에서는 기존 마스킹을 유지한다.
+
+API **463 passed·1 skipped**, 실제 PostgreSQL **118 passed**(mission 신규 11개 포함),
+참조 **112개**·SQL **96개**·계약 검사 **0 failure**, round7 웹 프로덕션 빌드 통과.
+원본 로그 6개는 `C:\evo_forge\.local\evidence\mission-persistence-20261027-04hrzi1i`에 보존했다.
+지원 브랜치의 `docs/validation/2026-10-27-mission-persistence.json`에 source·로그 SHA-256을 기록했고,
+설정과 한계는 `docs/MISSION_PERSISTENCE.md`를 따른다.
+
+앞 절의 mission 저장 미완료 기록 중 **지원 브랜치의 상태 저장**은 이 구현으로 대체된다.
+현재 main은 여전히 기존 mission 구현이며, Muse T22(`muse/round8`)의 main/평가/UI·봉인 수용 테스트는 변경하지 않았다.
+T22가 main에 먼저 반영되면 지원 브랜치에 동기화하고 공유 core의 호출 전 claim·명령 완료·비용 연결을 이어간다.
+출력 없는 UNKNOWN 대사·동시 모델 호출의 실행권·mission 접수와 Objective 기록의 원자성,
+공개 비용/명령/performance 저장·실제 청구·운영 DB/배포는 계속 미완료다. API min=max=1과 자동 재개를 유지한다.
