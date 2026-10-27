@@ -121,6 +121,11 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (CLI 청구 근거 없는 예약 보호) / `codex/pg-integration`:** 상위 `8f2323c`의 비용 미제공 시 0원 정산은
+  청구액 불명확 상태를 실제 무료 호출로 오인한다. `services/api/evoforge/eval_runner_and_preflight.py`,
+  기존 비봉인 `test_eval_runner_and_preflight_cr.py`, 새 `test_cli_billing_provenance.py` 및 관련 문서를 소유해
+  공급사 청구 근거가 없으면 UNKNOWN 예약을 유지하도록 회귀 검증한다. 상위 T22와 정본은 수정하지 않는다.
+
 - **Codex 확인 (CLI 비용 대사 및 타임아웃 UNKNOWN 처리 완료·검증 통과):** `fca6de2`/`aa67447`의 빈 CLI 결과 임의 청구는
   상위 `93d78cb`에서 수정되어 빈 결과의 예약 유지가 확인됐다. 추가 지적된 실제 청구액 근거가 없는 사용량의 0원 정산(가짜 `model_usage` 청구 방지)
   및 전송 예외/시간 초과 시 intent의 `UNKNOWN_EXTERNAL_OUTCOME` 전이도 구현·검증했다.
