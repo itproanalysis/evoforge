@@ -122,6 +122,17 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Antigravity (완료·클레임 해제·main 반영 `4426de9`) / `agy/web-live-dashboard`:**
+  1. `next.config.ts`에 `createNextIntlPlugin("./i18n.ts")` 연결 및 `apps/web/app/[locale]/performance/page.tsx` 라우트 추가로 프로덕션 standalone 서버에서 `/`, `/ko`, `/performance`, `/ko/performance`, `/lab`, `/ko/lab`, `/evidence`, `/ko/evidence` 전 경로가 500/404 없이 모두 **HTTP 200**으로 응답함을 검증했다.
+  2. 사용자 확인 웹페이지(`apps/web/app/[locale]/page.tsx`, `apps/web/app/page.tsx`, `apps/web/app/[locale]/evidence/page.tsx`, `apps/web/app/evidence/page.tsx`)를 실제 서버 라이브 상황을 즉시 확인할 수 있도록 고도화했다:
+     - 실시간 동기화 상태 배지·자동 폴링(5초 ON/OFF)·수동 새로고침 버튼
+     - `GET /v1/dashboard`의 `Validated (WVI)`(`validated_improvements`) 복원 및 상태별 미션·지출·예약·보류 지표 표시
+     - `GET /v1/missions`(`listMissions`)를 통한 서버 미션 전체 목록 자동 로드 및 클릭 시 `GET /v1/missions/{id}`(`getMission`) 5단계 진행률(`CREATED→GENERATED→REVIEWED→RAN→PR_OPENED`), 단계별 증거 ID 링크, GitHub PR URL 즉시 표시
+     - `GET /v1/outcomes`(`listOutcomes`)를 통한 검증된 개선 결과(WVI) 목록·PR 링크·`merged_sha`·증거 ID 표시
+     - `GET /v1/performance`(`getPerformance`)의 `X_SINGLE`·`PIPELINE` 측정 상태 및 운영 실행(`runs`/`gate_pass`/`gate_fail`/`gate_inconclusive`) 요약 표시
+     - Evidence Timeline 페이지에서 `?id=` 쿼리 파라미터 자동 조회 및 서버 최근 미션/WVI 증거 ID 원클릭 칩 선택 지원
+  3. `muse/round8`의 T22a 성과 백엔드(`d888b9c`)와 `test_muse_t22b_isolation.py`를 `main`(`4426de9`)에 통합하고, `tsc --noEmit` 0 error 및 T22a/T22b·Critic/Muse 웹 테스트 55개 전원 PASS를 확인했다.
+
 - **Antigravity (완료·클레임 해제·main 반영 `f648534`) / `agy/web-harmonization`:**
   Web UI 소유 모듈(`apps/web/**`) 내에서 Next.js 15 비동기 `params: Promise<{ locale: string }>` 규격 불일치로 인한 `tsc --noEmit` 실패를 해결하고,
   Muse Spark의 T22b 성능 뷰(`PerformancePage`, `GET /v1/performance`, `apps/web/app/performance/page.tsx`, `api.ts`, `proxyPolicy.ts`)를
