@@ -127,13 +127,13 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   만료된 근거를 허용하지 않는다. 새 `provider_capabilities.py`/capability JSON/`test_muse_capability.py`,
   `eval_runner_and_preflight.py`, API Dockerfile 및 관련 문서를 소유한다. T22·Agy 신규 파일은 수정하지 않는다.
 
-- **Antigravity (도메인 이벤트 버스/Outbox/1만 건 재생 수렴·실시간 SSE 투영/폭주 필터링 및 관측성 SLO/안전 불변식·청구서 대사·인시던트 격리·삭제/출시 증거 패키지 런타임) / `agy/event-bus-and-observability` / `C:\evo_forge_agy`:**
-  상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
+- **Antigravity (완료·클레임 해제·main 반영 `cd2e459`) / `agy/event-bus-and-observability`:**
+  상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`, `codex/muse-capabilities`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
   도메인 이벤트 Envelope·낙관적 동시성(R27-2/C-11)·Outbox/Inbox 멱등 소비·1만 건 재생/중복/역순 수렴(R27-1)·Canonical Trajectory v1 정규화·실시간 UI SSE `MissionControlProjection` 커서/폭주 샘플링(R44-1~3, 1,000건/초 폭주 시 승인/오류/결론 누락 0·교차 테넌트 0),
-  및 OpenTelemetry 정본 컨텍스트 span·서비스 SLO vs 안전 불변식 분리 감시(R47-2)·공급사 청구서 드리프트(>1%) 및 PG 웹훅 중복/역순/부분 환불 대사(R47-3, R48-1~3)·투기 불일치 1건 즉시 전역 차단/보상 해킹 격리(R47-4)·Incident 상태 머신·목표 변경 시 패킷 STALE(CR-22)/코덱 플래그 OFF(CR-24)/S11 캐시 배치(CR-69)/전체 삭제 연쇄(CR-17, R46-2)/출시 증거 패키지(R49-1, R50-1)를 구현·검증한다.
-  파일: `services/api/evoforge/event_bus_and_sse.py`, `services/api/evoforge/observability_and_governance.py`,
+  및 OpenTelemetry 정본 컨텍스트 span·서비스 SLO vs 안전 불변식 분리 감시(R47-2)·공급사 청구서 드리프트(>1%) 및 PG 웹훅 중복/역순/부분 환불 대사(R47-3, R48-1~3)·투기 불일치 1건 즉시 전역 차단/보상 해킹 격리(R47-4)·Incident 상태 머신·목표 변경 시 패킷 STALE(CR-22)/코덱 플래그 OFF(CR-24)/S11 캐시 배치(CR-69)/전체 삭제 연쇄(CR-17, R46-2)/출시 증거 패키지(R49-1, R49-5, R50-1)를 구현·검증하고 main에 fast-forward 반영했다.
+  반영 파일: `services/api/evoforge/event_bus_and_sse.py`, `services/api/evoforge/observability_and_governance.py`,
   `services/api/tests/test_event_bus_and_sse_cr.py`, `services/api/tests/test_observability_and_governance_cr.py`,
-  `docs/EVENT_BUS_AND_OBSERVABILITY.md`. `main.py`·웹·DB 마이그레이션·github.py·`eval_runner_and_preflight.py`·정본(`docs/evoforge-v4.2/`)은 수정하지 않는다.
+  `docs/EVENT_BUS_AND_OBSERVABILITY.md`. `main.py`·웹·DB 마이그레이션·github.py·`eval_runner_and_preflight.py`·정본(`docs/evoforge-v4.2/`)은 수정하지 않았다.
 
 - **Codex (CLI 청구 근거 없는 예약 보호) / `codex/pg-integration`:** 상위 `8f2323c`의 비용 미제공 시 0원 정산은
   청구액 불명확 상태를 실제 무료 호출로 오인한다. `services/api/evoforge/eval_runner_and_preflight.py`,
@@ -636,3 +636,14 @@ CLI 관련 집중 29개·전체 API 538개(1 skipped)·계약 0 failure 통과. 
 원본: `.local/evidence/muse-capability-20261027-a799ryo1`. 해당 브랜치는 아직 main에 반영되지 않았다.
 공개 Generate/PR/Broker와 PostgreSQL 예약·영수증·승인 전체 연결 및 실제 실행·배포는 계속 미완료다.
 T22 우선 작업과 Muse Spark 기본값·현재 채팅 자동 재개를 유지한다.
+
+## 도메인 이벤트 버스·실시간 UI SSE 게이트웨이 및 관측성/거버넌스 런타임 (main 반영 완료)
+
+`cd2e459`는 상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`, `codex/muse-capabilities`)와 분리된 런타임 모듈 2종과 수용 테스트 9개로
+정본 명세 p.27, p.44, p.45~50 및 `Acceptance_Test_Matrix.md`의 요구사항을 구현·검증했다. 상세 매핑은 [EVENT_BUS_AND_OBSERVABILITY.md](EVENT_BUS_AND_OBSERVABILITY.md).
+
+- `evoforge/event_bus_and_sse.py`: 14필드 정본 Envelope 및 `(tenant_id, aggregate_id, aggregate_version)` 낙관적 동시성 강제(`R27-2`, `C-11`), `COMMAND` vs `PROPOSAL` 주체 분리, 트랜잭션 Outbox + `(tenant_id, consumer, event_id)` Inbox 중복 제거 및 프로젝터 실패 시 DLQ(`alert_raised=True`) 격리, 10,000건 재생·중복·순서 역전 스트림 수렴 엔진(`R27-1`, 중복 PR 0건·중복 청구 0건), 무작위 grant ref 기반 아티팩트 핸드오프(`CR-31`) 및 `Canonical Trajectory v1` 정규화, `MissionControlSSEGateway`(`R44-1`~`R44-3`, `D-009`: `projection_version`/`event_cursor` 일관성 경계, 커서 만료/버전 누락 시 스냅샷 재동기화, 발행 전 테넌트·RBAC 필터로 타 조직 노출 0건, 1,000건/초 폭주 시 `progress` 샘플링 및 `approval`·`error`·`conclusion` 누락 0건).
+- `evoforge/observability_and_governance.py`: OpenTelemetry 정본 컨텍스트/워크플로 span 추적(`CanonicalTelemetryTracer`), 서비스 SLO 5종 패널과 안전 불변식 6종 패널(목표 0건) 분리 감시(`R47-2`), v4.1 성능 기법 감시(`R47-4`: 표본 수 `n` 병기, 투기 불일치 1건 즉시 전역 차단, 보상 해킹 급증 시 카나리 자동 제외, 검증 Runner 이용률 ≥ 80% 증가 추세 시 상류 감속 권고), 공급사 일일 청구서 vs `provider_billed` 영수증 대사(`R47-3`, `R48-3`: 차이 > 1% 경보 및 원인 4종 분류), 결제 PG 웹훅 중복·역순·부분 환불 대사(`R48-1`), Incident 상태 머신(`DETECT -> ... -> PREVENT`)·운영자 독립 안전 스위치·공급망 7단계 런북, 목표 변경 시 패킷 `STALE` 전환 및 부활 금지(`CR-22`), 코덱 기능 플래그 OFF 폴백(`CR-24`), `S11` 캐시 배치 검증(`CR-69`), `shred_blob` + 검색 인덱스/임베딩/플레이북 삭제 연쇄(`CR-17`, `R46-2`), 마일스톤·GA 출시 증거 패키지 검증기(`R49-1`, `R49-5`, `R50-1`: `muse-spark-1.3` 기본값, 5모듈 하네스 매니페스트, 오라클 holdout ≥ 200건, 위생 감사 100%, 설계치/실측치 분리).
+
+근거: 신규 수용 테스트 **9 passed**(`test_event_bus_and_sse_cr.py` 4개, `test_observability_and_governance_cr.py` 5개), 참조 **112개**·`validate_package.py` **0 failure**.
+기존 `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 변경하지 않았다. 실제 운영 DB/SSE 엔드포인트 및 외부 PG 웹훅 연결은 별도 범위다.
