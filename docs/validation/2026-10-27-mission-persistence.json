@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-27",
+  "revision": "50ffc5bacbf13c6c086f696328acf0ae9494b91d",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Durable public mission facade, scoped append-only snapshots, evidence-backed completed-output recovery and sealed-code privacy",
+  "checks": {
+    "api": {
+      "passed": 463,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 118,
+      "new_mission_cases": 11
+    },
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "limitations": [
+    "Support branch only; active Muse T22 main, performance and UI edits preserved and not merged over",
+    "No implementation changes in main.py or commands.py relative to round7 main",
+    "Completed-output recovery never calls a model; absent output, singleflight dispatch, UNKNOWN reconciliation and atomic mission/Objective creation remain pending",
+    "Public command, cost ledger and performance persistence remain incomplete; API min=max=1 remains",
+    "Actual local Runner and PostgreSQL; Builder, Critic and GitHub transports are explicit synthetic fixtures",
+    "No paid Muse call, production migration, Docker build, GCP deployment or complete canonical approval integration",
+    "Muse Spark default muse-spark-1.3 and frozen v4.2 contracts remain unchanged"
+  ],
+  "source_sha256": {
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/missions.py": "8123aa664ca528e72d2be1e9594104036a49e7df3a5291117764e256a3c60304",
+    "services/api/evoforge/postgres_missions.py": "e924804ca2a8aa053b0282766e74382ccda3d5dcc99c159139f9f68e30eb635a",
+    "services/api/evoforge/postgres_state.py": "e93864167e4efe4150adcb84395aebf517b1f23444ebbf55166e0bdaf9c9322f",
+    "services/api/evoforge/postgres_kernel.py": "fc87c6961bcfe0a83c3b737f2ed8438de8f17047ce03ea5d6eb377c1a684e0e8",
+    "services/api/evoforge/evidence.py": "a752a1993716fcac5ed37a113ded889da0a452be59e65b842e4a8b58252ac5b8",
+    "services/api/migrations/006_api_missions.sql": "bcf06fdc00b8c85f063297e7d6545051c1830efe8937cde9473ac7ce4147a3c3",
+    "services/api/tests/test_postgres_kernel.py": "c88d3637cf3e0147a4fcbb2538f2b2d9107b2b3c42ae777e09ea8f17d6c16295",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767",
+    "services/api/.env.example": "b2b60f6cdf5f19ef488b2ea57535a3692889ab0e52a62301d84fd2cd8333f9cc",
+    "apps/web/package-lock.json": "fae0c56817a0c7b5893f4e3e81e594ee0e888258ce253cff90e7c8398d82d907"
+  },
+  "logs": {
+    "validation-missions-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\mission-persistence-20261027-04hrzi1i\\validation-missions-api.log",
+      "sha256": "216640fb47b485947fed45f3ba2aab4a2b94e8d5c1ed459738722b2b75c6a106"
+    },
+    "validation-missions-postgres-full.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\mission-persistence-20261027-04hrzi1i\\validation-missions-postgres-full.log",
+      "sha256": "9091c7a4a778b77838a3b20f0b3f35f31dc0a5ee882e16851d732220e2ec8ccf"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\mission-persistence-20261027-04hrzi1i\\validation-kernel.log",
+      "sha256": "886abc023c4488aec587a01acbfb8ad2a25a378868bb080f14ef76b20aa1004c"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\mission-persistence-20261027-04hrzi1i\\validation-postgres.log",
+      "sha256": "56cb5ee804eb63907d055e35ae3a49794c4b36bfaee84b9afb43dffa3dd3b9e6"
+    },
+    "validation-missions-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\mission-persistence-20261027-04hrzi1i\\validation-missions-contract.log",
+      "sha256": "51dd37c5369492691c9c853a5a73c9b9f9bae99d0d944ce48ce702e21470ea28"
+    },
+    "validation-missions-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\mission-persistence-20261027-04hrzi1i\\validation-missions-web.log",
+      "sha256": "7e990a23b1be8e96ad3df204606039401065c8225abe3d03fb0829210a18eb32"
+    }
+  }
+}
