@@ -27,6 +27,9 @@
 - [x] 정본 0원 정산·추정 영수증 KPI 제외(CR-13)·추정→실청구 단일 역분개 대사(CR-40)·부작용 intent 전이(CR-47) 및 UNKNOWN 예약 자동 대사 잡(CR-39), 5좌석 적응형 Collective·12개 정본 MCP 도구·가역 에포크 접기(ReFold)+압축 경계 3턴 continuation 평가(CR-75)·M6 GEPA 하네스 최적화 루프(CR-76)(`defc4c9`) main 반영·검증. API 478개·참조 112개·신규 CR 8개 통과.
 - [x] M0 위생 평가 러너(CR-74), Broker/CLI 사전 바인딩·비용 예약/영수증 가드(CR-29/33/37/38/41), 다중 코덱 파이프라인/섀도 감사 모니터(CR-03~05/09/57), 제자리 재작성 비용 회계(CR-27), 품질/승격 런타임(CR-51~58/62~64/67/77/79), 및 미검증 CLI 결과의 UNKNOWN 예약 보존·비용 미제공 시 무비용 정산·전송 예외 시 UNKNOWN 전이(`fca6de2`, `aa67447`, `93d78cb`) main 반영·검증. API 494개·신규 CR 10개 통과.
 - [x] 도메인 이벤트 Envelope·낙관적 동시성(R27-2/C-11)·Outbox/Inbox 멱등 소비·1만 건 재생/중복/역순 수렴(R27-1)·Canonical Trajectory v1·실시간 UI SSE 투영/폭주 샘플링(R44-1~3), 및 OpenTelemetry 컨텍스트 span·서비스 SLO vs 안전 불변식 분리 감시(R47-2)·청구서 드리프트(>1%)/PG 웹훅 중복·역순·부분 환불 대사(R47-3, R48-1~3)·투기 불일치 1건 즉시 전역 차단/보상 해킹 격리(R47-4)·Incident 상태 머신·패킷 STALE(CR-22)/코덱 플래그 OFF(CR-24)/S11 캐시 배치(CR-69)/전체 삭제 연쇄(CR-17, R46-2)/출시 증거 패키지(R49-1, R49-5, R50-1)(`cd2e459`) main 반영·검증. API 503개·참조 112개·신규 CR 9개 통과.
+- [x] Cloud SQL 프로비저닝 및 재배포 시 PostgreSQL evidence 영속성 실측 증명, 마이그레이션 단일 추적기 `migrate_once.py` 및 해커톤 테넌트/프로젝트/허용목록 시드(`c36e64f`, `11e78fe`, `f214fdb`) main 반영·검증.
+- [x] Web UI 실시간 미션-Lab 딥링킹, WVI 머지 검증 결과 기록(`POST /v1/outcomes`), 실시간 성능 폴링(5초) 및 CR 검증 테스트(`test_web_live_dashboard_cr.py`)(`88ec9b6`, `505c614`) main 반영·검증. Next.js 빌드 11개 라우트 정상 컴파일.
+- [x] Runner 결과 수집 수 바인딩(`runner_client.py`, `test_runner_base_binding.py`) 및 스위트 불일치·exit code 불일치·봉인 종류 순서/값 불일치 방어(`2550dc1`) main 반영·검증. API 전체 667 passed, 1 skipped.
 
 ## 이어서 수행할 작업
 
