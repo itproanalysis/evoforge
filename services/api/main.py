@@ -644,6 +644,9 @@ def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
         raise HTTPException(409, f"PR blocked by gates: {', '.join(blocked)}")
     extra_files: dict[str, str] = {}
     stored_tests = src.get("tests")
+    # Unique per source evidence: repeated missions on the same base must not
+    # collide with test files an earlier mission already merged.
+    tag = re.sub(r"[^0-9a-z]", "", (source_evidence_id or "").lower().replace("ev_", ""))[:8] or "gen"
     if isinstance(stored_tests, list):
         for i, t in enumerate(stored_tests, 1):
             if not isinstance(t, dict):
@@ -651,7 +654,7 @@ def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
             code = t.get("code")
             if not isinstance(code, str) or code == "":
                 continue
-            extra_files[f"tests/evoforge_gen/test_gen_{i}.py"] = code
+            extra_files[f"tests/evoforge_gen/test_{tag}_{i}.py"] = code
     for p in extra_files:
         segs = p.split("/")
         if "" in segs or ".." in segs or not p.startswith("tests/evoforge_gen/"):

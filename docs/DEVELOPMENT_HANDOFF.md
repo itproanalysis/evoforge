@@ -303,6 +303,20 @@ manifest: 지원 브랜치 `docs/validation/2026-10-27-receipt-release.json`(sou
 T22 Muse/OpenCode 실행이 동작 중이므로 중복 실행하지 않았다. 상위 main 반영 후 공개 명령/Broker 비용·전체 승인 연결을 이어간다.
 전체 개발은 미완료이고 Muse Spark 기본값·자동 재개를 유지한다. 지원 코드는 main 미반영이다.
 
+## 2026-10-27 PR 기준 커밋과 작업 브랜치 보호
+
+지원 브랜치 `codex/pg-integration`의 `f11f0ae`는 `expected_base_sha`가 있으면 그 커밋에서만 파일을 읽고
+기준 브랜치가 검증한 SHA인지 전후로 확인한다. 기존 ref 호출도 이동을 감지하고 이미 존재하는 작업 브랜치는 재사용하지 않는다.
+기존 ref 호출의 중간 이동 후 원복은 감지하지 못하므로 공개 `_pr_core`는 서버 기준 SHA 전달 연결이 필요하다.
+
+수정 전 새 회귀 9 failed, 수정 후 기존 Critic 포함 34 passed·API 508 passed·1 skipped·실제 DB 166 passed·
+참조 112·SQL 96·계약 0 failure·웹 빌드 통과. 실제 Git 커밋과 합성 GitHub transport이며 실제 PR/배포는 아니다.
+첫 DB 실행은 180초 제한으로 종료돼 원본을 보존했고, 도구 제한을 300초로 조정한 `912ea9d`에서 221초에 통과했다.
+manifest: 지원 브랜치 `docs/validation/2026-10-27-pr-snapshot.json`, 원본 9개: main `.local/evidence/pr-snapshot-20261027-6wq9831x`.
+
+검증은 main `3495cdc`까지 포함한다. 이후 main `dca4709`의 증거별 테스트 파일명과 canonical 후보 등록 검증을 동기화한다.
+상위 T22·다른 개발 작업을 보존한다. 공개 비용/승인·운영 통합은 미완료이고 Muse Spark 기본값·자동 재개를 유지한다.
+
 ## 2026-10-27 DB 영수증 적재/해제 경합 보호
 
 지원 브랜치 `codex/pg-integration`의 `afecb31`·확장 009가 별도 ctx_gateway 적재와 직접 core_app 해제를
