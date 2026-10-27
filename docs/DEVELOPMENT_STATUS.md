@@ -122,6 +122,11 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (원격 Runner 수집 수·종류 바인딩) / `codex/runner-count-binding`:**
+  `runner_client.py`, Codex 소유 `test_runner_base_binding.py`와 관련 문서를 소유한다. 전달된 스위트보다
+  적게 수집한 성공 응답과 요청과 다른 봉인 테스트 종류를 증거로 채택하지 않도록 보강한다.
+  다른 작업의 runner.py·승격 Critic 테스트·정본은 변경하지 않는다.
+
 - **Codex (원격 Runner 기준 커밋 고정·응답 검증) / `codex/runner-base-binding`:**
   `services/api/evoforge/runner_client.py`, 새 `test_runner_base_binding.py` 및 관련 문서를 소유한다.
   기준 ref를 실제 Git 커밋으로 고정해 bundle을 만들고 Runner 응답의 기준과 일치하지 않으면 거부한다.
