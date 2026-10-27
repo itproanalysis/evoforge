@@ -362,3 +362,9 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 
 이전 `e9a1168` API 560 passed·1 skipped·실제 PostgreSQL 169 passed·SQL 96·참조 112·웹 npm ci/tsc/build,
 `ca0b584` API 569 passed·1 skipped 통과. 보강은 main 미반영이며 실제 provider 출처 인증 및 공개/운영 연결은 미완료다.
+
+## 2026-10-28 공급사 허용·동의 보강
+
+`codex/preflight-policy` `3740307`은 빈 allowlist가 기본 허용 목록으로 대체되거나 문자열 동의가 참으로
+취급되는 경로를 차단한다. 수정 전 12 failed, 수정 후 관련 집중 94 passed·계약 0 failure.
+원본 `.local/evidence/preflight-policy-20261028-2noz3me8`. 전체 API/DB 및 main 반영은 계속 필요하다.

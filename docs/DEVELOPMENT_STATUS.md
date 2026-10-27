@@ -699,3 +699,10 @@ SQL 96·참조 112·계약 및 격리된 웹 npm ci/tsc/프로덕션 빌드가 �
 이후 T22a/T22b를 동기화한 `f69106a`에서 실제 PostgreSQL 169개·SQL 96개·참조 112개·정본 검사와
 웹 npm ci/tsc/프로덕션 빌드가 통과했다. 전체 API 재검사는 진행 중이다.
 새 보강은 아직 main 미반영이다. 모델/청구는 합성 fixture이며 실 provider 출처 및 공개 경로·운영 연결은 미완료다.
+
+## 공급사 allowlist와 동의 fail-closed
+
+`codex/preflight-policy`의 `3740307`은 명시적인 빈 allowlist를 전체 거부로 해석하고,
+잘못된 allowlist와 boolean이 아닌 동의를 거부한다. 저장된 동의도 오직 `true`일 때만 인정한다.
+수정 전 12 failed·5 passed, 수정 후 관련 집중 94 passed·계약 0 failure.
+원본: `.local/evidence/preflight-policy-20261028-2noz3me8`. 전체 API/DB 재검증과 main 반영은 미완료다.
