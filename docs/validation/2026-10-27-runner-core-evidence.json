@@ -1,0 +1,75 @@
+{
+  "date": "2026-10-27",
+  "revision": "21707ed5f112b06461ee2720ccb5122083adb799",
+  "feature_revision": "3526ae0",
+  "base_revision": "3d75cd7",
+  "branch": "codex/runner-core-evidence",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Internal candidate/settled Builder call/server Runner evidence/G2_REQUIRED binding; no candidate state or merge approval mutation",
+  "checks": {
+    "api": {
+      "passed": 414,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 91
+    },
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed",
+    "isolated_runner_file_set_without_api": "passed"
+  },
+  "limitations": [
+    "Higher-priority round7 main integration pending",
+    "Critic, receipt and registered Runner image digest are explicitly synthetic fixtures",
+    "No paid provider call, real OCI digest verification, production migration or deployment",
+    "Docker build not run: Docker command unavailable",
+    "Public canonical generation/financial/approval integration remains incomplete"
+  ],
+  "source_sha256": {
+    "services/api/evoforge/postgres_run_evidence.py": "6df2bb1dafe73a924778cc1176ab4145306005168b668a852d69059a3408975b",
+    "services/api/evoforge/runner_attestation.py": "1fe0823be9583447126d3029391490f9ec4452e21a56e92242d1c556046b0a19",
+    "services/api/evoforge/kernel_api.py": "de60a7b154679709bd800ebc937474ede8ed83f3e5935b420d373a12c09e2ba0",
+    "services/api/evoforge/runner.py": "49d50ee0fdc845a49a34fab5dea7c33b8cfae1a67d9e13fe14302ba4aa9ce1db",
+    "services/api/evoforge/runner_client.py": "4fdfe8ecf3e6bf38eb3f45fc753833f85987c30554243de29a3fb86bd7a4340a",
+    "services/runner/app.py": "d4077db8d4a6b889a4cca8d392124c2d79d141d9842e9ddc652d0eb393f283f9",
+    "services/runner/Dockerfile": "1c5dc509aa3d7871ae115c53f9faf3ece71dec16b8fa2441784a3ed748832e12",
+    "services/api/migrations/005_runner_candidates.sql": "3d2f4a17e70d05b772719ea42c9b53e8b438001191dd80f4a85651f6b04e51cb",
+    "services/api/tests/test_postgres_kernel.py": "63d1898f121ff66fc03f4ed384e65a5f35d8f63a50f3b14fbc1d952839d4fc5b",
+    "services/api/tests/test_runner_attestation.py": "cf743ba10e1f2d258b01a6338150bc0f546d32285d8d58f001be5da2834b99a3",
+    "services/api/tests/test_kernel_api.py": "44f340febeab1f15f1b59666a68f275da0e6fa5aab07a1f095f73072f5ae535f"
+  },
+  "logs": {
+    "validation-core-run-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\runner-core-20261027-m9gl2ykz\\validation-core-run-api.log",
+      "sha256": "7fe40234884b2db226f7eef016472e790d6bc320ef0a9cfbdeea2776d9cb52c3"
+    },
+    "validation-core-run-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\runner-core-20261027-m9gl2ykz\\validation-core-run-contract.log",
+      "sha256": "82d0d2c6a42994ac549882acdaf135a35915a10225d64c03bfabc6e86b8a5c8a"
+    },
+    "validation-core-run-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\runner-core-20261027-m9gl2ykz\\validation-core-run-postgres.log",
+      "sha256": "8fc5adcfa218c29be6af19562a8670363af96526959ed55bcdf4f91ceb8f3e1f"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\runner-core-20261027-m9gl2ykz\\validation-postgres.log",
+      "sha256": "839c991a34371a68f41ac7f288532175da23fe171c4a20b10dee0a12ef5a3085"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\runner-core-20261027-m9gl2ykz\\validation-kernel.log",
+      "sha256": "8bd0fee42ce68296e900860f0667c4b3db076f1e0da9e4b0b505774e075ba70c"
+    },
+    "validation-core-run-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\runner-core-20261027-m9gl2ykz\\validation-core-run-web.log",
+      "sha256": "d39bb346a90279f80ff469ead19ebed10c3ec00c5838e1b4790b29a88201b4cf"
+    }
+  }
+}
