@@ -1445,3 +1445,243 @@ def test_real_database_command_accepts_separate_google_and_kernel_credentials(ht
     assert accepted.status_code==200,accepted.text
     cid=accepted.json()['command_id']
     assert http_kernel.get('/v1/kernel/commands/'+cid,headers=headers).json()['state']=='RECEIVED'
+
+
+def _mission_output(mid,*,linked=True,label='one'):
+    import main
+    eid=main._store_evidence({'mission_id':mid,'candidate':{'diff':label,'tests':[]},
+                              'gates':[{'gate':'GH_INTEGRITY','result':'INCONCLUSIVE'}]})
+    if linked:
+        main._link_stages(eid,('Task','Candidate','Gate'))
+    return eid
+
+
+def test_public_mission_generation_survives_new_api_process_and_updates_live_view(funded,durable_api,monkeypatch):
+    import main
+    from evoforge import missions
+    calls=[]
+    def builder(*args,**kwargs):
+        calls.append(True)
+        return {'diff':'','tests':[{'code':'def test_fixture():\n    assert 2 + 2 == 4\n'}],
+                'model':'muse-spark-1.3','stub':False}
+    monkeypatch.setattr(main.broker_meta,'call_builder',builder)
+    created=durable_api.post('/v1/missions',json={'goal':'durable fixture','repo_ref':'a'*40})
+    assert created.status_code==201,created.text
+    mid=created.json()['mission_id']
+    live=missions.get(mid)
+    generated=durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'GENERATED'})
+    assert generated.status_code==200,generated.text
+    eid=generated.json()['evidence_id']
+    assert calls==[True] and eid in generated.json()['evidence_ids']
+    assert live['state']=='GENERATED' and live['stages']['generate']==eid
+    assert durable_api.get('/v1/dashboard').json()['missions_by_state']['GENERATED']==1
+    script="""import json,os
+import main
+from fastapi.testclient import TestClient
+with TestClient(main.app) as c:
+    r=c.get('/v1/missions/'+os.environ['CHECK_MISSION_ID'])
+    assert r.status_code==200
+    body=r.json()
+    assert body['state']=='GENERATED' and body['generate_evidence_id']==os.environ['CHECK_MISSION_EVIDENCE']
+    assert c.get('/v1/dashboard').json()['active_missions']==1
+    print(json.dumps(body))
+"""
+    child=subprocess.run([sys.executable,'-c',script],cwd=ROOT/'services/api',
+                         env={**os.environ,'CHECK_MISSION_ID':mid,'CHECK_MISSION_EVIDENCE':eid},
+                         capture_output=True,text=True,timeout=20,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    assert child.returncode==0 and '_version' not in child.stdout
+    assert durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'GENERATED'}).status_code==409
+    assert calls==[True]
+
+
+def test_mission_recovery_adopts_committed_output_without_sending_builder(funded,durable_api,monkeypatch):
+    import main
+    from evoforge import missions
+    mid=durable_api.post('/v1/missions',json={'goal':'recover','repo_ref':'a'*40}).json()['mission_id']
+    eid=_mission_output(mid)
+    called=[]
+    monkeypatch.setattr(main.broker_meta,'call_builder',lambda *a,**k:called.append(True))
+    restored=durable_api.get('/v1/missions/'+mid)
+    assert restored.status_code==200 and restored.json()['state']=='GENERATED'
+    assert restored.json()['generate_evidence_id']==eid and not called
+    assert durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'GENERATED'}).status_code==409
+    assert not called and missions.get(mid)['state']=='GENERATED'
+
+
+def test_mission_partial_output_blocks_redispatch_until_event_evidence_is_ready(durable_api,monkeypatch):
+    import main
+    mid=durable_api.post('/v1/missions',json={'goal':'partial','repo_ref':'a'*40}).json()['mission_id']
+    eid=_mission_output(mid,linked=False)
+    called=[]
+    monkeypatch.setattr(main.broker_meta,'call_builder',lambda *a,**k:called.append(True))
+    assert durable_api.get('/v1/missions/'+mid).status_code==409
+    assert durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'GENERATED'}).status_code==409
+    assert not called
+    main._link_stages(eid,('Task','Candidate','Gate'))
+    assert durable_api.get('/v1/missions/'+mid).json()['state']=='GENERATED'
+
+
+def test_multiple_unclaimed_mission_outputs_require_reconciliation(durable_api,monkeypatch):
+    import main
+    mid=durable_api.post('/v1/missions',json={'goal':'ambiguous','repo_ref':'a'*40}).json()['mission_id']
+    _mission_output(mid,label='first')
+    _mission_output(mid,label='second')
+    called=[]
+    monkeypatch.setattr(main.broker_meta,'call_builder',lambda *a,**k:called.append(True))
+    assert durable_api.get('/v1/missions/'+mid).status_code==409
+    assert durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'GENERATED'}).status_code==409
+    assert not called
+
+
+def test_mission_versions_cannot_fake_progress_change_inputs_or_erase_evidence(funded,durable_api):
+    from copy import deepcopy
+    from evoforge import missions
+    mid=durable_api.post('/v1/missions',json={'goal':'immutable','repo_ref':'a'*40}).json()['mission_id']
+    scope=(funded['scope'].tenant_id,funded['scope'].project_id)
+    with funded['kernel']._transaction() as conn:
+        row=conn.execute('SELECT version,document FROM runtime.api_mission_versions '
+                         'WHERE tenant_id=%s AND project_id=%s AND mission_id=%s ORDER BY version DESC LIMIT 1',
+                         (*scope,mid)).fetchone()
+    for change in ('state','goal','evidence'):
+        document=deepcopy(row['document'])
+        if change=='state':
+            document['state']='GENERATED'
+        elif change=='goal':
+            document['goal']='replaced'
+        else:
+            document['evidence_ids']=[]
+        with pytest.raises(KernelRejected):
+            with funded['kernel']._transaction() as conn:
+                conn.execute('INSERT INTO runtime.api_mission_versions(tenant_id,project_id,mission_id,version,document) '
+                             'VALUES (%s,%s,%s,%s,%s)',(*scope,mid,row['version']+1,Jsonb(document)))
+    with pytest.raises(KernelRejected):
+        missions.mark(mid,'GENERATED')
+    with pytest.raises(KernelRejected):
+        missions.reset()
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute('DELETE FROM runtime.api_mission_versions WHERE mission_id=%s',(mid,))
+    assert missions.get(mid)['state']=='CREATED'
+
+
+def test_mission_scope_and_foreign_evidence_do_not_fall_back_to_memory(funded,durable_api,monkeypatch):
+    from evoforge import missions
+    created=[durable_api.post('/v1/missions',json={'goal':g,'repo_ref':'a'*40}).json()['mission_id'] for g in ('a','b')]
+    eid=_mission_output(created[1])
+    with pytest.raises(KernelRejected):
+        missions.attach_evidence(created[0],eid,'generate')
+    monkeypatch.setitem(missions._missions,created[0],{'mission_id':created[0],'private':'memory-canary'})
+    monkeypatch.setenv('EVO_PROJECT_ID',str(uuid4()))
+    found=durable_api.get('/v1/missions/'+created[0])
+    absent=durable_api.get('/v1/missions/msn_missing')
+    assert found.status_code==absent.status_code==404 and found.json()==absent.json()
+    assert durable_api.get('/v1/missions').json()['missions']==[]
+
+
+def test_cancelled_mission_keeps_evidence_and_is_not_recovered_forward(durable_api):
+    from evoforge import missions
+    mid=durable_api.post('/v1/missions',json={'goal':'cancel','repo_ref':'a'*40}).json()['mission_id']
+    before=missions.get(mid)
+    ids=list(before['evidence_ids'])
+    assert durable_api.post(f'/v1/missions/{mid}/cancel').status_code==200
+    _mission_output(mid)
+    after=durable_api.get('/v1/missions/'+mid).json()
+    assert after['state']=='CANCELLED' and after['evidence_ids']==ids
+    assert durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'GENERATED'}).status_code==409
+
+
+def test_mission_database_failure_never_creates_a_process_local_mission(durable_api,monkeypatch):
+    from evoforge import missions
+    monkeypatch.setenv('DATABASE_URL','postgresql://private:never-echo-mission-secret@127.0.0.1:1/missing')
+    existing=set(missions._missions)
+    response=durable_api.post('/v1/missions',json={'goal':'no fallback','repo_ref':'a'*40})
+    assert response.status_code==503 and 'never-echo-mission-secret' not in response.text
+    assert set(missions._missions)==existing
+
+
+def test_mission_review_real_runner_and_mock_pr_persist_with_sealed_code_private(durable_api,monkeypatch,tmp_path):
+    """Real Runner and DB; explicitly synthetic Builder/Critic/GitHub transports."""
+    import main
+    from evoforge import repo_source,github
+    repo=tmp_path/'mission-code'
+    repo.mkdir()
+    def git(*args):
+        return subprocess.check_output(['git','-C',str(repo),*args],text=True).strip()
+    git('init','-q')
+    git('config','user.name','Fixture')
+    git('config','user.email','fixture@example.invalid')
+    (repo/'calc.py').write_text('def add(a, b):\n    return a - b\n',encoding='utf-8')
+    git('add','calc.py')
+    git('commit','-qm','base')
+    base=git('rev-parse','HEAD')
+    diff='--- a/calc.py\n+++ b/calc.py\n@@ -1,2 +1,2 @@\n def add(a, b):\n-    return a - b\n+    return a + b\n'
+    visible='from calc import add\ndef f_ref(a, b):\n    return a + b\ndef test_sum():\n    assert add(2, 3) == f_ref(2, 3)\n'
+    sealed=[{'kind':kind,'code':f'# MISSION_PRIVATE_CANARY_509\nfrom calc import add\ndef test_{kind}():\n    assert add(2, 3) == 5\n'}
+            for kind in ('compositional','negative','boundary')]
+    monkeypatch.setattr(main.broker_meta,'call_builder',lambda *a,**k:{'diff':diff,'tests':[{'code':visible}],
+                         'model':'muse-spark-1.3','stub':False})
+    monkeypatch.setattr(main.broker_meta,'call_critic',lambda *a,**k:{'sealed_tests':sealed,'review':{'result':'PASS'},
+                         'model':'muse-spark-1.3','stub':False})
+    clones=[]
+    def clone(source,ref):
+        assert source=='' and ref==base
+        target=tmp_path/f'resolved-{len(clones)}'
+        subprocess.check_call(['git','clone','-q','--no-hardlinks',str(repo),str(target)])
+        clones.append(target)
+        return str(target)
+    monkeypatch.setattr(repo_source,'resolve_repo_dir',clone)
+    monkeypatch.setenv('EVO_REPO_ROOTS',str(tmp_path))
+    monkeypatch.setenv('EVO_ALLOW_LOCAL_REPOS','1')
+    monkeypatch.setenv('EVO_RUNNER_URL','')
+    monkeypatch.setattr(github,'create_pr',lambda *a,**k:{'html_url':'https://fixture.invalid/pr/1'})
+    created=durable_api.post('/v1/missions',json={'goal':'sum the arguments','repo_ref':base})
+    assert created.status_code==201,created.text
+    mid=created.json()['mission_id']
+    for state in ('GENERATED','REVIEWED','RAN','PR_OPENED'):
+        response=durable_api.post(f'/v1/missions/{mid}/advance',json={'to':state})
+        assert response.status_code==200,response.text
+        assert 'MISSION_PRIVATE_CANARY_509' not in response.text
+    detail=durable_api.get('/v1/missions/'+mid).json()
+    assert detail['state']=='PR_OPENED' and detail['pr_url']=='https://fixture.invalid/pr/1'
+    run=durable_api.get('/v1/evidence/'+detail['run_evidence_id'])
+    assert run.json()['run']['visible']['pass']==1 and run.json()['run']['heldout']['pass']==3
+    review=durable_api.get('/v1/evidence/'+detail['review_evidence_id'])
+    assert 'MISSION_PRIVATE_CANARY_509' not in review.text
+    assert clones and all(not target.exists() for target in clones)
+
+
+def test_mission_confirmation_and_parallel_completion_preserve_one_version_per_change(funded,durable_api):
+    from evoforge import missions
+    request={'goal':'confirmed fixture','repo_ref':'a'*40,'risk':'HIGH'}
+    assert durable_api.post('/v1/missions',json=request).status_code==409
+    assert durable_api.get('/v1/missions').json()['missions']==[]
+    created=durable_api.post('/v1/missions',json={**request,'confirm':True})
+    assert created.status_code==201,created.text
+    mid=created.json()['mission_id']
+    live=missions.get(mid)
+    assert live['confirmed'] is True and live['risk']=='HIGH'
+    eid=_mission_output(mid)
+    with ThreadPoolExecutor(max_workers=6) as workers:
+        list(workers.map(lambda _:missions.attach_evidence(mid,eid,'generate'),range(12)))
+        list(workers.map(lambda _:missions.mark(mid,'GENERATED'),range(12)))
+    assert live['state']=='GENERATED' and live['evidence_ids'].count(eid)==1
+    with funded['kernel']._transaction() as conn:
+        versions=conn.execute('SELECT version FROM runtime.api_mission_versions '
+                              'WHERE tenant_id=%s AND project_id=%s AND mission_id=%s ORDER BY version',
+                              (funded['scope'].tenant_id,funded['scope'].project_id,mid)).fetchall()
+    assert [r['version'] for r in versions]==[1,2,3,4]
+
+
+def test_mission_live_views_never_mix_database_connections():
+    from types import SimpleNamespace
+    from evoforge.postgres_missions import view
+    scope=KernelScope(uuid4(),uuid4())
+    def store(name):
+        return SimpleNamespace(kernel=PostgresKernel('postgresql://fixture.invalid/'+name,scope),
+                               scope=(scope.tenant_id,scope.project_id))
+    first=store('first')
+    current={'version':9,'document':{'mission_id':'msn_same','goal':'first','state':'GENERATED'}}
+    live=view(first,current)
+    other=view(store('second'),{'version':1,'document':{**current['document'],'goal':'second','state':'CREATED'}})
+    assert other is not live and other['goal']=='second' and live['goal']=='first'
+    assert view(first,{'version':8,'document':{**current['document'],'state':'CREATED'}})['state']=='GENERATED'

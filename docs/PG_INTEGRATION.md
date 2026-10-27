@@ -11,6 +11,7 @@
 - core_app 세션 역할과 RLS를 유지한 완료 커밋. 증거 테이블에 UPDATE 권한을 추가하지 않는다.
 - 정산된 Builder 바인딩·현재 fencing·커밋 head의 실제 로컬/번들 Runner 결과 → core G2_REQUIRED.
 - Google ID 인증과 내부 커널 토큰을 각각 검사하는 HTTP 전달. 잘못된 명시 헤더는 대체하지 않는다.
+- 공개 mission facade의 선택 PostgreSQL 저장. 불변 입력·버전별 상태·단계 증거를 보존하고 완료된 서버 출력만 복원한다.
 
 클라이언트가 보낸 실행 수나 모델 JSON만으로 게이트를 만들지 않는다.
 다른 필수 게이트·독립 리뷰·승인은 누락 상태를 유지하며 `core.authorize_merge`의 거부를 확인한다.
@@ -28,10 +29,15 @@ Google 인증 연동 테스트의 서명 검증기는 fixture로 대체하므로
 확장 004는 신설 테이블·반복 적용을 검증했다. 이전 미배포 초안의 응답에 서버 증거가 없으면 스키마 보강을 거부하며,
 불변 응답을 수정하거나 증거를 생성해 맞추지 않는다.
 
+후속 mission 저장은 확장 006을 사용하며 [MISSION_PERSISTENCE.md](MISSION_PERSISTENCE.md)와
+`docs/validation/2026-10-27-mission-persistence.json`에 별도 근거를 기록한다.
+위 107개 집계는 mission 저장 추가 전 통합 검증 기록이다.
+
 ## 남은 공개 경로와 운영 연결
 
 공개 Generate와 mission은 현재 메모리 명령·추정 원장을 사용한다. 내부 HTTP 명령 경로는 항상 PostgreSQL을 사용한다.
-`EVO_STATE_BACKEND=postgres`의 기존 증거 저장과 새 내부 명령 API가 공개 전체 파이프라인의 영속화를 뜻하지 않는다.
+`EVO_STATE_BACKEND=postgres`에서 증거와 mission 상태를 저장하지만 명령·비용 원장·performance 저장은 별도다.
+완료 출력의 복원은 호출 전 실행권·UNKNOWN 대사·공개 전체 파이프라인의 영속화를 뜻하지 않는다.
 따라서 P0-2와 전체 개발은 계속 미완료다.
 
 후속 Muse T22가 같은 main 파일을 편집 중이다. 그 작업이 먼저 반영된 뒤 다음을 이어간다.
@@ -39,6 +45,6 @@ Google 인증 연동 테스트의 서명 검증기는 fixture로 대체하므로
 1. `commands.py` backend 위임과 명시적 dispatch/완료를 공유 `_generate_core`·mission 생성 단계에 연결한다.
 2. 공개 HTTP의 재전송·동시 요청·실패·DB 복구·재시작을 새 경로에서 검증한다.
 3. 실제 Builder/독립 Critic 호출의 패킷·가격표·예약·정본 영수증과 공개 비용 원장을 연결한다.
-4. canonical 후보 생성·다른 게이트/리뷰/승인·0원과 청구 정정 정책, mission/측정 상태와 운영 배포를 대조한다.
+4. canonical 후보 생성·다른 게이트/리뷰/승인·0원과 청구 정정 정책, mission 호출 실행권·측정 상태와 운영 배포를 대조한다.
 
 Muse Spark `muse-spark-1.3` 기본값과 자동 모델 대체 금지는 유지한다.

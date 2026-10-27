@@ -1,8 +1,9 @@
 """Mission lifecycle: CREATED->GENERATED->REVIEWED->RAN->PR_OPENED, plus CANCELLED/FAILED.
 
 A mission binds one objective to one generate/review/run/PR evidence chain.
-The store is in-memory (P0-2 persistence stays min=max=1); cancel marks the
-state but never deletes evidence.
+Memory is the default. The configured PostgreSQL backend persists snapshots;
+cancel marks state and never deletes evidence. Model dispatch fencing remains
+a separate controller integration, so min=max=1 stays in place.
 """
 from __future__ import annotations
 
@@ -39,7 +40,24 @@ class NeedsConfirmation(Exception):
 _missions: dict[str, dict] = {}
 
 
+def _backend():
+    from evoforge.postgres_state import backend
+    selected=backend()
+    if selected:
+        from evoforge.postgres_missions import MissionStore
+        return MissionStore(selected.kernel)
+    return None
+
+
+def _view(store,row):
+    from evoforge.postgres_missions import view
+    return view(store,row)
+
+
 def reset() -> None:
+    if _backend():
+        from evoforge.postgres_kernel import KernelRejected
+        raise KernelRejected('durable missions cannot be cleared')
     _missions.clear()
 
 
@@ -51,6 +69,9 @@ def create(goal: str, repo_ref: str, target_paths: list[str] | None = None,
         raise ValueError("repo_ref required")
     if risk in RISKY and not confirm:
         raise NeedsConfirmation(f"risk={risk} requires confirm=true")
+    store=_backend()
+    if store:
+        return _view(store,store.create(goal,repo_ref,target_paths,risk,confirm))
     now = time.time()
     mission = {
         "mission_id": f"msn_{uuid.uuid4().hex[:12]}",
@@ -69,14 +90,23 @@ def create(goal: str, repo_ref: str, target_paths: list[str] | None = None,
 
 
 def get(mission_id: str) -> dict | None:
+    store=_backend()
+    if store:
+        return _view(store,store.get(mission_id))
     return _missions.get(mission_id)
 
 
 def all() -> list[dict]:
+    store=_backend()
+    if store:
+        return [row['document'] for row in store.all()]
     return list(_missions.values())
 
 
 def attach_evidence(mission_id: str, evidence_id: str, stage: str | None = None) -> dict:
+    store=_backend()
+    if store:
+        return _view(store,store.attach_evidence(mission_id,evidence_id,stage))
     mission = _missions.get(mission_id)
     if mission is None:
         raise KeyError(mission_id)
@@ -89,6 +119,9 @@ def attach_evidence(mission_id: str, evidence_id: str, stage: str | None = None)
 
 
 def mark(mission_id: str, to_state: str) -> dict:
+    store=_backend()
+    if store:
+        return _view(store,store.mark(mission_id,to_state))
     mission = _missions.get(mission_id)
     if mission is None:
         raise KeyError(mission_id)
