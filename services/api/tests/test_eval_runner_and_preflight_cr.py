@@ -40,14 +40,14 @@ def _make_git_test_repo() -> tuple[str, str, str, str]:
                GIT_COMMITTER_NAME="EvoForge", GIT_COMMITTER_EMAIL="dev@evoforge.local")
     subprocess.run(["git", "init", "-q", tmp], check=True, env=env)
     app_py = os.path.join(tmp, "app.py")
-    with open(app_py, "w", encoding="utf-8") as fh:
+    with open(app_py, "w", encoding="utf-8", newline="\n") as fh:
         fh.write("def solve():\n    return 41\n")
     subprocess.run(["git", "add", "app.py"], cwd=tmp, check=True, env=env)
     subprocess.run(["git", "commit", "-q", "-m", "base commit"], cwd=tmp, check=True, env=env)
     base_sha = subprocess.run(["git", "rev-parse", "HEAD"], cwd=tmp, check=True, env=env, capture_output=True, text=True).stdout.strip()
 
     secret_token = "FUTURE_SECRET_TOKEN_XYZ_888"
-    with open(os.path.join(tmp, "secret.txt"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(tmp, "secret.txt"), "w", encoding="utf-8", newline="\n") as fh:
         fh.write(f"leaked secret: {secret_token}\n")
     subprocess.run(["git", "add", "secret.txt"], cwd=tmp, check=True, env=env)
     subprocess.run(["git", "commit", "-q", "-m", "future secret commit"], cwd=tmp, check=True, env=env)
@@ -88,13 +88,7 @@ def test_hygiene_eval_candidate_execution_and_scaffold_cr74() -> None:
     source_repo, base_sha, future_sha, _ = _make_git_test_repo()
     runner = HygieneEvalRunner()
 
-    diff = """--- a/app.py
-+++ b/app.py
-@@ -1,2 +1,2 @@
- def solve():
--    return 41
-+    return 42
-"""
+    diff = """--- a/app.py\n+++ b/app.py\n@@ -1,2 +1,2 @@\n def solve():\n-    return 41\n+    return 42\n"""
     visible_tests = [
         {"name": "test_vis_1", "kind": "visible", "code": "from app import solve\ndef test_solve(): assert solve() == 42\n"}
     ]
@@ -165,6 +159,8 @@ def test_preflight_broker_reservation_fencing_and_receipt_settlement_cr37_cr38_c
 
     broker = PreflightCallBroker(ledger=eng, allowed_providers={"meta", "anthropic", "openai"})
     packet = _load_example_packet()
+    provider = packet["cache_plan"]["provider"]
+    model = packet["cache_plan"]["model"]
 
     # 1. Provider allow-list check
     bad_provider_pkt = copy.deepcopy(packet)
@@ -178,7 +174,7 @@ def test_preflight_broker_reservation_fencing_and_receipt_settlement_cr37_cr38_c
         broker.prebind_and_reserve(call_id=call_id, packet=packet, reserved_micros=10_000)
     assert exc_info.value.code == "PROVIDER_CONSENT_MISSING"
 
-    broker.set_provider_consent(TENANT_ID, "meta", consented=True)
+    broker.set_provider_consent(TENANT_ID, provider, consented=True)
 
     # 3. Lease fencing: missing lease -> LEASE_INACTIVE, epoch mismatch -> STALE_LEASE
     with pytest.raises(PreflightError) as exc_info:
@@ -216,8 +212,8 @@ def test_preflight_broker_reservation_fencing_and_receipt_settlement_cr37_cr38_c
         "call_id": call_id,
         "reservation_key": call_id,
         "call_purpose": "task_turn",
-        "provider": "meta",
-        "model": "muse-spark-1.3",
+        "provider": provider,
+        "model": model,
         "source": "provider_billed",
         "billing_owner": "byok",  # Illegal BYOK
         "tokens": {"uncached_input": 100, "cache_write": 0, "cache_read": 0, "output": 50},
@@ -257,11 +253,13 @@ def test_dev_builder_cli_guard_budget_governed_cr38() -> None:
     eng.grant_credit(TENANT_ID, 500_000, idempotency_key="credit:cli:init")
 
     broker = PreflightCallBroker(ledger=eng)
-    broker.set_provider_consent(TENANT_ID, "meta", consented=True)
+    packet = _load_example_packet()
+    provider = packet["cache_plan"]["provider"]
+
+    broker.set_provider_consent(TENANT_ID, provider, consented=True)
     broker.register_lease(RUN_ID, TASK_ID, AGENT_ID, lease_epoch=12, active=True)
 
     cli_guard = DevBuilderCLIGuard(broker=broker)
-    packet = _load_example_packet()
 
     called = False
 
@@ -284,6 +282,7 @@ def test_dev_builder_cli_guard_budget_governed_cr38() -> None:
         reserved_micros=15_000,
         cli_runner=mock_cli_runner,
         actual_micros=8_500,
+        period_start=PERIOD,
     )
 
     assert called is True

@@ -537,6 +537,7 @@ class DevBuilderCLIGuard:
         cli_runner: Callable[[dict[str, Any]], dict[str, Any]],
         actual_micros: int = 12_000,
         call_id: str | None = None,
+        period_start: str | None = None,
     ) -> dict[str, Any]:
         resolved_call_id = call_id or str(uuid.uuid5(uuid.NAMESPACE_OID, f"cli:{task_spec.get('id', packet['task_id'])}"))
 
@@ -588,4 +589,5 @@ class DevBuilderCLIGuard:
             packet=packet,
             reserved_micros=reserved_micros,
             transport=_transport,
+            period_start=period_start,
         )
