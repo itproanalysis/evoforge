@@ -121,6 +121,11 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex (Muse 직접 API capability 사전 검증) / `codex/muse-capabilities`:** 정본 seed는 변경하지 않고
+  공식 근거의 별도 보수적 capability 입력과 정본 S1–S11 검증을 연결한다. 캐시 비활성화·프록시 endpoint·
+  만료된 근거를 허용하지 않는다. 새 `provider_capabilities.py`/capability JSON/`test_muse_capability.py`,
+  `eval_runner_and_preflight.py`, API Dockerfile 및 관련 문서를 소유한다. T22·Agy 신규 파일은 수정하지 않는다.
+
 - **Antigravity (도메인 이벤트 버스/Outbox/1만 건 재생 수렴·실시간 SSE 투영/폭주 필터링 및 관측성 SLO/안전 불변식·청구서 대사·인시던트 격리·삭제/출시 증거 패키지 런타임) / `agy/event-bus-and-observability` / `C:\evo_forge_agy`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
   도메인 이벤트 Envelope·낙관적 동시성(R27-2/C-11)·Outbox/Inbox 멱등 소비·1만 건 재생/중복/역순 수렴(R27-1)·Canonical Trajectory v1 정규화·실시간 UI SSE `MissionControlProjection` 커서/폭주 샘플링(R44-1~3, 1,000건/초 폭주 시 승인/오류/결론 누락 0·교차 테넌트 0),
