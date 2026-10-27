@@ -17,6 +17,9 @@
   - 공급자 전송 전 테넌트 신용 잔액 및 프로젝트 예산 한도를 원자적으로 확인하고 부족 시 `CREDIT_EXHAUSTED` / `BUDGET_EXCEEDED` 거부.
   - 미허용 공급자(`PROVIDER_NOT_ALLOWED`) 및 테넌트 데이터 동의 미획득 공급자(`PROVIDER_CONSENT_MISSING`) 전송 차단.
   - 에이전트 작업 리스 비활성(`LEASE_INACTIVE`), 만료(`LEASE_EXPIRED`), 에이전트/에포크 불일치(`STALE_LEASE`) 검사 및 네트워크 전송 직전 리스 상태 재확인.
+  - 패킷 발행·만료, 참조 만료와 리스 만료를 시간대가 포함된 서버 현재 시각과 비교한다. 호출자가 현재 시각을 대체할 수 없고, 예약 후 전송 직전에도 시각·리스 소유자·에포크를 다시 확인한다. 전송 전 재검사 실패 시 호출하지 않고 기존 예약을 유지해 후속 대사가 필요하다.
+  - 전송 직전 예약된 패킷의 digest와 현재 패킷이 일치하는지, 공급사 허용 및 테넌트 동의가 여전히 유효한지 재검사한다.
+  - 이는 인메모리 가드의 검사이며 실제 PostgreSQL의 원자적 리스 펜싱·공개 Broker 연결을 대체하지 않는다.
   - 패킷 SHA-256 및 예약 키가 불변 바인딩된 `PreboundCallBinding` 생성.
   - 영수증 검증 시 비플랫폼 키(`BYOK_RECEIPT_FORBIDDEN`, `billing_owner != 'platform'`, `CR-41`), 예약 키 불일치(`RESERVATION_KEY_MISMATCH`, `CR-37`), 가격표 버전 불일치(`PRICE_TABLE_MISMATCH`), 호출 식별자 불일치(`RECEIPT_BINDING_MISMATCH`) 차단 후 `ReconcilerLedger`와 원자적 정산.
 - **개발자 Muse Builder CLI 예산 가드 (`DevBuilderCLIGuard`, `DEVELOPMENT_STATUS.md` 98행)**:

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sys
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -32,7 +33,7 @@ def setup_call():
     ledger = ReconcilerLedger()
     ledger.set_project_budget(tenant, project, period, 100_000)
     ledger.grant_credit(tenant, 200_000, idempotency_key="synthetic-credit")
-    broker = PreflightCallBroker(ledger=ledger)
+    broker = PreflightCallBroker(ledger=ledger, server_now=lambda: datetime(2026, 10, 25, 9, 30, tzinfo=timezone.utc))
     broker.set_provider_consent(tenant, packet["cache_plan"]["provider"], consented=True)
     broker.register_lease(packet["run_id"], packet["task_id"], packet["recipient"]["agent_id"],
                           lease_epoch=packet["fencing"]["lease_epoch"], active=True)

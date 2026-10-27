@@ -317,12 +317,14 @@ class PreflightCallBroker:
         price_table_version: str = "pt_2026_10_v1",
         default_period_start: str = "2026-10-01",
         capability_today: Callable[[], date] | None = None,
+        server_now: Callable[[], datetime] | None = None,
     ):
         self.ledger = ledger
         self.allowed_providers = allowed_providers or {"meta", "anthropic", "openai", "google", "other"}
         self.price_table_version = price_table_version
         self.default_period_start = default_period_start
         self._capability_today = capability_today or (lambda: datetime.now(timezone.utc).date())
+        self._server_now = server_now or (lambda: datetime.now(timezone.utc))
         self.provider_consents: dict[tuple[str, str], bool] = {}
         self.leases: dict[tuple[str, str], AgentLease] = {}
         self.bindings: dict[str, PreboundCallBinding] = {}
@@ -351,6 +353,38 @@ class PreflightCallBroker:
         self.leases[(run_id, task_id)] = lease
         return lease
 
+    @staticmethod
+    def _utc_time(value: str, code: str) -> datetime:
+        try:
+            normalized = value[:-1] + "+00:00" if value.endswith(("Z", "z")) else value
+            parsed = datetime.fromisoformat(normalized)
+            if parsed.tzinfo is None or parsed.utcoffset() is None:
+                raise ValueError("timestamp requires an offset")
+            return parsed.astimezone(timezone.utc)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise PreflightError(code, "timestamp is missing or invalid") from exc
+
+    def _assert_fresh(self, packet: dict[str, Any], lease: AgentLease) -> None:
+        try:
+            now = self._server_now()
+            if now.tzinfo is None or now.utcoffset() is None:
+                raise ValueError("server clock requires a timezone")
+            now = now.astimezone(timezone.utc)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise PreflightError("SERVER_CLOCK_INVALID", "server clock is invalid") from exc
+        issued = self._utc_time(packet["issued_at"], "PACKET_TIME_INVALID")
+        expires = self._utc_time(packet["expires_at"], "PACKET_TIME_INVALID")
+        refs_expire = self._utc_time(packet["recovery"]["refs_expire_at"], "PACKET_TIME_INVALID")
+        lease_expires = self._utc_time(lease.expires_at, "LEASE_TIME_INVALID")
+        if issued > now:
+            raise PreflightError("PACKET_NOT_YET_VALID", "packet has not yet been issued")
+        if expires <= now:
+            raise PreflightError("PACKET_EXPIRED", "packet has expired")
+        if refs_expire <= now:
+            raise PreflightError("REFERENCES_EXPIRED", "packet evidence references have expired")
+        if lease_expires <= now:
+            raise PreflightError("LEASE_EXPIRED", "lease has expired")
+
     def validate_packet_and_registry(self, packet: dict[str, Any]) -> None:
         errs = list(_PACKET_VALIDATOR.iter_errors(packet))
         if errs:
@@ -365,7 +399,10 @@ class PreflightCallBroker:
                 )
             except provider_capabilities.CapabilityError as exc:
                 raise PreflightError(exc.code, exc.detail) from exc
-        sem = semantic_validator.semantic(packet)
+        try:
+            sem = semantic_validator.semantic(packet)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise PreflightError("PACKET_SEMANTIC_INVALID", "canonical semantic validation failed") from exc
         if sem:
             if "S6" in sem:
                 cp = packet.get("cache_plan", {})
@@ -398,6 +435,8 @@ class PreflightCallBroker:
         period_start: str | None = None,
         now_iso: str | None = None,
     ) -> PreboundCallBinding:
+        if now_iso is not None:
+            raise PreflightError("TIME_OVERRIDE_FORBIDDEN", "preflight uses the server clock")
         self.validate_packet_and_registry(packet)
         tenant_id = packet["tenant_id"]
         project_id = packet["project_id"]
@@ -424,9 +463,7 @@ class PreflightCallBroker:
                 "STALE_LEASE",
                 f"agent/epoch mismatch: expected ({lease.agent_id}, {lease.lease_epoch}), got ({agent_id}, {expected_epoch}, packet={packet_epoch})",
             )
-        check_now = now_iso or packet["issued_at"]
-        if check_now >= lease.expires_at:
-            raise PreflightError("LEASE_EXPIRED", f"lease expired at {lease.expires_at}")
+        self._assert_fresh(packet, lease)
 
         try:
             res = self.ledger.reserve_cost(
@@ -517,11 +554,22 @@ class PreflightCallBroker:
             lease_epoch=lease_epoch,
             period_start=period_start,
         )
+        try:
+            packet_bytes = json.dumps(packet, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        except (TypeError, ValueError, RecursionError) as exc:
+            raise PreflightError("PACKET_BINDING_MISMATCH", "packet changed before provider dispatch") from exc
+        if hashlib.sha256(packet_bytes).hexdigest() != binding.packet_sha256:
+            raise PreflightError("PACKET_BINDING_MISMATCH", "packet changed before provider dispatch")
+        if binding.provider not in self.allowed_providers:
+            raise PreflightError("PROVIDER_NOT_ALLOWED", "provider allow-list changed before dispatch")
+        if not self.provider_consents.get((binding.tenant_id, binding.provider), False):
+            raise PreflightError("PROVIDER_CONSENT_MISSING", "provider consent was revoked before dispatch")
         expected_epoch = int(packet.get("fencing", {}).get("lease_epoch", 1)) if lease_epoch is None else lease_epoch
         # Re-verify lease right before network dispatch
         lease = self.leases.get((binding.run_id, binding.task_id))
-        if lease is None or not lease.active or lease.lease_epoch != expected_epoch:
+        if lease is None or not lease.active or lease.lease_epoch != expected_epoch or lease.agent_id != binding.agent_id:
             raise PreflightError("STALE_LEASE", "lease invalidated before provider dispatch")
+        self._assert_fresh(packet, lease)
 
         self.ledger.mark_call_sent(binding.tenant_id, binding.project_id, binding.call_id)
         self.provider_calls_attempted += 1

@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 
@@ -30,6 +31,7 @@ RUN_ID = "0b7e1f00-1111-4c22-8d33-000000000001"
 TASK_ID = "0b7e1f00-1111-4c22-8d33-000000000002"
 AGENT_ID = "0b7e1f00-1111-4c22-8d33-0000000000a2"
 PERIOD = "2026-10-01"
+_TEST_NOW = lambda: datetime(2026, 10, 25, 9, 30, tzinfo=timezone.utc)
 
 
 def _make_git_test_repo() -> tuple[str, str, str, str]:
@@ -130,7 +132,7 @@ def test_hygiene_eval_candidate_execution_and_scaffold_cr74() -> None:
 def test_preflight_broker_packet_and_registry_rules_cr29_cr33() -> None:
     """CR-29, CR-33: Broker blocks undisableable provider caching in A0/NONE and blocks stale registry entries."""
     eng = ReconcilerLedger()
-    broker = PreflightCallBroker(ledger=eng)
+    broker = PreflightCallBroker(ledger=eng, server_now=_TEST_NOW)
 
     # Valid packet passes validation
     valid_packet = _load_example_packet()
@@ -157,7 +159,7 @@ def test_preflight_broker_reservation_fencing_and_receipt_settlement_cr37_cr38_c
     eng.set_project_budget(TENANT_ID, PROJECT_ID, PERIOD, 500_000)
     eng.grant_credit(TENANT_ID, 1_000_000, idempotency_key="credit:init")
 
-    broker = PreflightCallBroker(ledger=eng, allowed_providers={"meta", "anthropic", "openai"})
+    broker = PreflightCallBroker(ledger=eng, allowed_providers={"meta", "anthropic", "openai"}, server_now=_TEST_NOW)
     packet = _load_example_packet()
     provider = packet["cache_plan"]["provider"]
     model = packet["cache_plan"]["model"]
@@ -252,7 +254,7 @@ def test_dev_builder_cli_guard_budget_governed_cr38() -> None:
     eng.set_project_budget(TENANT_ID, PROJECT_ID, PERIOD, 200_000)
     eng.grant_credit(TENANT_ID, 500_000, idempotency_key="credit:cli:init")
 
-    broker = PreflightCallBroker(ledger=eng)
+    broker = PreflightCallBroker(ledger=eng, server_now=_TEST_NOW)
     packet = _load_example_packet()
     provider = packet["cache_plan"]["provider"]
 
