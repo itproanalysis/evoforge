@@ -750,3 +750,14 @@ Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.
 실패한 수집은 실패 결과로 유지한다. 수정 전 회귀 8 failed·2 passed, 수정 후 실제 Runner 서비스 포함 52 passed.
 원본: `.local/evidence/runner-count-binding-20261028-svzs_kqd`; 전체 API·실제 PostgreSQL 검증 중·main 미반영.
 스니펫 수 하한은 파일별 수집 증거가 아니며 로컬 Runner와 공개 게이트의 별도 확인도 남아 있다.
+
+## 2026-10-28 Runner 기준 및 bundle 보호 main 통합
+
+`20a607e`까지 main에 반영했다. 원격 실행의 Git 기준을 고정하고 응답을 대조하며,
+임시 bundle 참조의 이름 충돌·이동 시 다른 참조를 보존한다. 검증본 `e8e3754`와
+통합본의 API·웹·정본 tree는 같다. 전체 API 646 passed·1 skipped, 실제 PostgreSQL
+169 passed·SQL 96·참조 112·계약 0 failure, 실제 Runner 서비스 포함 집중 42 passed.
+동일 웹 소스의 npm ci/tsc/build도 통과했다. 소스 83개와 원본 로그 20개의 해시는
+`docs/validation/2026-10-28-runner-base-bundle.json`에 기록했다. 기존 미커밋 runner와
+Critic 테스트는 보존했으며 이 검증에 포함하지 않았다. 수집 결과 보강은 별도 검증 중이다.
+공개 PR의 검증 SHA 전달, 실제 provider 청구 출처, 공개 Broker/DB 연결과 배포는 미완료다.
