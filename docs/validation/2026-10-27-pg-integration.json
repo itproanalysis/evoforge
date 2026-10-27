@@ -1,0 +1,86 @@
+{
+  "date": "2026-10-27",
+  "revision": "b29c3a9560025375f96bf76b667fe1a93462e66b",
+  "combined_support_merge": "edffa84",
+  "proof_and_http_revision": "83798f9",
+  "priority_round7_revision": "d347b56",
+  "branch": "codex/pg-integration",
+  "worktree": "C:\\evo_forge_codex",
+  "scope": "Combined canonical command/server evidence/G2 support; deferred response requirement and independent Google/service authentication",
+  "checks": {
+    "api": {
+      "passed": 463,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 107
+    },
+    "kernel_auth_subset": {
+      "passed": 35,
+      "included_in_api_count": true
+    },
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "limitations": [
+    "Active Muse T22 main edits preserved; public command facade and shared generation hooks still pending",
+    "No code diff in main.py or commands.py relative to round7 main",
+    "Critic, provider receipt and registered Runner image are synthetic fixtures; Google signature verification replaced in header tests",
+    "No paid provider call, production migration, OCI digest verification, Docker build or GCP deployment",
+    "Public command/cost/mission state and complete canonical approval integration remain incomplete"
+  ],
+  "source_sha256": {
+    "services/api/main.py": "29ba0a14afd47176673b92d653cc77b13f838dd0e8d1d16e7e988377acfa38d3",
+    "services/api/evoforge/commands.py": "0788fabc2f6b38984d939d75d846ed31fcb44ab331c739992fe494c9eab7a767",
+    "services/api/evoforge/postgres_commands.py": "e459ba8a31a7f1a1b4358f7f2759a14c098ec1217c15eaaf8d603791c600ab52",
+    "services/api/migrations/004_api_commands.sql": "a50570f607a3d52c6bb20fb582c38ac16b78523ca8f6d24b10805b35cbd9f378",
+    "services/api/evoforge/kernel_api.py": "0085727f95d7875d950a07532a8ea162ea5bca42a697234d17d1ed370fd75319",
+    "services/api/evoforge/postgres_run_evidence.py": "6df2bb1dafe73a924778cc1176ab4145306005168b668a852d69059a3408975b",
+    "services/api/evoforge/runner_attestation.py": "1fe0823be9583447126d3029391490f9ec4452e21a56e92242d1c556046b0a19",
+    "services/api/migrations/005_runner_candidates.sql": "3d2f4a17e70d05b772719ea42c9b53e8b438001191dd80f4a85651f6b04e51cb",
+    "services/api/evoforge/runner.py": "49d50ee0fdc845a49a34fab5dea7c33b8cfae1a67d9e13fe14302ba4aa9ce1db",
+    "services/api/evoforge/runner_client.py": "4fdfe8ecf3e6bf38eb3f45fc753833f85987c30554243de29a3fb86bd7a4340a",
+    "services/runner/app.py": "d4077db8d4a6b889a4cca8d392124c2d79d141d9842e9ddc652d0eb393f283f9",
+    "services/runner/Dockerfile": "1c5dc509aa3d7871ae115c53f9faf3ece71dec16b8fa2441784a3ed748832e12",
+    "services/api/tests/test_postgres_kernel.py": "41d9d86435d936e1e145acd2ec255e9ebcdf9a5384617f961432ce68482ba21c",
+    "services/api/tests/test_kernel_api.py": "1db93f7649d61abf14bf5a9d4c042f54349b407b1d4bf8b4430216135a675be9"
+  },
+  "logs": {
+    "validation-pg-integration-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\pg-integration-20261027-wm8m7mca\\validation-pg-integration-api.log",
+      "sha256": "34a5c29fb5d46c50cf78a62151ed50e83ea0575b947a36b5a3c894e4fbb0b627"
+    },
+    "validation-pg-integration-auth.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\pg-integration-20261027-wm8m7mca\\validation-pg-integration-auth.log",
+      "sha256": "aaf99ccac1661bc33d1bcc238f1580077a622c4fdcf7f8762c6bf77038384ae5"
+    },
+    "validation-pg-integration-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\pg-integration-20261027-wm8m7mca\\validation-pg-integration-contract.log",
+      "sha256": "a7b21ffa195ef002413424e4ea3a9769d6fef751e4c0f799144b0043b7d6eaeb"
+    },
+    "validation-pg-integration-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\pg-integration-20261027-wm8m7mca\\validation-pg-integration-postgres.log",
+      "sha256": "bd724d200e97af7ec1b5c557534370dc39c4fd668c3c3ec1f68bbc34e4128716"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\pg-integration-20261027-wm8m7mca\\validation-postgres.log",
+      "sha256": "a1137b6e0e0a0c73d8d26359b59046a769424d62af3133b0e89d3daac8d90cbc"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\pg-integration-20261027-wm8m7mca\\validation-kernel.log",
+      "sha256": "d431650c54f1addfc5abf93a4f403a812b237aaf0a064df48002734cd06d2660"
+    },
+    "validation-pg-integration-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\pg-integration-20261027-wm8m7mca\\validation-pg-integration-web.log",
+      "sha256": "79c91fc6a7a8a0df833875f66eeb49c13597526fd26261cf5493e2199c526d0d"
+    }
+  }
+}
