@@ -120,14 +120,13 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex 확인 (CLI 청구 근거 누락·운영 연결 전 수정 필요):** `fca6de2`와 후속 `aa67447`의 독립
-  `DevBuilderCLIGuard`에 빈 CLI 결과를 주면 요청 ID와 사용량 기본값을 만들어 `provider_billed`로 분류하고
-  합성 메모리 원장에 청구하는 것을 재현했다. 실제 모델 호출·키·운영 원장은 사용하지 않았다.
-  재현: `C:\evo_forge\.local\evidence\cli-usage-provenance-20261027-w1q9mifd\repro.py`.
-  실제 공급사 사용량/청구 근거가 없으면 임의 청구·확정으로 처리하지 않아야 한다. 해당 모듈은 다른 개발자의 활성 클레임이므로 보존한다.
-  `fca6de2`의 fixture/개행 관련 3개 테스트 실패는 상위 `aa67447`에서 수정되어 해당 테스트 5개가 통과했다.
-  최신 코드에서도 빈 CLI 결과의 임의 청구는 재현되며, 정본 registry seed에 Meta/Muse 항목이 없어 합성 Muse 패킷은 거부된다.
-  이전/최신 로그와 `muse_registry_probe.py`를 같은 재현 폴더에 보존했다. 정본을 수정하거나 다른 모델로 자동 대체하지 않는다.
+- **Codex 확인 (CLI 비용 대사·Muse capability 미완료):** `fca6de2`/`aa67447`의 빈 CLI 결과 임의 청구는
+  상위 `93d78cb`에서 수정됐고 빈 결과의 예약 유지가 확인됐다. fixture/개행 관련 3개 테스트 실패도 `aa67447`에서 수정됐다.
+  `93d78cb`에서는 실제 청구액 근거가 없는 사용량에 기본 금액을 `provider_billed`로 청구하고,
+  전송 시간 초과 뒤 intent가 UNKNOWN이 아닌 SENT로 남는 문제가 각각 재현됐다. 실제 모델 호출·키·운영 원장은 사용하지 않았다.
+  재현/원본: `C:\evo_forge\.local\evidence\cli-usage-provenance-20261027-w1q9mifd`의 `unverified_cost.py`, `unknown_exception.py`.
+  정본 registry seed에 Meta/Muse 항목이 없어 합성 Muse 패킷은 의미 검증에서 거부된다(`muse_registry_probe.py`).
+  해당 모듈은 다른 개발자의 활성 클레임이므로 보존하며, 정본을 수정하거나 다른 모델로 자동 대체하지 않는다.
 - **Codex (PR 테스트 파일명·서버 실행 증거와 canonical 후보 연결) / `codex/pg-integration`:**
   `postgres_candidates.py`·`kernel_api.py`·새 확장 010·Codex DB 테스트·환경 예제/관련 문서를 수정한다.
   상위 main `dca4709`의 증거별 생성 테스트 이름을 보존하고, 같은 Builder 출력/기준과 일치하는 서버 실행 증거를 확인한다.
