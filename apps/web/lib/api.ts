@@ -25,11 +25,15 @@ export interface GenerateResponse {
 }
 
 export interface ReviewResponse {
-  sealed_tests?: Array<{ code?: string; kind?: string } | string>;
+  sealed_tests?: Array<{ kind?: string; code_sha256?: string; code_len?: number } | string>;
+  sealed_count?: number;
+  sealed_tests_count?: number;
+  sealed_kinds?: string[];
   review?: { result: string; findings?: unknown[] };
   stub?: boolean;
   model?: string;
   evidence_id?: string;
+  provider_evidence_ids?: string[];
   raw?: unknown;
 }
 
@@ -98,8 +102,9 @@ export function postEvaluate(diff: string, tests: string[], stats: RunStats) {
 }
 
 export interface SealedTest {
-  code: string;
   kind: string;
+  code_sha256: string;
+  code_len: number;
 }
 
 export interface SuiteResult {
@@ -120,11 +125,11 @@ export function postRun(
   base_sha: string,
   diff: string,
   tests: string[],
-  heldout_tests: SealedTest[],
+  review_evidence_id: string,
 ) {
   return req<RunResponse>("/v1/runs", {
     method: "POST",
-    body: JSON.stringify({ source_repo, base_sha, diff, tests: tests.map((code) => ({ code })), heldout_tests }),
+    body: JSON.stringify({ source_repo, base_sha, diff, tests: tests.map((code) => ({ code })), review_evidence_id }),
   });
 }
 
@@ -152,6 +157,18 @@ export function getEvidence(id: string) {
   return req<EvidenceChain | Record<string, unknown>>(
     `/v1/evidence/${encodeURIComponent(id)}`,
   );
+}
+
+export interface ChainEvent {
+  id: string;
+  stage: string;
+  kind: string;
+  evidence_id: string;
+  summary: Record<string, unknown>;
+}
+
+export function getEvent(event_id: string) {
+  return req<ChainEvent>(`/v1/events/${encodeURIComponent(event_id)}`);
 }
 
 export const EVIDENCE_STAGES = [

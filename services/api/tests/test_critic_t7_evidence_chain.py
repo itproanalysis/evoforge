@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import main  # noqa: E402
 from evoforge import commands, github, ledger  # noqa: E402
+from critic_helpers import sealed_suite, server_review  # noqa: E402
 
 c = TestClient(main.app, raise_server_exceptions=False)
 STAGES = ["ObjectiveVersion", "Task", "Candidate", "Gate", "Review", "PR", "Outcome"]
@@ -80,8 +81,9 @@ def test_run_then_pr_chain(monkeypatch):
     monkeypatch.setattr(github, "create_pr", lambda *a, **k: {"html_url": "https://github.com/o/r/pull/77"})
     if hasattr(main, "create_pr"):
         monkeypatch.setattr(main, "create_pr", lambda *a, **k: {"html_url": "https://github.com/o/r/pull/77"})
+    review = server_review(c, monkeypatch, HELD)
     run = c.post("/v1/runs", json={"source_repo": "C:/repos/p", "base_sha": "b" * 40, "diff": DIFF,
-                                   "tests": STRONG, "heldout_tests": HELD})
+                                   "tests": STRONG, "review_evidence_id": review})
     assert run.status_code == 200, run.text
     src = run.json()["evidence_id"]
     sbody, sch = _chain(src)

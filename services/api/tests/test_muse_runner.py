@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import main  # noqa: E402
 from evoforge.patch import PatchError  # noqa: E402
 from evoforge.runner import RunnerError, allowed_repo, run_candidate  # noqa: E402
+from critic_helpers import sealed_suite, server_review  # noqa: E402
 
 git = pytest.mark.skipif(subprocess.run(
     ["git", "--version"], capture_output=True).returncode != 0,
@@ -132,11 +133,12 @@ def _heldout():
 
 
 
-def _post_run(diff=""):
+def _post_run(monkeypatch, diff=""):
     c = TestClient(main.app, raise_server_exceptions=False)
+    review = server_review(c, monkeypatch, _heldout())  # T10: held-out from the server
     out = c.post("/v1/runs", json={"source_repo": "C:/repos/proj", "base_sha": "b" * 40,
                                    "diff": diff, "tests": STRONG_ONE,
-                                   "heldout_tests": _heldout()}).json()
+                                   "review_evidence_id": review}).json()
     return c, out, {g["gate"]: g for g in out["gates"]}
 
 
@@ -146,7 +148,7 @@ def _post_run(diff=""):
                                       ((1, 2), (1, 2)), ((2, 2), (2, 3)), ((2, 2), (0, 0))])
 def test_failing_or_missing_required_tests_block_pr(monkeypatch, vis, held):
     _stub_run(monkeypatch, vis, held)
-    c, out, g = _post_run(DIFF)
+    c, out, g = _post_run(monkeypatch, DIFF)
     assert g["G2_REQUIRED"]["result"] == "FAIL"
     r = c.post("/v1/pr/create", json={"evidence_id": out["evidence_id"], "title": "t"})
     assert r.status_code == 409 and "G2_REQUIRED" in r.json()["detail"]
@@ -154,7 +156,7 @@ def test_failing_or_missing_required_tests_block_pr(monkeypatch, vis, held):
 
 def test_all_required_tests_pass(monkeypatch):
     _stub_run(monkeypatch, (2, 2), (3, 3))
-    _, out, g = _post_run(DIFF)
+    _, out, g = _post_run(monkeypatch, DIFF)
     assert all(v["result"] == "PASS" for v in g.values()), out
     assert "executed and passed" in g["G2_REQUIRED"]["reason"]
 
@@ -165,11 +167,11 @@ def test_timeout_is_g2_fail(monkeypatch):
         "base": "b" * 40, "hygiene": [], "heldout_kinds": list(HELDOUT),
         "visible": {"pass": 0, "n": 1, "timed_out": True, "exit_code": None},
         "heldout": {"pass": 3, "n": 3, "timed_out": False, "exit_code": 0}})
-    _, _, g = _post_run(DIFF)
+    _, _, g = _post_run(monkeypatch, DIFF)
     assert g["G2_REQUIRED"]["result"] == "FAIL" and "timed out" in g["G2_REQUIRED"]["reason"]
 
 
 def test_gap_still_detected_by_integrity(monkeypatch):
     _stub_run(monkeypatch, (10, 10), (0, 10))
-    _, _, g = _post_run(DIFF)
+    _, _, g = _post_run(monkeypatch, DIFF)
     assert g["GH_INTEGRITY"]["result"] == "FAIL" and "gap" in g["GH_INTEGRITY"]["reason"]

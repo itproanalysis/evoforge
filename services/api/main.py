@@ -6,6 +6,7 @@ Amounts are integer cents, never float.
 """
 from __future__ import annotations
 
+import hashlib
 import os
 import sys
 import time
@@ -86,12 +87,32 @@ class PRRequest(BaseModel):
 
 
 class RunRequest(BaseModel):
+    """Runs execute only the server-stored Critic sealed suite (T10).
+
+    heldout_tests is deprecated and will be removed: it must be empty;
+    any non-empty value is rejected with 422. The held-out suite comes
+    solely from review_evidence_id (POST /v1/candidates/review evidence).
+    """
     source_repo: str
     base_sha: str
     diff: str = ""
     tests: list[dict] = []
-    heldout_tests: list[dict] = []
+    heldout_tests: list[dict] = Field(
+        default=[],
+        description="Deprecated, for removal: must be empty; non-empty is 422. "
+        "Held-out suite comes from review_evidence_id.",
+    )
+    review_evidence_id: str
     timeout_s: int = Field(120, ge=1, le=600)
+
+    @model_validator(mode="after")
+    def _no_client_heldout(self):
+        if self.heldout_tests:
+            raise ValueError(
+                "heldout_tests is deprecated and must be empty; "
+                "pass review_evidence_id pointing at server-stored review evidence"
+            )
+        return self
 
 
 class SandboxRequest(BaseModel):
@@ -133,9 +154,169 @@ def _call_provider(rsv: str, fn, *args):
     return out
 
 
+def _stage_summary(eid: str, stage: str) -> dict:
+    """Per-stage facts already stored server-side; never includes test code."""
+    stored = _evidence.get(eid, {})
+    if stage == "ObjectiveVersion":
+        return {
+            "objective_id": stored.get("objective_id"),
+            "goal": stored.get("goal"),
+            "risk": stored.get("risk"),
+        }
+    if stage == "Task":
+        return {"command_id": stored.get("command_id")}
+    if stage == "Candidate":
+        cand = stored.get("candidate")
+        diff = ""
+        tests: list = []
+        stub = None
+        if isinstance(cand, dict):
+            d = cand.get("diff")
+            if isinstance(d, str):
+                diff = d
+            t = cand.get("tests")
+            if isinstance(t, list):
+                tests = t
+            stub = cand.get("stub")
+        if not diff and isinstance(stored.get("diff"), str):
+            diff = stored["diff"]
+        if not tests and isinstance(stored.get("tests"), list):
+            tests = stored["tests"]
+        return {
+            "tests_count": len(tests),
+            "diff_chars": len(diff),
+            "stub": stub,
+        }
+    if stage == "Gate":
+        gates = stored.get("gates") if isinstance(stored.get("gates"), list) else []
+        verdicts = [
+            {"gate": g.get("gate"), "result": g.get("result"), "reason": g.get("reason", "")}
+            for g in gates if isinstance(g, dict)
+        ]
+        summary: dict = {"verdicts": verdicts, "gates": verdicts}
+        run = stored.get("run")
+        if isinstance(run, dict):
+            vis = run.get("visible") if isinstance(run.get("visible"), dict) else {}
+            held = run.get("heldout") if isinstance(run.get("heldout"), dict) else {}
+            summary["visible"] = {"pass": vis.get("pass"), "n": vis.get("n")}
+            summary["heldout"] = {"pass": held.get("pass"), "n": held.get("n")}
+            summary["run_counts"] = {
+                "vis_pass": vis.get("pass"), "vis_n": vis.get("n"),
+                "held_pass": held.get("pass"), "held_n": held.get("n"),
+            }
+            kinds = run.get("heldout_kinds")
+            if isinstance(kinds, list):
+                summary["heldout_kinds"] = [k for k in kinds if isinstance(k, str)]
+        return summary
+    if stage == "Review":
+        inner = stored.get("review")
+        sealed: list = []
+        review_doc: dict = {}
+        stub = None
+        model = None
+        if isinstance(inner, dict):
+            s = inner.get("sealed_tests")
+            if isinstance(s, list):
+                sealed = s
+            r = inner.get("review")
+            if isinstance(r, dict):
+                review_doc = r
+            stub = inner.get("stub")
+            model = inner.get("model")
+        result = review_doc.get("result")
+        findings = review_doc.get("findings") if isinstance(review_doc.get("findings"), list) else []
+        kinds = sorted({t.get("kind") for t in sealed if isinstance(t, dict) and isinstance(t.get("kind"), str)})
+        return {
+            "result": result,
+            "review_result": result,
+            "review": {"result": result},
+            "findings_count": len(findings),
+            "sealed_count": len(sealed),
+            "sealed_kinds": kinds,
+            "stub": stub,
+            "model": model,
+        }
+    if stage == "PR":
+        pr_url = stored.get("pr")
+        return {
+            "pr": pr_url,
+            "pr_url": pr_url,
+            "html_url": pr_url,
+            "title": stored.get("title"),
+            "source_evidence_id": stored.get("source_evidence_id"),
+        }
+    return {}
+
+
 def _link_stages(eid: str, stages) -> None:
     for stage in stages:
-        evidence_chain.link(eid, stage, evidence_chain.record(stage, {"evidence_id": eid}))
+        event_id = evidence_chain.record(stage, None, evidence_id=eid, summary=_stage_summary(eid, stage))
+        evidence_chain.link(eid, stage, event_id)
+
+
+def _redact_sealed_entry(entry):
+    """One sealed test -> {kind, code_sha256, code_len}; raw code never leaves."""
+    if isinstance(entry, dict):
+        kind = entry.get("kind")
+        code = entry.get("code")
+        if isinstance(code, str):
+            digest = hashlib.sha256(code.encode("utf-8")).hexdigest()
+            ln = len(code)
+        else:
+            digest = ""
+            ln = 0
+        return {"kind": kind, "code_sha256": digest, "code_len": ln}
+    if isinstance(entry, str):
+        return {"kind": "", "code_sha256": hashlib.sha256(entry.encode("utf-8")).hexdigest(),
+                "code_len": len(entry)}
+    return {"kind": "", "code_sha256": "", "code_len": 0}
+
+
+def _redact_sealed_list(tests: list) -> list:
+    return [_redact_sealed_entry(t) for t in tests]
+
+
+def _sealed_counts(tests: list) -> dict:
+    kinds = sorted({t.get("kind") for t in tests
+                    if isinstance(t, dict) and isinstance(t.get("kind"), str)})
+    return {"sealed_count": len(tests), "sealed_tests_count": len(tests),
+            "sealed_kinds": kinds}
+
+
+def _redact_value(value):
+    """Public copy helper: strip sealed test code and provider response bodies.
+
+    Raw records stay in the server store; this builds a redacted copy for HTTP.
+    Every sealed_tests list becomes [{kind, code_sha256, code_len}] plus counts.
+    """
+    if isinstance(value, dict):
+        if "response_document" in value:
+            out = {}
+            for k, v in value.items():
+                if k == "response_document":
+                    out[k] = {"redacted": True}
+                elif k == "sealed_tests" and isinstance(v, list):
+                    out[k] = _redact_sealed_list(v)
+                else:
+                    out[k] = _redact_value(v)
+            if isinstance(value.get("sealed_tests"), list):
+                for ck, cv in _sealed_counts(value["sealed_tests"]).items():
+                    out.setdefault(ck, cv)
+            return out
+        if isinstance(value.get("sealed_tests"), list):
+            out = {}
+            for k, v in value.items():
+                if k == "sealed_tests":
+                    out[k] = _redact_sealed_list(v)
+                else:
+                    out[k] = _redact_value(v)
+            for ck, cv in _sealed_counts(value["sealed_tests"]).items():
+                out.setdefault(ck, cv)
+            return out
+        return {k: _redact_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_redact_value(x) for x in value]
+    return value
 
 
 def _store_evidence(payload: dict) -> str:
@@ -215,12 +396,14 @@ def review(req: ReviewRequest):
         out = broker_meta.call_critic(req.goal_contract, req.diff, req.ci, dispatch=dispatch)
         eid = _store_evidence({"review": out, "provider_evidence_ids": phase_evidence_ids})
         _link_stages(eid, ("Review",))
-        return {**out, "evidence_id": eid, "provider_evidence_ids": phase_evidence_ids}
+        public = _redact_value(out)
+        return {**public, "evidence_id": eid, "provider_evidence_ids": phase_evidence_ids}
     rsv = _reserve_or_402()
     out = _call_provider(rsv, broker_meta.call_critic, req.goal_contract, req.diff, req.ci)
     eid = _store_evidence({"review": out})
     _link_stages(eid, ("Review",))
-    return {**out, "evidence_id": eid}
+    public = _redact_value(out)
+    return {**public, "evidence_id": eid}
 
 
 @app.post("/v1/gates/evaluate")
@@ -236,10 +419,29 @@ def gates_evaluate(req: EvaluateRequest):
 @app.post("/v1/runs")
 def runs(req: RunRequest):
     from evoforge import runner
+    from evoforge.critic import ensure_sealed_suite
     from evoforge.gates import apply_run, evaluate_full
+    if req.heldout_tests:
+        # Defense in depth: the model validator already 422s non-empty
+        # client suites; never fall back to them here.
+        raise HTTPException(422, "heldout_tests is deprecated and must be empty; "
+                                 "pass review_evidence_id pointing at server-stored review evidence")
+    src = _evidence.get(req.review_evidence_id)
+    if src is None:
+        raise HTTPException(404, "unknown review evidence id")
+    inner = src.get("review")
+    if not isinstance(inner, dict):
+        raise HTTPException(409, f"evidence {req.review_evidence_id} is not a review")
+    if inner.get("stub") is True:
+        raise HTTPException(409, f"evidence {req.review_evidence_id} is a stub review "
+                                 "and cannot back a run")
+    sealed = inner.get("sealed_tests")
+    ok, normalized, _findings = ensure_sealed_suite(sealed)
+    if not ok:
+        raise HTTPException(409, f"evidence {req.review_evidence_id} has an invalid sealed suite")
     try:
         run = runner.run_candidate(req.source_repo, req.base_sha, req.diff,
-                                   req.tests, req.heldout_tests,
+                                   req.tests, normalized,
                                    timeout_s=req.timeout_s)
     except runner.RunnerError as e:
         raise HTTPException(400, str(e))
@@ -253,7 +455,8 @@ def runs(req: RunRequest):
     gates = [v.__dict__ for v in apply_run(verdicts, run)]
     eid = _store_evidence({"diff": req.diff, "tests": req.tests, "gates": gates,
                            "run": run, "source_repo": req.source_repo,
-                           "base_sha": req.base_sha})
+                           "base_sha": req.base_sha,
+                           "review_evidence_id": req.review_evidence_id})
     _link_stages(eid, ("Candidate", "Gate"))
     return {"gates": gates, "run": run, "evidence_id": eid}
 
@@ -314,8 +517,25 @@ def evidence(eid: str):
     if eid not in _evidence:
         raise HTTPException(404, "unknown evidence id")
     stored = _evidence[eid]
-    data = {k: v for k, v in stored.items() if k not in ("chain", "data")}
-    return {**stored, "chain": evidence_chain.chain(eid), "data": data}
+    public = _redact_value(stored)
+    # Surface sealed metadata at the top level too (mirrors POST shape) so
+    # clients need not dig into data/review payloads; counts included.
+    inner = public.get("review")
+    if isinstance(inner, dict) and isinstance(inner.get("sealed_tests"), list):
+        public.setdefault("sealed_tests", inner["sealed_tests"])
+        for ck in ("sealed_count", "sealed_tests_count", "sealed_kinds"):
+            if ck in inner:
+                public.setdefault(ck, inner[ck])
+    data = {k: v for k, v in public.items() if k not in ("chain", "data")}
+    return {**public, "chain": evidence_chain.chain(eid), "data": data}
+
+
+@app.get("/v1/events/{event_id}")
+def event(event_id: str):
+    view = evidence_chain.view(event_id)
+    if view is None:
+        raise HTTPException(404, "unknown event id")
+    return view
 
 
 @app.get("/v1/commands/{command_id}")

@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 import main  # noqa: E402
 from evoforge import github, ledger, runner  # noqa: E402
 from evoforge.patch import PatchError  # noqa: E402
+from critic_helpers import sealed_suite, server_review  # noqa: E402
 
 c = TestClient(main.app, raise_server_exceptions=False)
 
@@ -182,10 +183,11 @@ def test_source_repo_untouched(repo):
 
 def test_api_run_then_pr(repo, monkeypatch):
     calls = []
+    review = server_review(c, monkeypatch, HELDOUT)
     monkeypatch.setattr(github, "create_pr", lambda diff, title, body, branch, base="main", **k:
                         calls.append(diff) or {"html_url": "https://github.com/o/r/pull/3"})
     r = c.post("/v1/runs", json={"source_repo": repo["path"], "base_sha": repo["base"], "diff": FIX_DIFF,
-                                 "tests": VISIBLE, "heldout_tests": HELDOUT})
+                                 "tests": VISIBLE, "review_evidence_id": review})
     assert r.status_code == 200, r.text
     j = r.json()
     g = {x["gate"]: x["result"] for x in j["gates"]}
@@ -199,9 +201,10 @@ def test_api_run_then_pr(repo, monkeypatch):
     assert calls == [FIX_DIFF]
 
 
-def test_api_run_without_fix_blocks_pr(repo):
+def test_api_run_without_fix_blocks_pr(repo, monkeypatch):
+    review = server_review(c, monkeypatch, HELDOUT)
     r = c.post("/v1/runs", json={"source_repo": repo["path"], "base_sha": repo["base"], "diff": "",
-                                 "tests": VISIBLE, "heldout_tests": HELDOUT})
+                                 "tests": VISIBLE, "review_evidence_id": review})
     assert r.status_code == 200
     # Critic correction: failing required tests are G2_REQUIRED's verdict, not GH_INTEGRITY's.
     assert {x["gate"]: x["result"] for x in r.json()["gates"]}["G2_REQUIRED"] == "FAIL"
@@ -210,12 +213,16 @@ def test_api_run_without_fix_blocks_pr(repo):
 
 
 def test_api_errors(repo, monkeypatch):
-    r = c.post("/v1/runs", json={"source_repo": "https://github.com/o/r.git", "base_sha": "x"})
+    review = server_review(c, monkeypatch, HELDOUT)
+    r = c.post("/v1/runs", json={"source_repo": "https://github.com/o/r.git", "base_sha": "x",
+                                 "review_evidence_id": review})
     assert r.status_code == 400
     r = c.post("/v1/runs", json={"source_repo": repo["path"], "base_sha": repo["base"],
-                                 "diff": "--- a/calc.py\n+++ b/calc.py\n@@ -1 +1 @@\n-nope\n+x\n", "tests": VISIBLE})
+                                 "diff": "--- a/calc.py\n+++ b/calc.py\n@@ -1 +1 @@\n-nope\n+x\n", "tests": VISIBLE,
+                                 "review_evidence_id": review})
     assert r.status_code == 409
-    r = c.post("/v1/runs", json={"source_repo": repo["path"], "base_sha": repo["base"], "timeout_s": 0})
+    r = c.post("/v1/runs", json={"source_repo": repo["path"], "base_sha": repo["base"], "timeout_s": 0,
+                                 "review_evidence_id": review})
     assert r.status_code == 422
 
 

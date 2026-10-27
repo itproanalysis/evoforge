@@ -97,7 +97,9 @@ def test_critic_has_one_reservation_per_phase_and_preserves_sealed_tests(provide
     response = _review(provider)
     assert response.status_code == 200, response.text
     out = response.json()
-    assert out["sealed_tests"] == SEALED and out["execution_verified"] is False
+    # T12 (Muse Spark plan): HTTP returns sealed metadata only; raw code stays in the server store.
+    assert [t["kind"] for t in out["sealed_tests"]] == [t["kind"] for t in SEALED]
+    assert all("code" not in t for t in out["sealed_tests"]) and out["execution_verified"] is False
     assert len(provider["calls"]) == 2 and provider["options"] == [0]
     assert all(call["model"] == "muse-spark-1.3" for call in provider["calls"])
     assert "PRIVATE_DIFF_SENTINEL" not in json.dumps(provider["calls"][0])

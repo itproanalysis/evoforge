@@ -1,0 +1,80 @@
+{
+  "rationale": "Baseline main ad07177: pytest services/api 222 passed/1 skipped. F1 is a live privilege-escalation bypass (client-supplied heldout_tests decide GH_INTEGRITY/G2_REQUIRED and unlock PR; oracle-strength rates trivial constants as strong; keyless stub is shape-valid yet tautological), so it outranks everything. F2 breaks the README drilldown promise (chain event_ids resolve to nothing). F3 is the residual exposure that makes even a fixed F1 brittle (builder can read the sealed suite it must beat). Order: T10 closes the bypass by sourcing held-out exclusively from server-stored Critic review; T11 makes chain ids resolvable; T12 removes sealed code from the HTTP surface while keeping the Python-internal critic.call_critic shape T8 unit-tests assert on.",
+  "tasks": [
+    {
+      "id": "T10_server_heldout_runs",
+      "title": "Runs use server-stored Critic sealed suite only",
+      "why": "Fixes F1 high-severity reward-hack bypass: client trivial tests (assert 1==1 x3, correct kinds) currently earn PASS and unlock PR, and the keyless stub suite can back a PASS.",
+      "spec": "POST /v1/runs requires review_evidence_id: str pointing at server-stored POST /v1/candidates/review evidence. Server loads that evidence's review.sealed_tests, revalidates with critic.ensure_sealed_suite, and rejects stub reviews (stored stub is True) as ineligible. Runner executes ONLY the server suite; run['heldout_kinds'] derives from it. Client field heldout_tests: 422 when non-empty, ignored when empty (deprecated, documented for removal). Missing/unknown review id -> 404/409; shape-invalid or stub review -> 409 and no PASS-capable evidence is stored (never fall back to client suite). Valid review + fully-passing candidate still yields GH_INTEGRITY=PASS and G2_REQUIRED=PASS via existing apply_run path. /v1/pr/create unchanged and transitively safe.",
+      "edit": [
+        "services/api/main.py",
+        "services/api/evoforge/critic.py",
+        "services/api/evoforge/runner.py",
+        "services/api/evoforge/gates.py"
+      ],
+      "acceptance": [
+        "Client-only POST /v1/runs with 3 trivial kind-correct heldout_tests and no review_evidence_id is rejected (422/409), never PASS",
+        "Same trivial suite attached alongside a valid review_evidence_id is ignored/rejected and cannot flip the verdict",
+        "Keyless stub review (stub True) used as review_evidence_id can never yield GH_INTEGRITY=PASS or G2_REQUIRED=PASS",
+        "Valid server review + candidate passing both suites still yields all-PASS and unlocks /v1/pr/create",
+        "python -m pytest services/api -q passes"
+      ],
+      "out_of_scope": [
+        "services/api/evoforge/postgres_kernel.py",
+        "services/api/evoforge/kernel_api.py",
+        "docs/POSTGRES_KERNEL.md",
+        "docs/INTERNAL_KERNEL_API.md",
+        "ledger math and web UI changes"
+      ]
+    },
+    {
+      "id": "T11_resolvable_chain_events",
+      "title": "Resolvable per-stage chain events with web drilldown",
+      "why": "Fixes F2 medium drilldown gap: T7 chain event_ids point at bare {evidence_id} placeholder events no endpoint can resolve, so README drilldown and web Evidence page dead-end.",
+      "spec": "Add GET /v1/events/{event_id} returning {id, stage/kind, evidence_id, summary} with 404 on unknown; summary carries per-stage facts already stored server-side (e.g. command_id, gate verdicts, review result, PR url, run counts) and never embeds held-out test code. Replace _link_stages placeholder payloads {evidence_id} with these stage summaries. Web: apps/web/lib/api.ts adds getEvent(event_id); apps/web/app/evidence/page.tsx makes each non-null stage id clickable to fetch and render the event summary, keeping null stages as 증거 부족.",
+      "edit": [
+        "services/api/evoforge/evidence.py",
+        "services/api/main.py",
+        "apps/web/lib/api.ts",
+        "apps/web/app/evidence/page.tsx"
+      ],
+      "acceptance": [
+        "Every non-null event_id in GET /v1/evidence/{id}.chain resolves via GET /v1/events/{event_id} with matching stage and owning evidence id",
+        "Unknown event id returns 404; missing stages stay null and are never fabricated",
+        "Evidence page click on a stage fetches and displays the event summary; web build passes",
+        "No held-out test code appears in chain, event, or evidence bodies; python -m pytest services/api -q passes"
+      ],
+      "out_of_scope": [
+        "services/api/evoforge/postgres_kernel.py",
+        "services/api/evoforge/kernel_api.py",
+        "docs/POSTGRES_KERNEL.md",
+        "docs/INTERNAL_KERNEL_API.md",
+        "gate verdict rules and ledger math"
+      ]
+    },
+    {
+      "id": "T12_redact_sealed_code_http",
+      "title": "Redact sealed test code from HTTP evidence surfaces",
+      "why": "Closes F3 note: GET /v1/evidence/{review_id} and provider-call audit records hand the held-out code to any client (the same party that submits the candidate), defeating held-out purpose even after T10.",
+      "spec": "HTTP layer only (direct critic.call_critic() Python return shape unchanged): POST /v1/candidates/review response and GET /v1/evidence/{id} (including nested provider_call records and data/review payloads) strip each sealed test code and return [{kind, code_sha256, code_len}] plus counts; raw code never appears in any HTTP body. Full code stays in the private server store keyed by evidence_id and is the copy T10's runner executes. Chain entries and T11 event summaries already carry ids/metadata only.",
+      "edit": [
+        "services/api/main.py",
+        "services/api/evoforge/critic.py",
+        "apps/web/lib/api.ts"
+      ],
+      "acceptance": [
+        "HTTP POST /v1/candidates/review and GET /v1/evidence/{review_id} bodies contain no 'def test_' code but contain per-test kind plus sha256/len and total count",
+        "Provider-call audit entries in evidence bodies contain no sealed code",
+        "Server run via review_evidence_id still executes the full unstripped suite (passing candidate still PASSes)",
+        "python -m pytest services/api -q passes (T8 HTTP-shape expectations updated by Critic to redacted form; Python-level critic shape tests unchanged)"
+      ],
+      "out_of_scope": [
+        "services/api/evoforge/postgres_kernel.py",
+        "services/api/evoforge/kernel_api.py",
+        "docs/POSTGRES_KERNEL.md",
+        "docs/INTERNAL_KERNEL_API.md",
+        "changing the Python-internal sealed-suite shape validator"
+      ]
+    }
+  ]
+}
