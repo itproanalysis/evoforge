@@ -1,0 +1,21 @@
+{
+  "id": "T16_runner_service",
+  "planned_by": "muse-spark-1.3 (round-6 plan, production P0)",
+  "goal": "Isolated Runner service with bundle protocol\nWHY: P0-3: candidate code runs as subprocess inside the API process, which holds MODEL_API_KEY and can reach the metadata server/network; production needs a separate secretless Runner that receives only a base-only bundle + diff + suites and returns counts.\n\nSPEC: New service services/runner/app.py (FastAPI, PORT default 8081): POST /run takes {bundle_b64: str (git bundle of history up to base, max 50MB decoded), base_sha: str (40-hex, required), diff: str (<=1MB), visible: [{code}] (<=64 entries, each <=64KB non-empty str), sealed: [{code, kind}] (same caps), timeout_s: int 1..600} -> 200 {base, visible: {pass,n,timed_out,exit_code}, heldout: {pass,n,timed_out,exit_code}, heldout_kinds: [str]} (counts only, never code/logs). Behavior: reconstruct repo from bundle (git clone <bundle> + checkout base_sha, verify HEAD==base), reuse the exact strict diff-path checks, scrubbed-env subprocess execution, visible-first ordering, sealed run with python -I + Runner-owned ini + --noconftest + PYTEST_DISABLE_PLUGIN_AUTOLOAD, junit pre-exist refusal, per-suite timeout; violations 400/409 with same semantics as today. The Runner image/process reads NO secrets: must not reference MODEL_API_KEY/GITHUB_TOKEN/DATABASE_URL/EVO_KERNEL_TOKEN (startup assert warns if present; request schema has no secret fields) and runs with no IAM secret access. API side services/api/evoforge/runner_client.py: when EVO_RUNNER_URL is set, /v1/runs builds (git bundle create --all up to base from the T15-resolved repo dir) + diff + visible + server-stored sealed suite and POSTs to {EVO_RUNNER_URL}/run (timeout timeout_s+30s); maps result into the existing run dict and gate evaluation (response shape unchanged); runner unreachable/bad payload -> 502; when unset, falls back to in-process runner.run_candidate (dev). Sealed suite still comes only from server-stored review_evidence_id (client heldout_tests still 422). Env: API EVO_RUNNER_URL (empty=local fallback); Runner RUNNER_MAX_BUNDLE_MB/RUNNER_MAX_DIFF_KB/RUNNER_MAX_TESTS/RUNNER_MAX_TEST_KB with the defaults above. New Dockerfile services/runner/Dockerfile (python:3.12-slim, no secret mounts).\nCritic constraints: sealed tests start services/runner/app.py with uvicorn on a free localhost port and set EVO_RUNNER_URL to it, and also POST /run directly with a bundle built by `git bundle create`. Keep the Runner importable as module services/runner/app.py with a FastAPI `app`. When EVO_RUNNER_URL is set and EVO_RUNNER_AUDIENCE is set, the API attaches a metadata-server ID token for that audience (production); without EVO_RUNNER_AUDIENCE it sends no auth header (tests).\n\nACCEPTANCE (your own plan): With EVO_RUNNER_URL pointed at a test Runner (TestClient or local uvicorn), POST /v1/runs executes via HTTP and returns identical shape; killing the Runner -> 502 (not 500); malformed runner reply -> 502.; Runner rejects: diff with absolute/.git/'..' path -> 409/400; sealed suite that reads visible files still isolated (port of conftest/ini/sitecustomize/file-tamper isolation tests passes against services/runner).; Runner source contains no os.getenv for MODEL_API_KEY/GITHUB_TOKEN/DATABASE_URL and its request/response schemas contain no code echo (only counts+kinds); oversized bundle/diff/suite -> 413/400 before execution.; All existing tests pass in both modes (EVO_RUNNER_URL unset).\nOUT OF SCOPE: Cloud Run service/terraform/IAM for the Runner (Claude infra); GitHub checkout logic itself (T15; this task only bundles its result); PostgreSQL wiring (Codex)",
+  "edit": [
+    "services/runner/app.py",
+    "services/runner/requirements.txt",
+    "services/runner/Dockerfile",
+    "services/api/evoforge/runner_client.py",
+    "services/api/evoforge/runner.py",
+    "services/api/main.py",
+    "services/api/tests/test_runner_service.py"
+  ],
+  "context": [
+    "AGENTS.md",
+    "docs/SERVICE_STATUS.md"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
