@@ -226,3 +226,21 @@ main `.local/evidence/tenant-credit-guard-20261027-ezvkqtpw`, 범위는 `docs/TE
 DB에 확장 007을 먼저 적용한 뒤 새 API를 배포해야 한다. 이번 검증은 운영 DB/실청구/배포를 수행하지 않았다.
 Muse T22를 먼저 main에 반영한 다음 지원 브랜치에 동기화한다. 공개 명령/비용·전체 승인 연결은 계속 미완료이며,
 기본 Muse Spark와 자동 재개를 유지한다.
+
+## 2026-10-27 canonical Builder 후보 등록 연결
+
+지원 브랜치 `codex/pg-integration`의 `e947cbf`는 내부 Worker 후보 POST/GET을 연결한다.
+정산된 call·영수증/원장·SDK request ID·서버 출력과 reserved base→head의 전체 Git 변경/visible 테스트를 확인한 뒤,
+PROPOSED 후보와 확장 008 binding을 함께 저장한다. Git 확인 후 fencing/출력을 재검사하고 binding 실패 시 후보도 롤백한다.
+등록 후 head drift는 Runner/G2와 과거 PASS 재전송을 차단한다. 다른 게이트·리뷰·승인을 만들지 않는다.
+
+API 465 passed·1 skipped·실제 DB 144 passed(신규 5개)·참조 112·SQL 96·계약 0 failure·웹 빌드 통과.
+실제 Git/로컬 Runner/DB를 사용했고 Builder/Critic/영수증/checkout transport는 합성 fixture다.
+동시 등록 8회·재시작 조회·G2 연결·병합 거부·metadata/Git/fence/원자적 롤백을 확인했다.
+manifest: 지원 브랜치 `docs/validation/2026-10-27-candidate-registration.json`.
+원본 7개: main `.local/evidence/candidate-registration-20261027-u3iva17t`.
+경로와 제한: `docs/CANDIDATE_REGISTRATION.md`. 새 API 전 DB 확장 008까지 적용해야 한다.
+
+T22의 상위 main 반영을 먼저 기다리고 지원 브랜치에 동기화한다. 현재 main/commands.py의 공개 접점은 그대로다.
+공개 Broker 전송·비용/명령·후보 등록 호출·PR base 전달·독립 리뷰/전체 승인·실청구/운영 반영은 계속 미완료다.
+Muse Spark 기본값과 자동 재개를 유지한다.
