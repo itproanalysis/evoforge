@@ -23,6 +23,7 @@
 - [x] 정본 v1 영수증 검증·원자적 보존·저장 금액 정산 내부 경로. round3 동기화 후 API 291개, 실제 DB 46개 통과.
 - [x] Next 15.5.28·PostCSS 8.5.32로 웹 의존성 수정. npm audit 0건, 프로덕션 빌드와 standalone HTTP 검사 통과.
 - [x] Builder 전용 패킷·공급사 동의·agent/task fencing과 비용 예약 원자적 연결을 main에 반영·검증. 실제 전송기 연결은 남아 있다.
+- [x] Context Mesh(L1–L5 로그 게이트·Vault·Folder 복원·Packet v2 컴파일러·캐시 네임스페이스 솔트·온라인 결정 규칙), 400KB 대형 Diff 분할·Review Coverage 원장·리뷰어 자격 시험 풀, 공급망/BSL-1.1/SBOM 스캐너·테넌트 공정 큐·플랫폼 키 KMS 격리 가드(`ebfeb95`) main 반영·검증. API 465개·참조 112개·신규 CR 15개 통과.
 
 ## 이어서 수행할 작업
 
@@ -121,15 +122,12 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 - **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — 병합 승인 시점의 정책/자격 검사:** Codex 소유 postgres_kernel.py와
   test_postgres_kernel.py·관련 문서에서 실행의 현재 policy hash와 HIGH/CRITICAL 리뷰어의 실제 시각 자격 만료를 대조한다.
   정본 core.authorize_merge는 그대로 호출하고 추가 거부 조건만 보강한다. main/상위 T22·Agy 자격 시험 모듈·봉인 테스트는 수정하지 않는다.
-- **Antigravity / `agy/cr-closure` / `C:\evo_forge_agy` — Context Mesh·리뷰어 자격/대형 Diff·공급망/공정 큐/키 격리 고도화:**
+- **Antigravity (완료·클레임 해제·main 반영 `ebfeb95`) / `agy/cr-closure`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 파일과 전혀 겹치지 않는 독립 모듈로 수용 매트릭스(`Acceptance_Test_Matrix.md`)와
-  `SERVICE_STATUS.md` P1의 미구현 항목을 구현·검증한다.
-  대상 파일: `services/api/evoforge/context_mesh.py` (L1–L5 로그 Fidelity Gate, Vault 왕복/용량 상한/crypto-shred, Folder 복원 어댑터,
-  Context Packet v2 컴파일러·테넌트 캐시 네임스페이스 솔트·런타임 인젝션/민감도/기능 플래그 가드, 온라인 컨텍스트 결정 규칙 CR-01/11/12/15/17/18/19/20/24/25/26/28),
-  `services/api/evoforge/review_qualification.py` (400KB 대형 Diff 분할·chunk 리뷰 바이트 커버리지 합산·seeded-defect canary 및 리뷰어 자격 시험 풀 CR-08/10/32/34/58/66/68),
-  `services/api/evoforge/runtime_guards.py` (BSL-1.1/Caveman/LiteLLM 공급망·SBOM 스캐너, 테넌트 가중 공정 큐 DRR, 플랫폼 키 KMS Broker 전용 복호화 CR-23/35/49/50),
-  신규 테스트 `services/api/tests/test_context_mesh_cr.py`, `services/api/tests/test_review_qualification_cr.py`, `services/api/tests/test_runtime_guards_cr.py`,
-  문서 `docs/CR_CLOSURE_ADVANCEMENT.md`. `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 수정하지 않는다.
+  `SERVICE_STATUS.md` P1의 미구현 항목을 구현·검증하고 main에 fast-forward 반영했다.
+  반영 파일: `services/api/evoforge/context_mesh.py`, `services/api/evoforge/review_qualification.py`, `services/api/evoforge/runtime_guards.py`,
+  `services/api/tests/test_context_mesh_cr.py`, `services/api/tests/test_review_qualification_cr.py`, `services/api/tests/test_runtime_guards_cr.py`,
+  `docs/CR_CLOSURE_ADVANCEMENT.md`. `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 수정하지 않았다.
 - **Codex (프로젝트 cap 경합 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 확장 007·Codex DB 테스트·관련 문서에서
   정본 함수의 한도 검사 뒤 기존 호출이 정산되는 경합을 재현하고 `c479487`에서 저장 시점의 cap을 재검사한다.
   API 465개·실제 DB 145개·SQL 96개·참조 112개·계약·웹 빌드 통과. 지원 코드는 main 미반영이다.
@@ -424,3 +422,15 @@ INSERT 시점의 테넌트 잔액/hold와 프로젝트 현재 cap/사용액을 �
 `docs/TENANT_CREDIT_GUARD.md`에 007 재적용과 한계를 기록했다.
 실제 공급사 호출·운영 DB 적용/배포는 수행하지 않았다. T22 Muse 실행 프로세스가 동작 중인 것을 확인했고 중복 실행하지 않았다.
 공개 명령·Broker 비용/영수증·전체 승인·운영 연결은 계속 미완료이며 Muse Spark와 자동 재개를 유지한다.
+
+## Context Mesh·리뷰어 자격·공급망/공정 큐/키 격리 고도화 (main 반영 완료)
+
+`ebfeb95`는 상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`)와 분리된 런타임 모듈 3종과 수용 테스트 15개로
+`Acceptance_Test_Matrix.md` 및 `SERVICE_STATUS.md` P1의 미구현 시나리오를 구현·검증했다. 상세 매핑은 [CR_CLOSURE_ADVANCEMENT.md](CR_CLOSURE_ADVANCEMENT.md).
+
+- `evoforge/context_mesh.py`: 결정적 `log.text` 코덱 및 독립 파서 기반 L1–L5 Fidelity Gate, 블롭별 DEK 포락선 암호화·read-back SHA 검증(CR-01)·임의 evict 없는 용량 상한(CR-20)·crypto-shred/색인 제거/패킷 REVOKED/legal-hold 차단(CR-17)·Vault 장애 시 Critic 승인 차단(CR-16), Folder Bridge 및 REST 복원 게이트웨이(CR-06/07/15/21), `A_RAW` 캐시 기준선·복원률 70% 손익분기·기능 플래그 OFF 폴백·5-Agent A/B 계측 온라인 결정 엔진(CR-12/18/24/28), 테넌트 32바이트 `cache_namespace` 솔트(CR-26)·연속 턴 L0–L2 해시 고정(CR-25)·런타임 프롬프트 인젝션 및 민감도 라우팅 차단(CR-11/19) Context Packet v2 컴파일러.
+- `evoforge/review_qualification.py`: 409,600B 초과 대형 Diff PR 분할/인간 리뷰어 요구 및 hunk 단위 `review_chunk`+`review_cross_chunk` 계획(CR-32), 리뷰어별 바이트 구간 합집합(`range_agg`) Review Coverage 원장 및 `assert_review_gate`(CR-08/10/14/32), Seeded-Defect Canary 검출률(`context_fidelity_probe_score`) 기반 승인자 풀 자동 제외 및 SNR 정밀도·버전 변경 재자격·HIGH/CRITICAL 독립성+인간 승인 통합 검사(CR-34/58/66/68).
+- `evoforge/runtime_guards.py`: BSL-1.1/Caveman/LiteLLM/미고정 Git 의존성 공급망·SBOM 스캐너 및 실패 시 기존 코덱 버전을 유지하는 릴리스 가드(CR-23/35), 단일 테넌트 폭주 시 정상 테넌트 대기시간 p95 증가율을 ≤ 20%로 제한하는 Start-Time Fair Queuing 스케줄러(CR-49), `provider_broker` 신원만 복호화를 허용하고 그 외 모든 신원의 복호화 성공 0건을 강제하는 KMS 포락선 키 가드(CR-50).
+
+근거: API **465 passed·1 skipped**(신규 CR 수용 테스트 15개 포함), 참조 **112개**·`validate_package.py` **0 failure** 통과.
+기존 `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 변경하지 않았다. 실제 외부 공급사 과금 호출·GCP KMS 하드웨어 연동·운영 배포는 별도 범위다.

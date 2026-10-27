@@ -24,6 +24,7 @@ visible 3/3·held-out 3/3) → 게이트 `GH_INTEGRITY`·`GC_COMPOSITION`·`G2_R
 | 증거 | 단계 체인(ObjectiveVersion→…→Outcome), `GET /v1/events/{id}` 드릴다운, 없는 단계는 null | README "증거 부족" |
 | 웹 | Mission Control(실제 원장), Improvement Lab(Review→서버 Run→PR), Evidence 드릴다운 | — |
 | PostgreSQL 커널 | 정본 함수 어댑터·영수증 저장·내부 `/v1/kernel` API (Codex) — **요청 경로 미연결** | CR-37~48(DB) |
+| Context Mesh & 런타임 가드 | `log.text` L1–L5 게이트, Vault 왕복/용량/crypto-shred, Folder 복원, Packet v2 컴파일러(솔트·인젝션·라우팅), 온라인 결정(70% 손익분기·5-Agent A/B), 400KB Diff 분할·Review Coverage·리뷰어 자격/Canary 풀, BSL/SBOM 스캔·공정 큐·KMS Broker 키 격리 (`context_mesh.py`, `review_qualification.py`, `runtime_guards.py`) | CR-01·06~21·23~26·28·32·34·35·49·50·58·66·68, L1–L5 |
 
 ## 3. 정식 출시 갭
 
