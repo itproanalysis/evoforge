@@ -3,7 +3,10 @@ import { useEffect, useState } from "react";
 import {
   type EvalSuite,
   type GateVerdict,
+  type MissionSummary,
   getEvalSuites,
+  getMission,
+  listMissions,
   postCreatePR,
   postRun,
   type SealedTest,
@@ -46,12 +49,16 @@ export default function Lab() {
   const [evalId, setEvalId] = useState("");
   const [suites, setSuites] = useState<EvalSuite[]>([]);
   const [suitesNote, setSuitesNote] = useState("");
+  const [recentMissions, setRecentMissions] = useState<MissionSummary[]>([]);
 
   useEffect(() => {
     try {
       const c = localStorage.getItem("evoforge.candidate");
       const g = localStorage.getItem("evoforge.gates");
       const gg = localStorage.getItem("evoforge.goal");
+      const rr = localStorage.getItem("evoforge.repo_ref");
+      const revId = localStorage.getItem("evoforge.review_evidence_id");
+      const runId = localStorage.getItem("evoforge.run_evidence_id");
       if (c) {
         const cand = JSON.parse(c);
         setDiff(cand.diff ?? "");
@@ -60,6 +67,9 @@ export default function Lab() {
       }
       if (gg) setGoal(JSON.parse(gg));
       if (g) setGates(JSON.parse(g));
+      if (rr) setBaseSha(rr);
+      if (revId) setReviewEvidenceId(revId);
+      if (runId) setEvalId(runId);
     } catch {}
   }, []);
 
@@ -72,10 +82,26 @@ export default function Lab() {
       .catch((e) => {
         if (live) setSuitesNote(`sealed suites unavailable: ${e instanceof Error ? e.message : String(e)}`);
       });
+    listMissions()
+      .then((res) => {
+        if (live) setRecentMissions(res.missions ?? []);
+      })
+      .catch(() => {});
     return () => {
       live = false;
     };
   }, []);
+
+  const loadMissionIntoLab = async (missionId: string) => {
+    try {
+      const m = await getMission(missionId);
+      setGoal(m.goal || "");
+      setBaseSha(m.repo_ref || "HEAD");
+      setReviewEvidenceId(m.review_evidence_id || "");
+      setEvalId(m.run_evidence_id || "");
+      if (m.pr_url) setPr(m.pr_url);
+    } catch {}
+  };
 
   const inconclusive = gates.some((g) => g.result === "INCONCLUSIVE");
   const failed = gates.some((g) => g.result === "FAIL");
@@ -158,6 +184,33 @@ export default function Lab() {
         candidate diff → sealed tests → review → PR. INCONCLUSIVE는 머지 차단.
       </p>
 
+      {recentMissions.length > 0 ? (
+        <section style={card}>
+          <div style={{ fontSize: 12, color: "#8b96ad", marginBottom: 8 }}>
+            Quick-Load Server Mission (GET /v1/missions)
+          </div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {recentMissions.slice(0, 10).map((m) => (
+              <button
+                key={m.mission_id}
+                onClick={() => void loadMissionIntoLab(m.mission_id)}
+                style={{
+                  background: "#0f1524",
+                  color: "#e8edf5",
+                  border: "1px solid #33405c",
+                  borderRadius: 6,
+                  padding: "4px 8px",
+                  cursor: "pointer",
+                  fontSize: 12,
+                }}
+              >
+                <code>{m.mission_id}</code> · {m.state}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <section style={card}>
         <label style={{ fontSize: 12, color: "#8b96ad" }}>
           goal{" "}
@@ -224,7 +277,12 @@ export default function Lab() {
                 <code>{g.gate}</code>={g.result} <span style={{ color: "#8b96ad" }}>{g.reason}</span>
               </li>
             ))}
-            <li style={{ color: "#8b96ad" }}>evidence: <code>{evalId}</code></li>
+            <li style={{ color: "#8b96ad" }}>
+              evidence:{" "}
+              <a href={`/evidence?id=${encodeURIComponent(evalId)}`} style={{ color: "#7db4ff" }}>
+                <code>{evalId}</code>
+              </a>
+            </li>
           </ul>
         ) : null}
       </section>

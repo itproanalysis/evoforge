@@ -4,7 +4,10 @@ import { useTranslations } from "next-intl";
 import {
   type EvalSuite,
   type GateVerdict,
+  type MissionSummary,
   getEvalSuites,
+  getMission,
+  listMissions,
   postCreatePR,
   postRun,
   type SealedTest,
@@ -34,12 +37,17 @@ export default function Lab() {
   const [evalId, setEvalId] = useState("");
   const [suites, setSuites] = useState<EvalSuite[]>([]);
   const [suitesNote, setSuitesNote] = useState("");
+  const [recentMissions, setRecentMissions] = useState<MissionSummary[]>([]);
+  const [selectedMissionId, setSelectedMissionId] = useState("");
 
   useEffect(() => {
     try {
       const c = localStorage.getItem("evoforge.candidate");
       const g = localStorage.getItem("evoforge.gates");
       const gg = localStorage.getItem("evoforge.goal");
+      const rr = localStorage.getItem("evoforge.repo_ref");
+      const revId = localStorage.getItem("evoforge.review_evidence_id");
+      const runId = localStorage.getItem("evoforge.run_evidence_id");
       if (c) {
         const cand = JSON.parse(c);
         setDiff(cand.diff ?? "");
@@ -54,6 +62,9 @@ export default function Lab() {
       }
       if (gg) setGoal(JSON.parse(gg));
       if (g) setGates(JSON.parse(g));
+      if (rr) setBaseSha(rr);
+      if (revId) setReviewEvidenceId(revId);
+      if (runId) setEvalId(runId);
     } catch {}
   }, []);
 
@@ -69,10 +80,27 @@ export default function Lab() {
             `sealed suites unavailable: ${e instanceof Error ? e.message : String(e)}`
           );
       });
+    listMissions()
+      .then((res) => {
+        if (live) setRecentMissions(res.missions ?? []);
+      })
+      .catch(() => {});
     return () => {
       live = false;
     };
   }, []);
+
+  const loadMissionIntoLab = async (missionId: string) => {
+    setSelectedMissionId(missionId);
+    try {
+      const m = await getMission(missionId);
+      setGoal(m.goal || "");
+      setBaseSha(m.repo_ref || "HEAD");
+      setReviewEvidenceId(m.review_evidence_id || "");
+      setEvalId(m.run_evidence_id || "");
+      if (m.pr_url) setPr(m.pr_url);
+    } catch {}
+  };
 
   const inconclusive = gates.some((g) => g.result === "INCONCLUSIVE");
   const failed = gates.some((g) => g.result === "FAIL");
@@ -174,6 +202,34 @@ export default function Lab() {
       <p className="text-text-secondary text-sm">{t("description")}</p>
 
       <Card className="mt-4">
+        <div className="text-xs text-text-secondary mb-2">
+          {t("recent-missions-heading")}
+        </div>
+        {recentMissions.length === 0 ? (
+          <div className="text-xs text-text-secondary">
+            {t("recent-missions-empty")}
+          </div>
+        ) : (
+          <div className="flex gap-1.5 flex-wrap">
+            {recentMissions.slice(0, 10).map((m) => (
+              <button
+                key={m.mission_id}
+                onClick={() => void loadMissionIntoLab(m.mission_id)}
+                className={`text-xs px-2.5 py-1 rounded border cursor-pointer transition-colors ${
+                  selectedMissionId === m.mission_id
+                    ? "bg-accent-blue text-white border-accent-blue font-semibold"
+                    : "bg-background-primary text-text-tertiary border-border hover:border-border-secondary"
+                }`}
+              >
+                <code>{m.mission_id}</code> · {m.state} ·{" "}
+                <span className="opacity-80">{m.goal.slice(0, 32)}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card className="mt-4">
         <label className="text-xs text-text-secondary">
           {t("goal-label")}{" "}
           <Input
@@ -204,7 +260,7 @@ export default function Lab() {
           {t("server-run-heading")}
         </h3>
         <p className="text-text-secondary text-xs">{t("server-run-description")}</p>
-        <div className="flex gap-3 items-center">
+        <div className="flex gap-3 items-center flex-wrap">
           <label className="text-xs text-text-secondary">
             {t("repo-path-label")}
             <Input
@@ -223,6 +279,17 @@ export default function Lab() {
             />
           </label>
         </div>
+        {reviewEvidenceId && (
+          <div className="text-xs text-text-secondary mt-2">
+            review_evidence_id:{" "}
+            <a
+              href={`/evidence?id=${encodeURIComponent(reviewEvidenceId)}`}
+              className="text-accent-cyan hover:underline font-mono"
+            >
+              {reviewEvidenceId}
+            </a>
+          </div>
+        )}
         <div className="mt-3">
           <Button
             onClick={doRun}
@@ -246,7 +313,13 @@ export default function Lab() {
               </li>
             ))}
             <li className="text-text-secondary">
-              evidence: <code>{evalId}</code>
+              evidence:{" "}
+              <a
+                href={`/evidence?id=${encodeURIComponent(evalId)}`}
+                className="text-accent-cyan hover:underline font-mono"
+              >
+                <code>{evalId}</code>
+              </a>
             </li>
           </ul>
         )}

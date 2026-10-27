@@ -91,6 +91,7 @@ function MeasureCard({
   }
   const rec = view.record;
   const rate = typeof view.pass_rate === "number" ? view.pass_rate : (rec?.pass_rate ?? 0);
+  const evId = view.evidence_id ?? rec?.evidence_id;
   return (
     <div style={{ ...card, flex: "1 1 160px", minWidth: 0 }}>
       <div style={label}>{title}</div>
@@ -107,6 +108,17 @@ function MeasureCard({
         {view.suite_version ?? rec?.suite_version} · {view.model ?? rec?.model} ·{" "}
         {view.harness_version ?? rec?.harness_version}
       </div>
+      {evId ? (
+        <div style={{ fontSize: 12, marginTop: 6 }}>
+          증거:{" "}
+          <a
+            href={`/evidence?id=${encodeURIComponent(evId)}`}
+            style={{ color: "#7db4ff", textDecoration: "none" }}
+          >
+            <code>{evId}</code> →
+          </a>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -116,16 +128,22 @@ export default function PerformancePage() {
   const [suites, setSuites] = useState<EvalSuite[]>([]);
   const [suiteVersion, setSuiteVersion] = useState<string>("v0");
   const [busy, setBusy] = useState<"baseline" | "pipeline" | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [autoPoll, setAutoPoll] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
 
   const refresh = async () => {
+    setSyncing(true);
     try {
       setPerf(await getPerformance());
+      setLastUpdated(new Date().toLocaleTimeString());
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
+      setSyncing(false);
     }
   };
 
@@ -138,6 +156,14 @@ export default function PerformancePage() {
       })
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (!autoPoll && busy === null) return;
+    const id = setInterval(() => {
+      void refresh();
+    }, busy !== null ? 3000 : 5000);
+    return () => clearInterval(id);
+  }, [autoPoll, busy]);
 
   const doBaseline = async () => {
     if (busy) return;
@@ -173,12 +199,23 @@ export default function PerformancePage() {
     }
   };
 
-  const families = new Map<string, { base?: { n: number; passed: number }; pipe?: { n: number; passed: number } }>();
+  const families = new Map<
+    string,
+    {
+      suite?: EvalSuite;
+      base?: { n: number; passed: number };
+      pipe?: { n: number; passed: number };
+    }
+  >();
+  for (const s of suites) {
+    families.set(s.family, { suite: s });
+  }
   const baseFam = perf?.baseline.record?.per_family ?? perf?.baseline.per_family;
   const pipeFam = perf?.pipeline.record?.per_family ?? perf?.pipeline.per_family;
   if (baseFam) {
     for (const [fam, v] of Object.entries(baseFam)) {
-      families.set(fam, { base: v });
+      const cur = families.get(fam) ?? {};
+      families.set(fam, { ...cur, base: v });
     }
   }
   if (pipeFam) {
@@ -194,10 +231,66 @@ export default function PerformancePage() {
 
   return (
     <main style={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>
-      <h1 style={{ margin: "4px 0 4px" }}>Performance</h1>
-      <p style={{ color: "#8b96ad", fontSize: 13, marginTop: 0 }}>
-        GET {API_BASE}/v1/performance · 측정된 숫자만 표시
-      </p>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          flexWrap: "wrap",
+          gap: 10,
+        }}
+      >
+        <div>
+          <h1 style={{ margin: "4px 0 4px" }}>Performance</h1>
+          <p style={{ color: "#8b96ad", fontSize: 13, marginTop: 0 }}>
+            GET {API_BASE}/v1/performance · 측정된 숫자만 표시
+          </p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+          <span
+            style={{
+              fontSize: 12,
+              color: "#8b96ad",
+              padding: "4px 10px",
+              borderRadius: 20,
+              border: "1px solid #263048",
+              background: "#141b2d",
+            }}
+          >
+            {syncing ? "동기화 중…" : "실시간 연결됨"}
+            {lastUpdated ? ` · ${lastUpdated}` : ""}
+          </span>
+          <button
+            onClick={() => setAutoPoll((v) => !v)}
+            style={{
+              padding: "5px 10px",
+              borderRadius: 6,
+              fontSize: 12,
+              background: autoPoll ? "#2563eb" : "#141b2d",
+              color: "#e8edf5",
+              border: "1px solid #33405c",
+              cursor: "pointer",
+            }}
+          >
+            {autoPoll ? "자동 갱신 ON (5초)" : "자동 갱신 OFF"}
+          </button>
+          <button
+            onClick={() => void refresh()}
+            disabled={syncing}
+            style={{
+              padding: "5px 10px",
+              borderRadius: 6,
+              fontSize: 12,
+              background: "#141b2d",
+              color: "#e8edf5",
+              border: "1px solid #33405c",
+              cursor: "pointer",
+            }}
+          >
+            새로고침
+          </button>
+        </div>
+      </div>
 
       <section style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <MeasureCard
@@ -256,27 +349,35 @@ export default function PerformancePage() {
       </section>
 
       <section style={card}>
-        <div style={label}>분야별 결과 (per-family)</div>
-        {families.size === 0 ? (
+        <div style={label}>분야별 결과 (per-family · Sealed {suiteVersion})</div>
+        { !baseFam && !pipeFam ? (
           <div style={{ fontSize: 13, color: "#aeb9cf", marginTop: 4 }}>
             측정 전 (not_measured) — {perf?.comparison.reason || "분야별 측정이 아직 없음"}
           </div>
-        ) : (
+        ) : null}
+        {families.size > 0 ? (
           <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
             {[...families.entries()].map(([fam, v]) => (
               <div
                 key={fam}
                 style={{ border: "1px solid #263048", borderRadius: 8, padding: 10, background: "#0f1524", fontSize: 13, overflowWrap: "break-word" }}
               >
-                <strong style={{ overflowWrap: "break-word" }}>{fam}</strong>
-                <div style={{ color: "#aeb9cf", marginTop: 2 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                  <strong style={{ overflowWrap: "break-word" }}>{fam}</strong>
+                  {v.suite ? (
+                    <span style={{ fontSize: 12, color: "#8b96ad" }}>
+                      tasks={v.suite.task_count} · kinds: {v.suite.heldout_kinds.join(", ")}
+                    </span>
+                  ) : null}
+                </div>
+                <div style={{ color: "#aeb9cf", marginTop: 4 }}>
                   X_SINGLE: {v.base ? `${v.base.passed}/${v.base.n}` : "not_measured"} ·{" "}
                   PIPELINE: {v.pipe ? `${v.pipe.passed}/${v.pipe.n}` : "not_measured"}
                 </div>
               </div>
             ))}
           </div>
-        )}
+        ) : null}
       </section>
 
       <section style={card}>
@@ -294,9 +395,19 @@ export default function PerformancePage() {
                   key={m.measurement_id}
                   style={{ border: "1px solid #263048", borderRadius: 8, padding: 10, background: "#0f1524", fontSize: 13, minWidth: 0, overflowWrap: "break-word" }}
                 >
-                  <div>
-                    <code style={{ overflowWrap: "break-word" }}>{m.kind}</code>{" "}
-                    {m.passed}/{m.n} · {fmtCents(m.cost_cents)}
+                  <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 6 }}>
+                    <div>
+                      <code style={{ overflowWrap: "break-word" }}>{m.kind}</code>{" "}
+                      {m.passed}/{m.n} ({fmtPct(m.pass_rate)}) · {fmtCents(m.cost_cents)}
+                    </div>
+                    {m.evidence_id ? (
+                      <a
+                        href={`/evidence?id=${encodeURIComponent(m.evidence_id)}`}
+                        style={{ color: "#7db4ff", fontSize: 12, textDecoration: "none" }}
+                      >
+                        <code>{m.evidence_id}</code> →
+                      </a>
+                    ) : null}
                   </div>
                   <div
                     style={{ height: 8, borderRadius: 4, background: "#263048", marginTop: 6, width: "100%", maxWidth: "100%" }}
@@ -306,7 +417,7 @@ export default function PerformancePage() {
                     />
                   </div>
                   <div style={{ fontSize: 12, color: "#8b96ad", marginTop: 4 }}>
-                    {m.suite_version} · {m.model} · {new Date(m.created_at * 1000).toLocaleString()}
+                    {m.measurement_id} · {m.suite_version} · {m.model} · {new Date(m.created_at * 1000).toLocaleString()}
                   </div>
                 </div>
               );

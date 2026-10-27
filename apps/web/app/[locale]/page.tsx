@@ -19,6 +19,7 @@ import {
   postMission,
   postMissionAdvance,
   postMissionCancel,
+  postOutcome,
 } from "../../lib/api";
 import { Button, Input, Card, Badge } from "../../components/ui";
 import { Error as ErrorComponent } from "../../components/ui/Error";
@@ -45,6 +46,9 @@ export default function MissionControl() {
   const [goal, setGoal] = useState("Fix flaky login retry");
   const [repoRef, setRepoRef] = useState("HEAD");
   const [busy, setBusy] = useState(false);
+  const [recordingOutcome, setRecordingOutcome] = useState(false);
+  const [mergedSha, setMergedSha] = useState("");
+  const [outcomePrUrl, setOutcomePrUrl] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [autoPoll, setAutoPoll] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
@@ -134,8 +138,45 @@ export default function MissionControl() {
   const selectMission = async (missionId: string) => {
     selectedIdRef.current = missionId;
     try {
-      setMission(await getMission(missionId));
+      const m = await getMission(missionId);
+      setMission(m);
+      setOutcomePrUrl(m.pr_url ?? "");
     } catch {}
+  };
+
+  const openInLab = (m: MissionDetail) => {
+    try {
+      localStorage.setItem("evoforge.goal", JSON.stringify(m.goal));
+      localStorage.setItem("evoforge.repo_ref", m.repo_ref || "HEAD");
+      localStorage.setItem(
+        "evoforge.review_evidence_id",
+        m.review_evidence_id || ""
+      );
+      localStorage.setItem("evoforge.run_evidence_id", m.run_evidence_id || "");
+    } catch {}
+    if (typeof window !== "undefined") {
+      window.location.href = "/lab";
+    }
+  };
+
+  const handleRecordOutcome = async () => {
+    if (!mission || !mergedSha.trim() || recordingOutcome) return;
+    setRecordingOutcome(true);
+    setErr("");
+    try {
+      await postOutcome(
+        mission.mission_id,
+        mergedSha.trim(),
+        outcomePrUrl.trim() || mission.pr_url || ""
+      );
+      setMergedSha("");
+      await refreshState(mission.mission_id);
+    } catch (e) {
+      const errorKey = getErrorMessageKey(e);
+      setErr(tErrors(errorKey as any));
+    } finally {
+      setRecordingOutcome(false);
+    }
   };
 
   const runMission = async () => {
@@ -345,15 +386,23 @@ export default function MissionControl() {
               <code>{mission.mission_id}</code> · repo_ref:{" "}
               <code>{mission.repo_ref}</code> · risk: <code>{mission.risk}</code>
             </div>
-            <a
-              href={`/evidence?id=${encodeURIComponent(
-                mission.evidence_ids[mission.evidence_ids.length - 1] ??
-                  mission.mission_id
-              )}`}
-              className="text-xs text-text-link hover:underline"
-            >
-              {t("evidence-link")}
-            </a>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => openInLab(mission)}
+                className="text-xs text-accent-cyan hover:underline bg-transparent border-0 cursor-pointer p-0"
+              >
+                {t("open-in-lab")}
+              </button>
+              <a
+                href={`/evidence?id=${encodeURIComponent(
+                  mission.evidence_ids[mission.evidence_ids.length - 1] ??
+                    mission.mission_id
+                )}`}
+                className="text-xs text-text-link hover:underline"
+              >
+                {t("evidence-link")}
+              </a>
+            </div>
           </div>
 
           <div className="mt-2 flex items-center gap-2 flex-wrap">
@@ -449,6 +498,38 @@ export default function MissionControl() {
               "—"
             )}
           </div>
+
+          {mission.state === "PR_OPENED" && (
+            <div className="mt-4 pt-3 border-t border-border">
+              <div className="text-xs text-text-secondary mb-2">
+                {t("record-outcome-heading")}
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                <Input
+                  value={mergedSha}
+                  onChange={(e) => setMergedSha(e.target.value)}
+                  placeholder={t("merged-sha-placeholder")}
+                  className="flex-[1_1_220px]"
+                />
+                <Input
+                  value={outcomePrUrl}
+                  onChange={(e) => setOutcomePrUrl(e.target.value)}
+                  placeholder={mission.pr_url || t("pr-url-placeholder")}
+                  className="flex-[1_1_240px]"
+                />
+                <Button
+                  onClick={handleRecordOutcome}
+                  disabled={recordingOutcome || !mergedSha.trim()}
+                  loading={recordingOutcome}
+                  variant="primary"
+                >
+                  {recordingOutcome
+                    ? t("recording-outcome")
+                    : t("record-outcome-button")}
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       )}
 

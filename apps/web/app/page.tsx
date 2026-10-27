@@ -18,6 +18,7 @@ import {
   postMission,
   postMissionAdvance,
   postMissionCancel,
+  postOutcome,
 } from "../lib/api";
 
 const card: React.CSSProperties = {
@@ -54,6 +55,8 @@ export default function MissionControl() {
   const [goal, setGoal] = useState("Fix flaky login retry");
   const [repoRef, setRepoRef] = useState("HEAD");
   const [busy, setBusy] = useState(false);
+  const [recordingOutcome, setRecordingOutcome] = useState(false);
+  const [mergedSha, setMergedSha] = useState("");
   const [err, setErr] = useState("");
   const [mission, setMission] = useState<MissionDetail | null>(null);
   const [missions, setMissions] = useState<MissionSummary[]>([]);
@@ -129,6 +132,25 @@ export default function MissionControl() {
     ledger && Array.isArray(ledger.unknown_reservations)
       ? ledger.unknown_reservations.length
       : null;
+
+  const handleRecordOutcome = async () => {
+    if (!mission || !mergedSha.trim() || recordingOutcome) return;
+    setRecordingOutcome(true);
+    setErr("");
+    try {
+      await postOutcome(
+        mission.mission_id,
+        mergedSha.trim(),
+        mission.pr_url || ""
+      );
+      setMergedSha("");
+      await refreshState(mission.mission_id);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRecordingOutcome(false);
+    }
+  };
 
   const runMission = async () => {
     if (busy || !goal.trim()) return;
@@ -278,6 +300,23 @@ export default function MissionControl() {
             evidence:{" "}
             {mission.evidence_ids.length ? mission.evidence_ids.join(", ") : "—"}
           </div>
+          {mission.state === "PR_OPENED" ? (
+            <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
+              <input
+                value={mergedSha}
+                onChange={(e) => setMergedSha(e.target.value)}
+                placeholder="merged_sha (POST /v1/outcomes)"
+                style={{ flex: "1 1 200px", padding: 6, borderRadius: 6, border: "1px solid #33405c", background: "#0b0e14", color: "#e8edf5" }}
+              />
+              <button
+                onClick={handleRecordOutcome}
+                disabled={recordingOutcome || !mergedSha.trim()}
+                style={{ padding: "6px 12px", borderRadius: 6, background: "#16a34a", color: "#fff", border: 0, cursor: "pointer" }}
+              >
+                {recordingOutcome ? "Recording…" : "Record WVI Outcome"}
+              </button>
+            </div>
+          ) : null}
           <p>
             <a href="/evidence" style={{ color: "#7db4ff" }}>
               Evidence Timeline →
