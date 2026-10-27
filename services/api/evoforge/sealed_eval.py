@@ -580,17 +580,14 @@ def check_task(task: dict, timeout_s: int | None = None) -> dict:
         source, base, future = _make_task_source_repo(tmpbase, str(tid), files)
         plain = os.path.join(tmpbase, "sandbox-plain")
         _build_clean_sandbox(source, base, plain, future)
-        if _runner_client.runner_url():
-            without = _run_heldout_remote(source, base, "", heldout, timeout_s)
-        else:
-            without = _run_heldout_local(plain, heldout, timeout_s, tmpbase)
+        # Validation always executes locally: the task source is an ephemeral
+        # local repo that a remote runner cannot read. Remote execution is
+        # only for real baselines via _score_heldout (server-owned repos).
+        without = _run_heldout_local(plain, heldout, timeout_s, tmpbase)
         fixed = os.path.join(tmpbase, "sandbox-fixed")
         _build_clean_sandbox(source, base, fixed, future)
         _apply_fix_to_sandbox(fixed, fix)
-        if _runner_client.runner_url():
-            with_fix = _run_heldout_remote(source, base, fix, heldout, timeout_s)
-        else:
-            with_fix = _run_heldout_local(fixed, heldout, timeout_s, tmpbase)
+        with_fix = _run_heldout_local(fixed, heldout, timeout_s, tmpbase)
     finally:
         _remove_tree(tmpbase)
     return {"fails_without_fix": without < 1.0,

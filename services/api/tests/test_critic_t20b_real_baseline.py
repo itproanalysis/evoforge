@@ -48,6 +48,18 @@ def test_heldout_fails_without_fix_and_passes_with_reference_fix():
         assert r["passes_with_fix"] is True, (t["id"], "reference fix does not satisfy its own held-out suite")
 
 
+def test_validation_runs_locally_even_when_runner_configured(monkeypatch):
+    """Suite validation must not depend on the runner service: the validation
+    source repo is ephemeral-local, so a configured runner URL must be ignored."""
+    from evoforge import runner_client as _rc
+
+    monkeypatch.setattr(_rc, "runner_url", lambda: "https://runner.invalid")
+    monkeypatch.setattr(_rc, "run_via_runner", lambda *a, **k: (_ for _ in ()).throw(AssertionError("must not call runner")))
+    t = _tasks()[0]
+    r = sealed_eval.check_task(t)
+    assert r["fails_without_fix"] is True and r["passes_with_fix"] is True
+
+
 def test_no_fix_scores_zero(monkeypatch):
     calls = []
 
