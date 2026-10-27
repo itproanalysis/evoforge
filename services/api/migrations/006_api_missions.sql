@@ -24,6 +24,27 @@ CREATE TABLE IF NOT EXISTS runtime.api_mission_versions (
 CREATE INDEX IF NOT EXISTS api_evidence_mission_lookup
   ON runtime.api_evidence_records(tenant_id,project_id,(document->>'mission_id'));
 
+CREATE OR REPLACE FUNCTION runtime.mission_review_calls_valid(t uuid,p uuid,m text,d jsonb)
+RETURNS boolean LANGUAGE plpgsql STABLE AS $$
+DECLARE ids jsonb; n integer; valid boolean;
+BEGIN
+  ids:=d->'provider_evidence_ids';
+  IF ids IS NULL THEN RETURN true; END IF;
+  IF jsonb_typeof(ids) IS DISTINCT FROM 'array' THEN RETURN false; END IF;
+  n:=jsonb_array_length(ids);
+  IF n=0 THEN RETURN true; END IF;
+  -- Phase A can finish with unusable/truncated tests, without a Phase B call.
+  IF n>2 OR EXISTS (SELECT 1 FROM jsonb_array_elements(ids) v
+      WHERE jsonb_typeof(v)<>'string' OR v#>>'{}'='') THEN RETURN false; END IF;
+  SELECT count(*)=n AND count(DISTINCT e.id)=n AND bool_and(coalesce(
+      e.document->>'kind'='provider_call'
+      AND e.document->>'phase'=CASE refs.pos WHEN 1 THEN 'critic_spec' ELSE 'critic_review' END
+      AND (e.document->>'mission_id' IS NULL OR e.document->>'mission_id'=m),false)) INTO valid
+    FROM jsonb_array_elements_text(ids) WITH ORDINALITY refs(eid,pos)
+    JOIN runtime.api_evidence_records e ON e.tenant_id=t AND e.project_id=p AND e.id=refs.eid;
+  RETURN coalesce(valid,false);
+END $$;
+
 CREATE OR REPLACE FUNCTION runtime.mission_stage_valid(t uuid,p uuid,m text,s text,e text,stages jsonb)
 RETURNS boolean LANGUAGE plpgsql STABLE AS $$
 DECLARE d jsonb; required text[]; run_doc jsonb;
@@ -36,7 +57,8 @@ BEGIN
        OR jsonb_typeof(d->'gates') IS DISTINCT FROM 'array' THEN RETURN false; END IF;
     required:=ARRAY['Task','Candidate','Gate'];
   ELSIF s='review' THEN
-    IF jsonb_typeof(d->'review') IS DISTINCT FROM 'object' THEN RETURN false; END IF;
+    IF jsonb_typeof(d->'review') IS DISTINCT FROM 'object'
+       OR NOT runtime.mission_review_calls_valid(t,p,m,d) THEN RETURN false; END IF;
     required:=ARRAY['Review'];
   ELSIF s='run' THEN
     IF jsonb_typeof(d->'run') IS DISTINCT FROM 'object'
@@ -102,11 +124,14 @@ BEGIN
     SELECT document INTO d FROM runtime.api_evidence_records
       WHERE tenant_id=NEW.tenant_id AND project_id=NEW.project_id AND id=eid;
     IF NOT FOUND THEN RAISE EXCEPTION 'mission evidence missing' USING ERRCODE='check_violation'; END IF;
-    IF d->>'mission_id' IS DISTINCT FROM NEW.mission_id AND NOT EXISTS (
+    IF d->>'mission_id' IS DISTINCT FROM NEW.mission_id AND (
+        d->>'mission_id' IS NOT NULL OR d->>'kind' IS DISTINCT FROM 'provider_call' OR NOT EXISTS (
         SELECT 1 FROM runtime.api_evidence_records parent
           WHERE parent.tenant_id=NEW.tenant_id AND parent.project_id=NEW.project_id
             AND parent.document->>'mission_id'=NEW.mission_id
-            AND parent.document->'provider_evidence_ids' @> jsonb_build_array(eid)) THEN
+            AND jsonb_typeof(parent.document->'review')='object'
+            AND runtime.mission_review_calls_valid(NEW.tenant_id,NEW.project_id,NEW.mission_id,parent.document)
+            AND (parent.document->'provider_evidence_ids') @> jsonb_build_array(eid))) THEN
       RAISE EXCEPTION 'mission evidence ownership differs' USING ERRCODE='check_violation'; END IF;
   END LOOP;
   FOREACH k IN ARRAY ARRAY['generate','review','run','pr'] LOOP
@@ -115,6 +140,12 @@ BEGIN
         OR NOT (NEW.document->'evidence_ids' ? eid)
         OR NOT runtime.mission_stage_valid(NEW.tenant_id,NEW.project_id,NEW.mission_id,k,eid,NEW.document->'stages')) THEN
       RAISE EXCEPTION 'mission stage evidence differs' USING ERRCODE='check_violation'; END IF;
+    IF k='review' AND eid IS NOT NULL AND EXISTS (
+        SELECT 1 FROM runtime.api_evidence_records parent
+          CROSS JOIN LATERAL jsonb_array_elements_text(coalesce(parent.document->'provider_evidence_ids','[]'::jsonb)) refs(call_id)
+          WHERE parent.tenant_id=NEW.tenant_id AND parent.project_id=NEW.project_id AND parent.id=eid
+            AND NOT ((NEW.document->'evidence_ids') ? refs.call_id)) THEN
+      RAISE EXCEPTION 'mission review requires call evidence' USING ERRCODE='check_violation'; END IF;
   END LOOP;
   IF (NEW.document->'stages'->>'review' IS NOT NULL AND NEW.document->'stages'->>'generate' IS NULL)
      OR (NEW.document->'stages'->>'run' IS NOT NULL AND NEW.document->'stages'->>'review' IS NULL)

@@ -82,10 +82,33 @@ class MissionStore:
         return conn.execute('SELECT runtime.mission_stage_valid(%s,%s,%s,%s,%s,%s) AS ok',
                             (*self.scope,mid,stage,eid,Jsonb(stages))).fetchone()['ok']
 
+    def _include_output(self,conn,mid,doc,stage,eid):
+        if not self._valid(conn,mid,stage,eid,doc['stages']):
+            raise KernelRejected('stored mission output needs evidence reconciliation')
+        dependencies=[]
+        if stage=='review':
+            source=conn.execute('SELECT document FROM runtime.api_evidence_records '
+                                'WHERE tenant_id=%s AND project_id=%s AND id=%s',
+                                (*self.scope,eid)).fetchone()['document']
+            dependencies=source.get('provider_evidence_ids',[])
+            if (not isinstance(dependencies,list) or len(dependencies)>2
+                    or any(not isinstance(pid,str) or not pid for pid in dependencies)
+                    or len(set(dependencies))!=len(dependencies)):
+                raise KernelRejected('review call evidence needs reconciliation')
+        for attached in [*dependencies,eid]:
+            if attached not in doc['evidence_ids']:
+                doc['evidence_ids'].append(attached)
+
     def _recover(self,conn,mid,row):
         # A committed output may precede attach/mark if the API stopped. Only
         # one matching output with its full server event chain can be adopted.
         outputs=None
+        existing_review=row['document']['stages']['review']
+        if existing_review is not None:
+            doc=copy.deepcopy(row['document'])
+            self._include_output(conn,mid,doc,'review',existing_review)
+            if doc!=row['document']:
+                row=self._write(conn,mid,row,doc)
         while row['document']['state'] in _NEXT:
             target,stage=_NEXT[row['document']['state']]
             doc=copy.deepcopy(row['document'])
@@ -103,10 +126,7 @@ class MissionStore:
                     raise KernelRejected('multiple mission outputs require reconciliation')
                 eid=candidates[0]['id']
                 doc['stages'][stage]=eid
-                if eid not in doc['evidence_ids']:
-                    doc['evidence_ids'].append(eid)
-            if not self._valid(conn,mid,stage,eid,doc['stages']):
-                raise KernelRejected('stored mission output needs evidence reconciliation')
+            self._include_output(conn,mid,doc,stage,eid)
             doc['state']=target
             row=self._write(conn,mid,row,doc)
         return row
@@ -137,12 +157,13 @@ class MissionStore:
             doc=copy.deepcopy(row['document'])
             if stage and doc['stages'][stage] not in (None,eid):
                 raise KernelRejected('mission stage already has another output')
-            if eid in doc['evidence_ids'] and (stage is None or doc['stages'][stage]==eid):
-                return row
-            if eid not in doc['evidence_ids']:
-                doc['evidence_ids'].append(eid)
             if stage:
                 doc['stages'][stage]=eid
+                self._include_output(conn,mid,doc,stage,eid)
+            elif eid not in doc['evidence_ids']:
+                doc['evidence_ids'].append(eid)
+            if doc==row['document']:
+                return row
             return self._write(conn,mid,row,doc)
 
     def mark(self,mid,state):

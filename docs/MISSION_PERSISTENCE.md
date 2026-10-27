@@ -43,3 +43,27 @@ HIGH 확인 보존, 병렬 완료의 멱등성, 서로 다른 DB 연결의 live 
 
 이 변경은 지원 브랜치의 구현이다. 운영 DB 적용·실제 Muse 청구·GCP 배포를 완료했다고 선언하지 않는다.
 후속 Muse T22가 편집하는 main/평가/UI와 상위 봉인 수용 테스트는 변경하지 않는다.
+
+## Review 호출 증거 복원 보강
+
+리뷰 출력 저장 뒤 mission 연결 중 종료되면 `provider_evidence_ids`도 같은 snapshot에 복원한다.
+명시적 단계 attach와 GET 복구가 동일한 검증을 사용하며, 먼저 연결된 호출 ID는 중복 추가하지 않는다.
+기존 review 포인터에 빠진 호출 ID도 새 불변 버전에 보충하고 과거 버전은 수정하지 않는다.
+
+확장 006은 같은 scope의 `provider_call` 레코드를 확인하고 다른 mission_id가 기록된 호출을 거부한다.
+호출 순서는 `critic_spec` 다음 `critic_review`다. Phase A의 잘린/불완전한 응답으로 조기 종료했다면
+하나의 spec 호출 기록을 보존한다. 생성된 봉인 suite를 검증하는 기존 Runner 경계는 유지한다.
+누락·중복·잘못된 형식/종류·scope/mission 불일치는 409로 차단하고 복구 snapshot은 커밋하지 않는다.
+DB도 review 포인터가 있는 버전에서 호출 ID를 생략하는 직접 INSERT를 거부한다.
+
+확장 006의 이전 지원 초안을 이미 적용한 테스트 DB에는 해당 SQL을 다시 적용해야 한다.
+이미 연결된 호출 기록은 기존 추정 원장의 감사 자료이며 canonical 청구 영수증이나 정산 완료 증명이 아니다.
+공식 SDK에 모의 HTTP 응답을 주고, 실제 리뷰 API의 연결 전/첫 호출 연결 후/두 호출 연결 후 중단을 검증한다.
+검증 원본과 집계는 `docs/validation/2026-10-27-review-recovery.json`에 별도 보존한다.
+
+리뷰 aggregate가 저장되기 전 발생한 UNKNOWN 호출에는 이 복원이 적용되지 않는다.
+호출 전 mission/command 바인딩과 그 대사는 공유 core 연결 단계에 남아 있다.
+
+보강 후 API **463 passed·1 skipped**, 실제 PostgreSQL **131 passed**(신규 회귀 13개 포함),
+참조 **112개**·SQL **96개**·계약 검사 **0 failure**, 웹 프로덕션 빌드를 통과했다.
+수정 전에는 새 복구 회귀의 8개 집중 사례가 실패했다. 이 집계는 앞 절의 118개 검증 이후 결과다.

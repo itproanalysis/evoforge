@@ -1685,3 +1685,180 @@ def test_mission_live_views_never_mix_database_connections():
     other=view(store('second'),{'version':1,'document':{**current['document'],'goal':'second','state':'CREATED'}})
     assert other is not live and other['goal']=='second' and live['goal']=='first'
     assert view(first,{'version':8,'document':{**current['document'],'state':'CREATED'}})['state']=='GENERATED'
+
+
+def _generated_mission(client):
+    mid=client.post('/v1/missions',json={'goal':'review recovery','repo_ref':'a'*40}).json()['mission_id']
+    _mission_output(mid)
+    assert client.get('/v1/missions/'+mid).json()['state']=='GENERATED'
+    return mid
+
+
+def _critic_call_output(phase,**extra):
+    import main
+    return main._store_evidence({'kind':'provider_call','phase':phase,'metadata':None,
+                                 'reservation':{'state':'SETTLED'},'response_document':None,**extra})
+
+
+def _mission_review_output(mid,phase_ids):
+    import main
+    review={'stub':False,'model':'muse-spark-1.3','sealed_tests':[
+        {'kind':kind,'code':'# RECOVERY_SEALED_PRIVATE_811\ndef test_sealed():\n    assert 2 == 2\n'}
+        for kind in ('compositional','negative','boundary')]}
+    eid=main._store_evidence({'mission_id':mid,'review':review,'provider_evidence_ids':phase_ids})
+    main._link_stages(eid,('Review',))
+    return eid
+
+
+@pytest.mark.parametrize('phase_count',[1,2])
+def test_mission_review_recovery_restores_call_evidence_ids_without_resending(durable_api,monkeypatch,phase_count):
+    import main
+    from evoforge import missions
+    mid=_generated_mission(durable_api)
+    before=list(missions.get(mid)['evidence_ids'])
+    phases=[_critic_call_output(p) for p in ('critic_spec','critic_review')[:phase_count]]
+    eid=_mission_review_output(mid,phases)
+    calls=[]
+    monkeypatch.setattr(main.broker_meta,'call_critic',lambda *a,**k:calls.append(True))
+    result=durable_api.get('/v1/missions/'+mid)
+    assert result.status_code==200,result.text
+    assert result.json()['state']=='REVIEWED' and result.json()['review_evidence_id']==eid
+    assert result.json()['evidence_ids']==before+phases+[eid]
+    assert 'RECOVERY_SEALED_PRIVATE_811' not in result.text
+    assert durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'REVIEWED'}).status_code==409
+    assert not calls
+    again=missions.get(mid)
+    assert again['evidence_ids']==before+phases+[eid]
+
+
+def test_mission_review_recovery_finishes_partial_call_attachment_atomically(durable_api):
+    from evoforge import missions
+    mid=_generated_mission(durable_api)
+    phases=[_critic_call_output(p) for p in ('critic_spec','critic_review')]
+    eid=_mission_review_output(mid,phases)
+    missions.attach_evidence(mid,phases[0])
+    # Simulates an API exit between the provider-attachment loop's two writes.
+    result=missions.attach_evidence(mid,eid,'review')
+    assert all(result['evidence_ids'].count(p)==1 for p in phases+[eid])
+    missions.mark(mid,'REVIEWED')
+    assert missions.get(mid)['stages']['review']==eid
+
+
+def test_mission_review_snapshot_requires_call_dependencies_in_same_version(funded,durable_api):
+    from copy import deepcopy
+    from evoforge import missions
+    mid=_generated_mission(durable_api)
+    phases=[_critic_call_output(p) for p in ('critic_spec','critic_review')]
+    eid=_mission_review_output(mid,phases)
+    with funded['kernel']._transaction() as conn:
+        row=conn.execute('SELECT version,document FROM runtime.api_mission_versions '
+                         'WHERE mission_id=%s ORDER BY version DESC LIMIT 1',(mid,)).fetchone()
+    document=deepcopy(row['document'])
+    document['state']='REVIEWED'
+    document['stages']['review']=eid
+    document['evidence_ids'].append(eid)
+    with pytest.raises(KernelRejected):
+        with funded['kernel']._transaction() as conn:
+            conn.execute('INSERT INTO runtime.api_mission_versions(tenant_id,project_id,mission_id,version,document) '
+                         'VALUES (%s,%s,%s,%s,%s)',
+                         (funded['scope'].tenant_id,funded['scope'].project_id,mid,row['version']+1,Jsonb(document)))
+    fixed=missions.get(mid)
+    assert fixed['state']=='REVIEWED' and all(p in fixed['evidence_ids'] for p in phases)
+
+
+@pytest.mark.parametrize('bad',['missing','cross_scope','cross_mission','not_provider','duplicate','nonlist'])
+def test_mission_review_recovery_refuses_invalid_call_dependencies(funded,durable_api,monkeypatch,bad):
+    import main
+    from evoforge import missions
+    mid=_generated_mission(durable_api)
+    before=list(missions.get(mid)['evidence_ids'])
+    spec=_critic_call_output('critic_spec')
+    if bad=='cross_scope':
+        other=uuid4()
+        with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+            conn.execute("INSERT INTO core.projects(tenant_id,project_id,name) VALUES (%s,%s,'other')",
+                         (funded['scope'].tenant_id,other))
+        with monkeypatch.context() as other_env:
+            other_env.setenv('EVO_PROJECT_ID',str(other))
+            second=_critic_call_output('critic_review')
+    elif bad=='cross_mission':
+        other=durable_api.post('/v1/missions',json={'goal':'other','repo_ref':'a'*40}).json()['mission_id']
+        second=_critic_call_output('critic_review',mission_id=other)
+    elif bad=='not_provider':
+        second=_critic_call_output('critic_review',kind='unrelated')
+    else:
+        second='ev_missing_phase'
+    phase_ids={'duplicate':[spec,spec],'nonlist':{'spec':spec}}.get(bad,[spec,second])
+    _mission_review_output(mid,phase_ids)
+    calls=[]
+    monkeypatch.setattr(main.broker_meta,'call_critic',lambda *a,**k:calls.append(True))
+    assert durable_api.get('/v1/missions/'+mid).status_code==409
+    assert durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'REVIEWED'}).status_code==409
+    assert not calls
+    with funded['kernel']._transaction() as conn:
+        latest=conn.execute('SELECT document FROM runtime.api_mission_versions '
+                            'WHERE mission_id=%s ORDER BY version DESC LIMIT 1',(mid,)).fetchone()['document']
+    assert latest['state']=='GENERATED' and latest['evidence_ids']==before
+
+
+@pytest.mark.parametrize('stopped_after',[0,1,2])
+def test_mission_review_api_recovers_sdk_calls_after_attachment_failure(durable_api,monkeypatch,stopped_after):
+    """Official SDK with in-memory HTTP transport; no paid provider request."""
+    import json
+    import httpx
+    import openai
+    import main
+    from evoforge import missions,ledger
+    mid=_generated_mission(durable_api)
+    ledger.reset()
+    ledger.configure({'default':50_000})
+    monkeypatch.setenv('MODEL_API_KEY','synthetic-recovery-key')
+    monkeypatch.setenv('MODEL_API_BASE','https://recovery.fixture.invalid/v1')
+    monkeypatch.setenv('MODEL_CRITIC','muse-spark-1.3')
+    sealed=[{'kind':kind,'code':'# RECOVERY_SDK_PRIVATE_912\ndef test_contract():\n    assert 2 == 2\n'}
+            for kind in ('compositional','negative','boundary')]
+    calls,clients,retries=[],[],[]
+    def respond(request):
+        calls.append(json.loads(request.content))
+        content={'sealed_tests':sealed} if len(calls)==1 else {'review':{'result':'PASS','findings':[]}}
+        return httpx.Response(200,headers={'x-request-id':f'recovery-request-{len(calls)}'},json={
+            'id':f'recovery-completion-{len(calls)}','object':'chat.completion','created':1,'model':'muse-spark-1.3',
+            'choices':[{'index':0,'finish_reason':'stop','message':{'role':'assistant','content':json.dumps(content)}}],
+            'usage':{'prompt_tokens':11,'completion_tokens':7,'total_tokens':18}})
+    original_client=openai.OpenAI
+    def client(**kwargs):
+        retries.append(kwargs.get('max_retries'))
+        instance=original_client(**kwargs,http_client=httpx.Client(transport=httpx.MockTransport(respond)))
+        clients.append(instance)
+        return instance
+    monkeypatch.setattr(openai,'OpenAI',client)
+    attach=missions.attach_evidence
+    attached=[]
+    def fail_attachment(mid,eid,stage=None):
+        if len(attached)==stopped_after:
+            raise RuntimeError('injected mission attachment interruption')
+        result=attach(mid,eid,stage)
+        attached.append(eid)
+        return result
+    monkeypatch.setattr(missions,'attach_evidence',fail_attachment)
+    try:
+        broken=durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'REVIEWED'})
+        assert broken.status_code==500 and len(calls)==2,broken.text
+        monkeypatch.setattr(missions,'attach_evidence',attach)
+        restored=durable_api.get('/v1/missions/'+mid)
+        assert restored.status_code==200 and restored.json()['state']=='REVIEWED',restored.text
+        eid=restored.json()['review_evidence_id']
+        phase_ids=main._evidence[eid]['provider_evidence_ids']
+        assert len(phase_ids)==2 and all(restored.json()['evidence_ids'].count(p)==1 for p in phase_ids+[eid])
+        assert [main._evidence[p]['metadata']['provider_request_id'] for p in phase_ids]==[
+            'recovery-request-1','recovery-request-2']
+        assert all(c['model']=='muse-spark-1.3' for c in calls) and retries==[0]
+        assert 'RECOVERY_SDK_PRIVATE_912' not in durable_api.get('/v1/evidence/'+eid).text
+        assert ledger.snapshot()['spent_cents']==2*main.COST_CENTS and ledger.snapshot()['reserved_cents']==0
+        assert durable_api.post(f'/v1/missions/{mid}/advance',json={'to':'REVIEWED'}).status_code==409
+        assert len(calls)==2
+    finally:
+        for instance in clients:
+            instance.close()
+        ledger.reset()
+        ledger.configure({'default':50_000})

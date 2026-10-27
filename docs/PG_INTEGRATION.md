@@ -32,6 +32,7 @@ Google 인증 연동 테스트의 서명 검증기는 fixture로 대체하므로
 후속 mission 저장은 확장 006을 사용하며 [MISSION_PERSISTENCE.md](MISSION_PERSISTENCE.md)와
 `docs/validation/2026-10-27-mission-persistence.json`에 별도 근거를 기록한다.
 위 107개 집계는 mission 저장 추가 전 통합 검증 기록이다.
+리뷰 복구의 호출별 증거 누락 보강은 `docs/validation/2026-10-27-review-recovery.json`을 따른다.
 
 ## 남은 공개 경로와 운영 연결
 
