@@ -119,6 +119,13 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Antigravity (0원/추정→실청구 정정·UNKNOWN 대사 잡 및 5-좌석/압축 경계/M6 하네스 최적화 런타임) / gy/collective-and-reconciler / C:\evo_forge_agy:**
+  상위 Muse T22(muse/round8) 및 Codex(codex/pg-integration) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
+  미구현 대사 정책(CR-13/39/40/47, 0원 정산·추정→실청구 단일 역분개·UNKNOWN 대사 잡)과
+  적응형 멀티에이전트/압축 경계 continuation 수집/하네스 최적화 루프(CR-59/60/61/65/70/71/72/73/75/76, MCP 12 도구·ReFold 접기·GEPA 최적화기)를 구현·검증한다.
+  파일: services/api/evoforge/reconciler_policy.py, services/api/evoforge/collective_runtime.py,
+  services/api/tests/test_reconciler_policy_cr.py, services/api/tests/test_collective_runtime_cr.py,
+  docs/COLLECTIVE_AND_RECONCILER.md. main.py·웹·DB 마이그레이션·github.py·정본(docs/evoforge-v4.2/)은 수정하지 않는다.
 - **Codex (PR 기준 snapshot·기존 분기 보호) / `codex/pg-integration` / `C:\evo_forge_codex`:**
   상위 T22 편집 목록 밖의 github.py·새 test_github_snapshot.py·관련 문서/검증 manifest를 수정한다.
   검증된 기준 SHA의 명시적 조회 경로와 ref 이동 검사, 이미 존재하는 작업 분기의 쓰기 거부를 보강한다.
