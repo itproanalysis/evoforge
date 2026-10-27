@@ -106,6 +106,12 @@ class CandidateRunRequest(InternalRequest):
     evidence_id: str = Field(min_length=1, max_length=256)
 
 
+class CandidateRegistrationRequest(InternalRequest):
+    call_id: UUID
+    evidence_id: str = Field(min_length=1,max_length=256)
+    head_sha: str = Field(pattern=r'^[a-f0-9]{40}$')
+
+
 class CommandRequest(InternalRequest):
     goal: str = Field(min_length=1,max_length=100000)
     idempotency_key: str = Field(min_length=1,max_length=4096)
@@ -226,6 +232,18 @@ def builder_call(call_id: UUID, kernel: PostgresKernel = Depends(authenticated_k
 def candidate_run(req: CandidateRunRequest, kernel: PostgresKernel = Depends(authenticated_kernel)):
     from evoforge.postgres_run_evidence import record
     return invoke(record,kernel,req.candidate_id,req.call_id,req.evidence_id)
+
+
+@router.post('/candidates')
+def register_candidate(req: CandidateRegistrationRequest,kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_candidates import register
+    return invoke(register,kernel,req.call_id,req.evidence_id,req.head_sha)
+
+
+@router.get('/candidates/{candidate_id}')
+def registered_candidate(candidate_id: UUID,kernel: PostgresKernel = Depends(authenticated_kernel)):
+    from evoforge.postgres_candidates import read
+    return invoke(read,kernel,candidate_id)
 
 
 @router.get('/candidates/{candidate_id}/runner-evidence/{evidence_id}')

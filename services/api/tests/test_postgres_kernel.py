@@ -2034,3 +2034,208 @@ def test_tenant_credit_guard_rejects_connections_that_skip_origin_triggers(funde
     with funded['kernel']._transaction() as conn:
         assert conn.execute('SELECT count(*) AS n FROM core.cost_reservations').fetchone()['n']==0
         assert conn.execute('SELECT count(*) AS n FROM core.side_effect_intents').fetchone()['n']==0
+
+
+@pytest.fixture
+def builder_proposal(funded,durable_api,http_kernel,monkeypatch,tmp_path):
+    """Real Git/PostgreSQL; synthetic Builder, receipt and remote checkout transport."""
+    import main
+    import tempfile
+    from evoforge import repo_source
+    repo=tmp_path/'proposal-source'
+    repo.mkdir()
+    def git(*args):
+        return subprocess.check_output(['git','-C',str(repo),*args],text=True).strip()
+    git('init','-q')
+    git('config','user.name','Fixture')
+    git('config','user.email','fixture@example.invalid')
+    (repo/'value.py').write_text('result = 2\n',encoding='utf-8')
+    git('add','value.py')
+    git('commit','-qm','base')
+    base=git('rev-parse','HEAD')
+    diff='--- a/value.py\n+++ b/value.py\n@@ -1 +1 @@\n-result = 2\n+result = 3\n'
+    visible='from value import result\ndef f_ref():\n    return 3\ndef test_value():\n    assert result == f_ref()\n'
+    (repo/'value.py').write_text('result = 3\n',encoding='utf-8')
+    git('commit','-qam','patch')
+    patch_head=git('rev-parse','HEAD')
+    target=repo/'tests/evoforge_gen/test_gen_1.py'
+    target.parent.mkdir(parents=True)
+    target.write_text(visible,encoding='utf-8')
+    git('add','tests')
+    git('commit','-qm','visible tests')
+    head=git('rev-parse','HEAD')
+    context=_builder_packet(funded,base_sha=base)
+    call=uuid4()
+    _prepare(funded,context['packet'],call)
+    funded['kernel'].mark_sent(call)
+    receipt=receipt_document(tenant=funded['scope'].tenant_id,project=funded['scope'].project_id,
+                             packet=context['packet'],call=call)
+    funded['kernel'].record_receipt(receipt)
+    funded['kernel'].settle_from_receipt(receipt['receipt_id'])
+    candidate={'diff':diff,'tests':[{'code':visible}],'stub':False,'model':'muse-spark-1.3',
+               'provider_calls':[{'provider':'meta','model':'muse-spark-1.3','phase':'builder',
+                                  'provider_request_id':receipt['provider_request_id']}]}
+    monkeypatch.setattr(main.broker_meta,'call_builder',lambda *a,**k:candidate)
+    generated=durable_api.post('/v1/commands/generate',json={'goal':'result is 3','repo_sha':base,'idempotency_key':uuid4().hex})
+    assert generated.status_code==200,generated.text
+    eid=generated.json()['evidence']['id']
+    clones=[]
+    original=repo_source.resolve_repo_dir
+    def resolve(source,ref):
+        if source!='':
+            return original(source,ref)
+        clone=Path(tempfile.mkdtemp(prefix='evoforge-remote-'))
+        clones.append(clone)
+        subprocess.check_call(['git','clone','-q','--no-hardlinks',str(repo),str(clone)])
+        subprocess.check_call(['git','-C',str(clone),'checkout','--detach','-q',ref])
+        return str(clone)
+    monkeypatch.setattr(repo_source,'resolve_repo_dir',resolve)
+    monkeypatch.setenv('EVO_ALLOW_LOCAL_REPOS','1')
+    monkeypatch.setenv('EVO_REPO_ROOTS',str(tmp_path))
+    monkeypatch.setenv('EVO_RUNNER_URL','')
+    monkeypatch.setenv('EVO_RUNNER_IMAGE_DIGEST','sha256:'+'7'*64)
+    return {'call':call,'context':context,'receipt':receipt,'repo':repo,'git':git,'base':base,'head':head,
+            'patch_head':patch_head,'candidate':candidate,'evidence':eid,'clones':clones,'api':durable_api,'http':http_kernel}
+
+
+def _propose(ctx,**change):
+    return ctx['http'].post('/v1/kernel/candidates',json={
+        'call_id':str(ctx['call']),'evidence_id':ctx['evidence'],'head_sha':ctx['head'],**change})
+
+
+def test_registered_builder_proposal_survives_restart_and_links_real_runner_only_to_verified_head(funded,builder_proposal,monkeypatch):
+    import main
+    from evoforge.postgres_candidates import register
+    ctx=builder_proposal
+    with ThreadPoolExecutor(max_workers=4) as workers:
+        rows=list(workers.map(lambda _:register(funded['kernel'],ctx['call'],ctx['evidence'],ctx['head']),range(8)))
+    ids={r['candidate_id'] for r in rows}
+    assert len(ids)==1 and all(r['status']=='PROPOSED' for r in rows)
+    candidate=next(iter(ids))
+    result=_propose(ctx)
+    assert result.status_code==200 and result.json()['candidate_id']==str(candidate),result.text
+    assert all(not clone.exists() for clone in ctx['clones'])
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.candidates').fetchone()['n']==1
+        assert conn.execute('SELECT count(*) AS n FROM core.gate_results').fetchone()['n']==0
+    script="""import os
+import main
+from fastapi.testclient import TestClient
+with TestClient(main.app) as c:
+    r=c.get('/v1/kernel/candidates/'+os.environ['CHECK_REGISTERED_CANDIDATE'],
+            headers={'Authorization':'Bearer '+os.environ['EVO_KERNEL_TOKEN']})
+    assert r.status_code==200 and r.json()['head_sha']==os.environ['CHECK_REGISTERED_HEAD']
+    print(r.json()['candidate_id'])
+"""
+    child=subprocess.run([sys.executable,'-c',script],cwd=ROOT/'services/api',capture_output=True,text=True,timeout=20,
+                         env={**os.environ,'CHECK_REGISTERED_CANDIDATE':str(candidate),'CHECK_REGISTERED_HEAD':ctx['head']},
+                         creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    assert child.returncode==0 and child.stdout.strip()==str(candidate)
+    sealed=[{'kind':kind,'code':f'# REGISTERED_PRIVATE_631\nfrom value import result\ndef test_{kind}():\n    assert result == 3\n'}
+            for kind in ('compositional','negative','boundary')]
+    monkeypatch.setattr(main.broker_meta,'call_critic',lambda *a,**k:{
+        'sealed_tests':sealed,'stub':False,'model':'muse-spark-1.3','review':{'result':'PASS'}})
+    review=ctx['api'].post('/v1/candidates/review',json={'goal_contract':'result is 3'})
+    run=ctx['api'].post('/v1/runs',json={'source_repo':str(ctx['repo']),'base_sha':ctx['head'],'diff':'',
+        'tests':ctx['candidate']['tests'],'review_evidence_id':review.json()['evidence_id']})
+    assert run.status_code==200,run.text
+    body={'candidate_id':str(candidate),'call_id':str(ctx['call']),'evidence_id':run.json()['evidence_id']}
+    linked=ctx['http'].post('/v1/kernel/candidate-runs',json=body)
+    assert linked.status_code==200 and linked.json()['result']=='PASS',linked.text
+    assert 'REGISTERED_PRIVATE_631' not in linked.text
+    assert ctx['http'].post('/v1/kernel/merge-authorizations',json={
+        'candidate_id':str(candidate),'head_sha':ctx['head'],'policy_hash':'1'*64}).status_code==409
+    with funded['kernel']._transaction() as conn:
+        conn.execute('UPDATE core.candidates SET head_sha=%s WHERE candidate_id=%s',('f'*40,candidate))
+    assert _propose(ctx).status_code==409
+    assert ctx['http'].post('/v1/kernel/candidate-runs',json=body).status_code==409
+    with monkeypatch.context() as scope:
+        scope.setenv('EVO_PROJECT_ID',str(uuid4()))
+        assert ctx['http'].get('/v1/kernel/candidates/'+str(candidate)).status_code==404
+
+
+def test_registered_candidate_rejects_unbound_builder_metadata_without_git_or_partial_rows(funded,builder_proposal):
+    import main
+    from copy import deepcopy
+    ctx=builder_proposal
+    for change in ('stub','model','request','phase','calls','tests'):
+        record=deepcopy(main._evidence[ctx['evidence']])
+        record.pop('id')
+        candidate=record['candidate']
+        if change=='stub': candidate['stub']=True
+        elif change=='model': candidate['model']='different-model'
+        elif change=='request': candidate['provider_calls'][0]['provider_request_id']='another-call'
+        elif change=='phase': candidate['provider_calls'][0]['phase']='critic_spec'
+        elif change=='calls': candidate['provider_calls']=[]
+        else: candidate['tests']=[]
+        eid=main._store_evidence(record)
+        main._link_stages(eid,('Task','Candidate','Gate'))
+        assert _propose(ctx,evidence_id=eid).status_code==409,change
+    pending=uuid4()
+    _prepare(funded,ctx['context']['packet'],pending)
+    assert _propose(ctx,call_id=str(pending)).status_code==409
+    with funded['kernel']._transaction() as conn:
+        conn.execute('UPDATE core.cost_reservations SET actual_micros=actual_micros+1 WHERE request_key=%s',(str(ctx['call']),))
+    assert _propose(ctx).status_code==409
+    assert ctx['clones']==[]
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.candidates').fetchone()['n']==0
+    assert funded['kernel'].reservation(ctx['call']).status=='COMMITTED'
+
+
+def test_registered_candidate_rejects_git_content_tests_and_unrelated_changes(funded,builder_proposal):
+    import main
+    from copy import deepcopy
+    ctx=builder_proposal
+    assert _propose(ctx,head_sha=ctx['patch_head']).status_code==409
+    (ctx['repo']/'unrelated.txt').write_text('extra change\n',encoding='utf-8')
+    ctx['git']('add','unrelated.txt')
+    ctx['git']('commit','-qm','unrelated')
+    assert _propose(ctx,head_sha=ctx['git']('rev-parse','HEAD')).status_code==409
+    record=deepcopy(main._evidence[ctx['evidence']])
+    record.pop('id')
+    record['candidate']['diff']=record['candidate']['diff'].replace('+result = 3','+result = 4')
+    eid=main._store_evidence(record)
+    main._link_stages(eid,('Task','Candidate','Gate'))
+    assert _propose(ctx,evidence_id=eid).status_code==409
+    assert ctx['clones'] and all(not clone.exists() for clone in ctx['clones'])
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.candidates').fetchone()['n']==0
+
+
+def test_registered_candidate_rechecks_fencing_after_git_and_rolls_back_registration(funded,builder_proposal,monkeypatch):
+    from evoforge import postgres_candidates
+    ctx=builder_proposal
+    verify=postgres_candidates.verify_head
+    def revoked(*args):
+        tree=verify(*args)
+        with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+            conn.execute('UPDATE core.tasks SET lease_epoch=lease_epoch+1 WHERE task_id=%s',(ctx['context']['task'],))
+        return tree
+    monkeypatch.setattr(postgres_candidates,'verify_head',revoked)
+    assert _propose(ctx).status_code==409
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.candidates').fetchone()['n']==0
+        assert conn.execute('SELECT count(*) AS n FROM runtime.builder_candidate_evidence').fetchone()['n']==0
+    assert all(not clone.exists() for clone in ctx['clones'])
+
+
+def test_registered_candidate_binding_failure_rolls_back_core_candidate(funded,builder_proposal):
+    ctx=builder_proposal
+    with psycopg.connect(funded['dsn'],autocommit=True) as conn:
+        conn.execute("CREATE FUNCTION runtime.test_reject_candidate_binding() RETURNS trigger LANGUAGE plpgsql AS $$ "
+                     "BEGIN RAISE EXCEPTION 'injected binding failure' USING ERRCODE='check_violation'; END $$")
+        conn.execute('CREATE TRIGGER test_reject_candidate_binding BEFORE INSERT ON runtime.builder_candidate_evidence '
+                     'FOR EACH ROW EXECUTE FUNCTION runtime.test_reject_candidate_binding()')
+        try:
+            response=_propose(ctx)
+            assert response.status_code==409,response.text
+            with funded['kernel']._transaction() as check:
+                assert check.execute('SELECT count(*) AS n FROM core.candidates').fetchone()['n']==0
+                assert check.execute('SELECT count(*) AS n FROM runtime.builder_candidate_evidence').fetchone()['n']==0
+        finally:
+            conn.execute('DROP TRIGGER test_reject_candidate_binding ON runtime.builder_candidate_evidence')
+            conn.execute('DROP FUNCTION runtime.test_reject_candidate_binding()')
+    assert _propose(ctx).status_code==200
+    assert funded['kernel'].reservation(ctx['call']).status=='COMMITTED'
+    assert all(not clone.exists() for clone in ctx['clones'])

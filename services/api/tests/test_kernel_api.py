@@ -20,6 +20,27 @@ from evoforge.postgres_kernel import (  # noqa: E402
 TOKEN = "test-only-kernel-service-token-not-a-real-secret"
 
 
+def test_candidate_registration_requires_service_auth_before_any_adapter(api):
+    body={'call_id':str(api['call']),'evidence_id':'ev_builder','head_sha':'a'*40}
+    assert api['client'].post('/v1/kernel/candidates',json=body).status_code==401
+    assert api['client'].get('/v1/kernel/candidates/'+str(uuid4())).status_code==401
+    api['factory'].assert_not_called()
+
+
+def test_candidate_registration_accepts_only_bound_ids_and_immutable_head(api,monkeypatch):
+    from evoforge import postgres_candidates
+    register=Mock(return_value={'candidate_id':str(uuid4()),'status':'PROPOSED'})
+    monkeypatch.setattr(postgres_candidates,'register',register)
+    body={'call_id':str(api['call']),'evidence_id':'ev_builder','head_sha':'a'*40}
+    for extra in ({'tenant_id':str(uuid4())},{'source_repo':'C:/private'},{'status':'MERGED'},
+                  {'head_sha':'main'},{'head_sha':'a'*64}):
+        assert api['client'].post('/v1/kernel/candidates',headers=api['headers'],json={**body,**extra}).status_code==422
+    register.assert_not_called()
+    result=api['client'].post('/v1/kernel/candidates',headers=api['headers'],json=body)
+    assert result.status_code==200 and result.json()['status']=='PROPOSED'
+    register.assert_called_once_with(api['kernel'],api['call'],'ev_builder','a'*40)
+
+
 @pytest.fixture
 def api(monkeypatch):
     tenant, project, call = uuid4(), uuid4(), uuid4()

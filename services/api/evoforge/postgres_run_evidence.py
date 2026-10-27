@@ -81,6 +81,10 @@ def record(kernel, candidate_id, call_id, evidence_id):
                                  'AND candidate_id=%s FOR UPDATE', (*scope,candidate_id)).fetchone()
         if not candidate:
             raise KernelNotFound('candidate not found in scope')
+        origin=conn.execute('SELECT head_sha,call_id FROM runtime.builder_candidate_evidence '
+                            'WHERE tenant_id=%s AND project_id=%s AND candidate_id=%s',(*scope,candidate_id)).fetchone()
+        if origin and (origin['head_sha']!=candidate['head_sha'] or origin['call_id']!=call_id):
+            raise KernelRejected('registered Builder candidate head or call changed')
         existing = _read(conn,scope,candidate_id,evidence_id)
         if existing:
             if existing['call_id'] != call_id or existing['head_sha'] != candidate['head_sha']:
