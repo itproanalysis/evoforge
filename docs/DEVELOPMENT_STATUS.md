@@ -118,12 +118,14 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex / `codex/pg-integration` / `C:\evo_forge_codex`:** 두 준비된 지원 브랜치를 별도 통합 브랜치에서 합친다.
+- **Codex (내부 통합 검증 완료·공개 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 두 준비된 지원 브랜치를 별도 통합 브랜치에서 합쳤다.
   명령 완료 응답과 같은 scope의 서버 생성 증거를 원자적으로 연결하도록 `postgres_commands.py`·확장 004·Codex 테스트·문서를 보강한다.
   `kernel_api.py`의 서비스 인증 명령 접수/dispatch/완료/조회 경로와 Codex HTTP 테스트도 연결한다. 브라우저에는 내부 자격 증명을 제공하지 않는다.
   상위 round7은 `d347b56`으로 먼저 main에 반영되어 통합 브랜치에서 보존·동기화했다.
   후속 Muse T22(`muse/round8`)가 main을 편집 중이므로 공개 `commands.py` backend 위임·공유 `_generate_core`/mission 접점은 그 병합 뒤 이어간다.
   현재 main 파일은 편집하지 않으며 봉인 테스트도 편집하지 않는다.
+  완료 증거/지연 제약·내부 Worker 경로는 `83798f9`, Google/커널 인증 병행과 round7 호환 검증은 `b29c3a9`, manifest는 `9ce7093`이다.
+  이후 두 원 브랜치를 따로 합치지 말고 이 통합 브랜치를 기준으로 이어간다. 아래 최신 검증 기록을 따른다.
 - **Codex (지원 검증 완료·상위 병합 대기) / `codex/runner-core-evidence` / `C:\evo_forge_codex`:** 상위 API 진입점 편집과 분리해 실제 Runner의 입력/빌드 식별자와 저장된 실행 증거를 기존 core 후보·G2_REQUIRED에 연결한다.
   `postgres_run_evidence.py`, `runner_attestation.py`, Runner/Runner client의 선택적 메타데이터, `kernel_api.py`, 확장 005,
   Codex 소유 테스트·문서/환경 예제만 수정한다. 구체적 head를 빈 diff로 다시 실행한 증거와 정산된 Builder 바인딩을 요구한다.
@@ -249,3 +251,30 @@ Docker 실행 파일이 없어 컨테이너 빌드는 수행하지 않았다. Cr
 상위 round7이 main/mission/평가 경로를 편집 중이므로 main 병합은 아직 하지 않았다.
 공개 요청의 canonical 후보 생성·나머지 검증/독립 리뷰·비용/승인 연결, 운영 확장 005와 실제 Runner digest 설정·배포 검증은 남아 있다.
 전체 개발과 P0-2는 미완료이며 현재 채팅의 자동 재개를 유지한다.
+
+## PostgreSQL 지원 통합 검증 (round7 동기화·공개 연결 대기)
+
+`codex/pg-integration`은 두 지원 브랜치의 테스트·환경 설정을 모두 보존해 합쳤다(`edffa84`).
+상위 round7이 `d347b56`으로 먼저 main에 반영된 뒤 `911c41d`에서 동기화했고, Muse 코드와 봉인 수용 테스트를 그대로 유지했다.
+통합 지원 코드는 아직 main에 병합하지 않았다.
+
+`83798f9`는 서비스 인증 내부 명령 접수·단일 dispatch·완료·조회와 서버 증거 FK를 연결한다.
+응답의 command_id·candidate·gates가 같은 프로젝트의 저장 증거와 일치해야 하며,
+API BUILD 상태만 APPLIED로 커밋하는 SQL도 지연 제약으로 거부한다.
+core_app 세션 역할·RLS에서 완료 커밋이 동작하고, 증거 테이블에 UPDATE 권한을 추가하지 않았음을 확인했다.
+20회 재전송·동시 실행권·복구 후 완료 재저장·새 API 프로세스 조회·다른 scope/위조된 증거 거부도 검증했다.
+
+`b29c3a9`는 Google ID 토큰과 내부 토큰의 Authorization 충돌을 해결한다.
+운영 Google 인증을 유지한 채 `X-Evoforge-Kernel-Token`을 별도로 검사하며, 명시한 잘못된 헤더는 다른 자격 증명으로 대체하지 않는다.
+Google audience·허용 서비스 계정·IAM·BFF 정책은 변경하지 않았다. 서명 검증기는 fixture로 대체한 테스트다.
+
+API **463 passed·1 skipped**, 실제 PostgreSQL **107 passed**, 인증 경계 **35 passed**(전체 API 집계에 포함),
+참조 **112개**·SQL **96개**·패키지 검사와 round7 웹 빌드 통과.
+원본 로그 7개는 `C:\evo_forge\.local\evidence\pg-integration-20261027-wm8m7mca`에 보존했다.
+각 로그·source SHA-256은 통합 브랜치의 `docs/validation/2026-10-27-pg-integration.json`(`9ce7093`),
+범위와 다음 작업은 `docs/PG_INTEGRATION.md`에 기록했다.
+
+후속 Muse T22(`muse/round8`)가 main을 편집 중이어서 공개 facade·공유 생성/mission 접점 변경은 그 병합 뒤 이어간다.
+현재 통합 브랜치의 main.py·commands.py는 round7 main과 코드 차이가 없으며 공개 명령·비용·mission 영속화는 계속 미완료다.
+Critic·영수증·등록 image는 합성 fixture이며 실제 Muse 청구·Google IAM·운영 DB 확장·새 배포 검증은 수행하지 않았다.
+전체 개발과 P0-2를 완료로 표시하거나 자동 재개를 비활성화하지 않는다.

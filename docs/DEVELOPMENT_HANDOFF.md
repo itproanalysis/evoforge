@@ -159,3 +159,20 @@ API 414 passed·1 skipped, 실제 DB 91 passed, 참조 112·SQL 96·패키지 �
 상위 T19는 `_generate_core`/`_review_core`/`_run_core`/`_pr_core`를 웹·mission이 공유하도록 리팩터링했다.
 명령 dispatch/완료 연결은 endpoint만이 아니라 이 공유 core 호출 경로를 기준으로 검토한다.
 공개 canonical 후보 생성·실제 요율/청구·다른 게이트/독립 리뷰·운영 DB/Runner 설정은 계속 미완료다.
+
+## 2026-10-27 PostgreSQL 지원 통합과 Worker 인증
+
+현재 `C:\evo_forge_codex`는 `codex/pg-integration`이다. 두 원 지원 브랜치를 합쳤고(`edffa84`),
+상위 round7 `d347b56`이 먼저 main에 반영된 뒤 `911c41d`에서 동기화했다.
+이후에는 통합 브랜치 하나를 기준으로 이어간다. 두 테스트 끝부분·Runner base fixture·두 환경 설정을 모두 보존했다.
+
+`83798f9`: 내부 명령 HTTP 접수/dispatch/완료/조회, 같은 scope의 생성 증거 FK와 candidate/gates 일치,
+응답 없는 APPLIED 커밋을 거부하는 지연 제약과 core_app/RLS 검증.
+`b29c3a9`: Google ID 인증을 유지하며 내부 비밀값을 X-Evoforge-Kernel-Token으로 분리한다.
+API 463 passed·1 skipped, 실제 DB 107 passed, 참조 112·SQL 96·패키지 검사·round7 웹 빌드 통과.
+인증 35개는 API 집계에 포함되며 Google 서명 검증은 fixture다.
+manifest는 `9ce7093`, 원본은 main `.local/evidence/pg-integration-20261027-wm8m7mca`에 있다.
+
+Muse T22가 새 `muse/round8`에서 main을 편집 중이므로 main.py·commands.py의 공개 접점은 아직 수정하지 않았다.
+T22를 main에 먼저 반영한 뒤 통합 브랜치에 동기화하고, facade 위임과 `_generate_core`/mission의 명시적 dispatch·완료를 연결한다.
+통합 코드의 main 병합·공개 비용/상태·정본 전체 승인·실제 모델 청구·운영 배포는 계속 미완료다.
