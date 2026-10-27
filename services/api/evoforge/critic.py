@@ -22,17 +22,19 @@ ALLOWED_SEALED_KINDS = frozenset({"compositional", "negative", "boundary"})
 
 
 def _output_budget() -> int:
-    """Single output-token budget for every Muse Spark chat call.
+    """Output-token budget for Critic Muse Spark chat calls.
 
-    From env MODEL_MAX_TOKENS (default 8000); missing, non-int or <= 0
-    falls back to 8000. Read at call time.
+    Reasoning models spend thinking tokens from the same budget, so the
+    critic default (16000) is roomier than the builder default (8000).
+    Env MODEL_CRITIC_MAX_TOKENS wins, then MODEL_MAX_TOKENS, then 16000.
+    Missing, non-int or <= 0 falls back to 16000. Read at call time.
     """
     try:
-        raw = os.getenv("MODEL_MAX_TOKENS")
-        value = int(raw) if raw is not None else 8000
+        raw = os.getenv("MODEL_CRITIC_MAX_TOKENS", os.getenv("MODEL_MAX_TOKENS"))
+        value = int(raw) if raw is not None else 16000
     except (TypeError, ValueError):
-        return 8000
-    return value if value > 0 else 8000
+        return 16000
+    return value if value > 0 else 16000
 
 
 def _is_truncated(resp) -> bool:

@@ -48,13 +48,14 @@ def fake(monkeypatch):
     return {"calls": calls, "plans": plans}
 
 
-def test_default_budget_8000_for_all_calls(fake, monkeypatch):
+def test_default_budgets_critic_16000_builder_8000(fake, monkeypatch):
     monkeypatch.delenv("MODEL_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("MODEL_CRITIC_MAX_TOKENS", raising=False)
     fake["plans"].extend([({"sealed_tests": VALID}, "stop"), ({"review": {"result": "PASS", "findings": []}}, "stop")])
     critic.call_critic("spec", "diff")
     fake["plans"].append(({"diff": "", "tests": [], "rationale": "r"}, "stop"))
     broker_meta.call_builder("goal", "HEAD")
-    assert [c["max_tokens"] for c in fake["calls"]] == [8000, 8000, 8000]
+    assert [c["max_tokens"] for c in fake["calls"]] == [16000, 16000, 8000]
 
 
 @pytest.mark.parametrize("env,want", [("12000", 12000), ("abc", 8000), ("0", 8000), ("-5", 8000)])
@@ -65,13 +66,29 @@ def test_env_budget(fake, monkeypatch, env, want):
     assert fake["calls"][-1]["max_tokens"] == want
 
 
+@pytest.mark.parametrize("env,want", [("20000", 20000), ("abc", 16000), ("0", 16000), ("-5", 16000)])
+def test_critic_env_budget(fake, monkeypatch, env, want):
+    monkeypatch.setenv("MODEL_CRITIC_MAX_TOKENS", env)
+    fake["plans"].extend([({"sealed_tests": VALID}, "stop"), ({"review": {"result": "PASS", "findings": []}}, "stop")])
+    critic.call_critic("spec", "diff")
+    assert [c["max_tokens"] for c in fake["calls"]] == [want, want]
+
+
+def test_critic_env_beats_shared_env(fake, monkeypatch):
+    monkeypatch.setenv("MODEL_MAX_TOKENS", "12000")
+    monkeypatch.setenv("MODEL_CRITIC_MAX_TOKENS", "20000")
+    fake["plans"].extend([({"sealed_tests": VALID}, "stop"), ({"review": {"result": "PASS", "findings": []}}, "stop")])
+    critic.call_critic("spec", "diff")
+    assert [c["max_tokens"] for c in fake["calls"]] == [20000, 20000]
+
+
 def test_phase_a_truncation_is_explicit(fake):
     fake["plans"].append(("", "length"))
     out = critic.call_critic("spec", "diff")
     assert len(fake["calls"]) == 1  # no Phase B
     assert out["sealed_tests"] == [] and out["review"]["result"] == "INCONCLUSIVE"
     notes = " ".join(f.get("note", "") for f in out["review"]["findings"])
-    assert "truncated" in notes and "8000" in notes
+    assert "truncated" in notes and "16000" in notes
 
 
 def test_phase_a_truncated_even_if_partial_json_parses(fake):
