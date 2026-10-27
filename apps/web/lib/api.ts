@@ -180,9 +180,35 @@ export interface DashboardSnapshot {
   missions_by_state: Record<string, number>;
   active_missions: number;
   blocked_merges: number;
+  validated_improvements: number;
+  validated_mission_ids: string[];
   spent_cents: number;
   reserved_cents: number;
   unknown_holds: number;
+}
+
+export interface Outcome {
+  mission_id: string;
+  goal?: string;
+  pr_url: string;
+  merged_sha: string;
+  outcome_status: string;
+  weight: number;
+  run_evidence_id: string | null;
+  pr_evidence_id: string | null;
+  recorded_at: number;
+  evidence_id?: string;
+}
+
+export function postOutcome(mission_id: string, merged_sha: string, pr_url = "") {
+  return req<Outcome>("/v1/outcomes", {
+    method: "POST",
+    body: JSON.stringify({ mission_id, merged_sha, pr_url }),
+  });
+}
+
+export function listOutcomes() {
+  return req<{ outcomes: Outcome[] }>("/v1/outcomes");
 }
 
 export function postMission(goal: string, repo_ref = "HEAD", risk = "LOW") {

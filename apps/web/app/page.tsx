@@ -89,6 +89,7 @@ export default function MissionControl() {
         })),
         { k: "Active missions", v: String(dashboard.active_missions) },
         { k: "Blocked merges", v: String(dashboard.blocked_merges) },
+        { k: "Validated (WVI)", v: String(dashboard.validated_improvements ?? 0) },
         { k: "Spent", v: fmtCents(dashboard.spent_cents) },
         { k: "Reserved", v: fmtCents(dashboard.reserved_cents) },
         { k: "Unknown holds", v: String(dashboard.unknown_holds) },

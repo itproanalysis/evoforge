@@ -120,6 +120,14 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Antigravity (M0 위생 평가 러너·Broker/CLI 사전 바인딩/예약 가드 및 다중 코덱/섀도 감사/승격 게이트 런타임) / `agy/eval-and-preflight` / `C:\evo_forge_agy`:**
+  상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
+  M0 위생 평가 러너 통합(CR-74, 전후 7항목 감사·5필드 scaffold score_record·GH_INTEGRITY·G2_REQUIRED),
+  Broker/개발 CLI 호출 전 패킷·공급사 동의·레지스트리 만료(CR-29/33)·비용 예약/영수증 가드(CR-37/38),
+  `junit.structural`(T1–T5)·`json.structural`(J1–J5)·제자리 재작성 비용 기록(CR-04/05/09/27/36)·코덱 런타임 섀도 감사 자동 비활성화(CR-57)·Tier A/B 승격 및 리뷰 신호 분류(CR-51~58/67/77/79)를 구현·검증한다.
+  파일: `services/api/evoforge/eval_runner_and_preflight.py`, `services/api/evoforge/codec_and_quality_runtime.py`,
+  `services/api/tests/test_eval_runner_and_preflight_cr.py`, `services/api/tests/test_codec_and_quality_runtime_cr.py`,
+  `docs/EVAL_RUNNER_AND_PREFLIGHT.md`. `main.py`·웹·DB 마이그레이션·github.py·정본(`docs/evoforge-v4.2/`)은 수정하지 않는다.
 - **Antigravity (완료·클레임 해제·main 반영 `defc4c9`) / `agy/collective-and-reconciler`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
   미구현 대사 정책(CR-13/39/40/47, 0원 정산·추정→실청구 단일 역분개·UNKNOWN 예약 대사 잡)과
