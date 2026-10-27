@@ -127,3 +127,85 @@ def test_unknown_ref_is_rejected_before_http(commits, monkeypatch):
     with pytest.raises(runner_client.RunnerClientError):
         runner_client.run_via_runner(str(repo), "missing-ref", "", [], [])
     assert requests == []
+
+
+def test_bundle_branch_collision_never_deletes_an_existing_branch(commits, monkeypatch):
+    repo, first, second = commits
+    monkeypatch.setattr(runner_client.secrets, "token_hex", lambda _size: "cafebabe")
+    existing = f"__evo_bundle_{os.getpid()}_cafebabe"
+    _git(repo, "branch", existing, first)
+    with pytest.raises(runner_client.RunnerBadRequest):
+        runner_client._create_bundle(str(repo), second)
+    assert _git(repo, "rev-parse", "--verify", existing) == first
+
+
+def test_failed_bundle_creation_removes_only_its_own_partial_file(commits, monkeypatch):
+    repo, first, _ = commits
+    original_run = runner_client.subprocess.run
+    original_mkstemp = runner_client.tempfile.mkstemp
+    allocated = []
+
+    def mkstemp(*args, **kwargs):
+        fd, path = original_mkstemp(*args, **kwargs)
+        allocated.append(path)
+        return fd, path
+
+    def failing_bundle(args, **kwargs):
+        if args[1:3] == ["bundle", "create"]:
+            Path(args[3]).write_bytes(b"partial")
+            return subprocess.CompletedProcess(args, 1)
+        return original_run(args, **kwargs)
+
+    monkeypatch.setattr(runner_client.tempfile, "mkstemp", mkstemp)
+    monkeypatch.setattr(runner_client.subprocess, "run", failing_bundle)
+    with pytest.raises(runner_client.RunnerBadRequest):
+        runner_client._create_bundle(str(repo), first)
+    try:
+        assert allocated and not Path(allocated[0]).exists()
+    finally:
+        if allocated:
+            Path(allocated[0]).unlink(missing_ok=True)
+
+
+def test_bundle_ref_moved_before_creation_is_rejected_and_preserved(commits, monkeypatch):
+    repo, first, second = commits
+    monkeypatch.setattr(runner_client.secrets, "token_hex", lambda _size: "deadbeef")
+    branch = f"__evo_bundle_{os.getpid()}_deadbeef"
+    original_run = runner_client.subprocess.run
+
+    def moved_before_bundle(args, **kwargs):
+        if args[1:3] == ["bundle", "create"]:
+            original_run(["git", "update-ref", f"refs/heads/{branch}", second], cwd=repo,
+                         capture_output=True, check=True)
+        return original_run(args, **kwargs)
+
+    monkeypatch.setattr(runner_client.subprocess, "run", moved_before_bundle)
+    bundle_path = None
+    try:
+        with pytest.raises(runner_client.RunnerClientError, match="bundle"):
+            bundle_path = runner_client._create_bundle(str(repo), first)
+    finally:
+        if bundle_path:
+            Path(bundle_path).unlink(missing_ok=True)
+    assert _git(repo, "rev-parse", "--verify", branch) == second
+
+
+def test_bundle_ref_changed_after_verification_is_not_deleted(commits, monkeypatch):
+    repo, first, second = commits
+    monkeypatch.setattr(runner_client.secrets, "token_hex", lambda _size: "c0ffee01")
+    branch = f"__evo_bundle_{os.getpid()}_c0ffee01"
+    original_run = runner_client.subprocess.run
+
+    def moved_after_verification(args, **kwargs):
+        result = original_run(args, **kwargs)
+        if args[1:3] == ["bundle", "list-heads"]:
+            original_run(["git", "update-ref", f"refs/heads/{branch}", second], cwd=repo,
+                         capture_output=True, check=True)
+        return result
+
+    monkeypatch.setattr(runner_client.subprocess, "run", moved_after_verification)
+    bundle = runner_client._create_bundle(str(repo), first)
+    try:
+        assert _git(repo, "rev-parse", "--verify", branch) == second
+    finally:
+        Path(bundle).unlink(missing_ok=True)

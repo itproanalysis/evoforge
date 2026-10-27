@@ -99,6 +99,8 @@ def _resolve_commit(repo_dir: str, ref: str) -> str:
 
 def _create_bundle(repo_dir: str, base_sha: str) -> str:
     """Bundle history up to base_sha into a temp file; returns its path."""
+    if not isinstance(base_sha, str) or not re.fullmatch(r"[0-9a-f]{40}", base_sha):
+        raise RunnerBadRequest("bundle base must be an immutable SHA-1 commit")
     try:
         fd, bundle_path = tempfile.mkstemp(prefix="evoforge-bundle-", suffix=".bundle")
     except OSError as e:
@@ -114,6 +116,8 @@ def _create_bundle(repo_dir: str, base_sha: str) -> str:
     except OSError:
         pass
     branch = f"__evo_bundle_{os.getpid()}_{secrets.token_hex(4)}"
+    created = False
+    complete = False
     try:
         try:
             proc = subprocess.run(["git", "branch", branch, base_sha], cwd=repo_dir,
@@ -122,6 +126,7 @@ def _create_bundle(repo_dir: str, base_sha: str) -> str:
             raise RunnerClientError(f"bundle create failed: {type(e).__name__}")
         if proc.returncode != 0:
             raise RunnerBadRequest("base checkout failed")
+        created = True
         try:
             proc = subprocess.run(["git", "bundle", "create", bundle_path, branch], cwd=repo_dir,
                                   capture_output=True, timeout=120)
@@ -129,13 +134,28 @@ def _create_bundle(repo_dir: str, base_sha: str) -> str:
             raise RunnerClientError(f"bundle create failed: {type(e).__name__}")
         if proc.returncode != 0 or not os.path.exists(bundle_path):
             raise RunnerBadRequest("bundle create failed")
+        try:
+            proc = subprocess.run(["git", "bundle", "list-heads", bundle_path], cwd=repo_dir,
+                                  capture_output=True, timeout=60)
+        except (subprocess.TimeoutExpired, OSError) as e:
+            raise RunnerClientError(f"bundle verification failed: {type(e).__name__}") from None
+        expected = f"{base_sha} refs/heads/{branch}"
+        if proc.returncode != 0 or proc.stdout.decode("ascii", errors="replace").strip() != expected:
+            raise RunnerClientError("bundle base changed before verification")
+        complete = True
         return bundle_path
     finally:
-        try:
-            subprocess.run(["git", "branch", "-D", branch], cwd=repo_dir,
-                           capture_output=True, timeout=60)
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+        if created:
+            try:
+                subprocess.run(["git", "update-ref", "--no-deref", "-d", f"refs/heads/{branch}", base_sha],
+                               cwd=repo_dir, capture_output=True, timeout=60)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+        if not complete:
+            try:
+                os.remove(bundle_path)
+            except OSError:
+                pass
 
 
 def _validate_counts(section: object, name: str) -> dict:
