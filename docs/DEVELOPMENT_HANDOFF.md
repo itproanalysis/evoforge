@@ -114,3 +114,11 @@ main 작업 폴더의 최종 API **291 passed·1 skipped**, 실제 DB **46 passe
 원본 로그와 SHA-256 manifest는 STATUS의 검증 기록을 확인한다.
 남은 실제 공급사/워크플로/배포 연결과 0원 정산·영수증 정정 정책은
 [RECEIPT_PERSISTENCE.md](RECEIPT_PERSISTENCE.md)에 구체적으로 남겼다.
+
+## 2026-10-27 Builder preflight 지원
+
+`codex/builder-preflight`의 `094b4aa`에서 Builder 패킷·동의·agent/task lease·목표/정책을 확인하고
+예약과 불변 바인딩을 함께 저장한다. SENT 전 재검증과 바인딩된 정본 영수증 정산도 연결했다.
+상위 round4를 보존해 동기화한 뒤 API 317 passed·1 skipped, 실제 DB 77 passed,
+참조 112·SQL 96·패키지 검사와 웹 빌드가 통과했다.
+마이그레이션·설정·남은 통합은 [BUILDER_PREFLIGHT.md](BUILDER_PREFLIGHT.md), main 반영 기록은 STATUS를 따른다.

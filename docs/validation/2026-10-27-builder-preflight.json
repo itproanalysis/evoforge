@@ -1,0 +1,33 @@
+{
+  "recorded_at": "2026-10-27T00:35:57.913726+00:00",
+  "tested_revision": "085145402b851d7f93ac09a44fee3abbb943b090",
+  "feature_revision": "094b4aa",
+  "api": {
+    "passed": 317,
+    "skipped_db_module": 1
+  },
+  "postgres": {
+    "version": "15.19",
+    "passed": 77,
+    "sql_checks": 96,
+    "reference_tests": 112,
+    "application_migrations_applied_twice": [
+      "001_receipt_documents.sql",
+      "002_builder_call_bindings.sql"
+    ]
+  },
+  "web_production_build": "passed",
+  "primary_model": "muse-spark-1.3",
+  "actual_provider_call_verified": false,
+  "browser_identity_and_membership_connected": false,
+  "provider_rate_calculation_implemented": false,
+  "runner_evidence_persisted_in_core": false,
+  "actual_github_and_cloud_deployment_verified": false,
+  "local_log_bundle": "C:\\evo_forge\\.local\\evidence\\builder-preflight-20261027-qtxftrk9",
+  "file_sha256": {
+    "validation-preflight-api.log": "75fe1a24ebae0dff3704f2603f25f8478c53cbb9f489275f72e90ea024e220c2",
+    "validation-kernel.log": "b24be639b1cdb0f3cc16f7705b79a248c6cc5b5d9384725b24242d5799c8825a",
+    "validation-postgres.log": "2da21c04e14fabf93a6c6c0fdec827e9f97306140cdbea056428064015385882",
+    "validation-preflight-web.log": "11a2a670da758fdc4784bc7b22c98bf605cdffdd691d52a6619ba20a0dda5552"
+  }
+}
