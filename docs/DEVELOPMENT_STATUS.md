@@ -119,8 +119,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — 병합 승인 시점의 정책/자격 검사:** Codex 소유 postgres_kernel.py와
-  test_postgres_kernel.py·관련 문서에서 실행의 현재 policy hash와 HIGH/CRITICAL 리뷰어의 실제 시각 자격 만료를 대조한다.
+- **Codex (병합 정책/자격 시점 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** Codex 소유 postgres_kernel.py와
+  test_postgres_kernel.py·관련 문서에서 현재 policy와 HIGH/CRITICAL 자격을 대조한다(`1441518`).
+  API 465개·실제 DB 147개·SQL 96개·참조 112개·계약·웹 빌드 통과. 지원 코드는 main 미반영이다.
   정본 core.authorize_merge는 그대로 호출하고 추가 거부 조건만 보강한다. main/상위 T22·Agy 자격 시험 모듈·봉인 테스트는 수정하지 않는다.
 - **Antigravity (완료·클레임 해제·main 반영 `ebfeb95`) / `agy/cr-closure`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 파일과 전혀 겹치지 않는 독립 모듈로 수용 매트릭스(`Acceptance_Test_Matrix.md`)와
@@ -422,6 +423,24 @@ INSERT 시점의 테넌트 잔액/hold와 프로젝트 현재 cap/사용액을 �
 `docs/TENANT_CREDIT_GUARD.md`에 007 재적용과 한계를 기록했다.
 실제 공급사 호출·운영 DB 적용/배포는 수행하지 않았다. T22 Muse 실행 프로세스가 동작 중인 것을 확인했고 중복 실행하지 않았다.
 공개 명령·Broker 비용/영수증·전체 승인·운영 연결은 계속 미완료이며 Muse Spark와 자동 재개를 유지한다.
+
+## 병합 승인의 현재 정책·자격 검사 (지원 검증 완료)
+
+`codex/pg-integration`의 `1441518`은 후보/task/run 공유 잠금 아래에서 head와 정책이 현재 run에 맞는지 확인한다.
+정본 core.authorize_merge를 그대로 호출한 뒤 HIGH/CRITICAL의 context-independent spec-first approve 검증자 자격을
+실제 DB 시각에도 확인한다. 트랜잭션 시작 시각에 고정된 now()로 지연 중 만료된 자격을 승인하지 않는다.
+게이트·리뷰·사람 승인·자격이나 후보 상태를 생성하지 않으며 Agy의 자격 시험 알고리즘은 수정하지 않았다.
+
+수정 전 정책 변경/트랜잭션 중 자격 만료 회귀 **2 failed**, 수정 후 API **465 passed·1 skipped**,
+실제 PostgreSQL **147 passed**(신규 2개), 참조 **112개**·SQL **96개**·계약 **0 failure**·웹 빌드 통과.
+만료된 HIGH 자격을 거부하고 새로 유효한 자격을 추가했을 때 정상 승인되는 것도 확인했다.
+승인 근거는 합성 DB fixture이며 실제 운영 승인이나 GitHub 병합을 실행한 것이 아니다.
+
+원본 로그 8개는 `C:\evo_forge\.local\evidence\merge-freshness-20261027-jomlv8hr`에 보존했다.
+지원 브랜치의 `docs/validation/2026-10-27-merge-freshness.json`에 source/로그 해시,
+`docs/POSTGRES_KERNEL.md`에 검사 시점과 실제 외부 병합 전 재검사/expected head 요구를 기록했다.
+정본·상위 main/평가/UI·봉인 테스트·Agy 소유 모듈은 보존했고 별도 Git 설치 CI 변경도 동기화해 보존했다.
+공개 명령/Broker 비용·검증 전체 연결·실제 청구/운영 배포는 미완료이며 Muse Spark 기본값과 자동 재개를 유지한다.
 
 ## Context Mesh·리뷰어 자격·공급망/공정 큐/키 격리 고도화 (main 반영 완료)
 

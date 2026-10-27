@@ -258,3 +258,18 @@ main `.local/evidence/project-cap-race-20261027-4io029zf`에 있다. 이전 지�
 
 T22의 Muse runner가 실행 중인 것을 확인해 중복 실행하거나 main 파일을 변경하지 않았다.
 상위 T22를 먼저 main에 반영한 뒤 지원 브랜치에 동기화한다. 공개 명령/비용·실청구/운영 통합은 미완료이며 자동 재개를 유지한다.
+
+## 2026-10-27 병합 승인 정책/자격 시점 보강
+
+지원 브랜치 `codex/pg-integration`의 `1441518`은 현재 run의 head/policy를 공유 잠금으로 확인하고,
+정본 core.authorize_merge 호출 뒤 HIGH/CRITICAL 자격을 clock_timestamp()로 재검사한다.
+정책이 바뀌었거나 지연 중 만료된 자격은 거부한다. 승인·게이트·리뷰를 만들거나 실제 merge를 실행하지 않는다.
+
+수정 전 회귀 2 failed, 수정 후 API 465 passed·1 skipped·실제 DB 147 passed(신규 2개)·
+참조 112·SQL 96·계약 0 failure·웹 빌드 통과. 새 유효 자격의 정상 승인도 함께 확인했다.
+합성 게이트/리뷰/사람 승인/자격 DB fixture이며 실제 운영 승인은 아니다.
+manifest: 지원 브랜치 `docs/validation/2026-10-27-merge-freshness.json`.
+원본 8개: main `.local/evidence/merge-freshness-20261027-jomlv8hr`. 검사 한계는 `docs/POSTGRES_KERNEL.md`를 따른다.
+
+상위 Git 설치 CI/test collection 수정은 동기화했고 T22·Agy 소유 파일은 보존했다.
+T22 main 반영 뒤 공개 경로 연결을 이어간다. 실제 모델/비용·전체 승인·운영 연결은 미완료이며 자동 재개를 유지한다.
