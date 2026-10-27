@@ -23,6 +23,7 @@ from typing import Literal
 
 from evoforge import auth as auth_module
 from evoforge import broker_meta, evidence as evidence_chain, ledger
+from evoforge import performance as performance_mod
 from evoforge import sealed_eval as sealed_eval_mod
 from evoforge import postgres_state
 from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
@@ -871,6 +872,67 @@ class EvalBaselineRequest(BaseModel):
     family: str | None = None
 
 
+class EvalPipelineRequest(BaseModel):
+    suite_version: Literal["v0"] = "v0"
+    model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
+    family: str | None = None
+
+
+def _eval_budget_or_402(n_tasks: int, attempts: int, per_attempt: int) -> None:
+    try:
+        performance_mod.check_budget(n_tasks, attempts, per_attempt)
+    except performance_mod.BudgetExceeded as e:
+        raise HTTPException(402, str(e))
+    except ledger.Overdraft as e:
+        raise HTTPException(402, "budget exhausted (reserve_cost refused)")
+
+
+def _production_stats() -> dict:
+    runs = 0
+    gate_pass = 0
+    gate_fail = 0
+    gate_inconclusive = 0
+    held_pass = 0
+    held_n = 0
+    try:
+        keys = list(_evidence)
+    except Exception:
+        keys = []
+    for key in keys:
+        try:
+            stored = _evidence.get(key, {})
+        except Exception:
+            continue
+        if not isinstance(stored, dict) or not isinstance(stored.get("run"), dict):
+            continue
+        run = stored["run"]
+        runs += 1
+        gates = stored.get("gates")
+        if isinstance(gates, list) and gates:
+            results = [g.get("result") for g in gates if isinstance(g, dict)]
+            if results and all(r == "PASS" for r in results):
+                gate_pass += 1
+            elif any(r == "FAIL" for r in results):
+                gate_fail += 1
+            else:
+                gate_inconclusive += 1
+        else:
+            gate_inconclusive += 1
+        held = run.get("heldout")
+        if isinstance(held, dict):
+            p = held.get("pass")
+            nn = held.get("n")
+            if isinstance(p, int) and isinstance(nn, int) and nn > 0:
+                held_pass += p
+                held_n += nn
+    pct = (100.0 * held_pass / held_n) if held_n else None
+    return {"runs": runs, "gate_pass": gate_pass, "gate_fail": gate_fail,
+            "gate_inconclusive": gate_inconclusive,
+            "heldout_pass_rate_pct": pct,
+            "sample_note": f"operational samples from /v1/runs (n={runs}); "
+                           "not a controlled eval"}
+
+
 @app.get("/v1/eval/suites")
 def eval_suites():
     """Redacted sealed v0 catalogue: families plus sha256/len metadata only."""
@@ -893,6 +955,13 @@ def eval_baseline(req: EvalBaselineRequest):
     """
     from evoforge import repo_source as _rs_eval2
 
+    try:
+        n_tasks = sealed_eval_mod.count_tasks(req.family)
+    except ValueError as e:
+        raise HTTPException(400, _rs_eval2.redact(str(e)))
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_eval2.redact(str(e) or "sealed baseline failed"))
+    _eval_budget_or_402(n_tasks, 1, sealed_eval_mod.BASELINE_COST_CENTS)
     try:
         result = sealed_eval_mod.run_baseline(
             req.suite_version, req.model, family=req.family)
@@ -929,11 +998,147 @@ def eval_baseline(req: EvalBaselineRequest):
                            "provider_stub": result["provider_stub"],
                            "gates": gates})
     _link_stages(eid, ("Gate", "Outcome"))
+    lo, hi = result.get("pass_rate_wilson_lb", 0.0), 1.0
+    try:
+        import sys as _sys
+        import os as _os
+        _ref = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "..",
+                                              "..", "docs", "evoforge-v4.2",
+                                              "reference_impl"))
+        if _ref not in _sys.path:
+            _sys.path.insert(0, _ref)
+        import quality_gate as _qg
+        lo, hi = _qg.wilson(passed, xs["n"])
+    except Exception:
+        pass
+    per_family = {fam: {"n": v.get("n", 0), "passed": v.get("passed", 0)}
+                  for fam, v in result["by_family"].items()}
+    measurement = performance_mod.make_record(
+        kind="X_SINGLE", suite_version=result["suite_version"],
+        model=result["model"],
+        harness_version=sealed_eval_mod.HARNESS_VERSION,
+        n=xs["n"], passed=passed, cost_cents=xs["cost_cents"],
+        per_family=per_family, evidence_id=eid)
+    measurement["wilson95"] = [lo, hi]
+    performance_mod.record(measurement)
     return {"baseline_id": result["baseline_id"], "evidence_id": eid,
+            "measurement_id": measurement["measurement_id"],
+            "measurement": dict(measurement),
             "suite_version": result["suite_version"], "model": result["model"],
             "X_SINGLE": xs, "audit": result["audit"], "scores": result["scores"],
             "tasks": result["tasks"], "by_family": result["by_family"],
             "chain": evidence_chain.chain(eid)}
+
+
+@app.post("/v1/eval/pipeline", status_code=201)
+def eval_pipeline(req: EvalPipelineRequest):
+    """Adaptive pipeline over the sealed v0 set (up to 3 attempts/task).
+
+    Costs are usage-derived per attempt; the total is the sum of all
+    settled attempts. No held-out code, reference fix, or task file
+    contents ever leave the server.
+    """
+    from evoforge import repo_source as _rs_eval3
+
+    try:
+        n_tasks = sealed_eval_mod.count_tasks(req.family)
+    except ValueError as e:
+        raise HTTPException(400, _rs_eval3.redact(str(e)))
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_eval3.redact(str(e) or "sealed pipeline failed"))
+    _eval_budget_or_402(n_tasks, sealed_eval_mod.PIPELINE_MAX_ATTEMPTS,
+                        sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
+    try:
+        result = sealed_eval_mod.run_pipeline(
+            req.suite_version, req.model, family=req.family)
+    except sealed_eval_mod.SealedTooLarge as e:
+        raise HTTPException(413, _rs_eval3.redact(str(e)))
+    except sealed_eval_mod.SealedTimeout:
+        raise HTTPException(504, "sealed pipeline timed out")
+    except ledger.Overdraft:
+        raise HTTPException(402, "budget exhausted (reserve_cost refused)")
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_eval3.redact(str(e) or "sealed pipeline failed"))
+    except ValueError as e:
+        raise HTTPException(400, _rs_eval3.redact(str(e)))
+    except HTTPException:
+        raise
+    except Exception as e:
+        name = type(e).__name__
+        if isinstance(e, TimeoutError) or "timeout" in name.lower():
+            raise HTTPException(504, "sealed pipeline timed out")
+        raise HTTPException(502, _rs_eval3.redact(f"sealed pipeline failed: {name}"))
+    pipe = result["PIPELINE"]
+    passed = sum(1 for s in result["scores"] if s["score"] >= 1.0)
+    gates = [{"gate": "G2_REQUIRED",
+              "result": "PASS" if (pipe["n"] > 0 and passed == pipe["n"]) else "FAIL",
+              "reason": f"sealed v0 PIPELINE executed {passed}/{pipe['n']} held-out tasks"}]
+    eid = _store_evidence({"pipeline_id": result["pipeline_id"],
+                           "suite_version": result["suite_version"],
+                           "model": result["model"], "PIPELINE": pipe,
+                           "scaffold": result["scaffold"], "audit": result["audit"],
+                           "scores": result["scores"], "tasks": result["tasks"],
+                           "by_family": result["by_family"],
+                           "reservation_ids": result["reservation_ids"],
+                           "reservation_id": result["reservation_id"],
+                           "provider_stub": result["provider_stub"],
+                           "attempts_total": result["attempts_total"],
+                           "usage_missing": result["usage_missing"],
+                           "gates": gates})
+    _link_stages(eid, ("Gate", "Outcome"))
+    per_family = {fam: {"n": v.get("n", 0), "passed": v.get("passed", 0)}
+                  for fam, v in result["by_family"].items()}
+    measurement = performance_mod.make_record(
+        kind="PIPELINE", suite_version=result["suite_version"],
+        model=result["model"],
+        harness_version=sealed_eval_mod.HARNESS_VERSION,
+        n=pipe["n"], passed=passed, cost_cents=pipe["cost_cents"],
+        per_family=per_family, evidence_id=eid,
+        attempts_total=result["attempts_total"],
+        usage_missing=result["usage_missing"])
+    measurement["wilson95"] = [result["pass_rate_wilson_lo"],
+                               result["pass_rate_wilson_hi"]]
+    performance_mod.record(measurement)
+    return {"pipeline_id": result["pipeline_id"], "evidence_id": eid,
+            "measurement_id": measurement["measurement_id"],
+            "measurement": dict(measurement),
+            "suite_version": result["suite_version"], "model": result["model"],
+            "PIPELINE": pipe, "audit": result["audit"],
+            "scores": result["scores"], "tasks": result["tasks"],
+            "by_family": result["by_family"],
+            "attempts_total": result["attempts_total"],
+            "usage_missing": result["usage_missing"],
+            "chain": evidence_chain.chain(eid)}
+
+
+@app.get("/v1/performance")
+def performance():
+    """Measured-only performance summary; missing data is not_measured."""
+    baseline = performance_mod.latest("X_SINGLE")
+    pipeline = performance_mod.latest("PIPELINE")
+    if baseline is None:
+        base_view: dict = {"status": "not_measured",
+                           "reason": "no X_SINGLE measurement yet",
+                           "record": None}
+    else:
+        base_view = {"status": "measured", "reason": "",
+                     "record": dict(baseline), **dict(baseline)}
+    if pipeline is None:
+        pipe_view: dict = {"status": "not_measured",
+                           "reason": "no PIPELINE measurement yet",
+                           "record": None}
+    else:
+        pipe_view = {"status": "measured", "reason": "",
+                     "record": dict(pipeline), **dict(pipeline)}
+    comparison = performance_mod.compare(baseline, pipeline)
+    return {"baseline": base_view, "pipeline": pipe_view,
+            "comparison": comparison,
+            "cost_per_solved_cents": {
+                "baseline": performance_mod.cost_per_solved(baseline),
+                "pipeline": performance_mod.cost_per_solved(pipeline)},
+            "history": performance_mod.history(),
+            "production": _production_stats(),
+            "storage": "memory"}
 
 
 @app.get("/v1/evidence/{eid}")
