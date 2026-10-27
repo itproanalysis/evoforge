@@ -100,10 +100,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex 추가 지원 / `codex/receipt-support`:** npm 설치에서 확인한 Next.js 중대 취약점 수정.
+- **Codex 추가 지원 (완료·클레임 해제) / `codex/receipt-support`:** npm 설치에서 확인한 Next.js 중대 취약점 수정.
   `apps/web/package.json`·`package-lock.json`만 수정해 Next 15 계열 보안 릴리스와 필요 전이 의존성을 고정하고 빌드·audit를 검증한다.
   Muse의 T9 화면 코드는 보존한다.
-- **Codex 지원 / `codex/receipt-support` / `C:\evo_forge_codex`:** Muse round3의 T7(main/evidence)·T8(critic)·T9(web)와 분리해,
+- **Codex 지원 (완료·클레임 해제) / `codex/receipt-support` / `C:\evo_forge_codex`:** Muse round3의 T7(main/evidence)·T8(critic)·T9(web)와 분리해,
   PostgreSQL의 정식 영수증 JSON 계약 검증·저장·스코프/예약 바인딩과 실제 DB 검증을 맡는다.
   파일: `evoforge/postgres_receipts.py`, `postgres_kernel.py`, `services/api/migrations/`,
   `services/api/requirements.txt`, Codex 소유 `test_postgres_kernel.py`·`test_receipt_contract.py`, 관련 문서·CI 검증 연결.
@@ -113,15 +113,27 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   T8 양성 provider fixture 지원 커밋: `92cc047` (`codex/receipt-support`), 기존 비용·실패 검증 유지.
   round3가 main에 먼저 반영되어 `89dbc71`에서 동기화했고, 상위 provider fixture를 채택했다.
 
-## Codex 영수증 지원 검증 (상위 round3 동기화 완료)
+## Codex 영수증 지원 검증 (main 반영 완료)
 
 `codex/receipt-support`에서 정본 v1 영수증 문서 검증·원자적 보존·서버 스코프/예약/패킷 확인과
 저장 금액 정산의 내부 HTTP 경로를 구현했다. 동시 정산 응답의 이전 intent 혼합과 RFC3339 검사 누락도 수정했다.
 동기화 전 API **269 passed·1 skipped**, 동기화 후 **291 passed·1 skipped**.
 실제 PostgreSQL **46 passed**, 참조 **112개**·SQL **96개**·기본/실제 PG 계약 검사 전체 통과.
 확장 마이그레이션과 정확한 미완료 경계는 [RECEIPT_PERSISTENCE.md](RECEIPT_PERSISTENCE.md)에 기록했다.
-상위 구현과 봉인 테스트·정본은 변경하지 않았다. main 반영 전에는 지원 브랜치 결과로만 취급한다.
+상위 구현과 봉인 테스트·정본은 변경하지 않았다. `228c272`로 main에 fast-forward 반영했다.
 Generate/Review·개발 CLI·인증된 프로젝트·공급사 청구 증거·실배포 완료를 뜻하지 않는다.
 
 웹 의존성 수정과 검증 근거는 [WEB_DEPENDENCY_SECURITY.md](WEB_DEPENDENCY_SECURITY.md)에 기록했다.
 Next가 자동 생성한 `next-env.d.ts`의 route 참조도 보존했다. T9 화면 코드는 변경하지 않았다.
+
+`C:\evo_forge` main 작업 폴더에서도 API **291 passed·1 skipped**, 실제 DB **46 passed**,
+참조 **112개**·SQL **96개**·C1–C9, npm ci·audit **0건**·프로덕션 빌드를 다시 확인했다.
+standalone 서버의 `/`, `/lab`, `/evidence`와 정적 JS HTTP 응답 및 검사 서버 종료도 확인했다.
+검증 원본은 `C:\evo_forge\.local\evidence\receipts-20261027-f42duc14`에 별도 보존했다.
+각 로그 SHA-256과 검증 revision을 기록한 manifest는 `docs/validation/2026-10-27-receipts.json`에도 저장했다.
+수신·조회·저장 금액 정산 기능은 `55bb411`, 웹 의존성 수정은 `83fe38a`다.
+
+현재 Codex 프로세스의 `MODEL_API_KEY`, `DATABASE_URL`, `GITHUB_TOKEN`, `EVO_KERNEL_TOKEN`은 모두 미설정이다.
+실제 연동 시 해당 실행 환경에 Muse 접근 키, 프로젝트/예산이 준비된 DB와 내부 스코프·서비스 토큰,
+대상 저장소 PR 권한을 비밀 저장소로 주입해야 한다. 다른 세션·OpenCode·클라우드의 설정 여부는 이 확인으로 판단하지 않는다.
+새 비밀 값을 채팅에 붙여 넣을 필요는 없다. 독립 개발과 자동 재개는 계속한다.

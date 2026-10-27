@@ -78,7 +78,8 @@ Cloud Build 배포 단계에도 확장 적용을 추가했으나 실제 클라�
 동기화 후 **API 291 passed·1 skipped**, 실제 DB **46 passed**, 참조 **112개**·SQL **96개**와
 기본/실제 PG 패키지 검사가 다시 통과했다. 웹 보안 의존성의 빌드 검증은
 [WEB_DEPENDENCY_SECURITY.md](WEB_DEPENDENCY_SECURITY.md)에 기록했다.
-main 반영 기록은 [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)를 따른다.
+`228c272`로 main에 반영했고 `C:\evo_forge`에서도 동일한 API/DB/계약 검증을 통과했다.
+로그와 해시 manifest 보존 위치는 [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md)를 따른다.
 전체 서비스·실제 모델 실행·배포의 완료 근거는 아니다.
 
 정본 영수증은 0원도 허용하지만 `core.usage_ledger`의 model_usage는 음수 청구만 허용한다.
