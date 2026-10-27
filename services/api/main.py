@@ -23,6 +23,7 @@ from typing import Literal
 
 from evoforge import auth as auth_module
 from evoforge import broker_meta, evidence as evidence_chain, ledger
+from evoforge import outcomes as outcomes_store
 from evoforge import sealed_eval as sealed_eval_mod
 from evoforge import postgres_state
 from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
@@ -1230,14 +1231,48 @@ def dashboard():
                                                if isinstance(g, dict)):
                 blocked += 1
     snap = ledger.snapshot("default")
+    validated = outcomes_store.all()
     return {
         "missions_by_state": by_state,
         "active_missions": active,
         "blocked_merges": blocked,
+        "validated_improvements": len(validated),
+        "validated_mission_ids": [o["mission_id"] for o in validated],
         "spent_cents": snap["spent_cents"],
         "reserved_cents": snap["reserved_cents"],
         "unknown_holds": len(snap["unknown_reservations"]),
     }
+
+
+class OutcomeRequest(BaseModel):
+    mission_id: str
+    merged_sha: str
+    pr_url: str = ""
+
+
+@app.post("/v1/outcomes", status_code=201)
+def outcome_record(req: OutcomeRequest):
+    mission = missions_store.get(req.mission_id)
+    if mission is None:
+        raise HTTPException(404, "unknown mission")
+    run_eid = (mission.get("stages") or {}).get("run")
+    pr_eid = (mission.get("stages") or {}).get("pr")
+    run_ev = _evidence.get(run_eid, {}) if run_eid else {}
+    pr_ev = _evidence.get(pr_eid, {}) if pr_eid else {}
+    try:
+        out = outcomes_store.record(mission, run_ev, pr_ev, req.merged_sha, req.pr_url)
+    except KeyError as e:
+        raise HTTPException(409, str(e))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    eid = _store_evidence({"outcome": out, "mission_id": req.mission_id})
+    missions_store.attach_evidence(req.mission_id, eid)
+    return {**out, "evidence_id": eid}
+
+
+@app.get("/v1/outcomes")
+def outcomes_list():
+    return {"outcomes": outcomes_store.all()}
 
 
 @app.post("/v1/ledger/reconcile")

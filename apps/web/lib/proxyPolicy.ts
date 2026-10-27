@@ -8,8 +8,11 @@ const EXACT_ALLOW = new Set([
   "/v1/ledger",
   "/v1/ledger/reconcile",
   "/v1/eval/sandbox",
+  "/v1/eval/suites",
+  "/v1/eval/baseline",
   "/v1/missions",
   "/v1/dashboard",
+  "/v1/outcomes",
 ]);
 
 const SEGMENT_RE = /^[A-Za-z0-9._~-]+$/;
