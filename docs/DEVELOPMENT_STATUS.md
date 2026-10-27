@@ -121,7 +121,8 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 - **Codex / `codex/pg-integration` / `C:\evo_forge_codex`:** 두 준비된 지원 브랜치를 별도 통합 브랜치에서 합친다.
   명령 완료 응답과 같은 scope의 서버 생성 증거를 원자적으로 연결하도록 `postgres_commands.py`·확장 004·Codex 테스트·문서를 보강한다.
   `kernel_api.py`의 서비스 인증 명령 접수/dispatch/완료/조회 경로와 Codex HTTP 테스트도 연결한다. 브라우저에는 내부 자격 증명을 제공하지 않는다.
-  상위 round7이 main에 반영되기 전에는 main/commands facade·mission·봉인 테스트를 편집하거나 지원 코드를 main에 병합하지 않는다.
+  상위 round7은 `d347b56`으로 먼저 main에 반영되었다. 이제 해당 구현을 보존해 `commands.py`의 backend 위임,
+  main의 공유 `_generate_core` 및 mission 생성 단계에 canonical dispatch/완료 저장을 연결한다. 봉인 테스트는 편집하지 않는다.
 - **Codex (지원 검증 완료·상위 병합 대기) / `codex/runner-core-evidence` / `C:\evo_forge_codex`:** 상위 API 진입점 편집과 분리해 실제 Runner의 입력/빌드 식별자와 저장된 실행 증거를 기존 core 후보·G2_REQUIRED에 연결한다.
   `postgres_run_evidence.py`, `runner_attestation.py`, Runner/Runner client의 선택적 메타데이터, `kernel_api.py`, 확장 005,
   Codex 소유 테스트·문서/환경 예제만 수정한다. 구체적 head를 빈 diff로 다시 실행한 증거와 정산된 Builder 바인딩을 요구한다.
