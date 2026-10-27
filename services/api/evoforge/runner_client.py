@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 import secrets
 import shutil
 import subprocess
@@ -78,6 +79,22 @@ def _head_sha(repo_dir: str) -> str:
     if proc.returncode != 0:
         return ""
     return proc.stdout.decode("utf-8", errors="replace").strip()
+
+
+def _resolve_commit(repo_dir: str, ref: str) -> str:
+    """Resolve a ref exactly once before creating a bundle or calling the Runner."""
+    if not isinstance(ref, str) or not ref.strip():
+        raise RunnerBadRequest("base checkout failed")
+    try:
+        proc = subprocess.run(["git", "rev-parse", "--verify", "--end-of-options", f"{ref.strip()}^{{commit}}"],
+                              cwd=repo_dir, capture_output=True, timeout=30)
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        raise RunnerClientError(f"base resolution failed: {type(exc).__name__}") from None
+    sha = proc.stdout.decode("ascii", errors="replace").strip()
+    # The Runner bundle protocol currently accepts Git SHA-1 object IDs.
+    if proc.returncode != 0 or not re.fullmatch(r"[0-9a-f]{40}", sha):
+        raise RunnerBadRequest("base checkout failed")
+    return sha
 
 
 def _create_bundle(repo_dir: str, base_sha: str) -> str:
@@ -153,13 +170,20 @@ def run_via_runner(source_repo, base_sha, diff, visible_tests, sealed_tests,
         raise RunnerBadRequest(repo_source.redact(str(e)))
 
     is_temp = isinstance(source_repo, str) and source_repo in ("", "github")
-    effective_base = (base_sha.strip() if isinstance(base_sha, str) else "")
-    if is_temp:
-        head = _head_sha(source)
-        if head:
-            effective_base = head
     bundle_path = None
     try:
+        requested_base = base_sha.strip() if isinstance(base_sha, str) else ""
+        if is_temp:
+            if re.fullmatch(r"[0-9a-fA-F]{64}", requested_base):
+                raise RunnerBadRequest("base checkout requires a SHA-1 commit")
+            head = _head_sha(source)
+            if not re.fullmatch(r"[0-9a-f]{40}", head):
+                raise RunnerBadRequest("base checkout failed")
+            if re.fullmatch(r"[0-9a-fA-F]{40}", requested_base) and head != requested_base.lower():
+                raise RunnerBadRequest("base checkout does not match requested commit")
+            effective_base = _resolve_commit(source, head)
+        else:
+            effective_base = _resolve_commit(source, requested_base)
         try:
             bundle_path = _create_bundle(source, effective_base)
         except RunnerBadRequest:
@@ -209,8 +233,8 @@ def run_via_runner(source_repo, base_sha, diff, visible_tests, sealed_tests,
         if not isinstance(data, dict):
             raise RunnerClientError("malformed runner reply")
         base = data.get("base")
-        if not isinstance(base, str) or not base:
-            raise RunnerClientError("malformed runner reply (base)")
+        if not isinstance(base, str) or base != effective_base:
+            raise RunnerClientError("malformed runner reply (base mismatch)")
         visible = _validate_counts(data.get("visible"), "visible")
         heldout = _validate_counts(data.get("heldout"), "heldout")
         kinds = data.get("heldout_kinds")
