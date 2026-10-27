@@ -48,7 +48,10 @@ def _resolve_all(eid):
         ev = r.json()
         assert ev["id"] == link["event_id"]
         assert (ev.get("stage") or ev.get("kind")) == link["stage"]
-        assert ev["evidence_id"] in (eid, body.get("source_evidence_id"), body.get("data", {}).get("source_evidence_id"))
+        # An event belongs to the record that recorded it, but may be linked from others (e.g. a run chain links
+        # the review's Review event); what must hold is that the record listing it really links it.
+        assert eid in ev.get("evidence_ids", [ev["evidence_id"]]) or ev["evidence_id"] in (
+            eid, body.get("source_evidence_id"), body.get("data", {}).get("source_evidence_id"))
         assert isinstance(ev.get("summary"), dict) and ev["summary"], ev
         assert MARK not in r.text  # held-out code never leaks through an event
         events[link["stage"]] = ev
