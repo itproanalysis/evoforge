@@ -287,3 +287,18 @@ manifest: 지원 브랜치 `docs/validation/2026-10-27-upstream-sync.json`(sourc
 실제 DB/Git/Runner를 사용했고 모델/영수증·승인/자격은 합성 fixture다. 실 KMS·청구·Docker/운영 배포는 미검증이다.
 T22의 main 반영이 먼저다. 이후 공개 command dispatch/완료·Broker 비용/영수증·후보/전체 승인 접점을 연결한다.
 전체 개발은 미완료이고 Muse Spark 기본값·자동 재개를 유지한다. 지원 코드는 아직 main에 합치지 않았다.
+
+## 2026-10-27 영수증 저장 후 예약 해제 보호
+
+지원 브랜치 `codex/pg-integration`의 `61c608b`는 정산 전 기록된 영수증이 있는데도 미접수로 예약을 해제하던 경로를 차단한다.
+같은 scope/call의 ctx 영수증을 예약 잠금 뒤 새 statement로 검사하며 추정/0원·문서/공급사 참조 누락도 대사를 기다린다.
+다른 호출/프로젝트의 정상 미접수 해제·멱등성과 정상 견적 정산은 유지했다.
+
+수정 전 회귀 7 failed·1 passed, 수정 후 신규 8 passed·API 485 passed·1 skipped·실제 DB 155 passed·
+참조 112·SQL 96·계약 0 failure·웹 빌드 통과. 저장 트랜잭션의 실제 행 잠금 대기 후 해제 거부도 확인했다.
+manifest: 지원 브랜치 `docs/validation/2026-10-27-receipt-release.json`(source 36개·로그 8개 해시).
+원본: main `.local/evidence/receipt-release-20261027-tp1nltz3`. 정본 함수/RLS와 기존 금전 기록은 보존했다.
+
+외부 영수증 적재 서비스에도 같은 예약 잠금 규약이 필요하다. 실제 청구/배포는 미검증이고 0원·실청구 정정 정책은 계속 미완료다.
+T22 Muse/OpenCode 실행이 동작 중이므로 중복 실행하지 않았다. 상위 main 반영 후 공개 명령/Broker 비용·전체 승인 연결을 이어간다.
+전체 개발은 미완료이고 Muse Spark 기본값·자동 재개를 유지한다. 지원 코드는 main 미반영이다.
