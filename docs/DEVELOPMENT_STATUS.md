@@ -122,9 +122,7 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex (빈 공급사 allowlist·엄격한 동의) / `codex/preflight-policy`:** `eval_runner_and_preflight.py`와
-  새 `test_preflight_policy.py`·관련 문서를 소유한다. 빈 허용 목록과 boolean이 아닌 동의가
-  허용으로 해석되는 재현을 수정하고 예약/전송 전에 fail-closed를 검증한다.
+- **Codex (공급사 allowlist·동의 검증 완료·클레임 해제):** `f07089a`가 빈 허용 목록과 boolean이 아닌 동의를 차단한다.
 
 - **Antigravity (완료·클레임 해제·main 반영 `4426de9`) / `agy/web-live-dashboard`:**
   1. `next.config.ts`에 `createNextIntlPlugin("./i18n.ts")` 연결 및 `apps/web/app/[locale]/performance/page.tsx` 라우트 추가로 프로덕션 standalone 서버에서 `/`, `/ko`, `/performance`, `/ko/performance`, `/lab`, `/ko/lab`, `/evidence`, `/ko/evidence` 전 경로가 500/404 없이 모두 **HTTP 200**으로 응답함을 검증했다.
@@ -145,14 +143,9 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   모든 CI 게이트 검증 통과: `validate_package.py` 0 failure, `tsc --noEmit` 0 error, `next build` 11개 라우트 정상 컴파일, `npm ci` 정상, `test_critic_t9_ledger_web.py` 및 `test_sealed_t22b_web.py` 전원 PASS.
 
 
-- **Codex (CLI/Broker 패킷·리스 현재 시각 재검사) / `codex/preflight-freshness`:**
-  `eval_runner_and_preflight.py`, 새 `test_preflight_freshness.py`, 관련 비봉인 테스트 및 문서를 소유한다.
-  패킷이 발행된 시각을 현재 시각으로 오인해 만료된 패킷/리스를 허용하는지 검증하고 보강한다.
+- **Codex (패킷·리스 신선도 검증 완료·클레임 해제):** `6d8be77`이 서버 시각과 전송 직전 바인딩·권한을 재검사한다.
 
-- **Codex (Muse 직접 API capability 사전 검증) / `codex/muse-capabilities`:** 정본 seed는 변경하지 않고
-  공식 근거의 별도 보수적 capability 입력과 정본 S1–S11 검증을 연결한다. 캐시 비활성화·프록시 endpoint·
-  만료된 근거를 허용하지 않는다. 새 `provider_capabilities.py`/capability JSON/`test_muse_capability.py`,
-  `eval_runner_and_preflight.py`, API Dockerfile 및 관련 문서를 소유한다. T22·Agy 신규 파일은 수정하지 않는다.
+- **Codex (Muse capability 검증 완료·클레임 해제):** `67a4966`이 정본을 보존하며 Meta 직접 API의 보수적 capability를 검사한다.
 
 - **Antigravity (완료·클레임 해제·main 반영 `cd2e459`) / `agy/event-bus-and-observability`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`, `codex/muse-capabilities`) 클레임 파일과 전혀 겹치지 않는 독립 모듈로
@@ -162,10 +155,7 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
   `services/api/tests/test_event_bus_and_sse_cr.py`, `services/api/tests/test_observability_and_governance_cr.py`,
   `docs/EVENT_BUS_AND_OBSERVABILITY.md`. `main.py`·웹·DB 마이그레이션·github.py·`eval_runner_and_preflight.py`·정본(`docs/evoforge-v4.2/`)은 수정하지 않았다.
 
-- **Codex (CLI 청구 근거 없는 예약 보호) / `codex/pg-integration`:** 상위 `8f2323c`의 비용 미제공 시 0원 정산은
-  청구액 불명확 상태를 실제 무료 호출로 오인한다. `services/api/evoforge/eval_runner_and_preflight.py`,
-  기존 비봉인 `test_eval_runner_and_preflight_cr.py`, 새 `test_cli_billing_provenance.py` 및 관련 문서를 소유해
-  공급사 청구 근거가 없으면 UNKNOWN 예약을 유지하도록 회귀 검증한다. 상위 T22와 정본은 수정하지 않는다.
+- **Codex (CLI 청구 근거 검증 완료·클레임 해제):** `ad64516`이 원본 사용량·어댑터 실청구 표기를 요구하며 UNKNOWN 예약을 보존한다.
 
 - **Codex 확인 (CLI 비용 근거 보강):** `93d78cb`는 빈 결과를 UNKNOWN으로 남겼고 `8f2323c`는
   전송 예외 시 UNKNOWN 전이를 추가했다. 그러나 비용 없는 결과를 0원으로 정산하는 회귀가 확인되어
@@ -709,3 +699,15 @@ source 79개·원본 로그 24개의 SHA-256은 `docs/validation/2026-10-28-pref
 원본: `.local/evidence/preflight-policy-20261028-2noz3me8`. 실제 PostgreSQL 169개·SQL 96개·참조 112개와
 동일 웹 소스의 npm ci/tsc/build가 통과했다. 전체 API는 검증 중이며 main 반영은 미완료다.
 사용자 작업 파일을 보존하기 위해 별도 통합 브랜치 `5d4def9`을 준비했고 해당 코드의 집중 94개도 통과했다.
+
+## 2026-10-28 preflight 통합 완료·운영 연결 대기
+
+`f07089a`까지 main에 반영했다. CLI 원본 사용량·청구 출처, 서버 시각의 패킷/참조/리스 만료,
+전송 직전 패킷·허용 공급사·동의·리스 재검사, 빈 allowlist·엄격한 동의와 Muse 직접 API capability가 포함된다.
+API 635 passed·1 skipped, 실제 PostgreSQL 169 passed·SQL 96·참조 112·정본 검사 0 failure,
+동일 웹 소스 npm ci/tsc/프로덕션 빌드가 통과했다. 집중 94 passed; 재현·수정 전 12 failed.
+검증 revision `3740307`과 통합 `f07089a`의 API·웹·정본 Git tree는 동일하다.
+소스 80개·로그 23개 해시: `docs/validation/2026-10-28-preflight-policy.json`.
+다른 작업의 미커밋 `runner.py`·`test_critic_t5_runner.py`는 내용이 보존되었고 이 검증에 포함되지 않았다.
+어댑터의 청구 출처 주장은 공급사 실청구의 독립 증명이 아니며, 공개 Broker·실행·운영 배포 전체는 미완료다.
+Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.

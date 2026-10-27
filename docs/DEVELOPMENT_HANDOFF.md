@@ -371,3 +371,12 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 원본 `.local/evidence/preflight-policy-20261028-2noz3me8`. 실제 PostgreSQL 169개·SQL 96개·참조 112개 및
 동일 웹 소스 npm ci/tsc/build가 통과했고 전체 API는 검증 중이다. main 반영은 계속 필요하다.
 기존 작업 파일과 겹치지 않도록 통합 브랜치 `5d4def9`을 준비했고 집중 94개도 통과했다.
+
+## 2026-10-28 preflight main 통합 및 남은 경계
+
+`f07089a`까지 main에 반영했고 `3740307` 검증본과 API·웹·정본 tree가 같다.
+전체 API 635 passed·1 skipped, 실제 PostgreSQL 169 passed, SQL 96·참조 112·계약 0 failure,
+동일 웹 npm ci/tsc/build·집중 94 passed. 원본/해시: `docs/validation/2026-10-28-preflight-policy.json`.
+다른 작업의 미커밋 runner와 승격 Critic 테스트는 보존했고 검증본에는 포함되지 않았다.
+실제 공급사 청구 출처 검증, 공개 명령/Broker·DB 전체 연결 및 운영 배포는 계속 미완료다.
+자동 재개와 Muse Spark 기본값을 유지한다.
