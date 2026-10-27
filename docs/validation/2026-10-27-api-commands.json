@@ -1,0 +1,65 @@
+{
+  "date": "2026-10-27",
+  "revision": "9bfe0bc566bca422e0d9ab3b024b6a1a302692c7",
+  "base_revision": "770bc44",
+  "worktree": "C:\\evo_forge_codex",
+  "branch": "codex/commands-persistence",
+  "scope": "Standalone canonical command store; public Generate hook pending higher-priority round7 integration",
+  "checks": {
+    "api": {
+      "passed": 403,
+      "skipped": 1
+    },
+    "live_postgresql_kernel": {
+      "passed": 91
+    },
+    "sql": {
+      "passed": 96
+    },
+    "reference": {
+      "passed": 112
+    },
+    "contract": {
+      "failures": 0
+    },
+    "web_build": "passed"
+  },
+  "limitations": [
+    "No public command backend hook yet",
+    "No paid provider call in this validation",
+    "No production database migration or deployment",
+    "Public ledger and mission persistence still separate",
+    "Muse Spark muse-spark-1.3 remains the default"
+  ],
+  "source_sha256": {
+    "services/api/evoforge/postgres_commands.py": "366a63ea92646d0b1e0bdbefc6a9dabbd318bf793188e3e7d04a0af3641580bc",
+    "services/api/migrations/004_api_commands.sql": "4192c92953d126f96ab4b3377b8abe5aed909d318de0b83d21e25c333c4bc3c3",
+    "services/api/tests/test_postgres_kernel.py": "92399362566154c164d862644e4b9ab7f91cd0b5384a8b6729356724f72fe531"
+  },
+  "logs": {
+    "validation-commands-api.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\api-commands-20261027-9e7itreq\\validation-commands-api.log",
+      "sha256": "89a9d0bfc3cbea964a2931964d946b735598d11dc52d6f740a1cba3a15f6b02a"
+    },
+    "validation-commands-contract.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\api-commands-20261027-9e7itreq\\validation-commands-contract.log",
+      "sha256": "aa81abe5829fe978d2cf176ce976baf7ff0887dd52a1b25796284a7f693a6d00"
+    },
+    "validation-commands-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\api-commands-20261027-9e7itreq\\validation-commands-postgres.log",
+      "sha256": "f598bbf2f5f6a01d88461592fae2a42be76914571dc72a91c7c9e4691fef8b5a"
+    },
+    "validation-postgres.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\api-commands-20261027-9e7itreq\\validation-postgres.log",
+      "sha256": "997dd47e201f6e51b44a7e70451e7c44bcf36873445d280f0dca9980d7815fd1"
+    },
+    "validation-kernel.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\api-commands-20261027-9e7itreq\\validation-kernel.log",
+      "sha256": "888d8d83060590f644c67b6869b1f754bbc550bf7db395a7f2699c9da35affbf"
+    },
+    "validation-commands-web.log": {
+      "path": "C:\\evo_forge\\.local\\evidence\\api-commands-20261027-9e7itreq\\validation-commands-web.log",
+      "sha256": "1f53b1abbde142a6b2dad7610df3430990e71d75dff3eb762e370c41654f03dc"
+    }
+  }
+}

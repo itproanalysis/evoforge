@@ -1089,3 +1089,203 @@ def test_remote_bundle_runner_provenance_survives_client_and_backstops_core_gate
             raw.pop('attestation')
         monkeypatch.setattr(httpx,'post',lambda *args,**kwargs:httpx.Response(200,json=raw))
         assert ctx['api'].post('/v1/runs',json=ctx['request']).status_code==502
+
+
+@pytest.fixture
+def command_store(funded, monkeypatch):
+    from evoforge.postgres_commands import CommandStore
+    monkeypatch.setenv('EVO_COMMAND_ACTOR_ID', str(uuid4()))
+    return CommandStore(funded['kernel'])
+
+
+def test_canonical_command_response_and_history_survive_new_store_and_process(funded, command_store):
+    from evoforge.postgres_commands import CommandStore
+    created = command_store.create('한글 goal', 'arbitrary / key with spaces')
+    cid = created['command_id']
+    assert created['state'] == 'RECEIVED' and created['kind'] == 'BUILD'
+    dispatched = command_store.dispatch(cid)
+    assert dispatched['state'] == 'DISPATCHED'
+    body = {'command_id': cid, 'candidate': {'diff': 'verified fixture'}, 'evidence': {'id': 'ev_fixture'}}
+    dispatched['served'] = body
+    assert dispatched['state'] == 'APPLIED'
+    restarted = CommandStore(funded['kernel']).create('한글 goal', 'arbitrary / key with spaces')
+    assert restarted['served'] == body
+    assert [state for state, _ in restarted['history']] == ['RECEIVED','VALIDATING','PLANNED','DISPATCHED','APPLYING','APPLIED']
+    with psycopg.connect(funded['dsn']) as conn:
+        row = conn.execute('SELECT kind,status,payload FROM core.commands WHERE command_id=%s', (UUID(cid[4:]),)).fetchone()
+        assert row[0:2] == ('ASK','APPLIED') and row[2]['api_kind'] == 'BUILD'
+    env = {**os.environ, 'COMMAND_CHECK_DSN': funded['dsn'], 'COMMAND_CHECK_TENANT': str(funded['scope'].tenant_id),
+           'COMMAND_CHECK_PROJECT': str(funded['scope'].project_id), 'COMMAND_CHECK_ID': cid}
+    script = """import os
+from evoforge.postgres_kernel import KernelScope,PostgresKernel
+from evoforge.postgres_commands import CommandStore
+s=CommandStore(PostgresKernel(os.environ['COMMAND_CHECK_DSN'],KernelScope(os.environ['COMMAND_CHECK_TENANT'],os.environ['COMMAND_CHECK_PROJECT'])))
+r=s.get(os.environ['COMMAND_CHECK_ID'])
+assert r['state']=='APPLIED' and r['served']['evidence']['id']=='ev_fixture'
+print('restored')
+"""
+    child = subprocess.run([sys.executable,'-c',script],cwd=ROOT/'services/api',env=env,capture_output=True,
+                           text=True,timeout=15,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+    assert child.returncode == 0 and child.stdout.strip() == 'restored'
+
+
+def test_command_retry_after_dispatch_never_authorizes_another_attempt(funded, command_store):
+    from evoforge.commands import TransitionError
+    from evoforge.postgres_commands import CommandStore
+    cid = command_store.create('g','call-key')['command_id']
+    command_store.dispatch(cid)
+    restarted = CommandStore(funded['kernel'])
+    assert restarted.create('g','call-key')['state'] == 'DISPATCHED'
+    with pytest.raises(TransitionError):
+        restarted.dispatch(cid)
+    with pytest.raises(TransitionError):
+        restarted.advance(cid,'APPLIED')  # client status input cannot fabricate completion
+    assert 'served' not in restarted.get(cid)
+
+
+def test_concurrent_command_acceptance_and_dispatch_are_single_flight(command_store):
+    from evoforge.commands import TransitionError
+    with ThreadPoolExecutor(max_workers=6) as workers:
+        rows = list(workers.map(lambda _: command_store.create('g','concurrent-key'),range(6)))
+    assert len({row['command_id'] for row in rows}) == 1
+    def dispatch(_):
+        try:
+            command_store.dispatch(rows[0]['command_id'])
+            return True
+        except TransitionError:
+            return False
+    with ThreadPoolExecutor(max_workers=6) as workers:
+        assert sum(workers.map(dispatch,range(6))) == 1
+
+
+def test_canonical_command_refuses_changed_replay_invalid_transitions_and_risky_shortcuts(command_store):
+    from evoforge.commands import NeedsConfirmation, TransitionError
+    first = command_store.create('g','unique-key')
+    with pytest.raises(TransitionError):
+        command_store.create('different goal','unique-key')
+    with pytest.raises(TransitionError):
+        command_store.advance(first['command_id'],'APPLIED')
+    assert command_store.get(first['command_id'])['state'] == 'RECEIVED'
+    with pytest.raises(NeedsConfirmation):
+        command_store.create('risk','high-risk',risk='HIGH')
+    with pytest.raises(TransitionError):
+        command_store.create('merge','merge-key',kind='APPROVE_MERGE',confirm=True)
+
+
+def test_canonical_command_versions_and_safety_fast_lane_are_db_enforced(command_store):
+    from evoforge.commands import TransitionError
+    with pytest.raises(TransitionError):
+        command_store.create('stale','stale-key',expected_version='999')
+    stop = command_store.create('stop','stop-key',kind='STOP_ALL',expected_version='999')
+    assert stop['kind'] == 'STOP_ALL'
+
+
+def test_command_results_are_immutable_and_commands_are_scope_isolated(funded, command_store):
+    from evoforge.commands import TransitionError
+    from evoforge.postgres_commands import CommandStore
+    cmd = command_store.create('g','result-key')
+    command_store.dispatch(cmd['command_id'])
+    result = {'command_id': cmd['command_id'], 'candidate': {'diff': 'x'}}
+    command_store.complete(cmd['command_id'],result)
+    assert command_store.complete(cmd['command_id'],result)['served'] == result
+    with pytest.raises(TransitionError):
+        command_store.complete(cmd['command_id'],{**result,'candidate': {'diff':'changed'}})
+    foreign = CommandStore(PostgresKernel(funded['dsn'],KernelScope(funded['scope'].tenant_id,uuid4())))
+    assert foreign.get(cmd['command_id']) is None
+
+
+def test_command_input_errors_do_not_accept_or_confirm_a_command(funded, command_store, monkeypatch):
+    from decimal import Decimal
+    from evoforge.commands import TransitionError
+    from evoforge.postgres_kernel import KernelUnavailable
+    for version in (True, 1.0, Decimal(0), '01', -1, 2**63):
+        with pytest.raises(TransitionError):
+            command_store.create('g', 'bad-version', expected_version=version)
+    for goal, key, options in [('g', 'bad-confirm', {'risk':'HIGH', 'confirm':'false'}),
+                               ('nul\x00goal', 'bad-text', {}),
+                               ('g', 'nul\x00key', {}), ('surrogate\ud800', 'bad-text', {})]:
+        with pytest.raises(TransitionError):
+            command_store.create(goal, key, **options)
+    monkeypatch.delenv('EVO_COMMAND_ACTOR_ID')
+    with pytest.raises(KernelUnavailable, match='actor is not configured'):
+        command_store.create('g', 'missing-actor')
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.commands WHERE tenant_id=%s AND project_id=%s',
+                            command_store.scope).fetchone()['n'] == 0
+
+
+def test_database_refuses_responses_for_unapplied_or_mismatched_commands(funded, command_store):
+    cmd = command_store.create('g', 'response-constraints')
+    cid = UUID(cmd['command_id'][4:])
+    def insert(document):
+        with funded['kernel']._transaction() as conn:
+            conn.execute('INSERT INTO runtime.api_command_results(tenant_id,project_id,command_id,document) '
+                         'VALUES (%s,%s,%s,%s)', (*command_store.scope,cid,Jsonb(document)))
+    with pytest.raises(KernelRejected):
+        insert({'command_id': cmd['command_id']})  # RECEIVED is not complete
+    command_store.dispatch(cmd['command_id'])
+    # Exercise the SQL constraint directly with the trusted application role;
+    # the public adapter requires complete() and refuses this manual advance.
+    with funded['kernel']._transaction() as conn:
+        conn.execute("UPDATE core.commands SET status='APPLIED' WHERE command_id=%s", (cid,))
+    for document in ({}, {'command_id':'cmd_'+uuid4().hex}):
+        with pytest.raises(KernelRejected):
+            insert(document)
+    insert({'command_id':cmd['command_id']})
+    with funded['kernel']._transaction() as conn:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute('UPDATE runtime.api_command_results SET document=%s WHERE command_id=%s',
+                         (Jsonb({'command_id':cmd['command_id'],'changed':True}),cid))
+
+
+def test_command_status_read_does_not_mix_states_across_completion(funded, command_store, monkeypatch):
+    from threading import Event
+    cmd = command_store.create('g','consistent-status')
+    command_store.dispatch(cmd['command_id'])
+    entered, release = Event(), Event()
+    original = command_store._view
+    def pause_view(conn,row):
+        if row['status'] == 'DISPATCHED':
+            entered.set()
+            assert release.wait(10), 'status read did not resume'
+        return original(conn,row)
+    monkeypatch.setattr(command_store,'_view',pause_view)
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        reading = workers.submit(command_store.get,cmd['command_id'])
+        assert entered.wait(5)
+        completing = workers.submit(command_store.complete,cmd['command_id'],{'command_id':cmd['command_id']})
+        try:
+            with psycopg.connect(funded['dsn'],autocommit=True) as control:
+                deadline = time.monotonic()+5
+                while time.monotonic() < deadline:
+                    # Row writers wait on a transaction-ID lock, whose own
+                    # pg_locks.database is NULL; scope via the waiting session.
+                    waiting = control.execute('SELECT EXISTS(SELECT 1 FROM pg_locks l '
+                                              'JOIN pg_stat_activity a USING(pid) WHERE NOT l.granted '
+                                              'AND a.datname=current_database())').fetchone()[0]
+                    if waiting:
+                        break
+                    time.sleep(0.01)
+                assert waiting, 'completion must wait for the status snapshot'
+        finally:
+            release.set()
+        old = reading.result(timeout=10)
+        new = completing.result(timeout=10)
+    assert old['state'] == 'DISPATCHED' and 'served' not in old
+    assert [state for state,_ in old['history']][-1] == 'DISPATCHED'
+    assert new['state'] == 'APPLIED' and new['served']['command_id'] == cmd['command_id']
+
+
+def test_command_completion_failure_rolls_back_state_history_and_response(command_store, monkeypatch):
+    from evoforge.postgres_kernel import KernelUnavailable
+    cmd = command_store.create('g','completion-rollback')
+    command_store.dispatch(cmd['command_id'])
+    def fail_after_insert(*args):
+        raise KernelUnavailable('injected failure')
+    with monkeypatch.context() as patch:
+        patch.setattr(command_store,'_view',fail_after_insert)
+        with pytest.raises(KernelUnavailable):
+            command_store.complete(cmd['command_id'],{'command_id':cmd['command_id']})
+    row = command_store.get(cmd['command_id'])
+    assert row['state']=='DISPATCHED' and 'served' not in row
+    assert [state for state,_ in row['history']] == ['RECEIVED','VALIDATING','PLANNED','DISPATCHED']
