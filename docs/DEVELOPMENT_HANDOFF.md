@@ -345,3 +345,9 @@ SQL 96·참조 112·CLI 집중 29개·정본 검사 0 failure를 통과했다. �
 정본 schema와 S1–S11에 연결하고 만료·프록시·미확인 캐시 모드를 차단한다. 집중 22개·계약 검사는
 통과했고 전체 API 검사가 진행 중이다. main 미반영; 원본 `.local/evidence/muse-capability-20261027-a799ryo1`.
 T22와 다른 작업을 보존하고 완료 전 현재 채팅의 자동 재개를 유지한다.
+
+## 2026-10-27 CLI 원본 사용량 후속
+
+`codex/pg-integration` `545b1f6`은 CLI 원본 JSON 사용량을 그대로 보존하고 실청구 출처 명시가 없으면
+UNKNOWN 예약을 유지한다. 수정 전 9 failed, 수정 후 관련 집중 38 passed. 원본은
+`.local/evidence/cli-raw-usage-20261027-8igvgow9`. 실청구 인증·전체 API/DB 재검증·main 반영은 미완료다.

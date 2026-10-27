@@ -648,3 +648,12 @@ T22 우선 작업과 Muse Spark 기본값·현재 채팅 자동 재개를 유지
 
 근거: 신규 수용 테스트 **9 passed**(`test_event_bus_and_sse_cr.py` 4개, `test_observability_and_governance_cr.py` 5개), 참조 **112개**·`validate_package.py` **0 failure**.
 기존 `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 변경하지 않았다. 실제 운영 DB/SSE 엔드포인트 및 외부 PG 웹훅 연결은 별도 범위다.
+
+## CLI 원본 사용량·청구 출처 추가 보강
+
+지원 브랜치 `codex/pg-integration`의 `545b1f6`은 CLI 어댑터가 공급사 실청구 출처를 명시하고
+원본 JSON 사용량을 제공한 경우에만 영수증을 구성하며 원본을 재구성하지 않고 보존한다.
+누락·estimated·잘못된 JSON·너무 긴 요청 ID는 UNKNOWN 예약을 유지한다. 수정 전 9 failed,
+수정 후 관련 집중 38 passed. 원본은 `.local/evidence/cli-raw-usage-20261027-8igvgow9`.
+이 표시는 어댑터의 주장일 뿐 공급사 실청구를 독립적으로 인증하지 않으며 운영 연결 전 검증이 필요하다.
+`545b1f6`은 아직 main 미반영이다. 전체 API/DB 및 capability 변경 통합 검증은 계속 진행한다.
