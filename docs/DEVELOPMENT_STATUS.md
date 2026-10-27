@@ -118,6 +118,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — mission 영속화:** T22의 main/평가/UI 편집과 분리해
+  `postgres_missions.py`, `missions.py`의 선택 backend, 확장 006, Codex 테스트·관련 문서를 수정한다.
+  API가 이미 사용하는 mission facade를 통해 상태/단계 증거를 복원하고, 같은 상태 전이와 봉인 코드 비노출을 유지한다.
+  main.py·상위 봉인 테스트는 편집하지 않는다. 모델 호출 전 claim·비용/명령의 공유 core 연결은 T22 병합 뒤 이어간다.
 - **Codex (내부 통합 검증 완료·공개 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** 두 준비된 지원 브랜치를 별도 통합 브랜치에서 합쳤다.
   명령 완료 응답과 같은 scope의 서버 생성 증거를 원자적으로 연결하도록 `postgres_commands.py`·확장 004·Codex 테스트·문서를 보강한다.
   `kernel_api.py`의 서비스 인증 명령 접수/dispatch/완료/조회 경로와 Codex HTTP 테스트도 연결한다. 브라우저에는 내부 자격 증명을 제공하지 않는다.
