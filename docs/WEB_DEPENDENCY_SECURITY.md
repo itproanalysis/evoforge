@@ -31,5 +31,8 @@ npm run build
 - 검사 후 해당 서버 프로세스 종료 확인.
 - 로그는 지원 작업 트리의 `.local/validation-web-audit.json`, `.local/validation-web-startup.log`.
 
+main 반영 후 `C:\evo_forge`에서도 npm ci·audit 0건·프로덕션 빌드와 standalone HTTP 검사를 통과했다.
+최종 로그는 main의 `.local/evidence/receipts-20261027-f42duc14`에 별도로 보존했다.
+
 Linux 컨테이너 빌드, Cloud Run 배포, 실제 공급사·GitHub 워크플로와 브라우저 사용자 인증은
 이번 검증에 포함하지 않았다. Muse Spark 기본값과 자동 모델 대체 금지는 유지했다.

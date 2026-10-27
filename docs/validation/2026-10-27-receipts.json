@@ -1,0 +1,41 @@
+{
+  "recorded_at": "2026-10-27T00:05:45.699348+00:00",
+  "tested_revision": "228c272bff9103b9074fb69e141659f42284dbf6",
+  "api": {
+    "passed": 291,
+    "skipped_db_module": 1
+  },
+  "postgres": {
+    "version": "15.19",
+    "passed": 46,
+    "sql_checks": 96,
+    "reference_tests": 112
+  },
+  "web": {
+    "next": "15.5.28",
+    "postcss": "8.5.32",
+    "npm_audit_vulnerabilities": 0,
+    "production_build": "passed",
+    "standalone_http": "passed",
+    "test_server_stopped": true
+  },
+  "primary_model": "muse-spark-1.3",
+  "automatic_model_fallback": false,
+  "actual_provider_execution_verified": false,
+  "actual_github_pr_verified": false,
+  "container_and_cloud_deployment_verified": false,
+  "current_process_credential_presence": {
+    "MODEL_API_KEY": false,
+    "DATABASE_URL": false,
+    "GITHUB_TOKEN": false,
+    "EVO_KERNEL_TOKEN": false
+  },
+  "file_sha256": {
+    "validation-api.log": "da047f5542a5e5587d297dc8ccf48f474fb1ce01789c03af246751e79ad97826",
+    "validation-postgres.log": "15f7388dc85d8c4e437c6d29b29f5265e2185ffdfb945082a953144990441930",
+    "validation-kernel.log": "b70f2a7ef8d849b468c692b7a6e3decd90004926daacd87238ad794dfde9d902",
+    "validation-web-audit.json": "df6f48adbc2555a5067fd4c9ff28240c9c2a292b1b456bbde1a0bc3c04007de5",
+    "validation-web-build.log": "ad62cbb6dec304fcf0fe2f07652071ea4a214d8ce21afb217bd59923e22c1657",
+    "validation-web-startup.log": "8e4caf08dc96ae0ba762e31c493edc584e1d92c95b50733766d762d48dcd85a3"
+  }
+}
