@@ -131,3 +131,4 @@ main 작업 폴더의 최종 API **291 passed·1 skipped**, 실제 DB **46 passe
 API 403 passed·1 skipped, 실제 DB 81 passed, 참조 112·SQL 96·패키지 검사·웹 빌드 통과.
 명령·공개 원장은 아직 메모리이고, 운영 DB 적용·전체 P0-2 완료는 별도다.
 [설정과 경계](EVIDENCE_PERSISTENCE.md), main 반영 기록과 원본 로그는 STATUS를 따른다.
+`1554547`로 main에 반영했고 main API 시작/health/OpenAPI도 확인했다. 선택 모드는 운영에 자동 활성화하지 않았다.

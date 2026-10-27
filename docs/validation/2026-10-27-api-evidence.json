@@ -30,5 +30,7 @@
     "validation-kernel.log": "8d5271a5c3b6076d364bf4778c9185a5d86eb194f300de397f45a0e581aa9595",
     "validation-postgres.log": "1f21e4c74de011cbc679bdcffd3c8f518ccc52d65b80d17e0c7523bfbe813b40",
     "validation-evidence-web.log": "bf14007b58f9e3bdd5b13937f4071279bc4a6c4ae66a1a20f464ec805f62a15c"
-  }
+  },
+  "main_integration_revision": "1554547",
+  "main_api_startup_and_openapi": "passed"
 }

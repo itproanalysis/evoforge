@@ -44,6 +44,10 @@ DB는 일회용이고 실제 Meta 호출이나 운영 데이터는 사용하지 
 재현은 `tools/validate_local_pg.py --kernel-tests`와 전체 API 테스트를 사용한다.
 마이그레이션 001–003은 실제 DB bootstrap에서 두 번 적용한다.
 
+2026-10-27: API **403 passed·1 skipped**, 실제 DB **81 passed**, SQL 96·참조 112·패키지 검사·웹 빌드 통과.
+`1554547`로 main에 반영했다. 원본 로그 해시와 검증 범위는
+`docs/validation/2026-10-27-api-evidence.json`에 기록했다. 운영 활성화·추가 실 Meta 호출은 수행하지 않았다.
+
 ## 남은 P0-2
 
 명령 lifecycle과 공개 요청의 비용 원장은 아직 메모리 구현이다.

@@ -118,7 +118,7 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex / `codex/evidence-persistence` / `C:\evo_forge_codex`:** P0-2 중 서버 증거·비공개 봉인 리뷰·이벤트/체인의 PostgreSQL 영속화를 실제 요청 경로에 연결한다.
+- **Codex (증거 단계 완료·클레임 해제) / `codex/evidence-persistence` / `C:\evo_forge_codex`:** P0-2 중 서버 증거·비공개 봉인 리뷰·이벤트/체인의 PostgreSQL 영속화를 실제 요청 경로에 연결한다.
   `postgres_state.py`, `evidence.py`, main의 저장소 선택/오류 경계·예약 전 가용성 확인, 확장 003, Codex DB 테스트와 관련 문서·환경 예제를 수정한다.
   상위 Muse round6의 인증·원격 checkout·Runner·Builder/PR 구현은 보존한다. 명령·비용 원장의 PG 요청 연결은 별도 잔여 항목이다.
 - **Codex 지원 (완료·클레임 해제) / `codex/builder-preflight` / `C:\evo_forge_codex`:** Builder 호출의 기존 패킷·공급사 동의·agent/task lease 검증과 비용 예약의 원자적 바인딩을 맡는다.
@@ -178,7 +178,7 @@ standalone 서버의 `/`, `/lab`, `/evidence`와 정적 JS HTTP 응답 및 검�
 정본 패키지 검사와 웹 프로덕션 빌드가 통과했다. 상위 main/critic/runner/gates/evidence/web·봉인 테스트·정본은 그대로 보존했다.
 이는 Builder 호출 준비·전송 전 상태 검사다. SDK 전송기·실제 요율/청구·사용자 인증·Runner/core 증거 연결·배포는 남아 있다.
 
-## 요청 경로 증거 영속화 (지원 구현·검증 완료)
+## 요청 경로 증거 영속화 (main 반영 완료)
 
 `69add6e`는 `EVO_STATE_BACKEND=postgres`에서 실제 요청 증거·비공개 Critic 원본·단계 이벤트와 체인을
 PostgreSQL로 연결한다. 별도 API 프로세스에서도 기존 리뷰와 실제 Runner 결과를 복원하고,
@@ -188,3 +188,7 @@ API **403 passed·1 skipped**, 실제 PostgreSQL **81 passed**, 참조 **112개*
 Next 15.5.28 프로덕션 빌드가 통과했다. DB 오류 시 메모리로 우회하거나 공급사를 호출하지 않고 503으로 거부하며,
 처음부터 저장소가 불가하면 명령의 멱등 키도 소비하지 않는다.
 명령·공개 비용 원장은 아직 메모리이므로 P0-2 전체 완료나 운영 Cloud SQL 적용 완료를 뜻하지 않는다.
+`1554547`로 main에 fast-forward 반영했으며, 상위 round6 구현·인프라·비용 리포터를 보존했다.
+main의 API 모듈 컴파일·health/OpenAPI도 통과했다. 검증 원본은
+`C:\evo_forge\.local\evidence\api-evidence-20261027-f29wjim1`에 별도 보존했고
+`docs/validation/2026-10-27-api-evidence.json`에 각 로그 SHA-256을 기록했다.
