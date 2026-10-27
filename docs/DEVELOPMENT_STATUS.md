@@ -120,7 +120,8 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 - **Codex / `codex/pg-integration` / `C:\evo_forge_codex` — 테넌트 전체 비용 예약 보호:** 프로젝트 RLS로 다른 프로젝트의 open 예약이 숨겨지는 경우를
   Codex DB 회귀 테스트로 재현하고, 필요하면 확장 007의 private tenant hold 감사 기록과 추가 예약 검사를 구현한다.
-  정본 reserve/settle 함수와 RLS 정책은 보존하고 모델/main/T22 파일은 변경하지 않는다. 소유 파일은 새 SQL 확장·Codex 테스트·관련 문서다.
+  정본 reserve/settle 함수와 RLS 정책은 보존하고 모델/main/T22 파일은 변경하지 않는다.
+  소유 파일은 새 SQL 확장·postgres_kernel.py의 가드 준비 검사·Codex 테스트·환경 예제/관련 문서다.
 - **Codex (mission 호출 증거 복구 검증 완료·공유 core 연결 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** T22의 main/평가/UI 편집과 분리해
   `postgres_missions.py`, `missions.py`의 선택 backend, 확장 006, Codex 테스트·관련 문서를 수정한다.
   `50ffc5b`에서 API가 이미 사용하는 mission facade의 상태/단계 증거 복원·RLS·봉인 코드 비노출을 구현했다.
