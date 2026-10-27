@@ -153,10 +153,13 @@ def test_baseline_timeout_is_504(monkeypatch):
 
 
 def test_baseline_unexpected_is_502_without_traceback(monkeypatch):
-    def _boom():
+    # Critic (T20b): the baseline calls the Builder once per task; a Builder failure must still be a clean 502.
+    from evoforge import broker_meta
+
+    def _boom(*a, **k):
         raise RuntimeError("boom")
 
-    monkeypatch.setattr(sealed_eval, "_provider_single_shot", _boom)
+    monkeypatch.setattr(broker_meta, "call_builder", _boom)
     r = c.post("/v1/eval/baseline",
                json={"suite_version": "v0", "model": "muse-spark-1.3"})
     assert r.status_code == 502, r.text
