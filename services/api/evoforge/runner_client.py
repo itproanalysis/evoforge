@@ -176,6 +176,15 @@ def _validate_counts(section: object, name: str) -> dict:
             "timed_out": section["timed_out"], "exit_code": exit_code}
 
 
+def _validate_collection(section: dict, supplied_count: int, name: str) -> None:
+    """Reject a claimed success that cannot cover the suite sent to the Runner."""
+    if supplied_count == 0 and section["n"] != 0:
+        raise RunnerClientError(f"malformed runner reply ({name}: tests were not supplied)")
+    claimed_success = section["n"] > 0 and section["pass"] == section["n"] and not section["timed_out"]
+    if claimed_success and (section["exit_code"] != 0 or section["n"] < supplied_count):
+        raise RunnerClientError(f"malformed runner reply ({name}: incomplete or unsuccessful collection)")
+
+
 def run_via_runner(source_repo, base_sha, diff, visible_tests, sealed_tests,
                    timeout_s: int = 120) -> dict:
     """Execute via the remote Runner; returns the run dict for gate evaluation."""
@@ -257,9 +266,13 @@ def run_via_runner(source_repo, base_sha, diff, visible_tests, sealed_tests,
             raise RunnerClientError("malformed runner reply (base mismatch)")
         visible = _validate_counts(data.get("visible"), "visible")
         heldout = _validate_counts(data.get("heldout"), "heldout")
+        _validate_collection(visible, len(payload["visible"]), "visible")
+        _validate_collection(heldout, len(payload["sealed"]), "heldout")
         kinds = data.get("heldout_kinds")
         if not isinstance(kinds, list) or any(not isinstance(k, str) for k in kinds):
             raise RunnerClientError("malformed runner reply (heldout_kinds)")
+        if kinds != [test.get("kind", "") for test in payload["sealed"]]:
+            raise RunnerClientError("malformed runner reply (heldout_kinds mismatch)")
         if data.get('hygiene', []) != []:
             raise RunnerClientError('runner sandbox hygiene failed')
         result = {"base": base, "hygiene": [], "visible": visible,

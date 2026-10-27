@@ -46,9 +46,9 @@ def commits(tmp_path, monkeypatch):
 
 
 def _response(base):
-    counts = {"pass": 1, "n": 1, "timed_out": False, "exit_code": 0}
+    counts = {"pass": 0, "n": 0, "timed_out": False, "exit_code": 5}
     return httpx.Response(200, json={"base": base, "hygiene": [], "visible": counts,
-                                    "heldout": counts, "heldout_kinds": ["boundary"]})
+                                    "heldout": counts, "heldout_kinds": []})
 
 
 def test_mismatched_remote_base_never_becomes_run_evidence(commits, monkeypatch):
@@ -209,3 +209,72 @@ def test_bundle_ref_changed_after_verification_is_not_deleted(commits, monkeypat
         assert _git(repo, "rev-parse", "--verify", branch) == second
     finally:
         Path(bundle).unlink(missing_ok=True)
+
+
+def _stats_response(base, visible, heldout, kinds):
+    return httpx.Response(200, json={"base": base, "hygiene": [], "visible": visible,
+                                    "heldout": heldout, "heldout_kinds": kinds})
+
+
+_VIS_TWO = [{"code": "def test_a():\n assert 1 == 1\n"}, {"code": "def test_b():\n assert 2 == 2\n"}]
+_SEALED_THREE = [{"code": "def test_s():\n assert 1\n", "kind": kind}
+                 for kind in ("compositional", "negative", "boundary")]
+_ONE_SUCCESS = {"pass": 1, "n": 1, "timed_out": False, "exit_code": 0}
+_THREE_SUCCESS = {"pass": 3, "n": 3, "timed_out": False, "exit_code": 0}
+_TWO_SUCCESS = {"pass": 2, "n": 2, "timed_out": False, "exit_code": 0}
+
+
+@pytest.mark.parametrize("visible,heldout", [
+    (_ONE_SUCCESS, _THREE_SUCCESS), (_TWO_SUCCESS, _ONE_SUCCESS),
+])
+def test_incomplete_success_counts_are_not_returned_as_run_evidence(commits, monkeypatch, visible, heldout):
+    repo, first, _ = commits
+    monkeypatch.setattr(httpx, "post", lambda *_a, **_k: _stats_response(
+        first, visible, heldout, [t["kind"] for t in _SEALED_THREE]))
+    with pytest.raises(runner_client.RunnerClientError, match="visible|heldout"):
+        runner_client.run_via_runner(str(repo), first, "", _VIS_TWO, _SEALED_THREE)
+
+
+@pytest.mark.parametrize("kinds", [[], ["boundary", "negative", "compositional"],
+                                   ["compositional", "negative", "different"]])
+def test_reported_sealed_kinds_must_match_the_sent_suite(commits, monkeypatch, kinds):
+    repo, first, _ = commits
+    monkeypatch.setattr(httpx, "post", lambda *_a, **_k: _stats_response(
+        first, _TWO_SUCCESS, _THREE_SUCCESS, kinds))
+    with pytest.raises(runner_client.RunnerClientError, match="heldout_kinds"):
+        runner_client.run_via_runner(str(repo), first, "", _VIS_TWO, _SEALED_THREE)
+
+
+@pytest.mark.parametrize("exit_code", [None, 1])
+def test_success_counts_require_a_successful_exit(commits, monkeypatch, exit_code):
+    repo, first, _ = commits
+    visible = {**_TWO_SUCCESS, "exit_code": exit_code}
+    monkeypatch.setattr(httpx, "post", lambda *_a, **_k: _stats_response(
+        first, visible, _THREE_SUCCESS, [t["kind"] for t in _SEALED_THREE]))
+    with pytest.raises(runner_client.RunnerClientError, match="visible"):
+        runner_client.run_via_runner(str(repo), first, "", _VIS_TWO, _SEALED_THREE)
+
+
+def test_no_suite_cannot_report_collected_tests(commits, monkeypatch):
+    repo, first, _ = commits
+    empty = {"pass": 0, "n": 0, "timed_out": False, "exit_code": 5}
+    monkeypatch.setattr(httpx, "post", lambda *_a, **_k: _stats_response(first, _ONE_SUCCESS, empty, []))
+    with pytest.raises(runner_client.RunnerClientError, match="visible"):
+        runner_client.run_via_runner(str(repo), first, "", [], [])
+
+
+def test_failed_collection_can_still_be_reported_as_failure(commits, monkeypatch):
+    repo, first, _ = commits
+    failed = {"pass": 0, "n": 1, "timed_out": False, "exit_code": 1}
+    monkeypatch.setattr(httpx, "post", lambda *_a, **_k: _stats_response(
+        first, failed, _THREE_SUCCESS, [t["kind"] for t in _SEALED_THREE]))
+    result = runner_client.run_via_runner(str(repo), first, "", _VIS_TWO, _SEALED_THREE)
+    assert result["visible"] == failed
+
+
+def test_complete_matching_suites_remain_usable(commits, monkeypatch):
+    repo, first, _ = commits
+    kinds = [t["kind"] for t in _SEALED_THREE]
+    monkeypatch.setattr(httpx, "post", lambda *_a, **_k: _stats_response(first, _TWO_SUCCESS, _THREE_SUCCESS, kinds))
+    result = runner_client.run_via_runner(str(repo), first, "", _VIS_TWO, _SEALED_THREE)
+    assert result["visible"] == _TWO_SUCCESS and result["heldout_kinds"] == kinds
