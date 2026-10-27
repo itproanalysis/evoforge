@@ -166,28 +166,48 @@ def _pr(monkeypatch, eid, fake):
 
 def test_pr_commits_builder_tests(monkeypatch):
     eid = _run_evidence(monkeypatch)
+    tag = eid.replace("ev_", "")[:8]
+    name = f"tests/evoforge_gen/test_{tag}_1.py"
     fake = Fake({"calc.py": BUGGY})
     r = _pr(monkeypatch, eid, fake)
     assert r.status_code == 200, r.text
     puts = {q.url.path.split("/contents/", 1)[1]: json.loads(q.content) for q in fake.calls if q.method == "PUT"}
-    assert "calc.py" in puts and "tests/evoforge_gen/test_gen_1.py" in puts
-    assert base64.b64decode(puts["tests/evoforge_gen/test_gen_1.py"]["content"]).decode() == VIS[0]["code"]
+    assert "calc.py" in puts and name in puts
+    assert base64.b64decode(puts[name]["content"]).decode() == VIS[0]["code"]
     pull = json.loads([q for q in fake.calls if q.method == "POST" and q.url.path.endswith("/pulls")][0].content)
-    assert "tests/evoforge_gen/test_gen_1.py" in pull["body"]
+    assert name in pull["body"]
     assert all(MARK not in q.content.decode(errors="ignore") for q in fake.calls if q.content)
 
 
 def test_pr_refuses_test_path_collision(monkeypatch):
-    diff = FIX + "--- /dev/null\n+++ b/tests/evoforge_gen/test_gen_1.py\n@@ -0,0 +1 @@\n+x = 1\n"
-    eid = _run_evidence(monkeypatch, diff=diff)
+    from evoforge import patch as _patch
+
+    eid = "ev_collision01"
+    tag = "collision01"[:8]
+    name = f"tests/evoforge_gen/test_{tag}_1.py"
+    diff = FIX + f"--- /dev/null\n+++ b/{name}\n@@ -0,0 +1 @@\n+x = 1\n"
+    assert name in _patch.paths_in_diff(diff)
+    main._evidence[eid] = {
+        "id": eid, "diff": diff, "tests": VIS,
+        "gates": [{"gate": "GH_INTEGRITY", "result": "PASS"}, {"gate": "G2_REQUIRED", "result": "PASS"}],
+        "run": {"visible": {"pass": 1, "n": 1}, "heldout": {"pass": 3, "n": 3}},
+    }
     fake = Fake({"calc.py": BUGGY})
     r = _pr(monkeypatch, eid, fake)
-    assert r.status_code == 409, r.text
-    assert not [q for q in fake.calls if q.method in ("PUT", "DELETE") or q.url.path.endswith("/pulls")]
+    try:
+        assert r.status_code == 409, r.text
+        assert not [q for q in fake.calls if q.method in ("PUT", "DELETE") or q.url.path.endswith("/pulls")]
+    finally:
+        try:
+            del main._evidence[eid]
+        except KeyError:
+            pass
 
 
 def test_pr_refuses_existing_generated_path(monkeypatch):
     eid = _run_evidence(monkeypatch, tests=VIS)
-    fake = Fake({"calc.py": BUGGY, "tests/evoforge_gen/test_gen_1.py": "old"})
+    tag = eid.replace("ev_", "")[:8]
+    name = f"tests/evoforge_gen/test_{tag}_1.py"
+    fake = Fake({"calc.py": BUGGY, name: "old"})
     r = _pr(monkeypatch, eid, fake)
     assert r.status_code == 409  # existing file at the generated test path is a collision
