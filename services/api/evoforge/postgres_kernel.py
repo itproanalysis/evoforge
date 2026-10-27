@@ -134,6 +134,7 @@ class PostgresKernel:
             return self._reserve(conn, call_id, period, amount_micros)
 
     def _reserve(self, conn, call_id: UUID, period: date, amount_micros: int) -> ReservationState:
+        self._require_usage_guards(conn)
         guard = conn.execute("SELECT 1 FROM pg_trigger WHERE tgrelid='core.cost_reservations'::regclass "
                              "AND tgname='tenant_credit_hold' AND (tgenabled='A' OR "
                              "(tgenabled='O' AND current_setting('session_replication_role')<>'replica')) "
@@ -162,6 +163,7 @@ class PostgresKernel:
     def mark_sent(self, call_id: UUID, expected_builder_model: str = "muse-spark-1.3") -> ReservationState:
         call_id = UUID(str(call_id))
         with self._transaction() as conn:
+            self._require_usage_guards(conn)
             previous = self._read(conn, call_id, lock=True)
             if previous.status != "RESERVED" or previous.outcome != "RESERVED":
                 raise KernelRejected("provider call already sent or reservation closed")
@@ -191,6 +193,7 @@ class PostgresKernel:
                 return previous
             if previous.status != "RESERVED" or previous.outcome not in {"RESERVED", "SENT"}:
                 raise KernelRejected("unknown or confirmed calls require receipt reconciliation")
+            self._require_usage_guards(conn)
             # Receipt ingestion takes this same reservation lock. Read usage in
             # a fresh statement after any lock wait so a committed receipt can
             # never be followed by a "not accepted" release. Legacy ctx rows,
@@ -210,6 +213,18 @@ class PostgresKernel:
                          "AND project_id=%s AND request_key=%s",
                          (self.scope.tenant_id, self.scope.project_id, str(call_id)))
             return self._read(conn, call_id)
+
+    def _require_usage_guards(self, conn) -> None:
+        installed = conn.execute("SELECT count(*) AS installed FROM pg_trigger g "
+            "JOIN pg_class c ON c.oid=g.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE NOT tgisinternal "
+            "AND tgqual IS NULL AND (tgenabled='A' OR "
+            "(tgenabled='O' AND current_setting('session_replication_role')<>'replica')) AND ("
+            "(n.nspname='core' AND c.relname='cost_reservations' AND tgname='usage_release_guard' AND tgtype=19 "
+            "AND tgfoid=to_regprocedure('runtime.reject_usage_release()')) OR "
+            "(n.nspname='ctx' AND c.relname='provider_usage_receipts' AND tgname='usage_reservation_lock' AND tgtype=7 "
+            "AND tgfoid=to_regprocedure('runtime.lock_usage_reservation()')))").fetchone()['installed']
+        if installed != 2:
+            raise KernelUnavailable('receipt and release guards are not installed and enabled')
 
     def settle_reservation(self, call_id: UUID, receipt_id: UUID, customer_micros: int) -> ReservationState:
         call_id, receipt_id = UUID(str(call_id)), UUID(str(receipt_id))

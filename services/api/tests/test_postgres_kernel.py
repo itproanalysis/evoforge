@@ -6,6 +6,7 @@ No provider calls, billing API, production DATABASE_URL, or model keys are used.
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from datetime import date
 import os
 from pathlib import Path
@@ -90,6 +91,8 @@ def http_kernel(funded, monkeypatch):
 def _receipt(funded, call_id, *, owner="platform", referenced=True, cost=80):
     scope, packet, receipt = funded["scope"], uuid4(), uuid4()
     with psycopg.connect(funded["dsn"], autocommit=True) as connection:
+        connection.execute("SELECT set_config('app.tenant_id',%s,false),set_config('app.project_ids',%s,false)",
+                           (str(scope.tenant_id), str(scope.project_id)))
         connection.execute("""INSERT INTO ctx.context_packets
             (tenant_id,project_id,packet_id,run_id,task_id,task_attempt_id,idempotency_key,
              seat_id,function_role,agent_id,is_author_of_candidate,channel,profile,repo_sha,
@@ -2473,3 +2476,164 @@ def test_receipt_aware_release_ignores_other_calls_and_other_project_receipts(fu
     assert (state.status, state.outcome) == ('RELEASED', 'FAILED')
     assert kernel.release_not_accepted(call) == state
     assert kernel.reservation(document['call_id']).status == 'RESERVED'
+
+
+@contextmanager
+def _usage_guard_session(funded, role):
+    with psycopg.connect(funded['dsn'], autocommit=True) as conn:
+        conn.execute(sql.SQL('SET SESSION AUTHORIZATION {}').format(sql.Identifier(role)))
+        with conn.transaction():
+            conn.execute("SELECT set_config('app.tenant_id',%s,true),set_config('app.project_ids',%s,true)",
+                         (str(funded['scope'].tenant_id), str(funded['scope'].project_id)))
+            yield conn
+
+
+def _insert_direct_usage(conn, document):
+    conn.execute('INSERT INTO ctx.provider_usage_receipts '
+                 '(tenant_id,project_id,receipt_id,packet_id,call_id,call_purpose,provider,model,'
+                 'provider_request_id,source,billing_owner,uncached_input,cache_write,cache_read,'
+                 'output_tokens,raw_usage_fields,cost_micros,price_table_version) '
+                 "VALUES (%s,%s,%s,%s,%s,'task_turn','meta','muse-spark-1.3',%s,'provider_billed','platform',"
+                 '11,0,3,7,%s,80,%s)',
+                 (document['tenant_id'], document['project_id'], document['receipt_id'], document['packet_id'],
+                  document['call_id'], document['provider_request_id'], Jsonb(document['raw_usage_fields']),
+                  document['price_table_version']))
+
+
+def _release_direct_usage(conn, document):
+    conn.execute("UPDATE core.cost_reservations SET status='RELEASED' WHERE request_key=%s",
+                 (document['call_id'],))
+
+
+def test_database_usage_guard_refuses_direct_release_and_rolls_back_intent_change(funded):
+    document, kernel = _document(funded), funded['kernel']
+    kernel.record_receipt(document)
+    with pytest.raises(psycopg.errors.CheckViolation):
+        with _usage_guard_session(funded, 'core_app') as conn:
+            conn.execute("UPDATE core.side_effect_intents SET status='FAILED' WHERE idempotency_key=%s",
+                         (kernel._intent_key(UUID(document['call_id'])),))
+            _release_direct_usage(conn, document)
+    state = kernel.reservation(document['call_id'])
+    assert (state.status, state.outcome) == ('RESERVED', 'SENT')
+    assert _open_credit_holds(kernel) == 100
+    assert kernel.settle_from_receipt(document['receipt_id']).status == 'COMMITTED'
+
+
+def test_database_usage_guard_refuses_direct_receipt_after_reservation_release(funded):
+    document, kernel = _document(funded), funded['kernel']
+    kernel.release_not_accepted(document['call_id'])
+    with pytest.raises(psycopg.errors.CheckViolation):
+        with _usage_guard_session(funded, 'ctx_gateway') as conn:
+            _insert_direct_usage(conn, document)
+    with _usage_guard_session(funded, 'ctx_gateway') as conn:
+        assert conn.execute('SELECT count(*) FROM ctx.provider_usage_receipts WHERE call_id=%s',
+                            (document['call_id'],)).fetchone()[0] == 0
+    assert kernel.reservation(document['call_id']).status == 'RELEASED'
+    assert _open_credit_holds(kernel) == 0
+
+
+@pytest.mark.parametrize('first', ['receipt', 'release'])
+def test_database_usage_guard_serializes_independent_writer_and_release(funded, first):
+    from threading import Event
+    document, kernel = _document(funded), funded['kernel']
+    ready, attempted, finish = Event(), Event(), Event()
+    waiting_pid = []
+    actions = {'receipt': ('ctx_gateway', _insert_direct_usage), 'release': ('core_app', _release_direct_usage)}
+
+    def initial():
+        role, action = actions[first]
+        with _usage_guard_session(funded, role) as conn:
+            action(conn, document)
+            ready.set()
+            assert finish.wait(10)
+
+    def concurrent():
+        role, action = actions['release' if first == 'receipt' else 'receipt']
+        with _usage_guard_session(funded, role) as conn:
+            waiting_pid.append(conn.info.backend_pid)
+            attempted.set()
+            action(conn, document)
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        initial_result = workers.submit(initial)
+        try:
+            assert ready.wait(10)
+            concurrent_result = workers.submit(concurrent)
+            assert attempted.wait(10)
+            with psycopg.connect(funded['dsn'], autocommit=True) as observer:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    row = observer.execute('SELECT wait_event_type FROM pg_stat_activity WHERE pid=%s',
+                                           (waiting_pid[0],)).fetchone()
+                    if row and row[0] == 'Lock':
+                        break
+                    assert not concurrent_result.done(), 'concurrent operation bypassed reservation lock'
+                    time.sleep(0.01)
+                else:
+                    pytest.fail('concurrent writer did not wait for reservation lock')
+        finally:
+            finish.set()
+        initial_result.result(timeout=10)
+        with pytest.raises(psycopg.errors.CheckViolation):
+            concurrent_result.result(timeout=10)
+    assert kernel.reservation(document['call_id']).status == ('RESERVED' if first == 'receipt' else 'RELEASED')
+    assert _open_credit_holds(kernel) == (100 if first == 'receipt' else 0)
+
+
+@pytest.mark.parametrize('relation,trigger', [
+    ('core.cost_reservations', 'usage_release_guard'),
+    ('ctx.provider_usage_receipts', 'usage_reservation_lock'),
+])
+@pytest.mark.parametrize('mode', ['disabled', 'replica', 'missing'])
+def test_database_usage_guard_unavailable_blocks_reserve_send_and_release(funded, http_kernel, relation, trigger, mode):
+    kernel, call = funded['kernel'], uuid4()
+    kernel.reserve_cost(call, PERIOD, 100)
+    with psycopg.connect(funded['dsn'], autocommit=True) as admin:
+        installed = admin.execute('SELECT 1 FROM pg_trigger WHERE tgrelid=%s::regclass AND tgname=%s',
+                                  (relation, trigger)).fetchone()
+        if installed:
+            target = sql.SQL(relation)
+            if mode == 'missing':
+                admin.execute(sql.SQL('DROP TRIGGER {} ON {}').format(sql.Identifier(trigger), target))
+            else:
+                alteration = sql.SQL('DISABLE TRIGGER') if mode == 'disabled' else sql.SQL('ENABLE REPLICA TRIGGER')
+                admin.execute(sql.SQL('ALTER TABLE {} {} {}').format(target, alteration, sql.Identifier(trigger)))
+        try:
+            fresh = uuid4()
+            assert http_kernel.post('/v1/kernel/reservations', json={
+                'call_id': str(fresh), 'period_start': PERIOD.isoformat(), 'amount_micros': 100}).status_code == 503
+            assert http_kernel.post(f'/v1/kernel/reservations/{call}/sent').status_code == 503
+            assert http_kernel.post(f'/v1/kernel/reservations/{call}/release-not-accepted').status_code == 503
+            with pytest.raises(KernelNotFound):
+                kernel.reservation(fresh)
+            assert kernel.reservation(call).outcome == 'RESERVED'
+            assert _open_credit_holds(kernel) == 100
+        finally:
+            if installed:
+                admin.execute((ROOT/'services/api/migrations/009_usage_release_guards.sql').read_text(encoding='utf-8'))
+    assert kernel.mark_sent(call).outcome == 'SENT'
+    assert kernel.release_not_accepted(call).status == 'RELEASED'
+
+
+def test_database_usage_guard_migration_preserves_contracts_rls_and_restricts_helpers(funded):
+    with psycopg.connect(funded['dsn'], autocommit=True) as admin:
+        def contract_state():
+            functions = admin.execute("SELECT oid::regprocedure::text,pg_get_functiondef(oid) FROM pg_proc "
+                                      "WHERE pronamespace='core'::regnamespace ORDER BY oid").fetchall()
+            policies = admin.execute("SELECT schemaname,tablename,policyname,roles,qual,with_check FROM pg_policies "
+                                     "WHERE schemaname IN ('ctx','core') ORDER BY schemaname,tablename,policyname").fetchall()
+            return functions, policies
+        before = contract_state()
+        ddl = (ROOT/'services/api/migrations/009_usage_release_guards.sql').read_text(encoding='utf-8')
+        admin.execute(ddl)
+        admin.execute(ddl)
+        assert contract_state() == before
+        assert admin.execute("SELECT relrowsecurity,relforcerowsecurity FROM pg_class WHERE oid IN "
+                             "('core.cost_reservations'::regclass,'ctx.provider_usage_receipts'::regclass)").fetchall() == [(True, True)]*2
+        for role in ('core_app', 'ctx_gateway'):
+            for function in ('runtime.lock_usage_reservation()', 'runtime.reject_usage_release()'):
+                assert not admin.execute('SELECT has_function_privilege(%s,%s,\'EXECUTE\')', (role, function)).fetchone()[0]
+        assert not admin.execute("SELECT has_schema_privilege('core_owner','runtime','CREATE')").fetchone()[0]
+    with _usage_guard_session(funded, 'ctx_gateway') as conn:
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute('SELECT * FROM core.cost_reservations')
