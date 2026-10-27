@@ -1,0 +1,19 @@
+{
+  "id": "T11_resolvable_chain_events",
+  "planned_by": "muse-spark-1.3 (round-4 plan)",
+  "goal": "Resolvable per-stage chain events with web drilldown\nWHY: Fixes F2 medium drilldown gap: T7 chain event_ids point at bare {evidence_id} placeholder events no endpoint can resolve, so README drilldown and web Evidence page dead-end.\n\nSPEC: Add GET /v1/events/{event_id} returning {id, stage/kind, evidence_id, summary} with 404 on unknown; summary carries per-stage facts already stored server-side (e.g. command_id, gate verdicts, review result, PR url, run counts) and never embeds held-out test code. Replace _link_stages placeholder payloads {evidence_id} with these stage summaries. Web: apps/web/lib/api.ts adds getEvent(event_id); apps/web/app/evidence/page.tsx makes each non-null stage id clickable to fetch and render the event summary, keeping null stages as 증거 부족.\n\nACCEPTANCE (your own plan): Every non-null event_id in GET /v1/evidence/{id}.chain resolves via GET /v1/events/{event_id} with matching stage and owning evidence id; Unknown event id returns 404; missing stages stay null and are never fabricated; Evidence page click on a stage fetches and displays the event summary; web build passes; No held-out test code appears in chain, event, or evidence bodies; python -m pytest services/api -q passes\nOUT OF SCOPE: services/api/evoforge/postgres_kernel.py; services/api/evoforge/kernel_api.py; docs/POSTGRES_KERNEL.md; docs/INTERNAL_KERNEL_API.md; gate verdict rules and ledger math",
+  "edit": [
+    "services/api/evoforge/evidence.py",
+    "services/api/main.py",
+    "apps/web/lib/api.ts",
+    "apps/web/app/evidence/page.tsx"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t7_evidence_chain.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
+    "git checkout -- apps/web/tsconfig.tsbuildinfo"
+  ]
+}
