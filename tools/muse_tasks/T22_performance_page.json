@@ -18,6 +18,6 @@
   ],
   "check": [
     "python -m pytest services/api -q -p no:cacheprovider",
-    "cd apps\\web && node node_modules\typescript\bin\tsc --noEmit --incremental false -p ."
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p ."
   ]
 }
