@@ -110,6 +110,7 @@ class CandidateRegistrationRequest(InternalRequest):
     call_id: UUID
     evidence_id: str = Field(min_length=1,max_length=256)
     head_sha: str = Field(pattern=r'^[a-f0-9]{40}$')
+    pr_source_evidence_id: str | None = Field(default=None,min_length=1,max_length=256)
 
 
 class CommandRequest(InternalRequest):
@@ -237,7 +238,9 @@ def candidate_run(req: CandidateRunRequest, kernel: PostgresKernel = Depends(aut
 @router.post('/candidates')
 def register_candidate(req: CandidateRegistrationRequest,kernel: PostgresKernel = Depends(authenticated_kernel)):
     from evoforge.postgres_candidates import register
-    return invoke(register,kernel,req.call_id,req.evidence_id,req.head_sha)
+    if req.pr_source_evidence_id is None:
+        return invoke(register,kernel,req.call_id,req.evidence_id,req.head_sha)
+    return invoke(register,kernel,req.call_id,req.evidence_id,req.head_sha,req.pr_source_evidence_id)
 
 
 @router.get('/candidates/{candidate_id}')

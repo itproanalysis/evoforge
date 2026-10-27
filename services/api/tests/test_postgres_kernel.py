@@ -2637,3 +2637,123 @@ def test_database_usage_guard_migration_preserves_contracts_rls_and_restricts_he
     with _usage_guard_session(funded, 'ctx_gateway') as conn:
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             conn.execute('SELECT * FROM core.cost_reservations')
+
+
+def _tagged_candidate_run(ctx, monkeypatch):
+    """Use the actual local Runner and server evidence; provider outputs are synthetic."""
+    import main
+    sealed = [{'kind': kind, 'code': f'from value import result\ndef test_{kind}():\n    assert result == 3\n'}
+              for kind in ('compositional', 'negative', 'boundary')]
+    monkeypatch.setattr(main.broker_meta, 'call_critic', lambda *a, **k: {
+        'sealed_tests': sealed, 'stub': False, 'model': 'muse-spark-1.3', 'review': {'result': 'PASS'}})
+    review = ctx['api'].post('/v1/candidates/review', json={'goal_contract': 'result is 3'})
+    assert review.status_code == 200, review.text
+    result = ctx['api'].post('/v1/runs', json={
+        'source_repo': str(ctx['repo']), 'base_sha': ctx['base'], 'diff': ctx['candidate']['diff'],
+        'tests': ctx['candidate']['tests'], 'review_evidence_id': review.json()['evidence_id']})
+    assert result.status_code == 200, result.text
+    assert all(g['result'] == 'PASS' for g in result.json()['gates']), result.text
+    return result.json()['evidence_id']
+
+
+def _tagged_candidate_head(ctx, run_evidence_id):
+    tag = run_evidence_id.lower().replace('ev_', '')[:8] or 'gen'
+    ctx['git']('checkout', '--detach', '-q', ctx['patch_head'])
+    target = ctx['repo'] / f'tests/evoforge_gen/test_{tag}_1.py'
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(ctx['candidate']['tests'][0]['code'], encoding='utf-8')
+    ctx['git']('add', 'tests')
+    ctx['git']('commit', '-qm', 'evidence-tagged visible tests')
+    return ctx['git']('rev-parse', 'HEAD')
+
+
+def test_tagged_candidate_registers_matching_server_run_and_remains_immutable(funded, builder_proposal, monkeypatch):
+    ctx = builder_proposal
+    run_id = _tagged_candidate_run(ctx, monkeypatch)
+    head = _tagged_candidate_head(ctx, run_id)
+    response = _propose(ctx, head_sha=head, pr_source_evidence_id=run_id)
+    assert response.status_code == 200, response.text
+    candidate_id = response.json()['candidate_id']
+    assert response.json()['pr_source_evidence_id'] == run_id
+    assert len(response.json()['pr_source_evidence_sha256']) == 64
+    assert _propose(ctx, head_sha=head, pr_source_evidence_id=run_id).json()['candidate_id'] == candidate_id
+    assert _propose(ctx, head_sha=head).status_code == 409
+    assert _propose(ctx, head_sha=head, pr_source_evidence_id='ev_another_run').status_code == 409
+    assert ctx['http'].get(f'/v1/kernel/candidates/{candidate_id}').json()['pr_source_evidence_id'] == run_id
+    assert ctx['http'].post('/v1/kernel/merge-authorizations', json={
+        'candidate_id': candidate_id, 'head_sha': head, 'policy_hash': '1'*64}).status_code == 409
+    with psycopg.connect(funded['dsn'], autocommit=True) as conn:
+        ddl = (ROOT/'services/api/migrations/010_candidate_pr_evidence.sql').read_text(encoding='utf-8')
+        conn.execute(ddl)
+        conn.execute(ddl)
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            conn.execute('UPDATE runtime.builder_candidate_evidence SET pr_source_evidence_id=%s '
+                         'WHERE candidate_id=%s', ('ev_other', candidate_id))
+    assert ctx['http'].get(f'/v1/kernel/candidates/{candidate_id}').json()['pr_source_evidence_id'] == run_id
+
+
+def test_tagged_candidate_refuses_mismatched_server_run_before_git_or_writes(funded, builder_proposal, monkeypatch):
+    from copy import deepcopy
+    import main
+    ctx = builder_proposal
+    valid_id = _tagged_candidate_run(ctx, monkeypatch)
+    head = _tagged_candidate_head(ctx, valid_id)
+    original = deepcopy(main._evidence[valid_id])
+    stub = main._store_evidence({'review': {'stub': True}})
+    main._link_stages(stub, ('Review',))
+    for problem in ('base', 'diff', 'tests', 'missing_run', 'run_base', 'counts', 'gates', 'review'):
+        doc = deepcopy(original)
+        doc.pop('id', None)
+        if problem == 'base': doc['base_sha'] = 'f'*40
+        elif problem == 'diff': doc['diff'] += '\n'
+        elif problem == 'tests': doc['tests'][0]['code'] += '\n'
+        elif problem == 'missing_run': doc.pop('run')
+        elif problem == 'run_base': doc['run']['base'] = 'f'*40
+        elif problem == 'counts': doc['run']['visible']['pass'] = 0
+        elif problem == 'gates': doc['gates'][0]['result'] = 'FAIL'
+        elif problem == 'review': doc['review_evidence_id'] = stub
+        bad_id = main._store_evidence(doc)
+        main._link_stages(bad_id, ('Candidate', 'Gate'))
+        result = _propose(ctx, head_sha=head, pr_source_evidence_id=bad_id)
+        assert result.status_code == 409, (problem, result.status_code, result.text)
+    missing = _propose(ctx, head_sha=head, pr_source_evidence_id='ev_missing_run')
+    assert missing.status_code == 404
+    source = deepcopy(main._evidence[ctx['evidence']])
+    source.pop('id', None)
+    source['mission_id'] = 'mission_other'
+    other_source = main._store_evidence(source)
+    main._link_stages(other_source, ('Task', 'Candidate', 'Gate'))
+    assert _propose(ctx, head_sha=head, evidence_id=other_source, pr_source_evidence_id=valid_id).status_code == 409
+    other_project = uuid4()
+    with psycopg.connect(funded['dsn'], autocommit=True) as conn:
+        conn.execute("INSERT INTO core.projects(tenant_id,project_id,name) VALUES (%s,%s,'other')",
+                     (funded['scope'].tenant_id, other_project))
+    with monkeypatch.context() as foreign:
+        foreign.setenv('EVO_PROJECT_ID', str(other_project))
+        foreign_run = deepcopy(original)
+        foreign_run.pop('id', None)
+        foreign_id = main._store_evidence(foreign_run)
+        main._link_stages(foreign_id, ('Candidate', 'Gate'))
+    assert _propose(ctx, head_sha=head, pr_source_evidence_id=foreign_id).status_code == 404
+    assert ctx['clones'] == []
+    with funded['kernel']._transaction() as conn:
+        assert conn.execute('SELECT count(*) AS n FROM core.candidates').fetchone()['n'] == 0
+        assert conn.execute('SELECT count(*) AS n FROM runtime.builder_candidate_evidence').fetchone()['n'] == 0
+
+
+def test_tagged_candidate_missing_migration_fails_closed_and_preserves_legacy_binding(funded, builder_proposal):
+    ctx = builder_proposal
+    registered = _propose(ctx)
+    assert registered.status_code == 200, registered.text
+    candidate_id = registered.json()['candidate_id']
+    with psycopg.connect(funded['dsn'], autocommit=True) as conn:
+        conn.execute('ALTER TABLE runtime.builder_candidate_evidence RENAME COLUMN pr_source_evidence_id '
+                     'TO pr_source_evidence_id_offline')
+        try:
+            assert _propose(ctx).status_code == 503
+            assert ctx['http'].get(f'/v1/kernel/candidates/{candidate_id}').status_code == 503
+        finally:
+            conn.execute('ALTER TABLE runtime.builder_candidate_evidence RENAME COLUMN pr_source_evidence_id_offline '
+                         'TO pr_source_evidence_id')
+    assert _propose(ctx).json()['candidate_id'] == candidate_id
+    assert ctx['http'].get(f'/v1/kernel/candidates/{candidate_id}').status_code == 200
