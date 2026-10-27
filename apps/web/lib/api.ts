@@ -244,6 +244,27 @@ export function getEvent(event_id: string) {
   return req<ChainEvent>(`/v1/events/${encodeURIComponent(event_id)}`);
 }
 
+export interface EvalSuite {
+  family: string;
+  task_count: number;
+  heldout_kinds: string[];
+}
+
+export interface EvalSuitesResponse {
+  suite_version: string;
+  suites: EvalSuite[];
+}
+
+export interface XSingle {
+  pass_rate: number;
+  n: number;
+  cost_cents: number;
+}
+
+export function getEvalSuites() {
+  return req<EvalSuitesResponse>("/v1/eval/suites");
+}
+
 export const EVIDENCE_STAGES = [
   "ObjectiveVersion",
   "Task",

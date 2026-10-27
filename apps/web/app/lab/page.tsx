@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
+  type EvalSuite,
   type GateVerdict,
+  getEvalSuites,
   postCreatePR,
   postRun,
   type SealedTest,
@@ -42,6 +44,8 @@ export default function Lab() {
   const [baseSha, setBaseSha] = useState("HEAD");
   const [runInfo, setRunInfo] = useState("");
   const [evalId, setEvalId] = useState("");
+  const [suites, setSuites] = useState<EvalSuite[]>([]);
+  const [suitesNote, setSuitesNote] = useState("");
 
   useEffect(() => {
     try {
@@ -57,6 +61,20 @@ export default function Lab() {
       if (gg) setGoal(JSON.parse(gg));
       if (g) setGates(JSON.parse(g));
     } catch {}
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    getEvalSuites()
+      .then((out) => {
+        if (live) setSuites(out.suites ?? []);
+      })
+      .catch((e) => {
+        if (live) setSuitesNote(`sealed suites unavailable: ${e instanceof Error ? e.message : String(e)}`);
+      });
+    return () => {
+      live = false;
+    };
   }, []);
 
   const inconclusive = gates.some((g) => g.result === "INCONCLUSIVE");
@@ -209,6 +227,23 @@ export default function Lab() {
             <li style={{ color: "#8b96ad" }}>evidence: <code>{evalId}</code></li>
           </ul>
         ) : null}
+      </section>
+
+      <section style={card}>
+        <h3 style={{ marginTop: 0 }}>Sealed v0 + X_SINGLE (read-only)</h3>
+        <p style={{ color: "#8b96ad", fontSize: 12 }}>
+          Server-measured baseline catalogue. Catalogue loads over GET only;
+          sealed task code never leaves the server.
+        </p>
+        {suitesNote ? <p style={{ color: "#f59e0b", fontSize: 13 }}>{suitesNote}</p> : null}
+        <ul>
+          {suites.map((s) => (
+            <li key={s.family} style={{ fontSize: 13 }}>
+              <code>{s.family}</code> tasks={s.task_count}{" "}
+              <span style={{ color: "#8b96ad" }}>kinds: {s.heldout_kinds.join(", ")}</span>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section style={card}>

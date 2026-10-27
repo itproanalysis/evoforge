@@ -23,6 +23,7 @@ from typing import Literal
 
 from evoforge import auth as auth_module
 from evoforge import broker_meta, evidence as evidence_chain, ledger
+from evoforge import sealed_eval as sealed_eval_mod
 from evoforge.patch import PatchError
 from evoforge.kernel_api import router as kernel_router
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
@@ -393,6 +394,17 @@ def _stage_summary(eid: str, stage: str) -> dict:
             "html_url": pr_url,
             "title": stored.get("title"),
             "source_evidence_id": stored.get("source_evidence_id"),
+        }
+    if stage == "Outcome":
+        xs = stored.get("X_SINGLE") if isinstance(stored.get("X_SINGLE"), dict) else {}
+        return {
+            "baseline_id": stored.get("baseline_id"),
+            "suite_version": stored.get("suite_version"),
+            "model": stored.get("model"),
+            "X_SINGLE": {k: xs.get(k) for k in ("pass_rate", "n", "cost_cents")},
+            "pass_rate": xs.get("pass_rate"),
+            "n": xs.get("n"),
+            "cost_cents": xs.get("cost_cents"),
         }
     return {}
 
@@ -837,6 +849,74 @@ def eval_sandbox(req: SandboxRequest):
                     pass
     eid = _store_evidence({"sandbox": out})
     return {**out, "evidence_id": eid}
+
+
+class EvalBaselineRequest(BaseModel):
+    suite_version: Literal["v0"] = "v0"
+    model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
+    family: str | None = None
+
+
+@app.get("/v1/eval/suites")
+def eval_suites():
+    """Redacted sealed v0 catalogue: families plus sha256/len metadata only."""
+    from evoforge import repo_source as _rs_eval
+
+    try:
+        suites = sealed_eval_mod.public_suites()
+    except Exception as e:
+        raise HTTPException(
+            502, _rs_eval.redact(f"sealed suites unavailable: {type(e).__name__}"))
+    return {"suite_version": sealed_eval_mod.SUITE_VERSION, "suites": suites}
+
+
+@app.post("/v1/eval/baseline", status_code=201)
+def eval_baseline(req: EvalBaselineRequest):
+    """X_SINGLE baseline over the sealed v0 set in hygiene sandboxes.
+
+    Runner-side trouble maps to 413/502/504 with a short message; a raw
+    traceback never leaves the server.
+    """
+    from evoforge import repo_source as _rs_eval2
+
+    try:
+        result = sealed_eval_mod.run_baseline(
+            req.suite_version, req.model, family=req.family)
+    except sealed_eval_mod.SealedTooLarge as e:
+        raise HTTPException(413, _rs_eval2.redact(str(e)))
+    except sealed_eval_mod.SealedTimeout:
+        raise HTTPException(504, "sealed baseline timed out")
+    except ledger.Overdraft:
+        raise HTTPException(402, "budget exhausted (reserve_cost refused)")
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_eval2.redact(str(e) or "sealed baseline failed"))
+    except ValueError as e:
+        raise HTTPException(400, _rs_eval2.redact(str(e)))
+    except HTTPException:
+        raise
+    except Exception as e:
+        name = type(e).__name__
+        if isinstance(e, TimeoutError) or "timeout" in name.lower():
+            raise HTTPException(504, "sealed baseline timed out")
+        raise HTTPException(502, _rs_eval2.redact(f"sealed baseline failed: {name}"))
+    xs = result["X_SINGLE"]
+    passed = sum(1 for s in result["scores"] if s["score"] >= 1.0)
+    gates = [{"gate": "G2_REQUIRED",
+              "result": "PASS" if (xs["n"] > 0 and passed == xs["n"]) else "FAIL",
+              "reason": f"sealed v0 X_SINGLE executed {passed}/{xs['n']} held-out tasks"}]
+    eid = _store_evidence({"baseline_id": result["baseline_id"],
+                           "suite_version": result["suite_version"],
+                           "model": result["model"], "X_SINGLE": xs,
+                           "scaffold": result["scaffold"], "audit": result["audit"],
+                           "scores": result["scores"], "tasks": result["tasks"],
+                           "reservation_id": result["reservation_id"],
+                           "provider_stub": result["provider_stub"],
+                           "gates": gates})
+    _link_stages(eid, ("Gate", "Outcome"))
+    return {"baseline_id": result["baseline_id"], "evidence_id": eid,
+            "suite_version": result["suite_version"], "model": result["model"],
+            "X_SINGLE": xs, "audit": result["audit"], "scores": result["scores"],
+            "tasks": result["tasks"], "chain": evidence_chain.chain(eid)}
 
 
 @app.get("/v1/evidence/{eid}")
