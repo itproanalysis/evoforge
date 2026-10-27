@@ -122,6 +122,14 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
+- **Antigravity (완료·클레임 해제·main 반영 `f648534`) / `agy/web-harmonization`:**
+  Web UI 소유 모듈(`apps/web/**`) 내에서 Next.js 15 비동기 `params: Promise<{ locale: string }>` 규격 불일치로 인한 `tsc --noEmit` 실패를 해결하고,
+  Muse Spark의 T22b 성능 뷰(`PerformancePage`, `GET /v1/performance`, `apps/web/app/performance/page.tsx`, `api.ts`, `proxyPolicy.ts`)를
+  Next-intl `[locale]` 구조 및 Tailwind v3 토큰과 완벽하게 융합·조정했다.
+  또한 `performance/page.tsx`의 `EvalSuitesResponse.suite_version` 타입 오류를 수정하고 이를 `C:\evo_forge_muse8`에도 전파해 Muse의 Round 8 검증이 통과하도록 지원했다.
+  모든 CI 게이트 검증 통과: `validate_package.py` 0 failure, `tsc --noEmit` 0 error, `next build` 11개 라우트 정상 컴파일, `npm ci` 정상, `test_critic_t9_ledger_web.py` 및 `test_sealed_t22b_web.py` 전원 PASS.
+
+
 - **Codex (CLI/Broker 패킷·리스 현재 시각 재검사) / `codex/preflight-freshness`:**
   `eval_runner_and_preflight.py`, 새 `test_preflight_freshness.py`, 관련 비봉인 테스트 및 문서를 소유한다.
   패킷이 발행된 시각을 현재 시각으로 오인해 만료된 패킷/리스를 허용하는지 검증하고 보강한다.
