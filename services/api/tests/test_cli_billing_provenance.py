@@ -39,8 +39,12 @@ def setup_call():
     return packet, ledger, DevBuilderCLIGuard(broker), period
 
 
+_RAW_USAGE = {"prompt_tokens": 17, "completion_tokens": 9,
+              "prompt_tokens_details": {"cached_tokens": 0}, "provider_field": "synthetic"}
 _USAGE = {"provider_request_id": "synthetic-request", "uncached_input_tokens": 17,
-          "cached_read_tokens": 0, "cache_write_tokens": 0, "output_tokens": 9}
+          "cached_read_tokens": 0, "cache_write_tokens": 0, "output_tokens": 9,
+          "billing_source": "provider_billed", "billing_verified": True,
+          "raw_usage_fields": _RAW_USAGE}
 
 
 @pytest.mark.parametrize(
@@ -99,3 +103,40 @@ def test_explicit_amounts_settle_with_distinct_provider_and_customer_values(setu
     assert result["receipt"]["customer_price_micros"] == customer_price
     assert result["settlement"]["settlement"]["actual_micros"] == customer_price
     assert ledger._reservations[(packet["tenant_id"], packet["project_id"], call_id)].status == "COMMITTED"
+
+
+_BILLED_OUTPUT = {**_USAGE, "cost_micros": 200, "customer_price_micros": 500,
+                  "billing_source": "provider_billed", "billing_verified": True,
+                  "raw_usage_fields": _RAW_USAGE}
+
+
+@pytest.mark.parametrize("field,value", [
+    ("billing_source", None), ("billing_source", "estimated"),
+    ("billing_verified", None), ("billing_verified", False),
+    ("raw_usage_fields", None), ("raw_usage_fields", {}),
+    ("raw_usage_fields", {"bad": float("nan")}),
+    ("provider_request_id", "x" * 257),
+])
+def test_unverified_provenance_or_raw_usage_cannot_become_provider_billed(setup_call, field, value):
+    packet, ledger, guard, period = setup_call
+    call_id = str(uuid.uuid4())
+    output = {**_BILLED_OUTPUT, field: value}
+    with pytest.raises(PreflightError, match="CLI"):
+        guard.run_cli_task(task_spec={"id": "synthetic"}, packet=packet,
+                           reserved_micros=20_000, cli_runner=lambda _: output,
+                           call_id=call_id, period_start=period)
+    reservation = ledger._reservations[(packet["tenant_id"], packet["project_id"], call_id)]
+    intent_id = ledger._intents_by_key[(packet["tenant_id"], "provider.call", call_id)]
+    assert reservation.status == "RESERVED" and reservation.actual_micros is None
+    assert ledger._intents[(packet["tenant_id"], intent_id)].status == "UNKNOWN_EXTERNAL_OUTCOME"
+    assert not ledger._receipts
+
+
+def test_receipt_preserves_provider_raw_usage_verbatim(setup_call):
+    packet, ledger, guard, period = setup_call
+    result = guard.run_cli_task(task_spec={"id": "synthetic"}, packet=packet,
+                                reserved_micros=20_000, cli_runner=lambda _: _BILLED_OUTPUT,
+                                call_id=str(uuid.uuid4()), period_start=period)
+    assert result["receipt"]["raw_usage_fields"] == _RAW_USAGE
+    assert result["receipt"]["raw_usage_fields"] is not _RAW_USAGE
+    assert result["receipt"]["source"] == "provider_billed"

@@ -276,6 +276,9 @@ def test_dev_builder_cli_guard_budget_governed_cr38() -> None:
             "output_tokens": 180,
             "cost_micros": 8_500,
             "customer_price_micros": 8_500,
+            "billing_source": "provider_billed",
+            "billing_verified": True,
+            "raw_usage_fields": {"prompt_tokens": 1600, "completion_tokens": 180},
         }
 
     task_spec = {"id": TASK_ID, "description": "Run Muse Spark CLI improvement iteration"}

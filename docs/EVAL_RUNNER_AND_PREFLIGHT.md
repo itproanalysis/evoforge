@@ -22,6 +22,7 @@
 - **개발자 Muse Builder CLI 예산 가드 (`DevBuilderCLIGuard`, `DEVELOPMENT_STATUS.md` 98행)**:
   - 플랫폼 예산 및 신용 통제 하에 CLI 태스크를 실행한다. 신뢰된 CLI 어댑터가 공급사 요청 ID, 네 종류의 토큰 사용량, 공급사 비용과 고객 청구액을 명시적인 음수가 아닌 정수로 모두 반환한 경우에만 영수증을 만든다. `actual_micros` 인자는 청구 근거가 아니며, 제공될 경우 반환된 고객 청구액과 일치해야 한다. 실제 0원도 명시적으로 전달되어야 한다.
   - 사용량이나 청구액이 없거나 잘못되면 영수증을 만들지 않고 호출을 `UNKNOWN_EXTERNAL_OUTCOME`으로 남겨 예약을 유지한다. 공급사 비용과 고객 청구액은 서로 다른 값일 수 있으며 각각 기록한다.
+  - CLI 어댑터는 `billing_source=provider_billed`, `billing_verified=true`와 비어 있지 않은 원본 JSON 사용량을 명시해야 한다. 원본은 재구성하지 않고 보존하며, 잘못된 JSON이나 너무 긴 공급사 요청 ID도 예약을 유지한다. 이 표기는 어댑터의 주장으로, 실제 공급사에 대한 독립적인 인증은 별도 연결이 필요하다.
   - 이 가드는 반환된 값의 공급사 출처를 독립적으로 증명하지 않는다. 운영 연결 전에는 실제 어댑터의 출처 검증과 PostgreSQL 예약·영수증 경로 연결이 필요하다. 현 검증은 인메모리 원장과 합성 CLI 결과만 사용한다.
 
 ### 1.2 [`services/api/evoforge/codec_and_quality_runtime.py`](../services/api/evoforge/codec_and_quality_runtime.py)

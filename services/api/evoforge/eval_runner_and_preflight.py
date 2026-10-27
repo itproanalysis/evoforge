@@ -551,6 +551,8 @@ class DevBuilderCLIGuard:
 
         ``actual_micros`` is a compatibility assertion, never billing evidence. A
         missing or malformed amount/usage leaves the reservation open for reconciliation.
+        The adapter must attest provider-billed provenance and supply the original raw
+        usage; this guard does not independently authenticate the adapter's claim.
         """
         resolved_call_id = call_id or str(uuid.uuid5(uuid.NAMESPACE_OID, f"cli:{task_spec.get('id', packet['task_id'])}"))
 
@@ -566,6 +568,7 @@ class DevBuilderCLIGuard:
             if (
                 not isinstance(req_id, str)
                 or not req_id.strip()
+                or len(req_id.strip()) > 256
             ):
                 raise PreflightError(
                     "UNVERIFIED_CLI_OUTCOME",
@@ -583,6 +586,23 @@ class DevBuilderCLIGuard:
                     "UNVERIFIED_CLI_OUTCOME",
                     "CLI billing amount conflicts with the caller's actual_micros assertion; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
                 )
+            raw_usage = cli_out.get("raw_usage_fields")
+            if (cli_out.get("billing_source") != "provider_billed"
+                    or cli_out.get("billing_verified") is not True
+                    or not isinstance(raw_usage, dict) or not raw_usage):
+                raise PreflightError(
+                    "UNVERIFIED_CLI_OUTCOME",
+                    "CLI output lacks provider-billed provenance or original usage; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
+                )
+            try:
+                raw_copy = json.loads(json.dumps(raw_usage, allow_nan=False))
+                if raw_copy != raw_usage:
+                    raise ValueError("usage changed during JSON serialization")
+            except (TypeError, ValueError, RecursionError) as exc:
+                raise PreflightError(
+                    "UNVERIFIED_CLI_OUTCOME",
+                    "CLI original usage is not a valid JSON object; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
+                ) from exc
             now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             receipt_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"rcpt:{resolved_call_id}"))
             uncached_in = cli_out["uncached_input_tokens"]
@@ -608,12 +628,7 @@ class DevBuilderCLIGuard:
                     "cache_read": cached_read,
                     "output": out_tok,
                 },
-                "raw_usage_fields": {
-                    "input_tokens": uncached_in,
-                    "cache_creation_input_tokens": cache_write,
-                    "cache_read_input_tokens": cached_read,
-                    "output_tokens": out_tok,
-                },
+                "raw_usage_fields": raw_copy,
                 "cost_micros": cli_out["cost_micros"],
                 "customer_price_micros": cli_out["customer_price_micros"],
                 "reservation_key": binding.reservation_key,
