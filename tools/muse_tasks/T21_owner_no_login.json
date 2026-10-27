@@ -1,0 +1,23 @@
+{
+  "id": "T21_owner_no_login",
+  "planned_by": "Owner request (2026-10-27): 'no ID/password — I am the only user'",
+  "goal": "OWNER DECISION: the web must not ask for an ID or password; the owner is the only user. Keep everything else private.\nSPEC: (1) New server-only env EVO_WEB_AUTH with values 'session' (current behaviour, default) and 'none'. With 'none': apps/web/middleware.ts lets every page through; /login and /login/* redirect (307) to /; app/api/login/route.ts and app/api/logout/route.ts return 404; app/api/me/route.ts returns 200 {user: 'owner', auth: 'none'}; the proxy app/api/evoforge/[...path]/route.ts no longer requires a session but keeps the path policy, the server-side metadata ID token to the private API and everything else. Read EVO_WEB_AUTH at runtime (not build time); any value other than 'none' means 'session'. (2) Guardrail because the web origin becomes the only gate: in 'none' mode the proxy rate-limits mutating requests (POST) per client IP (first x-forwarded-for entry) to EVO_WEB_POST_PER_MIN (default 20) per rolling minute -> 429 {error:'rate limited'} without contacting the API; GET is not limited. (3) Remove any login link/redirect from page code when auth is 'none' (pages must render without a session cookie). (4) Production service wording; no secrets in NEXT_PUBLIC_*. Keep 'session' mode fully working (it stays the default).",
+  "edit": [
+    "apps/web/middleware.ts",
+    "apps/web/app/api/login/route.ts",
+    "apps/web/app/api/logout/route.ts",
+    "apps/web/app/api/me/route.ts",
+    "apps/web/app/api/evoforge/[...path]/route.ts",
+    "apps/web/app/login/page.tsx",
+    "apps/web/app/layout.tsx",
+    "apps/web/.env.example"
+  ],
+  "context": [
+    "apps/web/lib/proxyPolicy.ts"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p . && node node_modules\\next\\dist\\bin\\next build",
+    "git checkout -- apps/web/tsconfig.tsbuildinfo"
+  ]
+}

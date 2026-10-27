@@ -27,6 +27,11 @@ function verifySession(value: string, secret: string): boolean {
 }
 
 export async function GET() {
+  // Server-only auth mode, read at runtime. Any value other than "none"
+  // means the default "session" behaviour.
+  if ((process.env.EVO_WEB_AUTH ?? "") === "none") {
+    return NextResponse.json({ user: "owner", auth: "none" }, { status: 200 });
+  }
   const secret = process.env.EVO_SESSION_SECRET ?? "";
   const jar = await cookies();
   const raw = jar.get(COOKIE_NAME)?.value ?? "";

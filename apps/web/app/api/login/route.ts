@@ -9,6 +9,20 @@ const MAX_FAILS = 10;
 
 const fails = new Map<string, { count: number; first: number }>();
 
+// Server-only auth mode, read at runtime. Any value other than "none"
+// means the default "session" behaviour.
+function authDisabled(): boolean {
+  return (process.env.EVO_WEB_AUTH ?? "") === "none";
+}
+
+function notFound() {
+  return NextResponse.json({ error: "not found" }, { status: 404 });
+}
+
+function methodNotAllowed() {
+  return NextResponse.json({ error: "method not allowed" }, { status: 405 });
+}
+
 function clientIp(req: NextRequest): string {
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) {
@@ -79,6 +93,9 @@ function createSessionValue(secret: string): string {
 }
 
 export async function POST(req: NextRequest) {
+  if (authDisabled()) {
+    return notFound();
+  }
   let body: { username?: unknown; password?: unknown };
   try {
     body = (await req.json()) as { username?: unknown; password?: unknown };
@@ -120,4 +137,32 @@ export async function POST(req: NextRequest) {
     maxAge: MAX_AGE,
   });
   return NextResponse.json({ user: ownerUser }, { status: 200 });
+}
+
+export async function GET() {
+  if (authDisabled()) {
+    return notFound();
+  }
+  return methodNotAllowed();
+}
+
+export async function PUT() {
+  if (authDisabled()) {
+    return notFound();
+  }
+  return methodNotAllowed();
+}
+
+export async function PATCH() {
+  if (authDisabled()) {
+    return notFound();
+  }
+  return methodNotAllowed();
+}
+
+export async function DELETE() {
+  if (authDisabled()) {
+    return notFound();
+  }
+  return methodNotAllowed();
 }

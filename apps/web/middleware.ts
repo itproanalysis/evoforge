@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 const COOKIE_NAME = "__Host-evoforge-session";
 
+// Server-only auth mode, read at runtime. Any value other than "none"
+// means the default "session" behaviour (owner login required).
+function authDisabled(): boolean {
+  return (process.env.EVO_WEB_AUTH ?? "") === "none";
+}
+
 function hexToBytes(hex: string): Uint8Array | null {
   if (hex.length % 2 !== 0) return null;
   const out = new Uint8Array(hex.length / 2);
@@ -45,6 +51,15 @@ async function validSession(raw: string | undefined, secret: string): Promise<bo
 
 export async function middleware(req: NextRequest) {
   const p = req.nextUrl.pathname;
+  if (authDisabled()) {
+    if (p === "/login" || p.startsWith("/login/")) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/";
+      url.search = "";
+      return NextResponse.redirect(url, 307);
+    }
+    return NextResponse.next();
+  }
   if (
     p === "/login" ||
     p.startsWith("/login/") ||
