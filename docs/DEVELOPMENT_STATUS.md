@@ -692,5 +692,6 @@ T22 우선 작업과 Muse Spark 기본값·현재 채팅 자동 재개를 유지
 `e9a1168`은 별도 Muse capability 검증에서 전체 API 560 passed·1 skipped, 실제 PostgreSQL 169 passed,
 SQL 96·참조 112·계약 및 격리된 웹 npm ci/tsc/프로덕션 빌드가 통과했다.
 `ca0b584`은 CLI 원본 사용량 보강과 함께 전체 API 569 passed·1 skipped를 통과했다.
-이후 T22a/T22b가 main에 반영되어 이를 `f69106a` 지원 브랜치에 동기화했고 전체 API/DB/웹 재검사가 진행 중이다.
+이후 T22a/T22b를 동기화한 `f69106a`에서 실제 PostgreSQL 169개·SQL 96개·참조 112개·정본 검사와
+웹 npm ci/tsc/프로덕션 빌드가 통과했다. 전체 API 재검사는 진행 중이다.
 새 보강은 아직 main 미반영이다. 모델/청구는 합성 fixture이며 실 provider 출처 및 공개 경로·운영 연결은 미완료다.
