@@ -191,6 +191,17 @@ class PostgresKernel:
                 return previous
             if previous.status != "RESERVED" or previous.outcome not in {"RESERVED", "SENT"}:
                 raise KernelRejected("unknown or confirmed calls require receipt reconciliation")
+            # Receipt ingestion takes this same reservation lock. Read usage in
+            # a fresh statement after any lock wait so a committed receipt can
+            # never be followed by a "not accepted" release. Legacy ctx rows,
+            # estimates and zero quotes also require reconciliation.
+            conn.execute("SET LOCAL ROLE ctx_gateway")
+            usage = conn.execute("SELECT 1 FROM ctx.provider_usage_receipts WHERE tenant_id=%s "
+                                 "AND project_id=%s AND call_id=%s LIMIT 1",
+                                 (self.scope.tenant_id, self.scope.project_id, call_id)).fetchone()
+            conn.execute("SET LOCAL ROLE core_app")
+            if usage:
+                raise KernelRejected("recorded usage requires receipt reconciliation")
             if previous.outcome == "SENT":
                 conn.execute("UPDATE core.side_effect_intents SET status='FAILED' WHERE tenant_id=%s "
                              "AND kind='provider.call' AND idempotency_key=%s",

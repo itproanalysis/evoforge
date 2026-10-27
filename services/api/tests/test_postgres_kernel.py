@@ -2351,3 +2351,125 @@ def test_merge_authorization_rejects_qualification_expired_during_transaction(fu
                        "VALUES (%s,%s,'HIGH','test',clock_timestamp(),clock_timestamp()+interval '1 hour',%s)",
                        (funded['scope'].tenant_id,ctx['reviewer'],'f'*64))
     kernel.authorize_merge(ctx['candidate'],'b'*40,'1'*64)
+
+
+@pytest.mark.parametrize('kind', ['provider_billed', 'estimated', 'zero'])
+def test_receipt_aware_release_keeps_recorded_usage_reserved_for_reconciliation(funded, kind):
+    document, kernel = _document(funded), funded['kernel']
+    if kind == 'estimated':
+        document['source'] = 'estimated'
+    elif kind == 'zero':
+        document['cost_micros'] = document['customer_price_micros'] = 0
+    kernel.record_receipt(document)
+    restarted = PostgresKernel(funded['dsn'], funded['scope'])
+    with pytest.raises(KernelRejected):
+        restarted.release_not_accepted(document['call_id'])
+    state = restarted.reservation(document['call_id'])
+    assert (state.status, state.outcome, state.actual_micros) == ('RESERVED', 'SENT', None)
+    assert restarted.receipt_document(document['receipt_id'])['ledger_entry_id'] is None
+    with restarted._transaction() as conn:
+        assert conn.execute('SELECT runtime.tenant_open_reserved_micros() AS held').fetchone()['held'] == 100
+    if kind == 'zero':
+        # A zero quote still cannot bypass the unresolved canonical zero-charge policy.
+        with pytest.raises(ValueError):
+            restarted.settle_from_receipt(document['receipt_id'])
+        assert restarted.reservation(document['call_id']).status == 'RESERVED'
+    else:
+        assert restarted.settle_from_receipt(document['receipt_id']).actual_micros == 110
+        assert restarted.settle_from_receipt(document['receipt_id']).status == 'COMMITTED'
+
+
+@pytest.mark.parametrize('referenced', [True, False])
+def test_receipt_aware_release_also_preserves_legacy_usage_without_document(funded, referenced):
+    kernel, call = funded['kernel'], uuid4()
+    kernel.reserve_cost(call, PERIOD, 100)
+    kernel.mark_sent(call)
+    rid = _receipt(funded, call, referenced=referenced)
+    with pytest.raises(KernelRejected):
+        kernel.release_not_accepted(call)
+    assert kernel.reservation(call).status == 'RESERVED'
+    if referenced:
+        assert kernel.settle_reservation(call, rid, 110).status == 'COMMITTED'
+    else:
+        with pytest.raises(KernelRejected):
+            kernel.settle_reservation(call, rid, 110)
+        assert kernel.reservation(call).status == 'RESERVED'
+
+
+def test_receipt_aware_release_http_refuses_refund_then_settles_stored_quote(funded, http_kernel):
+    document = _document(funded)
+    call, rid = document['call_id'], document['receipt_id']
+    assert http_kernel.post('/v1/kernel/receipts', json=document).status_code == 200
+    assert http_kernel.post(f'/v1/kernel/reservations/{call}/release-not-accepted').status_code == 409
+    state = http_kernel.get(f'/v1/kernel/reservations/{call}').json()
+    assert (state['status'], state['outcome']) == ('RESERVED', 'SENT')
+    assert http_kernel.post(f'/v1/kernel/receipts/{rid}/settle', json={}).json()['status'] == 'COMMITTED'
+    assert http_kernel.post(f'/v1/kernel/receipts/{rid}/settle', json={}).json()['actual_micros'] == 110
+
+
+def test_receipt_aware_release_rechecks_usage_after_waiting_for_recording_transaction(funded, monkeypatch):
+    from contextlib import contextmanager
+    from threading import Event
+    document = _document(funded)
+    recorder = PostgresKernel(funded['dsn'], funded['scope'])
+    releaser = PostgresKernel(funded['dsn'], funded['scope'])
+    original_transaction, original_read = recorder._transaction, releaser._read
+    stored, release_started, finish_record = Event(), Event(), Event()
+    release_backend = []
+
+    @contextmanager
+    def pause_before_commit():
+        with original_transaction() as conn:
+            yield conn
+            stored.set()
+            assert finish_record.wait(10), 'recording transaction was not released'
+
+    def signal_read(conn, call_id, *, lock=False):
+        if lock:
+            release_backend.append(conn.info.backend_pid)
+            release_started.set()
+        return original_read(conn, call_id, lock=lock)
+
+    monkeypatch.setattr(recorder, '_transaction', pause_before_commit)
+    monkeypatch.setattr(releaser, '_read', signal_read)
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        recording = workers.submit(recorder.record_receipt, document)
+        try:
+            assert stored.wait(10), 'receipt was not inserted before release'
+            releasing = workers.submit(releaser.release_not_accepted, document['call_id'])
+            assert release_started.wait(10)
+            with psycopg.connect(funded['dsn'], autocommit=True) as observer:
+                deadline = time.monotonic() + 10
+                while time.monotonic() < deadline:
+                    wait = observer.execute('SELECT wait_event_type FROM pg_stat_activity WHERE pid=%s',
+                                            (release_backend[0],)).fetchone()
+                    if wait and wait[0] == 'Lock':
+                        break
+                    time.sleep(0.01)
+                else:
+                    pytest.fail('release did not wait for the reservation row lock')
+        finally:
+            finish_record.set()
+        assert recording.result(timeout=10)['ledger_entry_id'] is None
+        with pytest.raises(KernelRejected):
+            releasing.result(timeout=10)
+    assert funded['kernel'].reservation(document['call_id']).status == 'RESERVED'
+    assert funded['kernel'].settle_from_receipt(document['receipt_id']).status == 'COMMITTED'
+
+
+def test_receipt_aware_release_ignores_other_calls_and_other_project_receipts(funded):
+    document, kernel = _document(funded), funded['kernel']
+    kernel.record_receipt(document)
+    call = uuid4()
+    kernel.reserve_cost(call, PERIOD, 100)
+    kernel.mark_sent(call)
+    other_project = uuid4()
+    scope = funded['scope']
+    with psycopg.connect(funded['dsn'], autocommit=True) as conn:
+        conn.execute("INSERT INTO core.projects(tenant_id,project_id,name) VALUES (%s,%s,'other')",
+                     (scope.tenant_id, other_project))
+    _receipt({'dsn': funded['dsn'], 'scope': KernelScope(scope.tenant_id, other_project)}, call)
+    state = kernel.release_not_accepted(call)
+    assert (state.status, state.outcome) == ('RELEASED', 'FAILED')
+    assert kernel.release_not_accepted(call) == state
+    assert kernel.reservation(document['call_id']).status == 'RESERVED'
