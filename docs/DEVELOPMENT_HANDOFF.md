@@ -388,3 +388,9 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 실제 Runner 서비스 포함 37개 통과·정본 0 failure. 전체 API·실제 DB 검증 중.
 원본 `.local/evidence/runner-base-binding-20261028-srrygk3d`; main의 미커밋 runner/승격 테스트는 보존했다.
 공개 PR 경로의 SHA 전달은 기존 승격 T17 테스트가 유효하지 않은 가짜 SHA로 성공을 요구하여 별도 조정이 필요하다.
+
+## 2026-10-28 Runner bundle 참조 보존
+
+`codex/runner-bundle-ownership` `e8e3754`는 이름 충돌 시 기존 브랜치를 지우지 않고,
+참조 이동 시 bundle을 거부하며 변경된 참조를 보존한다. 수정 전 3 failed, 수정 후 실제 Runner 서비스 포함
+42 passed. 원본 `.local/evidence/runner-bundle-ownership-20261028-w4esi1fq`; 전체 API/DB 검증 중·main 미반영.

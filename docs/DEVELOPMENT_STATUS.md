@@ -728,3 +728,11 @@ Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.
 공개 `_pr_core`의 서버 검증 SHA 전달은 기존 승격 `test_critic_t17_context_pr_tests.py`가 허구의 `basesha`와
 서로 다른 Runner SHA로 성공을 요구하므로 안전한 강제 검사와 충돌한다. 승격 테스트를 고치거나 우회하지 않았으며
 공개 PR 경로의 최종 연결은 별도 해결이 필요하다.
+
+## Runner 임시 bundle 참조 보존
+
+`codex/runner-bundle-ownership`의 `e8e3754`는 임시 브랜치가 이미 있으면 삭제하지 않고,
+생성한 참조가 다른 커밋으로 이동하면 bundle을 거부하며 조건부 삭제로 그 참조를 보존한다.
+실패 시 자체 생성한 부분 bundle만 정리한다. 수정 전 회귀 3 failed, 수정 후 실제 Runner 서비스 포함
+관련 42 passed. 원본: `.local/evidence/runner-bundle-ownership-20261028-w4esi1fq`.
+전체 API·실제 PostgreSQL 검증 중이며 main 미반영이다. 기존 미커밋 runner/승격 테스트는 보존한다.
