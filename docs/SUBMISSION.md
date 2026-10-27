@@ -6,12 +6,11 @@
 ## Live (실측됨 2026-10-27)
 - Web: https://evoforge-web-230852112787.asia-northeast3.run.app
 - API: https://evoforge-api-230852112787.asia-northeast3.run.app (private IAM, 웹 same-origin 프록시 경유)
-- Mission `msn_f74933cc7eda` ("Reject unsigned webhook payloads"): CREATED→GENERATED→REVIEWED→RAN 전 체인 실측
-  - Builder: `stub:false`, muse-spark-1.3, 2736 토큰 (HMAC 서명 헬퍼 + 테스트 3종 생성)
-  - Critic: Phase A sealed 3종 (negative/boundary/compositional, 6368 토큰) + Phase B review FAIL (7209 토큰) — "라우트 미연결, CI 없음" 실질 지적
-  - Run (위생 샌드박스): visible 3/3 PASS, held-out 0/3 FAIL → gap +1.000 (95% LB +0.206) → GH_INTEGRITY FAIL, G2 FAIL → 병합 차단
-  - Ledger: spent 360¢, unknown 0 · Dashboard: RAN 1, blocked_merges 1
-- Mission `msn_db7466b500e0` ("Fix flaky login retry"): Builder 실호출 확인 (exponential backoff 패치)
+- **PASS 체인 → 실제 PR**: Mission `msn_5af789b9a5a4` ("calc.py add 수정") CREATED→GENERATED→REVIEWED→RAN→PR_OPENED
+  - Builder 실측 1줄 패치 (`a - b` → `a + b`), Critic PASS (sealed 3종), 위생 샌드박스 visible 3/3 + held-out 3/3
+  - GH_INTEGRITY/GC_COMPOSITION/G2 전부 PASS → https://github.com/itproanalysis/evoforge-target/pull/4 (OPEN, +10/-1)
+- **FAIL 체인 (차단 증명)**: Mission `msn_f74933cc7eda` ("webhook 403") — Critic FAIL + held-out 0/3 → gap +1.000 → GH_INTEGRITY FAIL → PR 차단, Dashboard blocked_merges 1
+- Ledger: spent 360¢·unknown 0 · base == target main HEAD (실제 repo 실행)
 
 ## 3분 데모 스크립트
 1. Mission Control에 목표 입력 → Generate: Builder 실측 패치+테스트 (0:30)
