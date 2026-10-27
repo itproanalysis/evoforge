@@ -119,9 +119,10 @@ stub 또는 정적 게이트·단위 테스트 통과만으로 실서비스 통�
 
 ## 현재 작업 클레임
 
-- **Codex (병합 정책/자격 시점 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** Codex 소유 postgres_kernel.py와
+- **Codex (병합 정책/자격·상위 동기화 검증 완료·T22 상위 병합 대기) / `codex/pg-integration` / `C:\evo_forge_codex`:** Codex 소유 postgres_kernel.py와
   test_postgres_kernel.py·관련 문서에서 현재 policy와 HIGH/CRITICAL 자격을 대조한다(`1441518`).
-  API 465개·실제 DB 147개·SQL 96개·참조 112개·계약·웹 빌드 통과. 지원 코드는 main 미반영이다.
+  상위 main `2cb3627`까지 합친 `41949da`에서 API 485개·실제 DB 147개·SQL 96개·참조 112개·계약·웹 빌드 통과.
+  관련 문서·검증 manifest의 근거를 정리했으며 지원 코드는 main 미반영이다.
   정본 core.authorize_merge는 그대로 호출하고 추가 거부 조건만 보강한다. main/상위 T22·Agy 자격 시험 모듈·봉인 테스트는 수정하지 않는다.
 - **Antigravity (완료·클레임 해제·main 반영 `ebfeb95`) / `agy/cr-closure`:**
   상위 Muse T22(`muse/round8`) 및 Codex(`codex/pg-integration`) 파일과 전혀 겹치지 않는 독립 모듈로 수용 매트릭스(`Acceptance_Test_Matrix.md`)와
@@ -453,3 +454,19 @@ INSERT 시점의 테넌트 잔액/hold와 프로젝트 현재 cap/사용액을 �
 
 근거: API **465 passed·1 skipped**(신규 CR 수용 테스트 15개 포함), 참조 **112개**·`validate_package.py` **0 failure** 통과.
 기존 `main.py`·웹·DB 마이그레이션·정본(`docs/evoforge-v4.2/`)은 변경하지 않았다. 실제 외부 공급사 과금 호출·GCP KMS 하드웨어 연동·운영 배포는 별도 범위다.
+
+## 상위 CR 모듈·Critic·배포 수정과 PostgreSQL 지원의 동기화 검증
+
+`codex/pg-integration`의 `41949da`는 main `2cb3627`까지의 CR 모듈(`ebfeb95`),
+Critic 16k 출력 예산(`fa02e57`), 웹 API base/표시 수정(`25480fd`), CI Git 설치/collection 보호와
+배포 인프라 수정을 보존해 합쳤다. Codex의 병합 정책/자격 시점 수정(`1441518`)과 전체 지원 코드도 함께 검증했다.
+
+API **485 passed·1 skipped**, 실제 PostgreSQL **147 passed**, 참조 **112개**·SQL **96개**·
+계약 **0 failure**·웹 프로덕션 빌드 통과. 이전 API 465개 기록은 상위 변경 동기화 전의 검증으로 보존한다.
+원본 로그 6개는 `C:\evo_forge\.local\evidence\upstream-sync-20261027-n32bxlnp`,
+source 33개와 로그의 SHA-256은 지원 브랜치 `docs/validation/2026-10-27-upstream-sync.json`에 기록했다.
+
+실제 DB/Git/Runner를 실행했지만 모델 transport·영수증·승인/자격 근거는 합성 fixture다.
+새 독립 모듈의 공개 경로 연결·실 GCP KMS·실청구·Docker 이미지/운영 배포는 이 검증으로 완료 처리하지 않는다.
+Muse T22의 main/평가/UI·봉인 테스트를 보존했으며 그 상위 병합 후 공개 명령/Broker 비용·전체 승인 연결을 이어간다.
+지원 코드는 main 미반영이고 전체 개발은 미완료다. Muse Spark `muse-spark-1.3`과 현재 채팅의 자동 재개를 유지한다.

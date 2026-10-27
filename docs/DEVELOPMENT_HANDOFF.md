@@ -273,3 +273,17 @@ manifest: 지원 브랜치 `docs/validation/2026-10-27-merge-freshness.json`.
 
 상위 Git 설치 CI/test collection 수정은 동기화했고 T22·Agy 소유 파일은 보존했다.
 T22 main 반영 뒤 공개 경로 연결을 이어간다. 실제 모델/비용·전체 승인·운영 연결은 미완료이며 자동 재개를 유지한다.
+
+## 2026-10-27 상위 변경을 포함한 지원 통합 재검증
+
+지원 브랜치 `codex/pg-integration`의 `41949da`에서 main `2cb3627`까지 동기화했다.
+CR 모듈/수용 테스트(`ebfeb95`), Critic 16k 출력 예산(`fa02e57`), 웹 배포(`25480fd`),
+Git 설치/CI collection·배포 인프라 변경과 Codex PostgreSQL 지원/승인 시점 보강을 함께 보존했다.
+
+API 485 passed·1 skipped·실제 DB 147 passed·참조 112·SQL 96·계약 0 failure·웹 빌드 통과.
+manifest: 지원 브랜치 `docs/validation/2026-10-27-upstream-sync.json`(source 33개·로그 6개 SHA-256).
+원본: main `.local/evidence/upstream-sync-20261027-n32bxlnp`. 기존 manifest는 각 과거 revision의 근거로 보존한다.
+
+실제 DB/Git/Runner를 사용했고 모델/영수증·승인/자격은 합성 fixture다. 실 KMS·청구·Docker/운영 배포는 미검증이다.
+T22의 main 반영이 먼저다. 이후 공개 command dispatch/완료·Broker 비용/영수증·후보/전체 승인 접점을 연결한다.
+전체 개발은 미완료이고 Muse Spark 기본값·자동 재개를 유지한다. 지원 코드는 아직 main에 합치지 않았다.
