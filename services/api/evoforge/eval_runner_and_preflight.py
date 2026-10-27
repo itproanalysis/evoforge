@@ -547,6 +547,11 @@ class DevBuilderCLIGuard:
         call_id: str | None = None,
         period_start: str | None = None,
     ) -> dict[str, Any]:
+        """Settle only usage and amounts explicitly returned by the trusted CLI adapter.
+
+        ``actual_micros`` is a compatibility assertion, never billing evidence. A
+        missing or malformed amount/usage leaves the reservation open for reconciliation.
+        """
         resolved_call_id = call_id or str(uuid.uuid5(uuid.NAMESPACE_OID, f"cli:{task_spec.get('id', packet['task_id'])}"))
 
         def _transport(_pkt: dict[str, Any], binding: PreboundCallBinding) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -561,27 +566,29 @@ class DevBuilderCLIGuard:
             if (
                 not isinstance(req_id, str)
                 or not req_id.strip()
-                or "uncached_input_tokens" not in cli_out
-                or "output_tokens" not in cli_out
             ):
-                self.broker.ledger.mark_call_unknown(binding.tenant_id, binding.project_id, binding.call_id)
                 raise PreflightError(
                     "UNVERIFIED_CLI_OUTCOME",
-                    "CLI output lacks verified provider_request_id and token usage; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
+                    "CLI output lacks a provider_request_id; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
+                )
+            fields = ("uncached_input_tokens", "cached_read_tokens", "cache_write_tokens", "output_tokens",
+                      "cost_micros", "customer_price_micros")
+            if any(type(cli_out.get(field)) is not int or cli_out[field] < 0 for field in fields):
+                raise PreflightError(
+                    "UNVERIFIED_CLI_OUTCOME",
+                    "CLI output lacks explicit, nonnegative integer usage and billing amounts; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
+                )
+            if actual_micros is not None and (type(actual_micros) is not int or actual_micros != cli_out["customer_price_micros"]):
+                raise PreflightError(
+                    "UNVERIFIED_CLI_OUTCOME",
+                    "CLI billing amount conflicts with the caller's actual_micros assertion; reservation retained as UNKNOWN_EXTERNAL_OUTCOME",
                 )
             now_str = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
             receipt_id = str(uuid.uuid5(uuid.NAMESPACE_OID, f"rcpt:{resolved_call_id}"))
-            uncached_in = int(cli_out["uncached_input_tokens"])
-            cached_read = int(cli_out.get("cached_read_tokens", 0))
-            cache_write = int(cli_out.get("cache_write_tokens", 0))
-            out_tok = int(cli_out["output_tokens"])
-            billed_micros = int(
-                cli_out.get("customer_price_micros",
-                    cli_out.get("cost_micros",
-                        cli_out.get("actual_micros", actual_micros if actual_micros is not None else 0)
-                    )
-                )
-            )
+            uncached_in = cli_out["uncached_input_tokens"]
+            cached_read = cli_out["cached_read_tokens"]
+            cache_write = cli_out["cache_write_tokens"]
+            out_tok = cli_out["output_tokens"]
             receipt = {
                 "schema_version": "provider-usage-receipt/v1",
                 "receipt_id": receipt_id,
@@ -607,8 +614,8 @@ class DevBuilderCLIGuard:
                     "cache_read_input_tokens": cached_read,
                     "output_tokens": out_tok,
                 },
-                "cost_micros": billed_micros,
-                "customer_price_micros": billed_micros,
+                "cost_micros": cli_out["cost_micros"],
+                "customer_price_micros": cli_out["customer_price_micros"],
                 "reservation_key": binding.reservation_key,
                 "ledger_entry_id": None,
                 "currency": "USD",

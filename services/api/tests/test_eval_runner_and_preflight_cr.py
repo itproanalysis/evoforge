@@ -272,7 +272,10 @@ def test_dev_builder_cli_guard_budget_governed_cr38() -> None:
             "provider_request_id": "req_meta_cli_777",
             "uncached_input_tokens": 1400,
             "cached_read_tokens": 200,
+            "cache_write_tokens": 0,
             "output_tokens": 180,
+            "cost_micros": 8_500,
+            "customer_price_micros": 8_500,
         }
 
     task_spec = {"id": TASK_ID, "description": "Run Muse Spark CLI improvement iteration"}
@@ -307,17 +310,18 @@ def test_dev_builder_cli_guard_budget_governed_cr38() -> None:
     assert eng.tenant_open_reserved_micros(TENANT_ID) == 20_000
     assert sum(1 for row in eng._ledger if row.entry_kind == "model_usage") == 1
 
-    # Usage without verified cost defaults to 0 and must not be recorded as a model_usage charge
-    zero_cost_res = cli_guard.run_cli_task(
-        task_spec={"id": "synthetic-no-bill"},
-        packet=packet,
-        reserved_micros=20_000,
-        cli_runner=lambda _task: {"provider_request_id": "req_nobill_1", "uncached_input_tokens": 17, "output_tokens": 9},
-        period_start=PERIOD,
-    )
-    assert zero_cost_res["receipt"]["customer_price_micros"] == 0
-    assert zero_cost_res["settlement"]["settlement"]["zero_cost"] is True
-    assert not any(row.entry_kind == "model_usage" and row.customer_micros < 0 for row in eng._ledger if row.idempotency_key == f"settle:{zero_cost_res['receipt']['call_id']}")
+    # Unknown billing must not be turned into an assumed zero-cost receipt.
+    with pytest.raises(PreflightError) as exc_no_bill:
+        cli_guard.run_cli_task(
+            task_spec={"id": "synthetic-no-bill"},
+            packet=packet,
+            reserved_micros=20_000,
+            cli_runner=lambda _task: {"provider_request_id": "req_nobill_1", "uncached_input_tokens": 17,
+                                     "cached_read_tokens": 0, "cache_write_tokens": 0, "output_tokens": 9},
+            period_start=PERIOD,
+        )
+    assert exc_no_bill.value.code == "UNVERIFIED_CLI_OUTCOME"
+    assert eng.tenant_open_reserved_micros(TENANT_ID) == 40_000
 
     # Transport timeout uncertainty marks intent UNKNOWN_EXTERNAL_OUTCOME
     def timeout_runner(_task: dict) -> dict:
