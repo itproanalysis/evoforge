@@ -1,1 +1,58 @@
-{"family": "parallel_multi_file", "suite_version": "v0", "tasks": [{"goal": "Ledger sums match receipt sums across files", "heldout": [{"code": "def test_pm01_compositional_sums_match():\n    receipts = [{'amount': 3}, {'amount': 7}]\n    ledger = {'entries': [3, 7]}\n    assert sum(r['amount'] for r in receipts) == sum(ledger['entries']) == 10\n", "id": "H1", "kind": "compositional"}, {"code": "def test_pm01_negative_unknown_currency_rejected():\n    KNOWN = {'USD', 'EUR'}\n    def check(cur):\n        if cur not in KNOWN:\n            raise ValueError('unknown currency')\n        return True\n    assert check('USD') is True\n    try:\n        check('XXX')\n    except ValueError:\n        pass\n    else:\n        raise AssertionError('expected ValueError')\n", "id": "H2", "kind": "negative"}, {"code": "def test_pm01_boundary_zero_amount_rejected():\n    def check(amount):\n        if amount <= 0:\n            raise ValueError('non-positive amount')\n        return True\n    assert check(1) is True\n    try:\n        check(0)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError('expected ValueError')\n", "id": "H3", "kind": "boundary"}], "id": "SV0-PM-01"}, {"goal": "Independent partitions compose without interference", "heldout": [{"code": "def test_pm02_compositional_partitions():\n    def part_a(items):\n        return [x for x in items if x % 2 == 0]\n    def part_b(items):\n        return [x for x in items if x % 2 == 1]\n    items = [1, 2, 3, 4]\n    assert sorted(part_a(items) + part_b(items)) == [1, 2, 3, 4]\n", "id": "H1", "kind": "compositional"}, {"code": "def test_pm02_negative_overlap_rejected():\n    def check_disjoint(a, b):\n        if set(a) & set(b):\n            raise ValueError('overlap')\n        return True\n    assert check_disjoint([1], [2]) is True\n    try:\n        check_disjoint([1], [1])\n    except ValueError:\n        pass\n    else:\n        raise AssertionError('expected ValueError')\n", "id": "H2", "kind": "negative"}, {"code": "def test_pm02_boundary_empty_partition():\n    def part_a(items):\n        return [x for x in items if x % 2 == 0]\n    assert part_a([]) == []\n", "id": "H3", "kind": "boundary"}], "id": "SV0-PM-02"}]}
+{
+ "family": "parallel_multi_file",
+ "suite_version": "v0",
+ "tasks": [
+  {
+   "id": "SV0-PM-01",
+   "goal": "Shard and merge keep every element across partitions",
+   "files": {
+    "shard.py": "\"\"\"Split a sequence into n partitions.\"\"\"\n\n\ndef shard(items, n):\n    chunks = [[] for _ in range(n)]\n    for i, x in enumerate(items):\n        chunks[i % (n - 1 if n > 1 else 1)].append(x)\n    return chunks\n",
+    "merge.py": "\"\"\"Combine partitions back into one sequence.\"\"\"\n\n\ndef merge(chunks):\n    if not chunks:\n        return []\n    return list(chunks[0])\n"
+   },
+   "reference_fix": "--- a/merge.py\n+++ b/merge.py\n@@ -2,6 +2,7 @@\n \n \n def merge(chunks):\n-    if not chunks:\n-        return []\n-    return list(chunks[0])\n+    out = []\n+    for chunk in chunks:\n+        out.extend(chunk)\n+    return out\n--- a/shard.py\n+++ b/shard.py\n@@ -2,7 +2,9 @@\n \n \n def shard(items, n):\n+    if n <= 0:\n+        raise ValueError(\"n must be positive\")\n     chunks = [[] for _ in range(n)]\n     for i, x in enumerate(items):\n-        chunks[i % (n - 1 if n > 1 else 1)].append(x)\n+        chunks[i % n].append(x)\n     return chunks\n",
+   "heldout": [
+    {
+     "id": "H1",
+     "kind": "compositional",
+     "code": "import merge\nimport shard\n\n\ndef test_pm01_compositional_round_trip():\n    items = list(range(7))\n    chunks = shard.shard(items, 3)\n    assert [len(c) for c in chunks] == [3, 2, 2]\n    assert sorted(merge.merge(chunks)) == items\n"
+    },
+    {
+     "id": "H2",
+     "kind": "negative",
+     "code": "import shard\n\n\ndef test_pm01_negative_nonpositive_partitions_rejected():\n    try:\n        shard.shard([1, 2], 0)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+    },
+    {
+     "id": "H3",
+     "kind": "boundary",
+     "code": "import merge\nimport shard\n\n\ndef test_pm01_boundary_empty_input():\n    assert shard.shard([], 3) == [[], [], []]\n    assert merge.merge([[], [], []]) == []\n"
+    }
+   ]
+  },
+  {
+   "id": "SV0-PM-02",
+   "goal": "Parallel partial sums add up to the sequential total",
+   "files": {
+    "workshare.py": "\"\"\"Split work for parallel workers.\"\"\"\n\n\ndef split_work(items, n):\n    if n <= 0:\n        raise ValueError(\"n must be positive\")\n    if n == 1:\n        return [list(items)]\n    return [list(items[i::n]) for i in range(n - 1)]\n",
+    "addup.py": "\"\"\"Add partial worker results.\"\"\"\n\n\ndef combine(partials):\n    total = 0\n    for part in partials:\n        total += part\n    return total\n"
+   },
+   "reference_fix": "--- a/workshare.py\n+++ b/workshare.py\n@@ -4,6 +4,4 @@\n def split_work(items, n):\n     if n <= 0:\n         raise ValueError(\"n must be positive\")\n-    if n == 1:\n-        return [list(items)]\n-    return [list(items[i::n]) for i in range(n - 1)]\n+    return [list(items[i::n]) for i in range(n)]\n",
+   "heldout": [
+    {
+     "id": "H1",
+     "kind": "compositional",
+     "code": "import addup\nimport workshare\n\n\ndef test_pm02_compositional_parallel_sum():\n    parts = workshare.split_work([1, 2, 3, 4, 5, 6], 3)\n    assert parts == [[1, 4], [2, 5], [3, 6]]\n    assert addup.combine([sum(p) for p in parts]) == 21\n"
+    },
+    {
+     "id": "H2",
+     "kind": "negative",
+     "code": "import workshare\n\n\ndef test_pm02_negative_nonpositive_workers_rejected():\n    try:\n        workshare.split_work([1], 0)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+    },
+    {
+     "id": "H3",
+     "kind": "boundary",
+     "code": "import addup\nimport workshare\n\n\ndef test_pm02_boundary_empty_work():\n    assert workshare.split_work([], 2) == [[], []]\n    assert addup.combine([]) == 0\n"
+    }
+   ]
+  }
+ ]
+}

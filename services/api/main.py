@@ -909,6 +909,8 @@ def eval_baseline(req: EvalBaselineRequest):
                            "model": result["model"], "X_SINGLE": xs,
                            "scaffold": result["scaffold"], "audit": result["audit"],
                            "scores": result["scores"], "tasks": result["tasks"],
+                           "by_family": result["by_family"],
+                           "reservation_ids": result["reservation_ids"],
                            "reservation_id": result["reservation_id"],
                            "provider_stub": result["provider_stub"],
                            "gates": gates})
@@ -916,7 +918,8 @@ def eval_baseline(req: EvalBaselineRequest):
     return {"baseline_id": result["baseline_id"], "evidence_id": eid,
             "suite_version": result["suite_version"], "model": result["model"],
             "X_SINGLE": xs, "audit": result["audit"], "scores": result["scores"],
-            "tasks": result["tasks"], "chain": evidence_chain.chain(eid)}
+            "tasks": result["tasks"], "by_family": result["by_family"],
+            "chain": evidence_chain.chain(eid)}
 
 
 @app.get("/v1/evidence/{eid}")
