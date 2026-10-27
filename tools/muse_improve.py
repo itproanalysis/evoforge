@@ -119,8 +119,15 @@ def _checks(task: dict, sealed: Path | None) -> tuple[bool, str]:
         out = []
         ok = True
         for cmd in task["check"]:
-            r = subprocess.run(cmd, shell=True, cwd=ROOT, capture_output=True, text=True,
-                               encoding="utf-8", errors="replace", timeout=600)
+            try:
+                r = subprocess.run(cmd, shell=True, cwd=ROOT, capture_output=True, text=True,
+                                   encoding="utf-8", errors="replace",
+                                   timeout=int(os.getenv("MUSE_CHECK_TIMEOUT", "2400")))
+            except subprocess.TimeoutExpired:
+                # The full suite is long; a slow check is a failed round, not a crash of the loop.
+                out.append(f"check timed out: {cmd[:80]}")
+                ok = False
+                continue
             out.append(r.stdout + r.stderr)
             ok = ok and r.returncode == 0
         return ok, "\n".join(out)
