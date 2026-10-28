@@ -54,7 +54,7 @@ AUDIT_CHECKS = ("no_remote", "single_base_ref", "head_is_base", "no_alternates",
 MAX_TEST_BYTES = 64 * 1024
 PYTEST_TIMEOUT_S = 90
 SCAFFOLD_NAME = "evoforge-sealed-v0"
-HARNESS_VERSION = "api-sealed-eval/1"
+HARNESS_VERSION = "api-sealed-eval/2"  # /2: hunk counts recomputed from the body (T26)
 
 _VALIDATED: dict[tuple, bool] = {}
 

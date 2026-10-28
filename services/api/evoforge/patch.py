@@ -1,4 +1,5 @@
-"""Strict unified-diff application (stdlib). A hunk applies exactly or not at all."""
+"""Unified-diff application (stdlib). Hunk counts are recomputed from the body when they
+disagree; context must match exactly. A hunk applies exactly or not at all."""
 from __future__ import annotations
 
 import re
@@ -18,22 +19,76 @@ def _header_path(line: str) -> str:
     return p[2:] if p.startswith(("a/", "b/")) else p
 
 
-def _parse(diff: str) -> list[dict]:
-    """[{old, new, path, hunks: [(old_start, old_lines, new_lines)]}] in diff order."""
+def _is_file_pair(lines: list[str], i: int) -> bool:
+    return (
+        lines[i].startswith("--- ")
+        and i + 1 < len(lines)
+        and lines[i + 1].startswith("+++ ")
+    )
+
+
+def _is_boundary(lines: list[str], i: int) -> bool:
+    ln = lines[i]
+    if ln.startswith("@@ ") or ln.startswith("diff --git"):
+        return True
+    if ln.startswith("--- ") and i + 1 < len(lines) and lines[i + 1].startswith("+++ "):
+        return True
+    return False
+
+
+def _is_body_line(ln: str) -> bool:
+    if ln == "" or ln.startswith("\\"):
+        return True
+    return ln[0] in (" ", "+", "-")
+
+
+def _split_lines(diff: str) -> list[str]:
     lines = diff.split("\n")
     if lines and lines[-1] == "":
         lines.pop()
+    while lines and lines[-1] == "":
+        lines.pop()
+    return lines
+
+
+def _parse_hunk_body(body_lines: list[str], hdr: str) -> tuple[list[str], list[str]]:
+    old_l: list[str] = []
+    new_l: list[str] = []
+    last: list[str] = []
+    for body in body_lines:
+        if body.startswith("\\"):  # "\ No newline at end of file" -> previous line had none
+            for side in last:
+                side[-1] = side[-1][:-1] if side[-1].endswith("\n") else side[-1]
+            continue
+        tag, text = (body[0], body[1:]) if body else (" ", "")
+        if tag == " ":
+            old_l.append(text + "\n"); new_l.append(text + "\n")
+            last = [old_l, new_l]
+        elif tag == "-":
+            old_l.append(text + "\n"); last = [old_l]
+        elif tag == "+":
+            new_l.append(text + "\n"); last = [new_l]
+        else:
+            raise PatchError(f"unexpected line in hunk: {body[:40]!r}")
+    return old_l, new_l
+
+
+def _parse_strict(diff: str) -> list[dict]:
+    """[{old, new, path, hunks: [(old_start, old_lines, new_lines)]}] in diff order."""
+    lines = _split_lines(diff)
     files: list[dict] = []
     i = 0
     while i < len(lines):
         ln = lines[i]
-        if ln.startswith("--- ") and i + 1 < len(lines) and lines[i + 1].startswith("+++ "):
+        if _is_file_pair(lines, i):
             old, new = _header_path(ln), _header_path(lines[i + 1])
             files.append({"old": old, "new": new, "path": old if new == NULL else new, "hunks": []})
             i += 2
             continue
         m = _HUNK.match(ln)
         if not m:
+            if ln.startswith("@@ "):
+                raise PatchError(f"malformed hunk header: {ln[:40]!r}")
             i += 1  # diff --git / index / mode lines
             continue
         if not files:
@@ -46,6 +101,8 @@ def _parse(diff: str) -> list[dict]:
         last: list[str] = []  # which sides the previous line went to
         i += 1
         while i < len(lines) and (a_n > 0 or b_n > 0 or lines[i].startswith("\\")):
+            if _is_boundary(lines, i):
+                raise PatchError(f"hunk @@ -{m.group(1)} line counts do not match its body")
             body = lines[i]
             if body.startswith("\\"):  # "\ No newline at end of file" -> previous line had none
                 for side in last:
@@ -67,10 +124,55 @@ def _parse(diff: str) -> list[dict]:
             i += 1
         if a_n or b_n:
             raise PatchError(f"truncated hunk @@ -{m.group(1)} in {files[-1]['path']}")
+        if i < len(lines) and not _is_boundary(lines, i) and _is_body_line(lines[i]):
+            raise PatchError(f"hunk @@ -{m.group(1)} line counts do not match its body")
         files[-1]["hunks"].append((a, old_l, new_l))
     if not files:
         raise PatchError("no file headers in diff")
     return files
+
+
+def _parse_recount(diff: str) -> list[dict]:
+    """Structural re-parse: hunk body runs to the next boundary; counts recomputed."""
+    lines = _split_lines(diff)
+    files: list[dict] = []
+    i = 0
+    while i < len(lines):
+        ln = lines[i]
+        if _is_file_pair(lines, i):
+            old, new = _header_path(ln), _header_path(lines[i + 1])
+            files.append({"old": old, "new": new, "path": old if new == NULL else new, "hunks": []})
+            i += 2
+            continue
+        m = _HUNK.match(ln)
+        if not m:
+            if ln.startswith("@@ "):
+                raise PatchError(f"malformed hunk header: {ln[:40]!r}")
+            i += 1  # diff --git / index / mode lines
+            continue
+        if not files:
+            raise PatchError("hunk before any file header")
+        a = int(m.group(1))
+        j = i + 1
+        while j < len(lines) and not _is_boundary(lines, j):
+            j += 1
+        body_lines = lines[i + 1:j]
+        while body_lines and body_lines[-1] == "" and j >= len(lines):
+            body_lines.pop()
+        old_l, new_l = _parse_hunk_body(body_lines, ln)
+        files[-1]["hunks"].append((a, old_l, new_l))
+        i = j
+    if not files:
+        raise PatchError("no file headers in diff")
+    return files
+
+
+def _parse(diff: str) -> list[dict]:
+    """[{old, new, path, hunks: [(old_start, old_lines, new_lines)]}] in diff order."""
+    try:
+        return _parse_strict(diff)
+    except PatchError:
+        return _parse_recount(diff)
 
 
 def paths_in_diff(diff: str) -> list[str]:
