@@ -29,7 +29,9 @@
 - [x] 도메인 이벤트 Envelope·낙관적 동시성(R27-2/C-11)·Outbox/Inbox 멱등 소비·1만 건 재생/중복/역순 수렴(R27-1)·Canonical Trajectory v1·실시간 UI SSE 투영/폭주 샘플링(R44-1~3), 및 OpenTelemetry 컨텍스트 span·서비스 SLO vs 안전 불변식 분리 감시(R47-2)·청구서 드리프트(>1%)/PG 웹훅 중복·역순·부분 환불 대사(R47-3, R48-1~3)·투기 불일치 1건 즉시 전역 차단/보상 해킹 격리(R47-4)·Incident 상태 머신·패킷 STALE(CR-22)/코덱 플래그 OFF(CR-24)/S11 캐시 배치(CR-69)/전체 삭제 연쇄(CR-17, R46-2)/출시 증거 패키지(R49-1, R49-5, R50-1)(`cd2e459`) main 반영·검증. API 503개·참조 112개·신규 CR 9개 통과.
 - [x] Cloud SQL 프로비저닝 및 재배포 시 PostgreSQL evidence 영속성 실측 증명, 마이그레이션 단일 추적기 `migrate_once.py` 및 해커톤 테넌트/프로젝트/허용목록 시드(`c36e64f`, `11e78fe`, `f214fdb`) main 반영·검증.
 - [x] Web UI 실시간 미션-Lab 딥링킹, WVI 머지 검증 결과 기록(`POST /v1/outcomes`), 실시간 성능 폴링(5초) 및 CR 검증 테스트(`test_web_live_dashboard_cr.py`)(`88ec9b6`, `505c614`) main 반영·검증. Next.js 빌드 11개 라우트 정상 컴파일.
-- [x] Runner 결과 수집 수 바인딩(`runner_client.py`, `test_runner_base_binding.py`) 및 스위트 불일치·exit code 불일치·봉인 종류 순서/값 불일치 방어(`2550dc1`) main 반영·검증. API 전체 667 passed, 1 skipped.
+- [x] Web UI 성과 분석 페이지(`apps/web/app/[locale]/performance/page.tsx`) ko/en 현지화(`messages/*.json`의 `performance` 네임스페이스, 키 동등성 테스트), 동기화 실패 시 "실시간 연결됨" 대신 갱신 실패 표시, 로케일 인지 증거 링크. 루트 폴백(`app/performance/page.tsx`)과 `GET /v1/participants`·출처(provenance) 경계(`check-admin-policy.mjs`)는 유지. `tsc --noEmit`·`next build`·standalone `/performance`·`/en/performance` 확인. Dockerfile standalone 메시지 복사(`aeb31f0`) 반영.
+- [x] Runner 결과 수집 수 바인딩(`runner_client.py`, `test_runner_base_binding.py`) 및 스위트 불일치·exit code 불일치·봉인 종류 순서/값 불일치 방어(`2550dc1`), Runner visible 스위트 실행 시 pytest 격리 및 conftest/rootdir 보호(`1cd7e44`) main 반영·검증.
+- [x] 공개 PR 생성(`_pr_core`) 시 서버 검증 불변 Git base SHA 바인딩 및 변경된 베이스 브랜치 409 충돌 거부(`7b85124`), T17/T18 테스트 픽스처 정렬 main 반영·검증.
 
 ## 이어서 수행할 작업
 
