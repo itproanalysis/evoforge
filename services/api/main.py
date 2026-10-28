@@ -1441,7 +1441,7 @@ def dashboard():
                                                if isinstance(g, dict)):
                 blocked += 1
     snap = ledger.snapshot("default")
-    validated = outcomes_store.all()
+    validated = _all_validated()
     return {
         "missions_by_state": by_state,
         "active_missions": active,
@@ -1489,7 +1489,7 @@ def outcome_record(req: OutcomeRequest):
 
 @app.get("/v1/outcomes")
 def outcomes_list():
-    return {"outcomes": outcomes_store.all()}
+    return {"outcomes": _all_validated()}
 
 
 @app.post("/v1/ledger/reconcile")
@@ -1502,6 +1502,31 @@ def ledger_reconcile(req: ReconcileRequest):
         raise HTTPException(409, str(e))
     eid = _store_evidence(result)
     return {**result, "evidence_id": eid}
+
+
+def _all_validated() -> list[dict]:
+    """All VALIDATED outcomes: live registry plus recovery from durable
+    evidence (survives restarts: the in-memory registry does not)."""
+    seen: dict[str, dict] = {}
+    for o in outcomes_store.all():
+        seen[o["mission_id"]] = o
+    try:
+        ids = list(_evidence)
+    except Exception:
+        ids = []
+    for eid in ids:
+        try:
+            doc = _evidence[eid]
+        except Exception:
+            continue
+        if not isinstance(doc, dict):
+            continue
+        out = doc.get("outcome")
+        if (isinstance(out, dict) and out.get("outcome_status") == "VALIDATED"
+                and isinstance(out.get("mission_id"), str)
+                and out["mission_id"] not in seen):
+            seen[out["mission_id"]] = out
+    return list(seen.values())
 
 
 @app.get("/v1/ledger")
