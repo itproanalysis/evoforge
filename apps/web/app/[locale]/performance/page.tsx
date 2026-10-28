@@ -18,6 +18,8 @@ import {
   provenance,
   viewProvenance,
 } from "../../../lib/performanceProvenance";
+import { buildTimeline } from "../../../lib/evolutionTimeline";
+import { EvolutionTimeline } from "../../../components/EvolutionTimeline";
 import { Button, Card } from "../../../components/ui";
 
 function fmtPct(rate: number): string {
@@ -299,6 +301,19 @@ export default function PerformancePage() {
           </Button>
         </div>
       </div>
+
+      <Card className="mt-4">
+        <div className="text-xs text-text-secondary">{t("timeline.heading")}</div>
+        {loading && !perf ? (
+          <div className="text-sm text-text-secondary mt-1">{t("loading")}</div>
+        ) : history.length === 0 ? (
+          <div className="text-sm text-text-secondary mt-1">{t("timeline.empty")}</div>
+        ) : (
+          <div className="mt-2">
+            <EvolutionTimeline timeline={buildTimeline(history)} />
+          </div>
+        )}
+      </Card>
 
       <section className="flex gap-3 flex-wrap mt-4">
         <MeasureCard

@@ -1,0 +1,21 @@
+{
+  "id": "T28_evolution_timeline",
+  "planned_by": "Claude (Critic): owner asked to see evolution intuitively on the web",
+  "goal": "T28 — make the measured evolution visible: an intuitive, beautiful timeline on the Performance page.\n\nData source: GET /v1/performance -> history: MeasurementRecord[] (lib/api.ts), each with kind (X_SINGLE|PIPELINE),\nsuite_version, model, harness_version, n, passed, pass_rate, wilson95 [lo, hi], cost_cents, created_at, per_family\n{family: {n, passed}}, evidence_id. Never invent, round away or recompute these numbers.\n\n1. NEW apps/web/lib/evolutionTimeline.ts — pure, dependency-free (no imports except `import type`), exported\n   `buildTimeline(history)` returning\n   { segments: [ { suite_version, model,\n                   points: [{measurement_id, kind, suite_version, harness_version, created_at, pass_rate, lo, hi,\n                             passed, n, cost_cents, evidence_id}],          // sorted by created_at\n                   harnessChanges: [{index, from, to}],  // index into points where harness_version differs from the\n                                                         // previous point of the segment\n                   families: [{family, cells: [{measurement_id, passed, n}]}]  // one cell per point, in point\n                                                         // order; a family missing from a record -> n: 0, passed: 0\n               } ] }\n   Segments: consecutive-in-time groups by (suite_version, model); a suite or model change starts a new segment\n   (different suites are not comparable). lo/hi are exactly wilson95[0]/[1]. Empty history -> {segments: []}.\n2. NEW apps/web/components/EvolutionTimeline.tsx — inline SVG, no chart library (do not add dependencies):\n   - one panel per segment, titled with suite version and model; between panels a clear \"not comparable\" divider;\n   - x: measurements in time order (date label under each), y: pass rate 0-100% with light gridlines at 0/25/50/75/100;\n   - each point: a dot at pass_rate plus a vertical Wilson 95% interval bar; X_SINGLE and PIPELINE in two distinct\n     colors with a small legend; a thin line joins points of the same kind within a segment;\n   - harness changes: a dashed vertical marker labelled with the new harness_version;\n   - every point has an accessible <title> (kind, passed/n, percent, interval, harness, date) and links to\n     /verify/<evidence_id>;\n   - per-family heatmap under each panel: rows = families, columns = points, cell text \"passed/n\", fill intensity by\n     passed/n (empty cells hatched or muted, never shown as 0%);\n   - entrance animation (bars/dots grow in, ~400ms) disabled under prefers-reduced-motion (Tailwind motion-reduce or a\n     media query);\n   - responsive: works at 375px (horizontal scroll inside the chart container only, never the page); uses the existing\n     theme tokens/classes so it fits the current dark UI.\n3. apps/web/app/[locale]/performance/page.tsx: render <EvolutionTimeline> as the first card (heading from messages),\n   built with buildTimeline(perf.history). Not-measured state: a short explanation, no fake axes with numbers.\n4. messages/ko.json and messages/en.json: all new strings under a \"timeline\" group, identical key sets.\nDo not change API code. Do not edit apps/web/app/performance/page.tsx (non-locale) beyond what tsc requires.",
+  "edit": [
+    "apps/web/lib/evolutionTimeline.ts",
+    "apps/web/components/EvolutionTimeline.tsx",
+    "apps/web/app/[locale]/performance/page.tsx",
+    "apps/web/messages/ko.json",
+    "apps/web/messages/en.json"
+  ],
+  "context": [
+    "apps/web/lib/api.ts",
+    "apps/web/components/ui/Card.tsx",
+    "apps/web/tailwind.config.ts"
+  ],
+  "check": [
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p .",
+    "python -m pytest services/api/tests -q -p no:cacheprovider -k \"web or i18n or locale or message or proxy or t28\""
+  ]
+}

@@ -259,6 +259,15 @@
     "how-wilson": "Wilson 95% 구간으로 비교: PIPELINE 하한이 기준 상한을 넘을 때만 개선됨으로 판정",
     "how-budget": "예산 상한: 서버 설정 EVO_EVAL_MAX_CENTS를 초과하면 402로 거부",
     "how-storage": "저장소: {storage}",
+    "timeline": {
+      "heading": "진화 타임라인",
+      "empty": "아직 측정이 없습니다. 기준 또는 파이프라인 측정을 실행하면 타임라인이 시작됩니다.",
+      "not-comparable": "비교 불가 (not comparable) — 스위트 또는 모델이 달라 비교할 수 없음",
+      "legend-x-single": "X_SINGLE",
+      "legend-pipeline": "PIPELINE",
+      "harness": "하네스 {version}",
+      "families-heading": "분야별 결과"
+    },
     "jobs": {
       "title": "백그라운드 측정 작업",
       "status": "작업 상태",

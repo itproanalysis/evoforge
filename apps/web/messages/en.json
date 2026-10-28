@@ -259,6 +259,15 @@
     "how-wilson": "Compared by Wilson 95% interval: improved only when the PIPELINE lower bound exceeds the baseline upper bound",
     "how-budget": "Budget cap: requests above the server setting EVO_EVAL_MAX_CENTS are refused with 402",
     "how-storage": "Storage: {storage}",
+    "timeline": {
+      "heading": "Evolution timeline",
+      "empty": "No measurements yet. Run a baseline or pipeline measurement to start the timeline.",
+      "not-comparable": "Not comparable — different suite or model",
+      "legend-x-single": "X_SINGLE",
+      "legend-pipeline": "PIPELINE",
+      "harness": "harness {version}",
+      "families-heading": "Per-family results"
+    },
     "jobs": {
       "title": "Background measurement job",
       "status": "Job status",
