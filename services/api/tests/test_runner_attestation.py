@@ -87,6 +87,7 @@ def test_runner_container_file_set_executes_with_provenance_without_api_sources(
     root=Path(__file__).resolve().parents[3]
     shutil.copy2(root/'services/runner/app.py',capsule/'app.py')
     shutil.copy2(provenance.__file__,capsule/'runner_attestation.py')
+    shutil.copy2(root/'services/api/evoforge/patch.py',capsule/'patch.py')  # Dockerfile copies the shared patch module
     tests=[{'code':'from value import value\ndef test_value():\n    assert value == 3\n'}]
     sealed=[{**tests[0],'kind':'boundary'}]
     payload={'bundle_b64':base64.b64encode(bundle.read_bytes()).decode('ascii'),'base_sha':base,
