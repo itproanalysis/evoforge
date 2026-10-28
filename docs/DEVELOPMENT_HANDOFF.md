@@ -443,3 +443,22 @@ Runner 서비스 포함 집중 34 passed; 동일 웹 tree의 npm ci/tsc/build가
 기존 미커밋 runner와 T5 테스트는 그대로이며 검증에 포함하지 않았다. 이 검사는 신뢰된
 Runner의 JUnit을 전제로 하고 보고서 위조를 방어하지 않는다. 로컬 Runner의 파일별 검증과
 실제 모델·공개 PR·운영 경로 검증은 별도로 남아 있다.
+
+## 2026-10-28 관리 참여자 및 성능 측정 영속화
+
+main `e13cce8`에 참여자 조회와 PostgreSQL 성능 측정 저장을 통합했다. 참여자는 현재 프로젝트의
+task lease holder·candidate 작성자·review 작성자로 실제 연결된 agent만 반환하며 이름이나 활성 상태를
+추정하지 않는다. 메모리 모드는 unavailable, DB 장애는 503이다. 성능은 기존 평가 evidence의 모델·스위트·
+집계·비용·모의 여부를 대조한 후 프로젝트 범위 append-only 저장소에 기록한다. 모의 결과에는
+`provider_stub`이 표시되며 과거 메모리 기록이나 출처는 복구·추정하지 않는다.
+
+최종 트리 전체 API 667 passed·3 skipped, 실제 PostgreSQL kernel 169개와 두 기능 DB 통합 3개,
+정본 검사, 웹 npm ci/tsc/build 및 프록시 정책 81개 통과. API·정본 tree가 같은 `cd48588`에서 DB를
+검증했고 최신 웹을 포함한 `e13cce8`에서 전체 API와 빌드를 검증했다. 기존 미커밋 Runner와 T5 테스트는
+보존했고 검증본에는 포함되지 않았다. 로그: `.local/validation-admin-final-api.log`,
+`.local/validation-admin-combined-kernel.log`, `.local/validation-admin-combined-targets.log`.
+
+운영에는 **011 마이그레이션 선적용 후 API와 웹 배포**가 필요하다. 평가 evidence와 measurement는
+별도 트랜잭션이므로 후자 저장 실패 시 evidence만 남는다. 이 결과는 실제 Muse 호출·공급사 청구 검증,
+공개 PR SHA 연결 또는 운영 배포 완료를 의미하지 않는다. 상세: `docs/ADMIN_PARTICIPANTS_CODEX.md`,
+`docs/PERFORMANCE_PERSISTENCE_CODEX.md`. Muse Spark 기본값과 자동 재개를 유지한다.

@@ -788,3 +788,14 @@ Runner 서비스 포함 52 passed다. 증거 해시는 `docs/validation/2026-10-
 승격 T17·T18 fixture를 실제 실행 SHA에 맞게 교정한 격리 작업트리에서 API 667 passed·
 1 skipped, 실제 PostgreSQL 169 passed, 정본 검사와 웹 빌드가 통과했다. 두 fixture 수정은
 소유권 때문에 미커밋이며 소유자 반영과 최종 트리 검증이 끝나기 전 main 통합은 보류한다.
+
+## 관리 참여자 및 성능 이력
+
+`e13cce8`까지 main에 통합했다. 프로젝트 관련 실제 agent 상태를 조회하고, 성능 평가 이력을
+원본 evidence와 대조해 PostgreSQL에 영속 저장한다. 기록이 없거나 모의·출처 미확인인 결과는
+사실대로 표시하며 과거 메모리 기록을 복구하지 않는다. 최종 API 667 passed·3 skipped,
+실제 PostgreSQL 169개 및 통합 회귀 3개, 정본 검사, 웹 npm ci/tsc/build·프록시 정책 81개 통과.
+기존 미커밋 Runner/T5는 보존했고 검증에 포함되지 않았다.
+
+운영 배포 전 011 마이그레이션을 먼저 적용해야 한다. evidence와 measurement 저장은 별도 트랜잭션이다.
+실제 모델 실행·공급사 청구·공개 PR SHA 연결·배포는 계속 미완료다. 자동 재개를 유지한다.
