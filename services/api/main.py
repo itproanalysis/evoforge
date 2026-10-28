@@ -418,7 +418,7 @@ def _stage_summary(eid: str, stage: str) -> dict:
             "baseline_id": stored.get("baseline_id"),
             "suite_version": stored.get("suite_version"),
             "model": stored.get("model"),
-            "X_SINGLE": {k: xs.get(k) for k in ("pass_rate", "n", "cost_cents")},
+            "X_SINGLE": {k: xs.get(k) for k in ("pass_rate", "n", "cost_cents", "usage_missing") if k in xs},
             "pass_rate": xs.get("pass_rate"),
             "n": xs.get("n"),
             "cost_cents": xs.get("cost_cents"),
