@@ -1,0 +1,24 @@
+{
+  "id": "T30_evolution_persistence",
+  "planned_by": "Claude (Critic): board W14",
+  "goal": "T30 — persist evolutions and evolution memory in PostgreSQL so they survive API redeploys (board W14).\n\nToday services/api/evoforge/evolution.py keeps evolutions in `_evolutions` and memory.py keeps patterns in `_patterns`\n(process memory): every deploy erases the autopilot history, its learned patterns and the leaderboard built on them.\nFollow the existing pattern exactly: services/api/evoforge/missions.py switches to postgres_missions.MissionStore when\npostgres_state.backend() is configured (EVO_STATE_BACKEND=postgres); memory mode stays unchanged.\n\n1. NEW services/api/migrations/012_evolutions.sql, modelled on 006_api_missions.sql: tables\n   runtime.api_evolutions (tenant_id, project_id, evolution_id, document jsonb, updated_at; PK tenant/project/id) and\n   runtime.api_evolution_memory (tenant_id, project_id, pattern_id/evolution_id, document jsonb, recorded_at), both with\n   ENABLE + FORCE ROW LEVEL SECURITY and the same tenant/project policy shape as the other runtime tables, REVOKE ALL FROM\n   PUBLIC, GRANT only what core_app needs (evolutions: SELECT, INSERT, UPDATE; memory: SELECT, INSERT). Wrap in\n   BEGIN/COMMIT with SET LOCAL ROLE ctx_owner like 011. Additive only.\n2. NEW services/api/evoforge/postgres_evolutions.py: a store scoped to the configured tenant/project (same kernel and\n   scope helpers as postgres_missions/postgres_performance) with get/list/upsert for evolutions and record/list for\n   memory patterns. Documents are JSON; reject non-finite data with KernelRejected.\n3. evolution.py and memory.py: when the postgres backend is configured, every read goes to the store (no stale cache\n   across processes) and every mutation (start, record_generation, cancel, memory record) is written through; reset()\n   raises KernelRejected for the durable store (like missions). Keep the per-evolution lock and all public function\n   signatures and return shapes unchanged. Memory mode behaviour must not change.\n4. Tests: services/api/tests/test_muse_t30.py (memory-mode unit tests) and live-PG tests that use the\n   test_postgres_kernel fixtures (`database`, `funded`) like tests/test_performance_persistence_pg.py.\nDo not change main.py endpoints, patch.py, sealed_eval.py or the web.",
+  "edit": [
+    "services/api/migrations/012_evolutions.sql",
+    "services/api/evoforge/postgres_evolutions.py",
+    "services/api/evoforge/evolution.py",
+    "services/api/evoforge/memory.py",
+    "services/api/tests/test_muse_t30.py",
+    "services/api/tests/test_muse_t30_pg.py"
+  ],
+  "context": [
+    "services/api/migrations/006_api_missions.sql",
+    "services/api/migrations/011_performance_measurements.sql",
+    "services/api/evoforge/postgres_missions.py",
+    "services/api/evoforge/missions.py",
+    "services/api/evoforge/postgres_performance.py",
+    "services/api/tests/test_performance_persistence_pg.py"
+  ],
+  "check": [
+    "set \"EVO_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/postgres\" && python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
