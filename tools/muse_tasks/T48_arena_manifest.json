@@ -1,0 +1,17 @@
+{
+  "id": "T48_arena_manifest",
+  "planned_by": "Claude (Critic): v3.6 feedback COMP-02, AT-17/AT-18",
+  "goal": "T48 — Arena fairness manifest (v3.6 feedback §2.2, §7.4; acceptance AT-17/AT-18). Every arena must state, before\nand after it runs, that both lanes got the same task and the same held-out tests, and what each lane was allowed.\n\nEdit services/api/evoforge/arena.py (T44 engine) only, plus your tests:\n- Add a \"manifest\" dict to every arena document, already present in the running document that seed_running stores at\n  POST time, unchanged in the finished document, and included in GET /v1/arena list rows:\n  * comparison_mode: \"same_task_same_tests_concurrent\"\n  * suite_version, task_id\n  * task_spec_hash: \"sha256:\" + sha256 hex of json.dumps({\"goal\": task[\"goal\"], \"files\": task[\"files\"]},\n    sort_keys=True, separators=(\",\", \":\")) encoded utf-8  (exactly what both Builders are given)\n  * heldout_hash: \"sha256:\" + sha256 hex of json.dumps([{\"name\": h[\"name\"], \"code\": h[\"code\"]} for h in\n    task[\"heldout\"]], sort_keys=True, separators=(\",\", \":\"))  (proves the same tests without revealing them)\n  * heldout_count: len(task[\"heldout\"])\n  * base_tree_sha: the 40-hex git tree id of the task base commit (git rev-parse <base>^{tree}); deterministic for\n    the same files. Compute it at POST time (a temporary repo via sealed_eval._make_task_source_repo is fine; clean up).\n  * lanes: {\"single\": {\"model\", \"harness\": \"api-sealed-eval/1\", \"max_attempts\": 1, \"critic\": false,\n    \"feedback\": \"none\"}, \"evoforge\": {\"model\", \"harness\": \"api-sealed-eval/2\", \"max_attempts\":\n    sealed_eval.PIPELINE_MAX_ATTEMPTS, \"feedback\": \"heldout_failing_test_names\"}}  (if a critic feedback mode exists\n    and is used, say \"critic\")\n  * cost_basis: \"model_api_usage\"; runner_cost: \"not_measured\"\n  * disclosure: one plain sentence that the EvoForge lane retries with the names of failing held-out tests (an upper\n    bound, an oracle signal the single lane does not get) and that Runner compute is not included in cost.\n- Each lane also records its own \"base_tree_sha\" from the repo it actually built (must equal the manifest's).\n- No held-out code or reference fix anywhere in the manifest. Do not change lane scoring, verdict or patch semantics.\nTests: services/api/tests/test_muse_t48.py.",
+  "edit": [
+    "services/api/evoforge/arena.py",
+    "services/api/tests/test_muse_t48.py"
+  ],
+  "context": [
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/main.py",
+    "services/api/tests/test_sealed_t44_arena.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
