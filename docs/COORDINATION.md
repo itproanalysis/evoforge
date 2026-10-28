@@ -67,7 +67,7 @@ your module, do not touch it — work on a branch.
 
 ## 6. Work board (updated 2026-10-28 22:30 KST — read before starting; update your row when you start/finish)
 
-Priority order is Muse Spark 1 > Claude 2 > Codex 3 (owner decision). One owner per row; if a row is not
+Direction and milestones: `docs/ROADMAP_EVOLUTION.md`. Priority order is Muse Spark 1 > Claude 2 > Codex 3 (owner decision). One owner per row; if a row is not
 yours, do not start it — add a row instead. Product copy says "service", never "demo"/"hackathon".
 
 | # | Work | Owner | Branch / state | Done when |
@@ -79,7 +79,11 @@ yours, do not start it — add a row instead. Product copy says "service", never
 | W5 | **Loading states**: Mission Control and Performance show "loading" until the first response; show "cannot load" only after a request actually failed (today the error text flashes on every page load) | agy | done (verified tsc/build/pytest) | no error text before the first fetch settles; 375px layout intact |
 | W6 | Runner isolation / PR base binding follow-ups already in flight | Codex | `codex/*` | merged to main with full suite green |
 | W10 | **T25 strong-oracle prompts**: Builder/Critic system prompts ask for `==` value asserts and `pytest.raises`, forbid `assert True/False` and try/except (frozen `oracle_ast` rates those tautologies). Live mission `msn_db7a9a9e80c9` (div): visible 3/3, held-out 4/4, G2 PASS, PR blocked GH_INTEGRITY=INCONCLUSIVE (strong fraction 0.67 < 0.8) | Muse Spark (Builder), Claude (Critic) | `muse/round10`, building | sealed T25 + full suite green; next live mission opens a PR |
-| W8 | **Sealed eval v1 with contract-stating goals** (`docs/EVAL_V1_GOALS.md`): `evals/sealed_v1/` copies v0 held-out tests, files and reference fixes unchanged and replaces only `goal`; `SUITE_VERSION` selectable; every task passes `check_task`. v0 measured 2/12 mostly because tests check behaviour the goals never state | Codex (evals data), Claude reviews | open | v1 loads, `check_task` green for 12/12, `/v1/eval/suites` lists v0 and v1 |
+| W11 | **T26 hunk recount** in `patch.py`: diffs with wrong `@@` counts apply by their body (git `--recount`), context still exact. v1 local: same Builder outputs 5/12 strict → 12/12 recounted | Muse Spark (Builder), Claude (Critic) | `muse/round11`, building | sealed T26 + full suite green |
+| W12 | **T27 signed proofs + evolution budget**: Ed25519 certificates (`EVO_PROOF_SIGNING_KEY`), `GET /v1/proof/key`, verify with server key only; `/v1/evolution/start` refuses worst case > `EVO_EVOLUTION_MAX_CENTS` (default 1500¢). Review of de481a8: sha256 "signature" was forgeable; 10×5 evolution could reserve 12000¢ | Muse Spark (Builder), Claude (Critic) | `muse/round12`, building | sealed T27 + full suite green; key in Secret Manager |
+| W13 | **v1 loader**: `sealed_eval` reads `evals/sealed_v<N>/` by `suite_version`; eval request models accept `"v1"`; `/v1/eval/suites` lists both | Muse Spark (after T24 merges) | open | v1 baseline runs on production |
+| W14 | **Persist evolutions / memory / leaderboard** in PostgreSQL (today process memory: lost on every deploy) | Codex (migration) + Muse (store) | open | an evolution survives an API redeploy |
+| W8 | **Sealed eval v1 with contract-stating goals** (`docs/EVAL_V1_GOALS.md`): `evals/sealed_v1/` copies v0 held-out tests, files and reference fixes unchanged and replaces only `goal`; `SUITE_VERSION` selectable; every task passes `check_task`. v0 measured 2/12 mostly because tests check behaviour the goals never state | Claude (data, Codex idle) | data merged `dede1da` (check_task 12/12); loader = W13 | v1 loads, `check_task` green for 12/12, `/v1/eval/suites` lists v0 and v1 |
 | W9 | **Per-task failure reason in eval evidence** (`empty_diff` / `apply_failed` / `heldout_failed` + failing test names / `provider_error`; no held-out code) | Codex (`sealed_eval.py`) | open | baseline and pipeline evidence carry a reason for every task with score < 1 |
 | W7 | Main worktree hygiene: uncommitted `services/api/evoforge/runner.py`, `services/api/tests/test_critic_t5_runner.py`, `apps/web/tsconfig.tsbuildinfo` sit in `C:\evo_forge` (cline checkpoints). Owner of that work: commit on your branch or discard; never leave WIP in the shared main worktree | whoever owns that WIP (cline) | open | `git status` clean in `C:\evo_forge` |
 
