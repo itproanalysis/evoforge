@@ -167,11 +167,13 @@ def _parse_recount(diff: str) -> list[dict]:
     return files
 
 
-def _parse(diff: str) -> list[dict]:
+def _parse(diff: str, recount: bool = True) -> list[dict]:
     """[{old, new, path, hunks: [(old_start, old_lines, new_lines)]}] in diff order."""
     try:
         return _parse_strict(diff)
     except PatchError:
+        if not recount:  # harness /1: strict counts only
+            raise
         return _parse_recount(diff)
 
 
@@ -197,9 +199,9 @@ def _apply(path: str, orig: list[str], hunks: list) -> list[str]:
     return out + orig[cursor:]
 
 
-def apply_unified_diff(files: dict[str, str | None], diff: str) -> dict[str, str | None]:
+def apply_unified_diff(files: dict[str, str | None], diff: str, recount: bool = True) -> dict[str, str | None]:
     result: dict[str, str | None] = {}
-    for f in _parse(diff):
+    for f in _parse(diff, recount):
         path = f["path"]
         cur = result[path] if path in result else files.get(path)
         if f["old"] == NULL and cur is not None:

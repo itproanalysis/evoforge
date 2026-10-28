@@ -1,0 +1,144 @@
+{
+  "family": "ci_saturated",
+  "suite_version": "v2",
+  "tasks": [
+    {
+      "id": "SV2-CI-01",
+      "goal": "In quarantine.py, decide(history) for a list of run results returns \"PASS\" when all are True, \"FAIL\" when all are False, \"QUARANTINE\" when mixed, and raises ValueError for an empty history.",
+      "files": {
+        "quarantine.py": "\"\"\"Decide whether a result quarantines a flaky check.\"\"\"\n\n\ndef decide(history):\n    if all(history):\n        return \"PASS\"\n    return \"FAIL\"\n"
+      },
+      "reference_fix": "--- a/quarantine.py\n+++ b/quarantine.py\n@@ -2,6 +2,10 @@\n \n \n def decide(history):\n+    if not history:\n+        raise ValueError(\"empty history\")\n     if all(history):\n         return \"PASS\"\n-    return \"FAIL\"\n+    if not any(history):\n+        return \"FAIL\"\n+    return \"QUARANTINE\"\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import quarantine\n\n\ndef test_ci01_compositional_mixed_quarantines():\n    assert quarantine.decide([True, True]) == \"PASS\"\n    assert quarantine.decide([True, False]) == \"QUARANTINE\"\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import quarantine\n\n\ndef test_ci01_negative_empty_history_rejected():\n    try:\n        quarantine.decide([])\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import quarantine\n\n\ndef test_ci01_boundary_single_result():\n    assert quarantine.decide([False]) == \"FAIL\"\n    assert quarantine.decide([True]) == \"PASS\"\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-CI-02",
+      "goal": "In benchstat.py, median(values) returns the true median: the middle value for odd length, the mean of the two middle values for even length (e.g. 2.5); a single value returns itself; empty input raises ValueError.",
+      "files": {
+        "benchstat.py": "\"\"\"Robust statistics for saturated CI timing data.\"\"\"\n\n\ndef median(values):\n    if not values:\n        raise ValueError(\"empty\")\n    ordered = sorted(values)\n    return ordered[len(ordered) // 2]\n"
+      },
+      "reference_fix": "--- a/benchstat.py\n+++ b/benchstat.py\n@@ -5,4 +5,7 @@\n     if not values:\n         raise ValueError(\"empty\")\n     ordered = sorted(values)\n-    return ordered[len(ordered) // 2]\n+    mid = len(ordered) // 2\n+    if len(ordered) % 2:\n+        return ordered[mid]\n+    return (ordered[mid - 1] + ordered[mid]) / 2\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import benchstat\n\n\ndef test_ci02_compositional_median_values():\n    assert benchstat.median([3, 1, 2]) == 2\n    assert benchstat.median([9, 1, 5, 3]) == 4.0\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import benchstat\n\n\ndef test_ci02_negative_empty_rejected():\n    try:\n        benchstat.median([])\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import benchstat\n\n\ndef test_ci02_boundary_single_and_even():\n    assert benchstat.median([7]) == 7\n    assert benchstat.median([1, 2, 3, 4]) == 2.5\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-CI-03",
+      "goal": "In flaky.py, flaky_tests(runs) takes a list of runs, each a dict {test_name: passed_bool}, and returns the sorted names that both passed and failed at least once. A test missing from a run does not count for that run.",
+      "files": {
+        "flaky.py": "def flaky_tests(runs):\n    names = set()\n    for run in runs:\n        for name, ok in run.items():\n            if not ok:\n                names.add(name)\n    return sorted(names)\n"
+      },
+      "reference_fix": "--- a/flaky.py\n+++ b/flaky.py\n@@ -1,7 +1,6 @@\n def flaky_tests(runs):\n-    names = set()\n+    passed, failed = set(), set()\n     for run in runs:\n         for name, ok in run.items():\n-            if not ok:\n-                names.add(name)\n-    return sorted(names)\n+            (passed if ok else failed).add(name)\n+    return sorted(passed & failed)\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import flaky\n\n\ndef test_sv2ci03_compositional():\n    runs = [{'a': True, 'b': False, 'c': True}, {'a': False, 'b': False, 'c': True}]\n    assert flaky.flaky_tests(runs) == ['a']\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import flaky\n\n\ndef test_sv2ci03_negative():\n    assert flaky.flaky_tests([{'x': False}, {'x': False}]) == []\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import flaky\n\n\ndef test_sv2ci03_boundary():\n    assert flaky.flaky_tests([]) == []\n    assert flaky.flaky_tests([{'y': True}, {}, {'y': False}]) == ['y']\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-CI-04",
+      "goal": "In shards.py, assign(durations, n) assigns tests to n shards greedily: process tests by descending duration (ties by name ascending) and put each on the shard with the smallest total so far (ties: lowest shard index). Returns a list of n lists of test names. n <= 0 raises ValueError.",
+      "files": {
+        "shards.py": "def assign(durations, n):\n    shards = [[] for _ in range(n)]\n    for i, name in enumerate(sorted(durations)):\n        shards[i % n].append(name)\n    return shards\n"
+      },
+      "reference_fix": "--- a/shards.py\n+++ b/shards.py\n@@ -1,5 +1,10 @@\n def assign(durations, n):\n+    if n <= 0:\n+        raise ValueError(\"n must be positive\")\n     shards = [[] for _ in range(n)]\n-    for i, name in enumerate(sorted(durations)):\n-        shards[i % n].append(name)\n+    totals = [0] * n\n+    for name in sorted(durations, key=lambda k: (-durations[k], k)):\n+        idx = min(range(n), key=lambda i: (totals[i], i))\n+        shards[idx].append(name)\n+        totals[idx] += durations[name]\n     return shards\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import shards\n\n\ndef test_sv2ci04_compositional():\n    assert shards.assign({'a': 5, 'b': 3, 'c': 3, 'd': 1}, 2) == [['a', 'd'], ['b', 'c']]\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import shards\n\n\ndef test_sv2ci04_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        shards.assign({'a': 1}, 0)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import shards\n\n\ndef test_sv2ci04_boundary():\n    assert shards.assign({}, 2) == [[], []]\n    assert shards.assign({'z': 2}, 3) == [['z'], [], []]\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-CI-05",
+      "goal": "In budget.py, over_budget(timings, limit) returns the names of steps whose time is strictly greater than limit, slowest first (ties by name ascending). timings is a dict name -> seconds; a negative limit raises ValueError.",
+      "files": {
+        "budget.py": "def over_budget(timings, limit):\n    return sorted(n for n, t in timings.items() if t >= limit)\n"
+      },
+      "reference_fix": "--- a/budget.py\n+++ b/budget.py\n@@ -1,2 +1,5 @@\n def over_budget(timings, limit):\n-    return sorted(n for n, t in timings.items() if t >= limit)\n+    if limit < 0:\n+        raise ValueError(\"negative limit\")\n+    slow = [n for n, t in timings.items() if t > limit]\n+    return sorted(slow, key=lambda n: (-timings[n], n))\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import budget\n\n\ndef test_sv2ci05_compositional():\n    assert budget.over_budget({'lint': 4, 'unit': 9, 'e2e': 12, 'docs': 9}, 5) == ['e2e', 'docs', 'unit']\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import budget\n\n\ndef test_sv2ci05_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        budget.over_budget({'a': 1}, -1)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import budget\n\n\ndef test_sv2ci05_boundary():\n    assert budget.over_budget({'a': 5}, 5) == []\n    assert budget.over_budget({}, 0) == []\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-CI-06",
+      "goal": "In retry_ci.py, final_status(attempts) takes the list of attempt results ('pass' or 'fail') for one job and returns 'pass' if any attempt passed, 'fail' if all failed; an empty list raises ValueError and any other value raises ValueError.",
+      "files": {
+        "retry_ci.py": "def final_status(attempts):\n    return attempts[-1]\n"
+      },
+      "reference_fix": "--- a/retry_ci.py\n+++ b/retry_ci.py\n@@ -1,2 +1,4 @@\n def final_status(attempts):\n-    return attempts[-1]\n+    if not attempts or any(a not in (\"pass\", \"fail\") for a in attempts):\n+        raise ValueError(\"bad attempts\")\n+    return \"pass\" if \"pass\" in attempts else \"fail\"\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import retry_ci\n\n\ndef test_sv2ci06_compositional():\n    assert retry_ci.final_status(['fail', 'pass', 'fail']) == 'pass'\n    assert retry_ci.final_status(['fail', 'fail']) == 'fail'\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import retry_ci\n\n\ndef test_sv2ci06_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        retry_ci.final_status(['pass', 'skip'])\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import retry_ci\n\n\ndef test_sv2ci06_boundary():\n    import pytest\n    with pytest.raises(ValueError):\n        retry_ci.final_status([])\n    assert retry_ci.final_status(['pass']) == 'pass'\n"
+        }
+      ]
+    }
+  ]
+}
