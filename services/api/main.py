@@ -877,13 +877,13 @@ def eval_sandbox(req: SandboxRequest):
 
 
 class EvalBaselineRequest(BaseModel):
-    suite_version: Literal["v0"] = "v0"
+    suite_version: Literal["v0", "v1"] = "v0"
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
 
 class EvalPipelineRequest(BaseModel):
-    suite_version: Literal["v0"] = "v0"
+    suite_version: Literal["v0", "v1"] = "v0"
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
@@ -944,16 +944,17 @@ def _production_stats() -> dict:
 
 
 @app.get("/v1/eval/suites")
-def eval_suites():
-    """Redacted sealed v0 catalogue: families plus sha256/len metadata only."""
+def eval_suites(suite_version: Literal["v0", "v1"] = "v0"):
+    """Redacted sealed catalogue for one suite version: families plus sha256/len metadata only."""
     from evoforge import repo_source as _rs_eval
 
     try:
-        suites = sealed_eval_mod.public_suites()
+        suites = sealed_eval_mod.public_suites(suite_version)
     except Exception as e:
         raise HTTPException(
             502, _rs_eval.redact(f"sealed suites unavailable: {type(e).__name__}"))
-    return {"suite_version": sealed_eval_mod.SUITE_VERSION, "suites": suites}
+    return {"suite_version": suite_version,
+            "suite_versions": list(sealed_eval_mod.SUITE_VERSIONS), "suites": suites}
 
 
 def _do_eval_baseline(suite_version: str, model: str, family) -> dict:
@@ -961,7 +962,7 @@ def _do_eval_baseline(suite_version: str, model: str, family) -> dict:
     from evoforge import repo_source as _rs_eval2
 
     try:
-        n_tasks = sealed_eval_mod.count_tasks(family)
+        n_tasks = sealed_eval_mod.count_tasks(family, suite_version)
     except ValueError as e:
         raise HTTPException(400, _rs_eval2.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
@@ -1051,7 +1052,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family) -> dict:
     from evoforge import repo_source as _rs_eval3
 
     try:
-        n_tasks = sealed_eval_mod.count_tasks(family)
+        n_tasks = sealed_eval_mod.count_tasks(family, suite_version)
     except ValueError as e:
         raise HTTPException(400, _rs_eval3.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
@@ -1135,16 +1136,16 @@ def eval_pipeline(req: EvalPipelineRequest):
 
 class EvalJobRequest(BaseModel):
     kind: Literal["X_SINGLE", "PIPELINE"]
-    suite_version: Literal["v0"] = "v0"
+    suite_version: Literal["v0", "v1"] = "v0"
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
 
-def _eval_job_precheck(kind: str, family) -> None:
+def _eval_job_precheck(kind: str, family, suite_version: str = "v0") -> None:
     from evoforge import repo_source as _rs_job
 
     try:
-        n_tasks = sealed_eval_mod.count_tasks(family)
+        n_tasks = sealed_eval_mod.count_tasks(family, suite_version)
     except ValueError as e:
         raise HTTPException(400, _rs_job.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
@@ -1158,7 +1159,7 @@ def _eval_job_precheck(kind: str, family) -> None:
 
 @app.post("/v1/eval/jobs", status_code=202)
 def eval_job_create(req: EvalJobRequest):
-    _eval_job_precheck(req.kind, req.family)
+    _eval_job_precheck(req.kind, req.family, req.suite_version)
     if req.kind == "X_SINGLE":
         def _runner(sv=req.suite_version, m=req.model, f=req.family):
             return _do_eval_baseline(sv, m, f)

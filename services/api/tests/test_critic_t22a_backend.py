@@ -33,6 +33,8 @@ def fresh(monkeypatch):
     commands.reset()
     if hasattr(sealed_eval, "reset_measurements"):
         sealed_eval.reset_measurements()
+    from evoforge import performance as _perf
+    _perf.clear()  # measurements are process-wide; each test starts with none
 
 
 def _rec(kind, passed, n, cost, suite="v0", model="muse-spark-1.3"):

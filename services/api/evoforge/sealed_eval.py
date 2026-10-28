@@ -41,7 +41,9 @@ from evoforge import patch as _patch  # noqa: E402
 from evoforge import runner as _runner  # noqa: E402
 from evoforge import runner_client as _runner_client  # noqa: E402
 
-SUITE_VERSION = "v0"
+SUITE_VERSION = "v0"  # default suite
+# v1 keeps v0 held-out tests, files and reference fixes unchanged; only the goals state the contract.
+SUITE_VERSIONS = ("v0", "v1")
 BASELINE_MODEL = "muse-spark-1.3"
 BASELINE_COST_CENTS = 120
 ALLOWED_KINDS = frozenset({"compositional", "negative", "boundary"})
@@ -69,9 +71,15 @@ class SealedTimeout(SealedEvalError):
     """Sandbox execution exceeded its timeout -> HTTP 504."""
 
 
-def sealed_dir() -> str:
+def _check_version(version: str) -> str:
+    if version not in SUITE_VERSIONS:
+        raise ValueError(f"unknown suite_version: {version!r}")
+    return version
+
+
+def sealed_dir(version: str = SUITE_VERSION) -> str:
     return os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..",
-                                        "..", "evals", "sealed_v0"))
+                                        "..", "evals", f"sealed_{_check_version(version)}"))
 
 
 def _gates_path() -> str:
@@ -163,7 +171,7 @@ def _dir_fingerprint(directory: str) -> tuple:
     return tuple(fp)
 
 
-def load_suites() -> list[dict]:
+def load_suites(version: str = SUITE_VERSION) -> list[dict]:
     """Read every family file; refuse tasks whose held-out is not a real test.
 
     Structural refusal (bad shape, missing files/fix, held-out that does
@@ -171,7 +179,7 @@ def load_suites() -> list[dict]:
     :func:`check_task` per task: a suite where held-out passes without the
     fix, or fails with the reference fix applied, is rejected.
     """
-    directory = sealed_dir()
+    directory = sealed_dir(version)
     try:
         names = sorted(f for f in os.listdir(directory) if f.endswith(".json"))
     except OSError as e:
@@ -261,15 +269,16 @@ def load_suites() -> list[dict]:
                     raise SealedEvalError(
                         f"sealed task {task['id']} reference fix fails its "
                         "held-out tests")
-        _VALIDATED.clear()
+        for stale in [k for k in _VALIDATED if k[0] == directory]:
+            del _VALIDATED[stale]
         _VALIDATED[key] = True
     return suites
 
 
-def public_suites() -> list[dict]:
+def public_suites(version: str = SUITE_VERSION) -> list[dict]:
     """Redacted suite summaries: kinds plus sha256/len metadata only."""
     out: list[dict] = []
-    for suite in load_suites():
+    for suite in load_suites(version):
         kinds = sorted({t["kind"] for task in suite["tasks"] for t in task["heldout"]})
         tasks = [{"id": task["id"],
                   "files": [_file_meta(p, task["files"][p])
@@ -634,13 +643,12 @@ def _call_builder_task(goal: str, base: str,
 def run_baseline(suite_version: str, model: str, family: str | None = None,
                  timeout_s: int | None = None) -> dict:
     """Execute the X_SINGLE baseline: one Builder attempt per sealed task."""
-    if suite_version != SUITE_VERSION:
-        raise ValueError(f"unknown suite_version: {suite_version!r}")
+    _check_version(suite_version)
     if model != BASELINE_MODEL:
         raise ValueError(f"unknown model: {model!r}")
     if timeout_s is None:
         timeout_s = PYTEST_TIMEOUT_S
-    suites = load_suites()
+    suites = load_suites(suite_version)
     if family is not None:
         suites = [s for s in suites if s["family"] == family]
         if not suites:
@@ -648,7 +656,7 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
     for suite in suites:
         for task in suite["tasks"]:
             _check_size(task["heldout"])
-    scaffold = {"name": SCAFFOLD_NAME, "version": SUITE_VERSION, "turn_cap": 1,
+    scaffold = {"name": SCAFFOLD_NAME, "version": suite_version, "turn_cap": 1,
                 "model": model, "harness_version": HARNESS_VERSION}
     baseline_id = f"bl_{uuid.uuid4().hex[:12]}"
     tmpbase = tempfile.mkdtemp(prefix="evoforge-sealed-")
@@ -706,7 +714,7 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
     n = len(scores)
     rate = (passed / n) if n else 0.0
     lb, _hi = _quality_gate.wilson(passed, n)
-    return {"baseline_id": baseline_id, "suite_version": SUITE_VERSION,
+    return {"baseline_id": baseline_id, "suite_version": suite_version,
             "model": model,
             "X_SINGLE": {"pass_rate": rate, "n": n,
                          "cost_cents": settled_total},
@@ -725,9 +733,9 @@ PIPELINE_MAX_ATTEMPTS = 3
 PIPELINE_PER_ATTEMPT_MAX_CENTS = BASELINE_COST_CENTS
 
 
-def count_tasks(family: str | None = None) -> int:
+def count_tasks(family: str | None = None, version: str = SUITE_VERSION) -> int:
     """Light task count for budget checks (no behavioural validation)."""
-    directory = sealed_dir()
+    directory = sealed_dir(version)
     try:
         names = sorted(f for f in os.listdir(directory) if f.endswith(".json"))
     except OSError as e:
@@ -892,14 +900,13 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
     Costs are usage-derived per attempt; the total is the sum of all
     settled attempts.
     """
-    if suite_version != SUITE_VERSION:
-        raise ValueError(f"unknown suite_version: {suite_version!r}")
+    _check_version(suite_version)
     if model != BASELINE_MODEL:
         raise ValueError(f"unknown model: {model!r}")
     if timeout_s is None:
         timeout_s = PYTEST_TIMEOUT_S
     max_attempts = max(1, min(int(max_attempts), PIPELINE_MAX_ATTEMPTS))
-    suites = load_suites()
+    suites = load_suites(suite_version)
     if family is not None:
         suites = [s for s in suites if s["family"] == family]
         if not suites:
@@ -907,7 +914,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
     for suite in suites:
         for task in suite["tasks"]:
             _check_size(task["heldout"])
-    scaffold = {"name": SCAFFOLD_NAME, "version": SUITE_VERSION, "turn_cap": 3,
+    scaffold = {"name": SCAFFOLD_NAME, "version": suite_version, "turn_cap": 3,
                 "model": model, "harness_version": HARNESS_VERSION}
     pipeline_id = f"pl_{uuid.uuid4().hex[:12]}"
     tmpbase = tempfile.mkdtemp(prefix="evoforge-pipeline-")
@@ -992,7 +999,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
     n = len(scores)
     rate = (passed / n) if n else 0.0
     lo, hi = _quality_gate.wilson(passed, n)
-    return {"pipeline_id": pipeline_id, "suite_version": SUITE_VERSION,
+    return {"pipeline_id": pipeline_id, "suite_version": suite_version,
             "model": model,
             "PIPELINE": {"pass_rate": rate, "n": n, "passed": passed,
                          "cost_cents": settled_total,
