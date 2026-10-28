@@ -125,7 +125,9 @@
       "active-missions": "활성 미션",
       "validated-wvi": "검증된 개선 (WVI)",
       "blocked-merges": "차단된 병합",
-      "spent": "실제 지출",
+      "spent": "모델 API 사용액(공급사 사용량 기준)",
+      "prs-awaiting": "PR 열림 · 병합 검증 대기",
+      "wvi-rule": "WVI는 PR이 병합되고 결과가 VALIDATED로 기록된 뒤에만 집계합니다. PR을 연 것만으로는 집계하지 않습니다. 사용액은 공급사가 보고한 토큰 기준 모델 API 비용이며 Runner 컴퓨팅 비용은 포함하지 않습니다.",
       "reserved": "예약 금액",
       "unknown-holds": "알 수 없는 보류",
       "missions-prefix": "미션: "

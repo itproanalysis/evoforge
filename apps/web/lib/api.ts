@@ -182,6 +182,9 @@ export interface DashboardSnapshot {
   blocked_merges: number;
   validated_improvements: number;
   validated_mission_ids: string[];
+  prs_awaiting_validation?: number;
+  wvi_rule?: string;
+  spend_basis?: string;
   spent_cents: number;
   reserved_cents: number;
   unknown_holds: number;

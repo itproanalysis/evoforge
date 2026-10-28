@@ -191,6 +191,10 @@ export default function MissionControl() {
           k: t("metrics.validated-wvi"),
           v: String(dashboard.validated_improvements ?? 0),
         },
+        {
+          k: t("metrics.prs-awaiting"),
+          v: String(dashboard.prs_awaiting_validation ?? 0),
+        },
         { k: t("metrics.blocked-merges"), v: String(dashboard.blocked_merges) },
         { k: t("metrics.spent"), v: fmtCents(dashboard.spent_cents) },
         { k: t("metrics.reserved"), v: fmtCents(dashboard.reserved_cents) },
@@ -356,6 +360,9 @@ export default function MissionControl() {
           ))
         )}
       </section>
+      {dashboard && (
+        <p className="text-xs text-text-secondary mt-2">{t("metrics.wvi-rule")}</p>
+      )}
 
       <Card className="mt-4">
         <div className="flex items-center justify-between flex-wrap gap-2">

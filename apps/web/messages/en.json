@@ -125,7 +125,9 @@
       "active-missions": "Active missions",
       "validated-wvi": "Validated (WVI)",
       "blocked-merges": "Blocked merges",
-      "spent": "Spent",
+      "spent": "Model API spend (provider usage)",
+      "prs-awaiting": "PRs opened · awaiting merge validation",
+      "wvi-rule": "WVI counts a PR only after it is merged and its outcome is recorded as VALIDATED. Opening a PR does not count. Spend is model API usage from provider-reported tokens; Runner compute is not included.",
       "reserved": "Reserved",
       "unknown-holds": "Unknown holds",
       "missions-prefix": "Missions: "
