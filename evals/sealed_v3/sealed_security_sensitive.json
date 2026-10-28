@@ -1,0 +1,188 @@
+{
+  "family": "security_sensitive",
+  "suite_version": "v3",
+  "tasks": [
+    {
+      "id": "SV3-SEC-01",
+      "goal": "In redact.py, redact(record) returns the record with the token value replaced by \"***\" and a new key preview = the first two characters of the original token followed by \"**\" (\"**\" for an empty token); the raw token never appears in the output.",
+      "files": {
+        "redact.py": "\"\"\"Scrub secrets from log records.\"\"\"\n\n\ndef redact(record):\n    return {\n        \"user\": record.get(\"user\"),\n        \"token\": record.get(\"token\"),\n        \"preview\": str(record.get(\"token\"))[:4],\n    }\n"
+      },
+      "reference_fix": "--- a/redact.py\n+++ b/redact.py\n@@ -2,8 +2,9 @@\n \n \n def redact(record):\n+    token = record.get(\"token\") or \"\"\n     return {\n         \"user\": record.get(\"user\"),\n-        \"token\": record.get(\"token\"),\n-        \"preview\": str(record.get(\"token\"))[:4],\n+        \"token\": \"***\",\n+        \"preview\": str(token)[:2] + \"**\",\n     }\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import redact\n\n\ndef test_sec01_compositional_masked_record():\n    assert redact.redact({\"user\": \"ann\", \"token\": \"s3cr3t\"}) == {\"user\": \"ann\", \"token\": \"***\", \"preview\": \"s3**\"}\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import json\n\nimport redact\n\n\ndef test_sec01_negative_token_never_leaks():\n    out = redact.redact({\"user\": \"ann\", \"token\": \"s3cr3t\"})\n    assert \"s3cr3t\" not in json.dumps(out)\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import redact\n\n\ndef test_sec01_boundary_empty_token():\n    assert redact.redact({\"user\": \"bob\", \"token\": \"\"}) == {\"user\": \"bob\", \"token\": \"***\", \"preview\": \"**\"}\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-SEC-02",
+      "goal": "In pathcheck.py, safe_join(root, name) returns os.path.join(root, name) when the result stays inside root; it raises ValueError when name is empty, absolute, contains a backslash or a '..' segment, or resolves outside root.",
+      "files": {
+        "pathcheck.py": "\"\"\"Keep file access inside the data root.\"\"\"\n\nimport os\n\n\ndef safe_join(root, name):\n    return os.path.join(root, name)\n"
+      },
+      "reference_fix": "--- a/pathcheck.py\n+++ b/pathcheck.py\n@@ -4,4 +4,12 @@\n \n \n def safe_join(root, name):\n-    return os.path.join(root, name)\n+    if not isinstance(name, str) or not name:\n+        raise ValueError(\"bad name\")\n+    if name.startswith(\"/\") or \"\\\\\" in name or \"..\" in name.split(\"/\"):\n+        raise ValueError(\"bad name\")\n+    full = os.path.join(root, name)\n+    base = os.path.realpath(root)\n+    if os.path.commonpath([base, os.path.realpath(full)]) != base:\n+        raise ValueError(\"escape\")\n+    return full\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import os\n\nimport pathcheck\n\n\ndef test_sec02_compositional_nested_join():\n    assert pathcheck.safe_join(\"/srv/data\", \"a/b.txt\") == os.path.join(\"/srv/data\", \"a/b.txt\")\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import pathcheck\n\n\ndef test_sec02_negative_traversal_rejected():\n    try:\n        pathcheck.safe_join(\"/srv/data\", \"../etc/passwd\")\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import pathcheck\n\n\ndef test_sec02_boundary_empty_name_rejected():\n    try:\n        pathcheck.safe_join(\"/srv/data\", \"\")\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-SEC-03",
+      "goal": "In tokens.py, constant_eq(a, b) returns True when the two strings are equal and False otherwise, comparing in constant time with hmac.compare_digest; non-str arguments raise TypeError.",
+      "files": {
+        "tokens.py": "def constant_eq(a, b):\n    return a in b\n"
+      },
+      "reference_fix": "--- a/tokens.py\n+++ b/tokens.py\n@@ -1,2 +1,7 @@\n+import hmac\n+\n+\n def constant_eq(a, b):\n-    return a in b\n+    if not isinstance(a, str) or not isinstance(b, str):\n+        raise TypeError(\"strings required\")\n+    return hmac.compare_digest(a.encode(), b.encode())\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import tokens\n\n\ndef test_sv2sec03_compositional():\n    assert tokens.constant_eq('abc', 'abc') is True\n    assert tokens.constant_eq('abc', 'abcd') is False\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import tokens\n\n\ndef test_sv2sec03_negative():\n    import pytest\n    with pytest.raises(TypeError):\n        tokens.constant_eq('a', None)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import tokens\n\n\ndef test_sv2sec03_boundary():\n    assert tokens.constant_eq('', '') is True\n    assert tokens.constant_eq('a', '') is False\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-SEC-04",
+      "goal": "In headers.py, scrub(headers) returns a copy of the dict where the values of Authorization, Cookie and X-Api-Key (header names matched case-insensitively) are replaced by \"[redacted]\"; other headers are unchanged and the input is not modified.",
+      "files": {
+        "headers.py": "def scrub(headers):\n    if \"Authorization\" in headers:\n        headers[\"Authorization\"] = \"[redacted]\"\n    return headers\n"
+      },
+      "reference_fix": "--- a/headers.py\n+++ b/headers.py\n@@ -1,4 +1,5 @@\n+SECRET = {\"authorization\", \"cookie\", \"x-api-key\"}\n+\n+\n def scrub(headers):\n-    if \"Authorization\" in headers:\n-        headers[\"Authorization\"] = \"[redacted]\"\n-    return headers\n+    return {k: (\"[redacted]\" if k.lower() in SECRET else v) for k, v in headers.items()}\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import headers\n\n\ndef test_sv2sec04_compositional():\n    assert headers.scrub({'authorization': 'Bearer t', 'Accept': 'json'}) == {'authorization': '[redacted]', 'Accept': 'json'}\n    assert headers.scrub({'COOKIE': 'a=b'}) == {'COOKIE': '[redacted]'}\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import headers\n\n\ndef test_sv2sec04_negative():\n    src = {'X-Api-Key': 'k', 'Host': 'h'}\n    out = headers.scrub(src)\n    assert src == {'X-Api-Key': 'k', 'Host': 'h'}\n    assert out == {'X-Api-Key': '[redacted]', 'Host': 'h'}\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import headers\n\n\ndef test_sv2sec04_boundary():\n    assert headers.scrub({}) == {}\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-SEC-05",
+      "goal": "In uploads.py, allowed(filename) returns True only when the file extension (after the last dot, case-insensitive) is one of png, jpg, jpeg, gif and the name has no path separators ('/' or '\\\\'); names without an extension return False.",
+      "files": {
+        "uploads.py": "def allowed(filename):\n    return filename.split(\".\")[1] in (\"png\", \"jpg\", \"jpeg\", \"gif\")\n"
+      },
+      "reference_fix": "--- a/uploads.py\n+++ b/uploads.py\n@@ -1,2 +1,7 @@\n+OK = {\"png\", \"jpg\", \"jpeg\", \"gif\"}\n+\n+\n def allowed(filename):\n-    return filename.split(\".\")[1] in (\"png\", \"jpg\", \"jpeg\", \"gif\")\n+    if \"/\" in filename or \"\\\\\" in filename or \".\" not in filename:\n+        return False\n+    return filename.rsplit(\".\", 1)[1].lower() in OK\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import uploads\n\n\ndef test_sv2sec05_compositional():\n    assert uploads.allowed('cat.PNG') is True\n    assert uploads.allowed('archive.tar.gz') is False\n    assert uploads.allowed('photo.backup.jpg') is True\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import uploads\n\n\ndef test_sv2sec05_negative():\n    assert uploads.allowed('../etc/passwd.png') is False\n    assert uploads.allowed('a\\\\b.gif') is False\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import uploads\n\n\ndef test_sv2sec05_boundary():\n    assert uploads.allowed('noext') is False\n    assert uploads.allowed('.png') is True\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-SEC-06",
+      "goal": "In ratelimit.py, allow(timestamps, now, limit, window) returns True when fewer than limit timestamps fall in the half-open window (now - window, now]; timestamps outside the window do not count. limit <= 0 raises ValueError.",
+      "files": {
+        "ratelimit.py": "def allow(timestamps, now, limit, window):\n    return len(timestamps) <= limit\n"
+      },
+      "reference_fix": "--- a/ratelimit.py\n+++ b/ratelimit.py\n@@ -1,2 +1,5 @@\n def allow(timestamps, now, limit, window):\n-    return len(timestamps) <= limit\n+    if limit <= 0:\n+        raise ValueError(\"limit must be positive\")\n+    recent = [t for t in timestamps if now - window < t <= now]\n+    return len(recent) < limit\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import ratelimit\n\n\ndef test_sv2sec06_compositional():\n    assert ratelimit.allow([1, 2, 3], 10, 3, 5) is True\n    assert ratelimit.allow([6, 8, 9], 10, 3, 5) is False\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import ratelimit\n\n\ndef test_sv2sec06_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        ratelimit.allow([], 0, 0, 5)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import ratelimit\n\n\ndef test_sv2sec06_boundary():\n    assert ratelimit.allow([5], 10, 1, 5) is True\n    assert ratelimit.allow([10], 10, 1, 5) is False\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-SEC-07",
+      "goal": "In csrf.py, issue(secret, session_id, now) returns a token \"<expiry>.<hexdigest>\" where expiry = now + 600 and the digest is HMAC-SHA256 of f\"{session_id}.{expiry}\" keyed with secret (bytes). check(secret, session_id, token, now) returns True only when the token is well formed, not expired (now < expiry), and the digest matches using hmac.compare_digest; any malformed token returns False (never raises).",
+      "files": {
+        "csrf.py": "import hashlib\n\n\ndef issue(secret, session_id, now):\n    expiry = now + 600\n    digest = hashlib.sha256(f\"{session_id}.{expiry}\".encode()).hexdigest()\n    return f\"{expiry}.{digest}\"\n\n\ndef check(secret, session_id, token, now):\n    expiry, digest = token.split(\".\")\n    return digest == hashlib.sha256(f\"{session_id}.{expiry}\".encode()).hexdigest()\n"
+      },
+      "reference_fix": "--- a/csrf.py\n+++ b/csrf.py\n@@ -1,12 +1,22 @@\n import hashlib\n+import hmac\n+\n+\n+def _digest(secret, session_id, expiry):\n+    return hmac.new(secret, f\"{session_id}.{expiry}\".encode(), hashlib.sha256).hexdigest()\n \n \n def issue(secret, session_id, now):\n     expiry = now + 600\n-    digest = hashlib.sha256(f\"{session_id}.{expiry}\".encode()).hexdigest()\n-    return f\"{expiry}.{digest}\"\n+    return f\"{expiry}.{_digest(secret, session_id, expiry)}\"\n \n \n def check(secret, session_id, token, now):\n-    expiry, digest = token.split(\".\")\n-    return digest == hashlib.sha256(f\"{session_id}.{expiry}\".encode()).hexdigest()\n+    try:\n+        expiry_s, digest = token.split(\".\")\n+        expiry = int(expiry_s)\n+    except (ValueError, AttributeError):\n+        return False\n+    if now >= expiry:\n+        return False\n+    return hmac.compare_digest(digest, _digest(secret, session_id, expiry))\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import csrf\n\n\ndef test_sv3sec07_compositional():\n    t = csrf.issue(b'k1', 's1', 1000)\n    assert csrf.check(b'k1', 's1', t, 1599) is True\n    assert csrf.check(b'k2', 's1', t, 1000) is False\n    assert csrf.check(b'k1', 's2', t, 1000) is False\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import csrf\n\n\ndef test_sv3sec07_negative():\n    assert csrf.check(b'k', 's', 'garbage', 0) is False\n    assert csrf.check(b'k', 's', 'x.y.z', 0) is False\n    assert csrf.check(b'k', 's', None, 0) is False\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import csrf\n\n\ndef test_sv3sec07_boundary():\n    t = csrf.issue(b'k', 's', 0)\n    assert csrf.check(b'k', 's', t, 600) is False\n    assert t.split('.')[0] == '600'\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-SEC-08",
+      "goal": "In sqlsafe.py, build_select(table, columns, filters) returns (sql, params) for a parameterised SELECT: table and every column must match ^[A-Za-z_][A-Za-z0-9_]*$ or ValueError is raised; columns empty means \"*\"; filters is a dict column -> value turned into \"WHERE c1 = ? AND c2 = ?\" in sorted column order with the values in params (never formatted into the SQL).",
+      "files": {
+        "sqlsafe.py": "def build_select(table, columns, filters):\n    cols = \", \".join(columns)\n    where = \" AND \".join(f\"{k} = '{v}'\" for k, v in filters.items())\n    sql = f\"SELECT {cols} FROM {table}\"\n    if where:\n        sql += \" WHERE \" + where\n    return sql, []\n"
+      },
+      "reference_fix": "--- a/sqlsafe.py\n+++ b/sqlsafe.py\n@@ -1,7 +1,20 @@\n+import re\n+\n+_IDENT = re.compile(r\"^[A-Za-z_][A-Za-z0-9_]*$\")\n+\n+\n+def _ident(name):\n+    if not isinstance(name, str) or not _IDENT.match(name):\n+        raise ValueError(f\"bad identifier: {name!r}\")\n+    return name\n+\n+\n def build_select(table, columns, filters):\n-    cols = \", \".join(columns)\n-    where = \" AND \".join(f\"{k} = '{v}'\" for k, v in filters.items())\n-    sql = f\"SELECT {cols} FROM {table}\"\n-    if where:\n-        sql += \" WHERE \" + where\n-    return sql, []\n+    cols = \", \".join(_ident(c) for c in columns) if columns else \"*\"\n+    sql = f\"SELECT {cols} FROM {_ident(table)}\"\n+    keys = sorted(filters)\n+    params = []\n+    if keys:\n+        sql += \" WHERE \" + \" AND \".join(f\"{_ident(k)} = ?\" for k in keys)\n+        params = [filters[k] for k in keys]\n+    return sql, params\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import sqlsafe\n\n\ndef test_sv3sec08_compositional():\n    assert sqlsafe.build_select('users', ['id', 'name'], {'name': 'bob', 'age': 3}) == ('SELECT id, name FROM users WHERE age = ? AND name = ?', [3, 'bob'])\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import sqlsafe\n\n\ndef test_sv3sec08_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        sqlsafe.build_select('users; DROP TABLE x', [], {})\n    with pytest.raises(ValueError):\n        sqlsafe.build_select('t', ['a b'], {})\n    with pytest.raises(ValueError):\n        sqlsafe.build_select('t', [], {'x=1 OR 1': 2})\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import sqlsafe\n\n\ndef test_sv3sec08_boundary():\n    assert sqlsafe.build_select('t', [], {}) == ('SELECT * FROM t', [])\n    sql, params = sqlsafe.build_select('t', [], {'a': \"x' OR '1'='1\"})\n    assert \"'\" not in sql and params == [\"x' OR '1'='1\"]\n"
+        }
+      ]
+    }
+  ]
+}
