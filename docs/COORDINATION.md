@@ -36,10 +36,14 @@ your module, do not touch it — work on a branch.
   the GCS source tarball against the tree).
 - `git add -A` swept other agents' `.kiro` and web WIP into release commits.
   All three are now banned by §1–§2.
+- `gcloud run deploy` REPLACES the whole env block; another agent's deploy
+  wiped MODEL_API_*/GITHUB_*/runner env and broke repo resolution. Shared
+  services change env ONLY via `gcloud run services update` (merge) and
+  record every env/secret change in this file.
 
 ## 4. Live systems (2026-10-27)
 
 - Web: https://evoforge-web-230852112787.asia-northeast3.run.app
 - API: https://evoforge-api-230852112787.asia-northeast3.run.app (private IAM, same-origin proxy)
 - Demo target: https://github.com/itproanalysis/evoforge-target (PR #4, #5 merged)
-- WVI: 1 (`msn_d283eebba020`, outcome VALIDATED)
+- WVI: 1 (`msn_a3b777e1cfcf` → PR #6, outcome VALIDATED, postgres-backed)
