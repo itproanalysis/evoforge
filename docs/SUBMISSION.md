@@ -9,8 +9,9 @@
 - **PASS 체인 → 실제 PR**: Mission `msn_5af789b9a5a4` ("calc.py add 수정") CREATED→GENERATED→REVIEWED→RAN→PR_OPENED
   - Builder 실측 1줄 패치 (`a - b` → `a + b`), Critic PASS (sealed 3종), 위생 샌드박스 visible 3/3 + held-out 3/3
   - GH_INTEGRITY/GC_COMPOSITION/G2 전부 PASS → https://github.com/itproanalysis/evoforge-target/pull/4 (MERGED, 07c19dde)
-- **CLOSED LOOP (WVI=1)**: Mission `msn_d283eebba020` ("calc.py sub 수정") 전 체인 → https://github.com/itproanalysis/evoforge-target/pull/5 → MERGED (d9f579eb) → `POST /v1/outcomes` → `outcome_status: VALIDATED`, dashboard `validated_improvements: 1`
+- **CLOSED LOOP (WVI=1)**: Mission `msn_a3b777e1cfcf` ("calc.py mul 수정") 전 체인 → https://github.com/itproanalysis/evoforge-target/pull/6 → MERGED (2816260d) → `POST /v1/outcomes` → `outcome_status: VALIDATED`, dashboard `validated_improvements: 1`
   - 재현 중 blind diff(`hunk does not apply`)·테스트 파일명 충돌을 잡아 `target_paths` 컨텍스트 주입·증거 기반 고유 파일명으로 수정 (둘 다 테스트 추가)
+  - Outcome은 postgres evidence에서 복구되므로 재배포 후에도 WVI 유지 (복구 경로 테스트 포함)
 - **FAIL 체인 (차단 증명)**: Mission `msn_f74933cc7eda` ("webhook 403") — Critic FAIL + held-out 0/3 → gap +1.000 → GH_INTEGRITY FAIL → PR 차단, Dashboard blocked_merges 1
 - **X_SINGLE 베이스라인 (실측)**: `bl_a42d827d2917`, muse-spark-1.3 원샷, n=12, pass 2/12 (0.167), 비용 1440¢, 위생 7/7 전부 clean, 봉인 해시만 노출
   - 가족별: algorithmic_optimization 1/2, parallel_multi_file 1/2, 나머지 0 — 원샷의 한계가 정직하게 드러남. X_ADAPTIVE(크리틱+실행 루프) 비교의 분모
