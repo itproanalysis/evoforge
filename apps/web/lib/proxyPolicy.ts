@@ -16,6 +16,7 @@ const EXACT_ALLOW = new Set([
   "/v1/eval/baseline",
   "/v1/eval/pipeline",
   "/v1/evolution",
+  "/v1/proof/key",
   "/v1/leaderboard",
   "/v1/memory",
   "/v1/eval/jobs",

@@ -1,0 +1,19 @@
+{
+  "id": "T27_signed_proofs_evolution_budget",
+  "planned_by": "Claude (Critic) review of de481a8/f4de75d",
+  "goal": "T27 — make proof certificates really signed, and cap an evolution's worst-case cost before it starts.\n\nCritic review of de481a8/f4de75d:\n(a) services/api/evoforge/proof.py sets signature = sha256(canonical JSON). Anyone who edits a certificate can recompute\n    that digest, so it is not tamper-evident and not \"an SSL certificate for AI code\".\n(b) POST /v1/evolution/start accepts 10 generations x 5 candidates = up to 100 model calls (2 per candidate: Builder +\n    Critic, COST_CENTS=120 each = 12000c reserved) with no upfront cap; one run could spend all remaining credit.\n\n1. proof.py (Ed25519 via the `cryptography` package already in requirements):\n   - Signing key from env EVO_PROOF_SIGNING_KEY = base64 of the 32-byte raw Ed25519 private key (production: Secret\n     Manager). Never log or return it.\n   - mint(...) keeps the current body fields and adds \"algorithm\": \"Ed25519\", \"signed\": true, \"public_key\": base64 raw\n     32-byte public key, \"signature\": base64 Ed25519 signature over the canonical JSON (sort_keys, separators (\",\",\":\"),\n     ensure_ascii) of the body EXCLUDING the keys signature, public_key, algorithm, signed.\n   - No key configured: \"signed\": false, \"signature\": null, \"algorithm\": null, \"public_key\": null (honest, never a digest\n     pretending to be a signature).\n   - verify(cert) checks the signature with the SERVER's configured public key (never the key embedded in the cert);\n     returns {\"ok\": false, ...} for unsigned certs, wrong key, or any edited field.\n   - Update the module docstring to say what is and is not proven.\n2. main.py: GET /v1/proof/key -> {\"algorithm\": \"Ed25519\", \"public_key\": \"<base64>\"} or 404 when no key is configured.\n   Add it to apps/web/lib/proxyPolicy.ts + proxyPolicy.cases.json (GET allowed). /v1/proof/{id} keeps working.\n3. main.py evolution_start: before creating the evolution compute worst = max_generations * population * 2 * COST_CENTS\n   and refuse with HTTP 402 when worst > int(env EVO_EVOLUTION_MAX_CENTS, default 1500); the detail names the worst case\n   and the cap. No evolution is created, nothing is reserved, no provider call.\n4. Tests: services/api/tests/test_muse_t27.py. The existing proof test in services/api/tests/test_evolution_autopilot.py\n   may set a generated EVO_PROOF_SIGNING_KEY via monkeypatch (its tamper-rejection assertions must stay).\nDo not touch evolution.py's search logic, memory.py, or other modules.",
+  "edit": [
+    "services/api/evoforge/proof.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t27.py",
+    "services/api/tests/test_evolution_autopilot.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/evolution.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
