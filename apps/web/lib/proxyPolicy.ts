@@ -23,6 +23,7 @@ const EXACT_ALLOW = new Set([
   "/v1/eval/jobs",
   "/v1/eval/abtest",
   "/v1/eval/decisions",
+  "/v1/arena",
 ]);
 
 const SEGMENT_RE = /^[A-Za-z0-9._~-]+$/;
@@ -89,6 +90,20 @@ export function resolveApiPath(segments: string[]): string | null {
     segments[0] === "v1" &&
     segments[1] === "eval" &&
     segments[2] === "jobs"
+  ) {
+    return apiPath;
+  }
+  if (
+    segments.length === 2 &&
+    segments[0] === "v1" &&
+    segments[1] === "arena"
+  ) {
+    return apiPath;
+  }
+  if (
+    segments.length === 3 &&
+    segments[0] === "v1" &&
+    segments[1] === "arena"
   ) {
     return apiPath;
   }
