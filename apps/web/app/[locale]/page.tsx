@@ -52,6 +52,7 @@ export default function MissionControl() {
   const [syncing, setSyncing] = useState(false);
   const [autoPoll, setAutoPoll] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [syncError, setSyncError] = useState(false);
   const [err, setErr] = useState("");
   const [mission, setMission] = useState<MissionDetail | null>(null);
   const [missions, setMissions] = useState<MissionSummary[]>([]);
@@ -61,38 +62,40 @@ export default function MissionControl() {
   const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
   const stopRef = useRef(false);
   const selectedIdRef = useRef<string | null>(null);
+  const refreshingRef = useRef(false);
 
   const refreshState = async (missionId: string | null) => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
     setSyncing(true);
     const targetId = missionId ?? selectedIdRef.current;
     try {
-      setDashboard(await getDashboard());
-    } catch {}
-    try {
-      setLedger(await getLedger());
-    } catch {}
-    try {
-      setPerf(await getPerformance());
-    } catch {}
-    try {
-      const out = await listOutcomes();
-      setOutcomes(out.outcomes ?? []);
-    } catch {}
-    let list: MissionSummary[] = [];
-    try {
-      const res = await listMissions();
-      list = res.missions ?? [];
-      setMissions(list);
-    } catch {}
-    const idToLoad = targetId || (list.length > 0 ? list[0].mission_id : null);
-    if (idToLoad) {
-      selectedIdRef.current = idToLoad;
-      try {
-        setMission(await getMission(idToLoad));
-      } catch {}
+      const [dash, books, performance, history, recent] = await Promise.allSettled([
+        getDashboard(), getLedger(), getPerformance(), listOutcomes(), listMissions(),
+      ]);
+      if (dash.status === "fulfilled") setDashboard(dash.value);
+      if (books.status === "fulfilled") setLedger(books.value);
+      if (performance.status === "fulfilled") setPerf(performance.value);
+      if (history.status === "fulfilled") setOutcomes(history.value.outcomes ?? []);
+      const list = recent.status === "fulfilled" ? recent.value.missions ?? [] : [];
+      if (recent.status === "fulfilled") setMissions(list);
+      let failed = [dash, books, performance, history, recent].some((r) => r.status === "rejected");
+      const idToLoad = targetId || (list.length > 0 ? list[0].mission_id : null);
+      if (idToLoad && selectedIdRef.current === targetId) {
+        selectedIdRef.current = idToLoad;
+        try {
+          const detail = await getMission(idToLoad);
+          if (selectedIdRef.current === idToLoad) setMission(detail);
+        } catch {
+          failed = true;
+        }
+      }
+      setSyncError(failed);
+      if (!failed) setLastUpdated(new Date().toLocaleTimeString());
+    } finally {
+      refreshingRef.current = false;
+      setSyncing(false);
     }
-    setLastUpdated(new Date().toLocaleTimeString());
-    setSyncing(false);
   };
 
   useEffect(() => {
@@ -101,7 +104,7 @@ export default function MissionControl() {
 
   useEffect(() => {
     const isRunning = mission && !TERMINAL.includes(mission.state);
-    if (!isRunning && !autoPoll) return;
+    if (!autoPoll) return;
     const intervalMs = isRunning ? 2000 : 5000;
     const id = setInterval(() => {
       void refreshState(selectedIdRef.current);
@@ -137,11 +140,15 @@ export default function MissionControl() {
 
   const selectMission = async (missionId: string) => {
     selectedIdRef.current = missionId;
+    setMission(null);
+    setOutcomePrUrl("");
     try {
       const m = await getMission(missionId);
-      setMission(m);
-      setOutcomePrUrl(m.pr_url ?? "");
-    } catch {}
+      if (selectedIdRef.current === missionId) {
+        setMission(m);
+        setOutcomePrUrl(m.pr_url ?? "");
+      }
+    } catch { setSyncError(true); }
   };
 
   const openInLab = (m: MissionDetail) => {
@@ -237,10 +244,10 @@ export default function MissionControl() {
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-background-secondary border border-border text-text-secondary">
             <span
               className={`w-2 h-2 rounded-full ${
-                syncing ? "bg-accent-amber" : "bg-accent-green"
+                syncing || syncError ? "bg-accent-amber" : "bg-accent-green"
               }`}
             />
-            {t("live-status")}
+            {syncError ? t("sync-error") : syncing ? t("syncing") : !autoPoll ? t("sync-paused") : t("live-status")}
             {lastUpdated ? ` · ${t("last-updated")}: ${lastUpdated}` : ""}
           </span>
           <button
@@ -262,6 +269,8 @@ export default function MissionControl() {
           </Button>
         </div>
       </div>
+
+      {syncError && <p role="alert" className="text-sm text-accent-amber mt-3">{t("sync-error-detail")}</p>}
 
       <section className="flex gap-3 flex-wrap mt-4">
         {metrics.map((m) => (
