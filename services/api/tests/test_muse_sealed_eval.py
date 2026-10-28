@@ -85,7 +85,7 @@ def test_baseline_full_run_records_evidence():
     assert body["suite_version"] == "v0" and body["model"] == "muse-spark-1.3"
     assert body["baseline_id"].startswith("bl_")
     xs = body["X_SINGLE"]
-    assert set(xs) == {"pass_rate", "n", "cost_cents"}
+    assert {"pass_rate", "n", "cost_cents"} <= set(xs) <= {"pass_rate", "n", "cost_cents", "usage_missing"}  # T29
     assert isinstance(xs["cost_cents"], int) and xs["cost_cents"] > 0
     fams = _read_families()
     total = sum(len(t) for t in fams.values())

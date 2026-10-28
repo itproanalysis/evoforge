@@ -1024,7 +1024,8 @@ def _do_eval_baseline(suite_version: str, model: str, family) -> dict:
         model=result["model"],
         harness_version=sealed_eval_mod.HARNESS_VERSION,
         n=xs["n"], passed=passed, cost_cents=xs["cost_cents"],
-        per_family=per_family, evidence_id=eid)
+        per_family=per_family, evidence_id=eid,
+        usage_missing=bool(result.get("usage_missing", False)))
     measurement["wilson95"] = [lo, hi]
     measurement["provider_stub"] = result["provider_stub"]
     performance_mod.record(measurement)

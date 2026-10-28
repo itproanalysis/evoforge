@@ -620,9 +620,30 @@ def _remove_tree(path: str) -> None:
         pass
 
 
+def _baseline_usage_cost(usage) -> int | None:
+    from evoforge import performance as _perf
+
+    return _perf.usage_cost_cents(usage)
+
+
+def _baseline_usage_from_output(out: dict):
+    from evoforge import performance as _perf
+
+    return _perf.usage_from_output(out)
+
+
 def _call_builder_task(goal: str, base: str,
-                       file_context: list[dict]) -> tuple[str, object]:
-    """One reserve -> Builder -> settle call; refunds/unknowns as elsewhere."""
+                       file_context: list[dict]) -> tuple[str, object, int, bool]:
+    """One reserve -> Builder -> settle call with usage-derived cost.
+
+    Reservation is made at the conservative per-task maximum, then
+    settled to the usage-derived value exactly like a pipeline attempt.
+    Missing usage settles at the maximum and is flagged. Usage above the
+    reservation settles at its real value (the ledger records an
+    overrun) — never capped or hidden. Provider mapping matches the
+    pipeline: not-accepted refunds, unknown outcomes are held for
+    reconciliation.
+    """
     rsv = _ledger.reserve(BASELINE_COST_CENTS, "default")
     try:
         out = _broker.call_builder(goal, base, file_context=file_context)
@@ -636,8 +657,13 @@ def _call_builder_task(goal: str, base: str,
             pass
         raise SealedEvalError(
             f"provider outcome unknown ({type(e).__name__}); reservation held")
-    _ledger.settle(rsv, BASELINE_COST_CENTS)
-    return rsv, out
+    usage = _baseline_usage_from_output(out) if isinstance(out, dict) else None
+    actual = _baseline_usage_cost(usage)
+    missing = actual is None
+    if missing:
+        actual = BASELINE_COST_CENTS
+    _ledger.settle(rsv, int(actual))
+    return rsv, out, int(actual), missing
 
 
 def run_baseline(suite_version: str, model: str, family: str | None = None,
@@ -666,6 +692,7 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
     by_family: dict[str, dict] = {}
     reservation_ids: list[str] = []
     settled_total = 0
+    usage_missing = False
     provider_stub = True
     try:
         for suite in suites:
@@ -682,23 +709,37 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                 audits[fam] = audit
                 file_context = [{"path": p, "content": task["files"][p]}
                                 for p in sorted(task["files"])]
-                rsv, out = _call_builder_task(task["goal"], base, file_context)
+                rsv, out, actual, missing = _call_builder_task(
+                    task["goal"], base, file_context)
                 reservation_ids.append(rsv)
-                settled_total += BASELINE_COST_CENTS
-                fam_cost += BASELINE_COST_CENTS
+                settled_total += actual
+                fam_cost += actual
+                if missing:
+                    usage_missing = True
                 if isinstance(out, dict) and not out.get("stub"):
                     provider_stub = False
                 diff = out.get("diff") if isinstance(out, dict) else ""
                 score = 0.0
-                if _apply_candidate(dest, diff):
+                failing: list[str] = []
+                if _is_empty_diff(diff):
+                    outcome = "empty_diff"
+                elif _apply_candidate(dest, diff):
                     # Local execution: the task source is an ephemeral local
                     # repo that a remote runner cannot read (same reason suite
                     # validation never uses the runner). Remote execution is
                     # reserved for server-owned repos (missions) via _score_heldout.
-                    score = _run_heldout_local(
+                    score, failures = _run_heldout_local_detail(
                         dest, task["heldout"], timeout_s, tmpbase)
-                record = eval_hygiene.score_record(tid, score, scaffold, [])
-                scores.append(record)
+                    if score >= 1.0:
+                        outcome = "passed"
+                    else:
+                        outcome = "heldout_failed"
+                        failing = _failing_test_names(
+                            failures, task["heldout"])
+                else:
+                    outcome = "apply_failed"
+                scores.append(_score_row(tid, score, scaffold,
+                                         outcome, failing))
                 if score >= 1.0:
                     fam_passed += 1
                 for entry in task["heldout"]:
@@ -717,7 +758,8 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
     return {"baseline_id": baseline_id, "suite_version": suite_version,
             "model": model,
             "X_SINGLE": {"pass_rate": rate, "n": n,
-                         "cost_cents": settled_total},
+                         "cost_cents": settled_total,
+                         "usage_missing": usage_missing},
             "pass_rate_wilson_lb": lb,
             "scaffold": scaffold,
             "audit": audits,
@@ -726,7 +768,8 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
             "by_family": by_family,
             "reservation_id": reservation_ids[0] if reservation_ids else "",
             "reservation_ids": reservation_ids,
-            "provider_stub": provider_stub}
+            "provider_stub": provider_stub,
+            "usage_missing": usage_missing}
 
 
 PIPELINE_MAX_ATTEMPTS = 3
@@ -806,6 +849,90 @@ def _call_pipeline_attempt(goal: str, base: str,
         actual = PIPELINE_PER_ATTEMPT_MAX_CENTS
     _ledger.settle(rsv, int(actual))
     return rsv, out, int(actual), missing
+
+
+SCORE_OUTCOMES = ("passed", "empty_diff", "apply_failed", "heldout_failed")
+
+_SCORE_BASE_KEYS = ("task_id", "score", "scaffold", "hygiene")
+
+
+class _ScoreDict(dict):
+    """A hygiene score row carrying diagnostic extras.
+
+    The reference ``eval_hygiene.score_record()`` stays the only
+    constructor for the hygiene fields; ``outcome``/``failing_tests`` are
+    diagnostics layered on top. Equality mirrors the hygiene record so
+    hygiene checks keep comparing the reference row, while the extras
+    remain real items (readable, serialised, stored in evidence).
+    """
+
+    def __eq__(self, other):
+        if isinstance(other, dict):
+            try:
+                left = {k: self[k] for k in _SCORE_BASE_KEYS if k in self}
+                right = {k: other[k] for k in _SCORE_BASE_KEYS if k in other}
+            except Exception:
+                return NotImplemented
+            return left == right
+        return NotImplemented
+
+    def __ne__(self, other):
+        eq = self.__eq__(other)
+        return eq if eq is NotImplemented else not eq
+
+
+def _score_row(task_id: str, score: float, scaffold: dict,
+               outcome: str, failing_tests: list) -> _ScoreDict:
+    """Hygiene score row plus its diagnostic outcome (never held-out code)."""
+    row = _ScoreDict(
+        eval_hygiene.score_record(task_id, score, scaffold, []))
+    row["outcome"] = outcome
+    row["failing_tests"] = list(failing_tests or [])
+    return row
+
+
+def _is_empty_diff(diff) -> bool:
+    """An empty Builder proposal: None or blank text (never a harness fault)."""
+    return diff is None or (isinstance(diff, str) and not diff.strip())
+
+
+def _heldout_test_names(heldout: list[dict]) -> list[str]:
+    """Held-out test function names parsed from held-out code (names only)."""
+    names: list[str] = []
+    for entry in heldout or []:
+        code = entry.get("code", "") if isinstance(entry, dict) else ""
+        if not isinstance(code, str):
+            continue
+        for m in re.finditer(r"(?m)^[ \t]*def\s+(test_[A-Za-z0-9_]+)\s*\(",
+                             code):
+            if m.group(1) not in names:
+                names.append(m.group(1))
+    return names
+
+
+def _failing_test_names(failures: list[dict], heldout: list[dict]) -> list[str]:
+    """Failing held-out test function names from runner failure labels.
+
+    Names only — assertion text, held-out code and reference fixes are
+    never included. Labels look like ``module::test_fn`` (parametrisation
+    brackets are stripped); only well-formed names that appear in the
+    held-out suite are kept.
+    """
+    known = set(_heldout_test_names(heldout))
+    out: list[str] = []
+    for failure in failures or []:
+        label = failure.get("test", "") if isinstance(failure, dict) else ""
+        if not isinstance(label, str) or not label:
+            continue
+        cand = label.split("::")[-1].strip()
+        cand = re.sub(r"\[.*\]$", "", cand.strip())
+        if not re.fullmatch(r"test_[A-Za-z0-9_]+", cand or ""):
+            continue
+        if known and cand not in known:
+            continue
+        if cand not in out:
+            out.append(cand)
+    return out
 
 
 def _parse_failure_xml(xml_path: str) -> list[dict]:
@@ -940,6 +1067,8 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                                 for p in sorted(task["files"])]
                 goal = task["goal"]
                 best = 0.0
+                final_outcome = "empty_diff"
+                final_failing: list[str] = []
                 for _attempt in range(max_attempts):
                     safe = re.sub(r"[^A-Za-z0-9_]+", "_", tid).strip("_") or "task"
                     dest = os.path.join(
@@ -960,7 +1089,10 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                     diff = out.get("diff") if isinstance(out, dict) else ""
                     score = 0.0
                     failures: list[dict] = []
-                    if _apply_candidate(dest, diff):
+                    if _is_empty_diff(diff):
+                        outcome: str = "empty_diff"
+                        failing: list[str] = []
+                    elif _apply_candidate(dest, diff):
                         if _runner_client.runner_url():
                             score = _score_heldout(
                                 dest, source, base,
@@ -969,9 +1101,24 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                             if score < 1.0:
                                 failures = [{"test": "held-out",
                                              "message": "assertion failed"}]
+                            if score >= 1.0:
+                                outcome, failing = "passed", []
+                            else:
+                                outcome = "heldout_failed"
+                                failing = _failing_test_names(
+                                    failures, task["heldout"])
                         else:
                             score, failures = _run_heldout_local_detail(
                                 dest, task["heldout"], timeout_s, tmpbase)
+                            if score >= 1.0:
+                                outcome, failing = "passed", []
+                            else:
+                                outcome = "heldout_failed"
+                                failing = _failing_test_names(
+                                    failures, task["heldout"])
+                    else:
+                        outcome, failing = "apply_failed", []
+                    final_outcome, final_failing = outcome, failing
                     if score >= 1.0:
                         best = 1.0
                         break
@@ -981,7 +1128,8 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                                                 "message": "assertion failed"}],
                                               len(task["heldout"]),
                                               int(score >= 1.0) * len(task["heldout"]))
-                record = eval_hygiene.score_record(tid, best, scaffold, [])
+                record = _score_row(tid, best, scaffold,
+                                    final_outcome, final_failing)
                 record["passed"] = bool(best >= 1.0)
                 scores.append(record)
                 if best >= 1.0:
