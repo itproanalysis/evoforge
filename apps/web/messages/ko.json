@@ -216,6 +216,25 @@
       "Outcome": "결과"
     }
   },
+  "feedback": {
+    "heading": "미션 피드백 (POST /v1/feedback)",
+    "kind-label": "피드백 종류",
+    "kinds": {
+      "bug": "버그",
+      "missed_case": "놓친 케이스",
+      "praise": "칭찬",
+      "other": "기타"
+    },
+    "text-placeholder": "피드백을 입력하세요 (최대 2000자)",
+    "submit": "피드백 제출",
+    "submitting": "제출 중…",
+    "loading": "불러오는 중…",
+    "empty": "이 미션에 대한 피드백이 아직 없습니다.",
+    "promote": "개선 미션으로 승격",
+    "promoting": "승격 중…",
+    "promoted": "개선 미션",
+    "error-prefix": "오류: "
+  },
   "performance": {
     "heading": "성과 분석",
     "subtitle": "측정된 숫자만 표시",

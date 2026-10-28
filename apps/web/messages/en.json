@@ -216,6 +216,25 @@
       "Outcome": "Outcome"
     }
   },
+  "feedback": {
+    "heading": "Mission feedback (POST /v1/feedback)",
+    "kind-label": "Feedback kind",
+    "kinds": {
+      "bug": "Bug",
+      "missed_case": "Missed case",
+      "praise": "Praise",
+      "other": "Other"
+    },
+    "text-placeholder": "Share feedback (up to 2000 chars)",
+    "submit": "Submit feedback",
+    "submitting": "Submitting…",
+    "loading": "Loading…",
+    "empty": "No feedback on this mission yet.",
+    "promote": "Promote to improvement mission",
+    "promoting": "Promoting…",
+    "promoted": "Improvement mission",
+    "error-prefix": "Error: "
+  },
   "performance": {
     "heading": "Performance",
     "subtitle": "Only measured numbers are shown",
