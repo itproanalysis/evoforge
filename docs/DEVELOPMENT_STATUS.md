@@ -773,3 +773,8 @@ Critic 테스트는 보존했으며 이 검증에 포함하지 않았다. 수집
 `2550dc1`에 반영됐고 검증본에서 전체 API 656 passed·1 skipped, 실제 PostgreSQL 169 passed,
 Runner 서비스 포함 52 passed다. 증거 해시는 `docs/validation/2026-10-28-runner-collection.json`.
 수집 수는 파일별 실행 증명이 아니다. 공개 PR 기준 SHA 바인딩은 별도 검증 중이다.
+
+공개 PR의 서버 검증 SHA 바인딩은 `codex/pr-base-binding` `e3867bb`에 구현됐다.
+승격 T17·T18 fixture를 실제 실행 SHA에 맞게 교정한 격리 작업트리에서 API 667 passed·
+1 skipped, 실제 PostgreSQL 169 passed, 정본 검사와 웹 빌드가 통과했다. 두 fixture 수정은
+소유권 때문에 미커밋이며 소유자 반영과 최종 트리 검증이 끝나기 전 main 통합은 보류한다.

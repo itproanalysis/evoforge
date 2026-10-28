@@ -422,3 +422,12 @@ Runner 수집 검증은 `2550dc1`에 반영됐고 검증본에서 API 656 passed
 실제 PostgreSQL 169 passed·Runner 서비스 포함 52 passed다. 원본 로그와 해시는
 `docs/validation/2026-10-28-runner-collection.json`에 있다. 수집 수만으로 각 파일 실행이
 증명되지는 않는다. 공개 PR의 기준 SHA 바인딩은 별도 브랜치에서 검증 중이다.
+
+## 공개 PR 기준 SHA 격리 검증
+
+`codex/pr-base-binding`의 `e3867bb`는 서버 Runner의 불변 기준 SHA를 PR 생성에 전달한다.
+T17·T18의 가짜 기준 SHA를 실제 실행 기준에 맞게 교정한 격리 작업트리에서 전체 API
+667 passed·1 skipped, 실제 PostgreSQL 169 passed, 정본 검사 및 웹 npm ci/tsc/build가 통과했다.
+두 승격 테스트 fixture 교정은 소유권 때문에 미커밋이며 커밋 단독은 해당 fixture와 충돌한다.
+소유자 반영과 최종 트리 재검증 전에는 main에 통합하지 않는다. 상세는 격리 작업트리의
+`docs/PR_BASE_BINDING_CODEX.md`와 `.local/validation-pr-*-codex.log`에 있다.
