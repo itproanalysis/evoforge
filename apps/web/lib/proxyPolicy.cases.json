@@ -1027,5 +1027,12 @@
       "arena",
       ".."
     ]
+  },
+  {
+    "expected": "/v1/stream",
+    "path_segments": [
+      "v1",
+      "stream"
+    ]
   }
 ]
