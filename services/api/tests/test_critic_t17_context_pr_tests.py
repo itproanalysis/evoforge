@@ -122,7 +122,7 @@ class Fake:
         self.calls.append(req)
         p = req.url.path
         if req.method == "GET" and p.endswith("/git/ref/heads/main"):
-            return httpx.Response(200, json={"object": {"sha": "basesha"}})
+            return httpx.Response(200, json={"object": {"sha": "b" * 40}})
         if req.method == "GET" and "/contents/" in p:
             path = p.split("/contents/", 1)[1]
             if path in self.files:

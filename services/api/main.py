@@ -640,6 +640,9 @@ def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
         raise HTTPException(409, f"evidence {source_evidence_id} has no server run; "
                                  "PRs require a /v1/runs server execution "
                                  "(client-reported counts cannot back a PR)")
+    verified_base = src["run"].get("base")
+    if not isinstance(verified_base, str) or not re.fullmatch(r"[0-9a-f]{40}", verified_base):
+        raise HTTPException(409, "server run has no immutable Git base SHA")
     blocked = [f"{g['gate']}={g['result']}" for g in gates if g.get("result") != "PASS"]
     if blocked:
         raise HTTPException(409, f"PR blocked by gates: {', '.join(blocked)}")
@@ -678,7 +681,8 @@ def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
     try:
         pr = github.create_pr(src["diff"], title, body,
                               branch, base,
-                              extra_files=extra_files or None)
+                              extra_files=extra_files or None,
+                              expected_base_sha=verified_base)
     except PatchError as e:
         raise HTTPException(409, str(e))
     except RuntimeError as e:

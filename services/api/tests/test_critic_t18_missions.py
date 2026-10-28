@@ -36,14 +36,15 @@ def _git(cwd, *args):
 
 
 class FakeGH:
-    def __init__(self):
+    def __init__(self, base):
         self.calls = []
+        self.base = base
 
     def __call__(self, req):
         self.calls.append(req)
         p = req.url.path
         if req.method == "GET" and p.endswith("/git/ref/heads/main"):
-            return httpx.Response(200, json={"object": {"sha": "basesha"}})
+            return httpx.Response(200, json={"object": {"sha": self.base}})
         if req.method == "GET" and "/contents/" in p:
             if p.endswith("/contents/calc.py"):
                 return httpx.Response(200, json={"sha": "blob", "encoding": "base64",
@@ -83,7 +84,7 @@ def env(tmp_path, monkeypatch):
     monkeypatch.setattr(broker_meta, "call_critic", lambda *a, **k: {
         "sealed_tests": json.loads(json.dumps(SEALED)), "review": {"result": "PASS", "findings": []},
         "stub": False, "execution_verified": False, "model": "muse-spark-1.3"})
-    fake = FakeGH()
+    fake = FakeGH(_git(w, "rev-parse", "HEAD"))
     orig = github.create_pr
     cl = httpx.Client(transport=httpx.MockTransport(fake))
     monkeypatch.setattr(github, "create_pr", lambda *a, **k: orig(*a, client=cl, **k))
