@@ -1712,8 +1712,11 @@ def dashboard():
     by_state = {s: 0 for s in missions_store.STATES}
     active = 0
     blocked = 0
+    pr_opened: list[str] = []
     for m in missions_store.all():
         by_state[m["state"]] = by_state.get(m["state"], 0) + 1
+        if m["state"] == "PR_OPENED":
+            pr_opened.append(m["mission_id"])
         if m["state"] not in missions_store.TERMINAL:
             active += 1
         if m["state"] == "FAILED":
@@ -1727,12 +1730,18 @@ def dashboard():
                 blocked += 1
     snap = ledger.snapshot("default")
     validated = _all_validated()
+    validated_ids = {o["mission_id"] for o in validated}
     return {
         "missions_by_state": by_state,
         "active_missions": active,
         "blocked_merges": blocked,
         "validated_improvements": len(validated),
         "validated_mission_ids": [o["mission_id"] for o in validated],
+        # An opened PR is not an improvement until it is merged and its outcome is recorded (AT-20).
+        "prs_awaiting_validation": sum(1 for mid in pr_opened if mid not in validated_ids),
+        "wvi_rule": "merged PR with a VALIDATED outcome (POST /v1/outcomes); an opened PR does not count",
+        # Ledger spend is model API usage priced from provider-reported tokens; Runner compute is not included.
+        "spend_basis": "model_api_usage",
         "spent_cents": snap["spent_cents"],
         "reserved_cents": snap["reserved_cents"],
         "unknown_holds": len(snap["unknown_reservations"]),
