@@ -1,5 +1,9 @@
 [
 {
+"expected": "/v1/participants",
+"path_segments": ["v1", "participants"]
+},
+{
 "expected": "/v1/commands/generate",
 "path_segments": [
 "v1",

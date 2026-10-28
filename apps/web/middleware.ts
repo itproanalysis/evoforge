@@ -6,7 +6,8 @@ const COOKIE_NAME = "__Host-evoforge-session";
 // Create next-intl middleware
 const intlMiddleware = createIntlMiddleware({
   locales: ['en', 'ko'],
-  defaultLocale: 'en',
+  defaultLocale: 'ko',
+  localeDetection: false,
   localePrefix: 'as-needed',
 });
 

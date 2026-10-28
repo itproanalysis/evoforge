@@ -34,10 +34,10 @@ export function LanguageSwitcher() {
     // Navigate to the new locale
     startTransition(() => {
       // Remove current locale from pathname if present
-      const pathnameWithoutLocale = pathname.replace(/^\/(en|ko)/, '') || '/';
+      const pathnameWithoutLocale = pathname.replace(/^\/(en|ko)(?=\/|$)/, '') || '/';
       
       // Navigate to new locale path
-      const newPath = newLocale === 'en' 
+      const newPath = newLocale === 'ko'
         ? pathnameWithoutLocale 
         : `/${newLocale}${pathnameWithoutLocale}`;
       

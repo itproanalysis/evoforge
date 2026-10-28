@@ -14,6 +14,7 @@ import {
   getLedger,
   getMission,
   getPerformance,
+  getParticipants,
   listMissions,
   listOutcomes,
   postMission,
@@ -39,11 +40,15 @@ function round1(val: number): number {
   return Math.round(val * 10) / 10;
 }
 
+function formatRate(rate: number | null | undefined): string {
+  return typeof rate === "number" && Number.isFinite(rate) ? `${round1(rate * 100)}%` : "—";
+}
+
 export default function MissionControl() {
   const t = useTranslations("mission-control");
   const tErrors = useTranslations("errors");
 
-  const [goal, setGoal] = useState("Fix flaky login retry");
+  const [goal, setGoal] = useState("");
   const [repoRef, setRepoRef] = useState("HEAD");
   const [busy, setBusy] = useState(false);
   const [recordingOutcome, setRecordingOutcome] = useState(false);
@@ -60,6 +65,7 @@ export default function MissionControl() {
   const [dashboard, setDashboard] = useState<DashboardSnapshot | null>(null);
   const [ledger, setLedger] = useState<LedgerSnapshot | null>(null);
   const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
+  const [participants, setParticipants] = useState<Awaited<ReturnType<typeof getParticipants>> | null>(null);
   const stopRef = useRef(false);
   const selectedIdRef = useRef<string | null>(null);
   const refreshingRef = useRef(false);
@@ -70,13 +76,15 @@ export default function MissionControl() {
     setSyncing(true);
     const targetId = missionId ?? selectedIdRef.current;
     try {
-      const [dash, books, performance, history, recent] = await Promise.allSettled([
-        getDashboard(), getLedger(), getPerformance(), listOutcomes(), listMissions(),
+      const [dash, books, performance, history, recent, people] = await Promise.allSettled([
+        getDashboard(), getLedger(), getPerformance(), listOutcomes(), listMissions(), getParticipants(),
       ]);
       if (dash.status === "fulfilled") setDashboard(dash.value);
       if (books.status === "fulfilled") setLedger(books.value);
       if (performance.status === "fulfilled") setPerf(performance.value);
       if (history.status === "fulfilled") setOutcomes(history.value.outcomes ?? []);
+      if (people.status === "fulfilled") setParticipants(people.value);
+      else setParticipants(null);
       const list = recent.status === "fulfilled" ? recent.value.missions ?? [] : [];
       if (recent.status === "fulfilled") setMissions(list);
       let failed = [dash, books, performance, history, recent].some((r) => r.status === "rejected");
@@ -297,15 +305,10 @@ export default function MissionControl() {
               <code>
                 {perf.baseline.passed ?? perf.baseline.record?.passed}/
                 {perf.baseline.n ?? perf.baseline.record?.n} (
-                {round1(
-                  (perf.baseline.pass_rate ??
-                    perf.baseline.record?.pass_rate ??
-                    0) * 100
-                )}
-                %)
+                {formatRate(perf.baseline.pass_rate ?? perf.baseline.record?.pass_rate)})
               </code>
             ) : (
-              <code>not_measured</code>
+              <span>{t(perf ? "not-measured" : "performance-unavailable")}</span>
             )}
           </div>
           <div>
@@ -314,15 +317,10 @@ export default function MissionControl() {
               <code>
                 {perf.pipeline.passed ?? perf.pipeline.record?.passed}/
                 {perf.pipeline.n ?? perf.pipeline.record?.n} (
-                {round1(
-                  (perf.pipeline.pass_rate ??
-                    perf.pipeline.record?.pass_rate ??
-                    0) * 100
-                )}
-                %)
+                {formatRate(perf.pipeline.pass_rate ?? perf.pipeline.record?.pass_rate)})
               </code>
             ) : (
-              <code>not_measured</code>
+              <span>{t(perf ? "not-measured" : "performance-unavailable")}</span>
             )}
           </div>
           <div>
@@ -330,13 +328,13 @@ export default function MissionControl() {
             perf.comparison.status === "measured" &&
             perf.comparison.verdict ? (
               <>
-                비교: <code>{perf.comparison.verdict}</code>{" "}
+                {t("comparison")}: <span>{t(`verdicts.${perf.comparison.verdict}` as any)}</span>{" "}
                 {typeof perf.comparison.delta_pp === "number"
                   ? `Δ${round1(perf.comparison.delta_pp)}%p`
                   : ""}
               </>
             ) : (
-              <span className="text-text-secondary">not measured yet</span>
+              <span className="text-text-secondary">{t(perf ? "comparison-empty" : "performance-unavailable")}</span>
             )}
           </div>
           {perf?.production ? (
@@ -348,6 +346,45 @@ export default function MissionControl() {
             </div>
           ) : null}
         </div>
+      </Card>
+
+      <Card className="mt-4">
+        <h2 className="text-base font-semibold m-0">{t("participants-heading")}</h2>
+        {!participants || participants.status !== "available" ? (
+          <p className="text-sm text-text-secondary mb-0">{t("participants-unavailable")}</p>
+        ) : participants.participants.length === 0 ? (
+          <p className="text-sm text-text-secondary mb-0">{t("participants-empty")}</p>
+        ) : (
+          <div className="grid gap-2 mt-3">
+            {participants.participants.map((person) => (
+              <div key={person.agent_id} className="p-2.5 rounded-lg border border-border text-sm">
+                <div className="font-semibold">{person.agent_id} · {person.kind}</div>
+                <div className="text-text-secondary">{t("participant-roles")}: {person.roles.map((value) => t.has(`participant-values.${value}` as any) ? t(`participant-values.${value}` as any) : value).join(", ") || "—"}</div>
+                <div className="text-text-secondary">{t("participant-states")}: {[person.join_state, person.connection_state, person.execution_state, person.credential_state].map((value) => t.has(`participant-values.${value}` as any) ? t(`participant-values.${value}` as any) : value).join(" · ")}</div>
+              </div>
+            ))}
+            {participants.has_more && <p className="text-sm text-text-secondary">{t("participants-more")}</p>}
+          </div>
+        )}
+      </Card>
+
+      <Card className="mt-4">
+        <h2 className="text-base font-semibold m-0">{t("measurement-history")}</h2>
+        {!perf ? (
+          <p className="text-sm text-text-secondary">{t("history-unavailable")}</p>
+        ) : !perf.history?.length ? (
+          <p className="text-sm text-text-secondary">{t("history-empty")}</p>
+        ) : (
+          <div className="grid gap-2 mt-3">
+            {[...perf.history].sort((a, b) => b.created_at - a.created_at).map((entry) => (
+              <div key={entry.measurement_id} className="flex flex-wrap justify-between gap-2 p-2.5 rounded-lg border border-border text-sm">
+                <span>{entry.kind} · {entry.model} · {entry.suite_version}</span>
+                <span>{entry.passed}/{entry.n} · {formatRate(entry.pass_rate)} · {new Date(entry.created_at * 1000).toLocaleString()}</span>
+                {entry.evidence_id && <a href={`/evidence?id=${encodeURIComponent(entry.evidence_id)}`} className="text-accent-cyan hover:underline">{t("evidence-label")}</a>}
+              </div>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Card className="mt-4">

@@ -378,6 +378,20 @@ export function getPerformance() {
   return req<PerformanceSnapshot>("/v1/performance");
 }
 
+export interface Participant {
+  agent_id: string;
+  kind: string;
+  roles: string[];
+  join_state: string;
+  connection_state: string;
+  execution_state: string;
+  credential_state: string;
+}
+
+export function getParticipants() {
+  return req<{status: "available" | "unavailable"; participants: Participant[]; has_more?: boolean}>("/v1/participants");
+}
+
 export function runBaseline(suite_version = "v0", model = "muse-spark-1.3") {
   return req<BaselineResponse>("/v1/eval/baseline", {
     method: "POST",

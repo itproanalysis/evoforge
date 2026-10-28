@@ -40,7 +40,7 @@ export default async function LocaleLayout({
 
   const raw = (process.env.NEXT_PUBLIC_API_BASE ?? '').trim();
   const apiBase = raw === '' ? '/api/evoforge (same-origin)' : raw;
-  const prefix = locale === 'en' ? '' : `/${locale}`;
+  const prefix = locale === 'ko' ? '' : `/${locale}`;
 
   return (
     <html lang={locale}>
