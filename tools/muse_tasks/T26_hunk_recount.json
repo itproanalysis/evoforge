@@ -1,0 +1,15 @@
+{
+  "id": "T26_hunk_recount",
+  "planned_by": "Claude (Critic) after sealed v1 diagnosis: 7/12 rejected on hunk counts",
+  "goal": "T26 — apply LLM diffs whose hunk header counts are wrong, by their body (git apply --recount semantics).\n\nEvidence (2026-10-28, sealed v1, real Muse Spark output): 7 of 12 Builder diffs were rejected only because\n\"@@ -a,N +b,M @@\" counts were off by one (e.g. header -4,10 +4,12 for a body of 9 old / 11 new lines). Recounting the\ncounts from the body made 12/12 diffs apply and pass their held-out tests. The same module applies diffs for missions,\nthe Runner, PRs and evals, so this is the biggest single lever on success rate.\n\nChange services/api/evoforge/patch.py only (+ new tests services/api/tests/test_muse_t26.py):\n1. Keep the current strict parse as the first attempt: a diff whose counts match its body must parse and apply exactly as\n   today (all existing tests stay green, unchanged).\n2. If a hunk's counts do not match its body (overrun into the next header or end of diff, or body lines left over after the\n   counts are used up), re-parse that hunk by STRUCTURE: the hunk body is every following line until the next \"@@ \" hunk\n   header, the next \"--- \"/\"+++ \" file-header pair, a \"diff --git\" line, or the end of the diff. Trailing empty lines at the\n   very end of the diff are not context. Then count old/new lines from that body.\n3. Lines left after a hunk that start with \"+\", \"-\" or \" \" (and are not a file-header pair) must never be silently skipped:\n   they belong to the hunk (step 2) or the diff fails.\n4. Context and removed lines must still match the file exactly (same offset search and ambiguity refusal as today).\n   Never apply at a fuzzy/approximate location.\n5. Keep PatchError for genuinely malformed diffs and the module docstring honest (\"hunk counts are recomputed from the body\n   when they disagree; context must match exactly\").",
+  "edit": [
+    "services/api/evoforge/patch.py",
+    "services/api/tests/test_muse_t26.py"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t3_patch_apply.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
