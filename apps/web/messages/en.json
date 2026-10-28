@@ -266,7 +266,10 @@
       "legend-x-single": "X_SINGLE",
       "legend-pipeline": "PIPELINE",
       "harness": "harness {version}",
-      "families-heading": "Per-family results"
+      "families-heading": "Per-family results",
+      "verdict-improved": "Improvement confirmed ({delta})",
+      "verdict-unclear": "Unclear difference (intervals overlap, {delta})",
+      "verdict-worse": "Worse ({delta})"
     },
     "jobs": {
       "title": "Background measurement job",
