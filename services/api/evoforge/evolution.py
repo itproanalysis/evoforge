@@ -26,7 +26,19 @@ _locks: dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
 
 
+def _backend():
+    from evoforge.postgres_state import backend
+    selected = backend()
+    if selected:
+        from evoforge.postgres_evolutions import EvolutionStore
+        return EvolutionStore(selected.kernel)
+    return None
+
+
 def reset() -> None:
+    if _backend():
+        from evoforge.postgres_kernel import KernelRejected
+        raise KernelRejected('durable evolutions cannot be cleared')
     with _store_lock:
         _evolutions.clear()
     with _locks_guard:
@@ -73,6 +85,10 @@ def start(goal: str, repo_ref: str = "HEAD",
         "created_at": now,
         "updated_at": now,
     }
+    store = _backend()
+    if store:
+        # Durable store has no DELETE grant; the cap is a memory-mode guard only.
+        return store.upsert(evo)
     with _store_lock:
         # Service stability: prune oldest non-running evolutions when store cap is reached
         while len(_evolutions) >= _MAX_EVOLUTIONS:
@@ -89,16 +105,34 @@ def start(goal: str, repo_ref: str = "HEAD",
 
 
 def get(evolution_id: str) -> dict | None:
+    store = _backend()
+    if store:
+        return store.get(evolution_id)
     with _store_lock:
         return _evolutions.get(evolution_id)
 
 
 def list_all() -> list[dict]:
+    store = _backend()
+    if store:
+        return store.list()
     with _store_lock:
         return list(_evolutions.values())
 
 
 def cancel(evolution_id: str) -> dict:
+    store = _backend()
+    if store:
+        def _cancel(current):
+            if current is None:
+                raise KeyError(evolution_id)
+            if current["status"] not in TERMINAL:
+                current["status"] = "CANCELLED"
+                current["updated_at"] = time.time()
+                return current, current
+            return None, current
+        _, result = store.mutate(evolution_id, _cancel)
+        return result
     with _store_lock:
         evo = _evolutions.get(evolution_id)
         if evo is None:
@@ -225,6 +259,40 @@ def feedback_goal(original_goal: str, generation: dict) -> str:
 
 
 def record_generation(evolution_id: str, candidates: list[dict]) -> dict:
+    store = _backend()
+    if store:
+        def _record(current):
+            if current is None:
+                raise KeyError(evolution_id)
+            if current["status"] in TERMINAL:
+                raise ValueError(f"evolution {evolution_id} is terminal ({current['status']})")
+            idx = len(current["generations"])
+            scored = []
+            for c in candidates:
+                fit = fitness(c.get("gates", []), c.get("run"))
+                reason = classify_failure(c)
+                scored.append({**c, "fitness": fit, "failure_reason": reason})
+            scored.sort(key=lambda c: c["fitness"]["score"], reverse=True)
+            winner = scored[0] if scored else None
+            gen = {
+                "index": idx,
+                "candidates": scored,
+                "winner": winner,
+                "converged": bool(winner and winner["fitness"]["all_pass"]),
+                "at": time.time(),
+            }
+            current["generations"].append(gen)
+            if winner and (current["best"] is None
+                           or winner["fitness"]["score"] > current["best"]["fitness"]["score"]):
+                current["best"] = {**winner, "generation": idx}
+            if gen["converged"]:
+                current["status"] = "CONVERGED"
+            elif len(current["generations"]) >= current["max_generations"]:
+                current["status"] = "EXHAUSTED"
+            current["updated_at"] = time.time()
+            return current, gen
+        _, gen = store.mutate(evolution_id, _record)
+        return gen
     with _store_lock:
         evo = _evolutions.get(evolution_id)
         if evo is None:
