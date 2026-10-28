@@ -1536,3 +1536,264 @@ def _all_validated() -> list[dict]:
 @app.get("/v1/ledger")
 def ledger_snapshot():
     return ledger.snapshot("default")
+
+
+# ---------------------------------------------------------------------------
+# Autonomous Evolution (Autopilot) + Proof Certificates — the new horizon.
+# Goal in, verified PR out. Every generation reuses the same trust-kernel
+# cores (_generate_core/_review_core/_run_core/_pr_core); nothing here can
+# mint a PASS on its own. Certificates carry digests, never code.
+# ---------------------------------------------------------------------------
+from evoforge import evolution as evo_engine
+from evoforge import proof as proof_mod
+from evoforge import memory as evo_memory
+
+
+def _evo_candidate(goal: str, base_sha: str, file_context,
+                   store_extra: dict) -> dict:
+    """One autopilot candidate: generate -> review -> run (best effort).
+
+    Systemic failures (402 budget, 502 provider) propagate and abort the
+    generation. Expected verification failures (stub review, 409 gates)
+    are captured as candidate data so evolution can learn from them.
+    """
+    import hashlib as _hl
+
+    gen_eid, candidate, gen_verdicts = _generate_core(
+        goal=goal, base_sha=base_sha, file_context=file_context,
+        store_extra={**store_extra, "autopilot": True})
+    diff = candidate.get("diff") if isinstance(candidate.get("diff"), str) else ""
+    out: dict = {
+        "generate_evidence_id": gen_eid,
+        "review_evidence_id": None,
+        "run_evidence_id": None,
+        "gates": [v.__dict__ for v in gen_verdicts],
+        "review_result": None,
+        "run": None,
+        "diff_chars": len(diff),
+        "diff_sha256": _hl.sha256(diff.encode("utf-8")).hexdigest(),
+        "candidate_error": None,
+    }
+    try:
+        rev_eid, review_out, phase_ids = _review_core(
+            goal_contract=goal, diff=diff, ci="",
+            store_extra={**store_extra, "autopilot": True})
+    except HTTPException as e:
+        out["candidate_error"] = f"review: {e.status_code} {e.detail}"
+        return out
+    out["review_evidence_id"] = rev_eid
+    inner = review_out.get("review") if isinstance(review_out, dict) else None
+    if isinstance(inner, dict):
+        out["review_result"] = inner.get("result")
+    if isinstance(review_out, dict) and review_out.get("stub") is True:
+        out["candidate_error"] = "review: stub (no MODEL_API_KEY) — cannot back a run"
+        return out
+    tests = candidate.get("tests") if isinstance(candidate.get("tests"), list) else []
+    try:
+        run_eid, gates, run = _run_core(
+            source_repo="", base_sha=base_sha, diff=diff, tests=tests,
+            review_evidence_id=rev_eid, timeout_s=120, store_extra={**store_extra, "autopilot": True})
+    except HTTPException as e:
+        out["candidate_error"] = f"run: {e.status_code} {e.detail}"
+        return out
+    out["run_evidence_id"] = run_eid
+    out["gates"] = gates
+    out["run"] = run
+    return out
+
+
+class EvolutionStart(BaseModel):
+    goal: str
+    repo_ref: str = "HEAD"
+    target_paths: list | None = None
+    max_generations: int = 3
+    population: int = 2
+    use_memory: bool = True
+
+
+@app.post("/v1/evolution/start", status_code=201)
+def evolution_start(req: EvolutionStart):
+    if not req.goal.strip():
+        raise HTTPException(400, "goal required")
+    validated = None
+    if req.target_paths is not None:
+        validated = _validate_target_paths(req.target_paths)
+    try:
+        evo = evo_engine.start(req.goal, req.repo_ref, validated,
+                               req.max_generations, req.population,
+                               req.use_memory)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    eid = _store_evidence({"evolution_id": evo["evolution_id"], "goal": req.goal,
+                           "repo_ref": req.repo_ref})
+    _link_stages(eid, ("ObjectiveVersion",))
+    return {"evolution_id": evo["evolution_id"], "evidence_id": eid,
+            "status": evo["status"], **evo_engine.public(evo)}
+
+
+@app.get("/v1/evolution")
+def evolution_list():
+    return {"evolutions": [evo_engine.public(e) for e in evo_engine.list_all()]}
+
+
+@app.get("/v1/evolution/{evolution_id}")
+def evolution_detail(evolution_id: str):
+    evo = evo_engine.get(evolution_id)
+    if evo is None:
+        raise HTTPException(404, "unknown evolution")
+    return evo_engine.public(evo)
+
+
+@app.post("/v1/evolution/{evolution_id}/step")
+def evolution_step(evolution_id: str):
+    """Run ONE generation (up to `population` candidates) synchronously."""
+    evo = evo_engine.get(evolution_id)
+    if evo is None:
+        raise HTTPException(404, "unknown evolution")
+    if evo["status"] in evo_engine.TERMINAL:
+        raise HTTPException(409, f"evolution {evolution_id} is terminal ({evo['status']})")
+    base_sha = evo["repo_ref"]
+    if not _HEX40.match(base_sha.strip()):
+        try:
+            base_sha = _resolve_mission_base(base_sha)
+        except HTTPException:
+            pass  # local/HEAD refs resolve inside the cores; keep original
+    file_context = None
+    if evo.get("target_paths"):
+        try:
+            file_context = _load_builder_context(base_sha, evo["target_paths"])
+        except HTTPException as e:
+            raise e
+    goal = evo["goal"]
+    if evo.get("use_memory", True):
+        hint = evo_memory.hint_block(evo["goal"])
+        if hint:
+            goal = goal + "\n\n" + hint
+    if evo["generations"]:
+        goal = evo_engine.feedback_goal(goal, evo["generations"][-1])
+    candidates = [_evo_candidate(goal, base_sha, file_context,
+                                 {"evolution_id": evolution_id})
+                  for _ in range(evo["population"])]
+    gen = evo_engine.record_generation(evolution_id, candidates)
+    _maybe_memorize(evo_engine.get(evolution_id))
+    evo = evo_engine.get(evolution_id)
+    assert evo is not None
+    return {"evolution_id": evolution_id, "status": evo["status"],
+            "generation": gen["index"], "converged": gen["converged"],
+            "winner": gen["winner"]}
+
+
+def _maybe_memorize(evo: dict | None) -> None:
+    """Distill converged winners into memory (server-side only, code never hits HTTP)."""
+    if not evo or evo.get("status") != "CONVERGED":
+        return
+    winner = (evo.get("generations") or [{}])[-1].get("winner") or {}
+    gen_eid = winner.get("generate_evidence_id")
+    diff = ""
+    if gen_eid:
+        cand = _evidence.get(gen_eid, {}).get("candidate")
+        if isinstance(cand, dict) and isinstance(cand.get("diff"), str):
+            diff = cand["diff"]
+    fit = (winner.get("fitness") or {}).get("score", 0.0)
+    try:
+        evo_memory.record(evo["evolution_id"], evo["goal"], diff,
+                          float(fit), winner.get("run_evidence_id"))
+    except Exception:
+        pass
+
+
+@app.post("/v1/evolution/{evolution_id}/run")
+def evolution_run(evolution_id: str):
+    """Run generations until CONVERGED or EXHAUSTED (bounded by max_generations)."""
+    evo = evo_engine.get(evolution_id)
+    if evo is None:
+        raise HTTPException(404, "unknown evolution")
+    ran = 0
+    last: dict | None = None
+    while evo["status"] == "RUNNING":
+        step = evolution_step(evolution_id)
+        last = step
+        ran += 1
+        evo = evo_engine.get(evolution_id)
+        assert evo is not None
+    return {"evolution_id": evolution_id, "status": evo["status"],
+            "generations_ran": ran, "last_generation": (last or {}).get("generation"),
+            "best": (evo_engine.public(evo))["best"]}
+
+
+@app.post("/v1/evolution/{evolution_id}/cancel")
+def evolution_cancel(evolution_id: str):
+    try:
+        evo = evo_engine.cancel(evolution_id)
+    except KeyError:
+        raise HTTPException(404, "unknown evolution")
+    return {"evolution_id": evolution_id, "status": evo["status"]}
+
+
+@app.post("/v1/evolution/{evolution_id}/promote", status_code=201)
+def evolution_promote(evolution_id: str):
+    """Open a PR from the best CONVERGED run. Non-PASS best is 409 — no exceptions."""
+    evo = evo_engine.get(evolution_id)
+    if evo is None:
+        raise HTTPException(404, "unknown evolution")
+    best = (evo.get("best") or {})
+    run_eid = best.get("run_evidence_id")
+    if not run_eid:
+        raise HTTPException(409, "no verified run to promote yet — evolve first")
+    title = f"evoforge autopilot: {evo['goal'][:80]}"
+    eid, pr = _pr_core(source_evidence_id=run_eid, title=title,
+                        body_intro=f"Autopilot {evolution_id} gen {best.get('generation')}: {evo['goal']}",
+                        branch=f"evoforge/evo-{uuid.uuid4().hex[:8]}", base="main",
+                        store_extra={"evolution_id": evolution_id})
+    return {"pr": pr, "evidence_id": eid, "source_evidence_id": run_eid}
+
+
+@app.get("/v1/proof/{evidence_id}")
+def proof_certificate(evidence_id: str):
+    """Public proof certificate over redacted evidence: digests, never code."""
+    if evidence_id not in _evidence:
+        raise HTTPException(404, "unknown evidence id")
+    stored = _evidence[evidence_id]
+    public_view = _redact_value(stored)
+    data = {k: v for k, v in public_view.items() if k not in ("chain", "data")}
+    diff = stored.get("diff") if isinstance(stored.get("diff"), str) else ""
+    if diff and not data.get("diff_sha256"):
+        import hashlib as _hl2
+        data["diff_sha256"] = _hl2.sha256(diff.encode("utf-8")).hexdigest()
+    cand = stored.get("candidate") if isinstance(stored.get("candidate"), dict) else {}
+    if isinstance(cand.get("diff"), str) and not data.get("diff_sha256"):
+        import hashlib as _hl3
+        data["diff_sha256"] = _hl3.sha256(cand["diff"].encode("utf-8")).hexdigest()
+    cert = proof_mod.mint(evidence_id, data, evidence_chain.chain(evidence_id))
+    return {**cert, "verify": proof_mod.verify(cert)}
+
+
+@app.get("/v1/leaderboard")
+def leaderboard():
+    """Trust leaderboard: converged evolutions ranked by fitness, then speed.
+
+    The unit of prestige is a VERIFIED fix with a proof link — not a claim.
+    """
+    rows = []
+    for e in evo_engine.list_all():
+        if e.get("status") != "CONVERGED" or not e.get("best"):
+            continue
+        best = e["best"]
+        fit = best.get("fitness") or {}
+        run_eid = best.get("run_evidence_id")
+        rows.append({
+            "evolution_id": e["evolution_id"],
+            "goal": e["goal"],
+            "generations_used": len(e.get("generations", [])),
+            "best_score": fit.get("score", 0.0),
+            "proof_evidence_id": run_eid,
+            "proof_path": f"/v1/proof/{run_eid}" if run_eid else None,
+        })
+    rows.sort(key=lambda r: (-(r["best_score"] or 0.0), r["generations_used"]))
+    return {"leaders": rows, "count": len(rows)}
+
+
+@app.get("/v1/memory")
+def memory_list():
+    """Digest-only view of what the factory has learned. No code, ever."""
+    return {"patterns": evo_memory.public_all(), "count": len(evo_memory.public_all())}

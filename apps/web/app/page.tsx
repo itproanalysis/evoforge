@@ -58,6 +58,7 @@ export default function MissionControl() {
   const [recordingOutcome, setRecordingOutcome] = useState(false);
   const [mergedSha, setMergedSha] = useState("");
   const [err, setErr] = useState("");
+  const [initialLoading, setInitialLoading] = useState(true);
   const [mission, setMission] = useState<MissionDetail | null>(null);
   const [missions, setMissions] = useState<MissionSummary[]>([]);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
@@ -95,6 +96,7 @@ export default function MissionControl() {
         setMission(await getMission(idToLoad));
       } catch {}
     }
+    setInitialLoading(false);
   };
 
   useEffect(() => {
@@ -217,7 +219,9 @@ export default function MissionControl() {
       <section style={{ ...card, marginTop: 16 }}>
         <div style={label}>Performance (GET /v1/performance)</div>
         <div style={{ fontSize: 13, marginTop: 4 }}>
-          {perf && perf.comparison.status === "measured" && perf.comparison.verdict ? (
+          {initialLoading ? (
+            "Loading…"
+          ) : perf && perf.comparison.status === "measured" && perf.comparison.verdict ? (
             <>
               비교: <code>{perf.comparison.verdict}</code>{" "}
               {typeof perf.comparison.delta_pp === "number"

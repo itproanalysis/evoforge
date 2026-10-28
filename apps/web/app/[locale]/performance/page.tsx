@@ -58,6 +58,7 @@ function MeasureCard({
       <Card className="flex-[1_1_220px] min-w-0">
         <div className="text-xs text-text-secondary">{title}</div>
         <div className="text-2xl font-bold mt-1">—</div>
+        <div className="text-xs text-text-secondary mt-1">{t("loading")}</div>
       </Card>
     );
   }
@@ -259,7 +260,9 @@ export default function PerformancePage() {
         />
         <Card className="flex-[1_1_220px] min-w-0">
           <div className="text-xs text-text-secondary">{t("verdict-title")}</div>
-          {measured && perf ? (
+          {loading && !perf ? (
+            <div className="text-sm text-text-secondary mt-2">{t("loading")}</div>
+          ) : measured && perf ? (
             <>
               <div className="text-2xl font-bold mt-1">
                 {t(`verdicts.${verdictKey}` as any)}
@@ -316,7 +319,9 @@ export default function PerformancePage() {
         <div className="text-xs text-text-secondary">
           {t("families-heading", { version: suiteVersion })}
         </div>
-        {!baseFam && !pipeFam ? (
+        {loading && !perf ? (
+          <div className="text-sm text-text-secondary mt-1">{t("loading")}</div>
+        ) : !baseFam && !pipeFam ? (
           <div className="text-sm text-text-secondary mt-1">
             {t("not-measured-short")} — {perf?.comparison.reason || t("families-empty")}
           </div>
@@ -348,7 +353,9 @@ export default function PerformancePage() {
 
       <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("history-heading")}</div>
-        {history.length === 0 ? (
+        {loading && !perf ? (
+          <div className="text-sm text-text-secondary mt-1">{t("loading")}</div>
+        ) : history.length === 0 ? (
           <div className="text-sm text-text-secondary mt-1">
             {t("not-measured-short")} — {t("history-empty")}
           </div>
@@ -392,7 +399,9 @@ export default function PerformancePage() {
 
       <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("production-heading")}</div>
-        {!prod ? (
+        {loading && !perf ? (
+          <div className="text-sm text-text-secondary mt-1">{t("loading")}</div>
+        ) : !prod ? (
           <div className="text-sm text-text-secondary mt-1">
             {t("not-measured-short")} — {t("production-empty")}
           </div>

@@ -32,6 +32,8 @@
 - [x] Web UI 성과 분석 페이지(`apps/web/app/[locale]/performance/page.tsx`) ko/en 현지화(`messages/*.json`의 `performance` 네임스페이스, 키 동등성 테스트), 동기화 실패 시 "실시간 연결됨" 대신 갱신 실패 표시, 로케일 인지 증거 링크. 루트 폴백(`app/performance/page.tsx`)과 `GET /v1/participants`·출처(provenance) 경계(`check-admin-policy.mjs`)는 유지. `tsc --noEmit`·`next build`·standalone `/performance`·`/en/performance` 확인. Dockerfile standalone 메시지 복사(`aeb31f0`) 반영.
 - [x] Runner 결과 수집 수 바인딩(`runner_client.py`, `test_runner_base_binding.py`) 및 스위트 불일치·exit code 불일치·봉인 종류 순서/값 불일치 방어(`2550dc1`), Runner visible 스위트 실행 시 pytest 격리 및 conftest/rootdir 보호(`1cd7e44`) main 반영·검증.
 - [x] 공개 PR 생성(`_pr_core`) 시 서버 검증 불변 Git base SHA 바인딩 및 변경된 베이스 브랜치 409 충돌 거부(`7b85124`), T17/T18 테스트 픽스처 정렬 main 반영·검증.
+- [x] Web UI 로딩 상태 가드(W5): Mission Control과 Performance에서 최초 응답 수신 전까지 "로딩 중…"을 유지하고, 실제 실패 시에만 "불러올 수 없음" 안내를 노출하도록 보강. 오류 문구 깜빡임 제거 및 375px 모바일 뷰포트 레이아웃 보존(`test_web_live_dashboard_cr.py` 8개 PASS, `tsc --noEmit` 0 error, Next.js 빌드 성공).
+- [x] Autonomous Evolution (Autopilot) + Proof Certificates (새 지평): N세대 × M개체 자율 번식·트러스트 커널 평가·Critic 피드백 진화 루프(`evolution.py`) 및 공용 증거 다이제스트 기반 변조 방지 증명서(`proof.py`, `/verify/[id]`) 구현·연결. 오프라인 EXHAUSTED 정직성 및 미검증 PR 승격 차단 409 검증(`test_evolution_autopilot.py` 6개 PASS, `proxyPolicy.ts` 92개 테스트 통과).
 
 ## 이어서 수행할 작업
 

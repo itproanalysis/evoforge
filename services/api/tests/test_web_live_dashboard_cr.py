@@ -149,3 +149,16 @@ def test_locale_lab_evidence_and_mission_pages_do_not_hardcode_english_ui_string
     assert "Review sealed summary" not in ev and "/v1/events/" in ev
     mc = (WEB / "app" / "[locale]" / "page.tsx").read_text(encoding="utf-8")
     assert 'label: "Generate"' not in mc and 'label: "Server Run"' not in mc
+def test_loading_states_guard_against_premature_error_flashes():
+    mc_locale = (WEB / "app" / "[locale]" / "page.tsx").read_text(encoding="utf-8")
+    assert "initialLoading" in mc_locale
+    assert 'tCommon("loading")' in mc_locale
+
+    mc_root = (WEB / "app" / "page.tsx").read_text(encoding="utf-8")
+    assert "initialLoading" in mc_root
+
+    perf_locale = (WEB / "app" / "[locale]" / "performance" / "page.tsx").read_text(encoding="utf-8")
+    assert "loading && !perf" in perf_locale
+
+    perf_root = (WEB / "app" / "performance" / "page.tsx").read_text(encoding="utf-8")
+    assert "loading && !perf" in perf_root

@@ -417,3 +417,98 @@ export const EVIDENCE_STAGES = [
   "PR",
   "Outcome",
 ] as const;
+
+// --- Autonomous Evolution (Autopilot) + Proof Certificates ---
+
+export interface EvolutionCandidate {
+  generate_evidence_id?: string | null;
+  review_evidence_id?: string | null;
+  run_evidence_id?: string | null;
+  gates?: GateVerdict[];
+  fitness?: { score: number; all_pass: boolean; gates_pass: number; gates_total: number };
+  review_result?: string | null;
+  diff_chars?: number;
+  diff_sha256?: string;
+  candidate_error?: string | null;
+}
+
+export interface EvolutionGeneration {
+  index: number;
+  converged: boolean;
+  at: number;
+  candidates: EvolutionCandidate[];
+  winner_run_evidence_id?: string | null;
+}
+
+export interface EvolutionPublic {
+  evolution_id: string;
+  goal: string;
+  repo_ref: string;
+  status: "RUNNING" | "CONVERGED" | "EXHAUSTED" | "CANCELLED";
+  max_generations: number;
+  population: number;
+  generations: EvolutionGeneration[];
+  best: {
+    generation?: number;
+    run_evidence_id?: string | null;
+    fitness?: { score: number; all_pass: boolean };
+    gates?: GateVerdict[];
+    review_result?: string | null;
+  } | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface ProofCertificate {
+  certificate_id: string;
+  evidence_id: string;
+  issued_at: number;
+  verdict: "VERIFIED" | "NOT_VERIFIED";
+  gates: GateVerdict[];
+  chain: EvidenceLink[];
+  diff_sha256: string;
+  sealed_kinds: string[];
+  sealed_count: number;
+  model: string;
+  signature: string;
+  verify?: { ok: boolean; reason: string };
+}
+
+export function startEvolution(goal: string, repo_ref = "HEAD", max_generations = 3, population = 2) {
+  return req<EvolutionPublic & { evidence_id?: string }>("/v1/evolution/start", {
+    method: "POST",
+    body: JSON.stringify({ goal, repo_ref, max_generations, population }),
+  });
+}
+
+export function listEvolutions() {
+  return req<{ evolutions: EvolutionPublic[] }>("/v1/evolution");
+}
+
+export function getEvolution(evolution_id: string) {
+  return req<EvolutionPublic>(`/v1/evolution/${encodeURIComponent(evolution_id)}`);
+}
+
+export function stepEvolution(evolution_id: string) {
+  return req<{ evolution_id: string; status: string; generation: number; converged: boolean; winner: EvolutionCandidate }>(
+    `/v1/evolution/${encodeURIComponent(evolution_id)}/step`,
+    { method: "POST" },
+  );
+}
+
+export function runEvolution(evolution_id: string) {
+  return req<{ evolution_id: string; status: string; generations_ran: number; best: EvolutionPublic["best"] }>(
+    `/v1/evolution/${encodeURIComponent(evolution_id)}/run`,
+    { method: "POST" },
+  );
+}
+
+export function promoteEvolution(evolution_id: string) {
+  return req<PRResponse>(`/v1/evolution/${encodeURIComponent(evolution_id)}/promote`, {
+    method: "POST",
+  });
+}
+
+export function getProof(evidence_id: string) {
+  return req<ProofCertificate>(`/v1/proof/${encodeURIComponent(evidence_id)}`);
+}

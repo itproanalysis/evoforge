@@ -315,7 +315,9 @@ export default function PerformancePage() {
         />
         <div style={{ ...card, flex: "1 1 160px", minWidth: 0 }}>
           <div style={label}>개선 여부 (Wilson 95% 구간 비교)</div>
-          {measured && perf ? (
+          {loading && !perf ? (
+            <div style={{ fontSize: 13, color: '#aeb9cf', marginTop: 4 }}>불러오는 중…</div>
+          ) : measured && perf ? (
             <>
               <div style={value}>{verdictKo(perf)}</div>
               <div style={{ fontSize: 12, color: "#aeb9cf" }}>{provenanceLabel[comparisonProvenance(perf.baseline, perf.pipeline)]}</div>
@@ -359,7 +361,9 @@ export default function PerformancePage() {
 
       <section style={card}>
         <div style={label}>분야별 결과 (per-family · Sealed {suiteVersion})</div>
-        { !baseFam && !pipeFam ? (
+        {loading && !perf ? (
+          <div style={{ fontSize: 13, color: '#aeb9cf', marginTop: 4 }}>불러오는 중…</div>
+        ) : !baseFam && !pipeFam ? (
           <div style={{ fontSize: 13, color: "#aeb9cf", marginTop: 4 }}>
             측정 전 (not_measured) — {perf?.comparison.reason || "분야별 측정이 아직 없음"}
           </div>
@@ -391,7 +395,9 @@ export default function PerformancePage() {
 
       <section style={card}>
         <div style={label}>측정 기록 (history, 오래된 순)</div>
-        {history.length === 0 ? (
+        {loading && !perf ? (
+          <div style={{ fontSize: 13, color: '#aeb9cf', marginTop: 4 }}>불러오는 중…</div>
+        ) : history.length === 0 ? (
           <div style={{ fontSize: 13, color: "#aeb9cf", marginTop: 4 }}>
             측정 전 (not_measured) — 측정 기록이 아직 없음
           </div>
@@ -437,7 +443,9 @@ export default function PerformancePage() {
 
       <section style={card}>
         <div style={label}>운영 표본 (production, /v1/runs 증거 기준)</div>
-        {!prod ? (
+        {loading && !perf ? (
+          <div style={{ fontSize: 13, color: '#aeb9cf', marginTop: 4 }}>불러오는 중…</div>
+        ) : !prod ? (
           <div style={{ fontSize: 13, color: "#aeb9cf", marginTop: 4 }}>
             측정 전 (not_measured) — 운영 표본이 아직 없음
           </div>

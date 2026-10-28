@@ -16,7 +16,8 @@
     "mission-control": "미션 컨트롤",
     "improvement-lab": "개선 랩",
     "evidence": "증거",
-    "performance": "성과 분석"
+    "performance": "성과 분석",
+    "autopilot": "오토파일럿"
   },
   "mission-control": {
     "heading": "미션 컨트롤",
@@ -219,6 +220,30 @@
     "how-wilson": "Wilson 95% 구간으로 비교: PIPELINE 하한이 기준 상한을 넘을 때만 개선됨으로 판정",
     "how-budget": "예산 상한: 서버 설정 EVO_EVAL_MAX_CENTS를 초과하면 402로 거부",
     "how-storage": "저장소: {storage}"
+  },
+  "evolution": {
+    "heading": "오토파일럿 — 목표 입력, 검증된 PR 출력",
+    "description": "자율 진화: 후보를 생성하고 트러스트 커널로 채점한 뒤 Critic 피드백으로 재시도합니다. POST /v1/evolution/*",
+    "goal-placeholder": "불안정한 로그인 재시도 수정",
+    "max-gen": "세대 수",
+    "population": "개체 수",
+    "start": "진화 시작",
+    "starting": "시작 중…",
+    "step": "1세대 진행",
+    "run-all": "수렴까지 실행",
+    "promote": "최적 후보 PR 승격",
+    "working": "작업 중…",
+    "runs-heading": "진화 실행",
+    "empty": "아직 진화가 없습니다 — 위에서 시작하세요.",
+    "select-hint": "실행을 선택하면 진화를 지켜볼 수 있습니다.",
+    "proof-link": "증명서 보기 →"
+  },
+  "verify": {
+    "heading": "증명서",
+    "description": "공개 증거 다이제스트 기반의 변조 방지 증명 — 코드는 서버를 떠나지 않습니다. 채팅 대신 이 URL을 공유하세요.",
+    "loading": "증명서 불러오는 중…",
+    "gates": "게이트",
+    "chain": "증거 체인"
   },
   "login": {
     "heading": "소유자 로그인",

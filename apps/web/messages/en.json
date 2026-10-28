@@ -16,7 +16,8 @@
     "mission-control": "Mission Control",
     "improvement-lab": "Improvement Lab",
     "evidence": "Evidence",
-    "performance": "Performance"
+    "performance": "Performance",
+    "autopilot": "Autopilot"
   },
   "mission-control": {
     "heading": "Mission Control",
@@ -219,6 +220,30 @@
     "how-wilson": "Compared by Wilson 95% interval: improved only when the PIPELINE lower bound exceeds the baseline upper bound",
     "how-budget": "Budget cap: requests above the server setting EVO_EVAL_MAX_CENTS are refused with 402",
     "how-storage": "Storage: {storage}"
+  },
+  "evolution": {
+    "heading": "Autopilot — goal in, verified PR out",
+    "description": "Autonomous evolution: breeds candidates, scores them with the trust kernel, retries with Critic feedback. POST /v1/evolution/*",
+    "goal-placeholder": "Fix flaky login retry",
+    "max-gen": "generations",
+    "population": "population",
+    "start": "Start evolution",
+    "starting": "Starting…",
+    "step": "Step 1 generation",
+    "run-all": "Run to convergence",
+    "promote": "Promote best to PR",
+    "working": "Working…",
+    "runs-heading": "Evolution runs",
+    "empty": "No evolutions yet — start one above.",
+    "select-hint": "Select a run to watch it evolve.",
+    "proof-link": "Proof certificate →"
+  },
+  "verify": {
+    "heading": "Proof certificate",
+    "description": "Tamper-evident proof over public evidence digests — code never leaves the server. Share this URL instead of a chat transcript.",
+    "loading": "Loading certificate…",
+    "gates": "Gates",
+    "chain": "Evidence chain"
   },
   "login": {
     "heading": "Owner login",

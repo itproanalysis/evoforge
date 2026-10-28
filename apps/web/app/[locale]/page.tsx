@@ -48,6 +48,7 @@ function formatRate(rate: number | null | undefined): string {
 export default function MissionControl() {
   const t = useTranslations("mission-control");
   const tErrors = useTranslations("errors");
+  const tCommon = useTranslations("common");
 
   const [goal, setGoal] = useState("");
   const [repoRef, setRepoRef] = useState("HEAD");
@@ -55,6 +56,7 @@ export default function MissionControl() {
   const [recordingOutcome, setRecordingOutcome] = useState(false);
   const [mergedSha, setMergedSha] = useState("");
   const [outcomePrUrl, setOutcomePrUrl] = useState("");
+  const [initialLoading, setInitialLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [autoPoll, setAutoPoll] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<string>("");
@@ -103,6 +105,7 @@ export default function MissionControl() {
       if (!failed) setLastUpdated(new Date().toLocaleTimeString());
     } finally {
       refreshingRef.current = false;
+      setInitialLoading(false);
       setSyncing(false);
     }
   };
@@ -282,12 +285,19 @@ export default function MissionControl() {
       {syncError && <p role="alert" className="text-sm text-accent-amber mt-3">{t("sync-error-detail")}</p>}
 
       <section className="flex gap-3 flex-wrap mt-4">
-        {metrics.map((m) => (
-          <Card key={m.k} className="min-w-[140px] flex-1">
-            <div className="text-xs text-text-secondary">{m.k}</div>
-            <div className="text-2xl font-bold mt-1">{m.v}</div>
+        {metrics.length === 0 && initialLoading ? (
+          <Card className="min-w-[140px] flex-1">
+            <div className="text-xs text-text-secondary">{tCommon("loading")}</div>
+            <div className="text-2xl font-bold mt-1">—</div>
           </Card>
-        ))}
+        ) : (
+          metrics.map((m) => (
+            <Card key={m.k} className="min-w-[140px] flex-1">
+              <div className="text-xs text-text-secondary">{m.k}</div>
+              <div className="text-2xl font-bold mt-1">{m.v}</div>
+            </Card>
+          ))
+        )}
       </section>
 
       <Card className="mt-4">
@@ -302,7 +312,9 @@ export default function MissionControl() {
         <div className="text-sm mt-2 flex flex-wrap gap-4">
           <div>
             <span className="text-text-secondary">X_SINGLE: </span>
-            {perf?.baseline?.status === "measured" ? (
+            {initialLoading ? (
+              <span className="text-text-secondary">{tCommon("loading")}</span>
+            ) : perf?.baseline?.status === "measured" ? (
               <code>
                 {perf.baseline.passed ?? perf.baseline.record?.passed}/
                 {perf.baseline.n ?? perf.baseline.record?.n} (
@@ -315,7 +327,9 @@ export default function MissionControl() {
           </div>
           <div>
             <span className="text-text-secondary">PIPELINE: </span>
-            {perf?.pipeline?.status === "measured" ? (
+            {initialLoading ? (
+              <span className="text-text-secondary">{tCommon("loading")}</span>
+            ) : perf?.pipeline?.status === "measured" ? (
               <code>
                 {perf.pipeline.passed ?? perf.pipeline.record?.passed}/
                 {perf.pipeline.n ?? perf.pipeline.record?.n} (
@@ -327,7 +341,9 @@ export default function MissionControl() {
             {perf?.pipeline?.status === "measured" && <span className="text-text-secondary"> · {t(`provenance.${viewProvenance(perf.pipeline)}` as any)}</span>}
           </div>
           <div>
-            {perf &&
+            {initialLoading ? (
+              <span className="text-text-secondary">{tCommon("loading")}</span>
+            ) : perf &&
             perf.comparison.status === "measured" &&
             perf.comparison.verdict ? (
               <>
@@ -354,7 +370,9 @@ export default function MissionControl() {
 
       <Card className="mt-4">
         <h2 className="text-base font-semibold m-0">{t("participants-heading")}</h2>
-        {!participants || participants.status !== "available" ? (
+        {initialLoading ? (
+          <p className="text-sm text-text-secondary mb-0">{tCommon("loading")}</p>
+        ) : !participants || participants.status !== "available" ? (
           <p className="text-sm text-text-secondary mb-0">{t("participants-unavailable")}</p>
         ) : participants.participants.length === 0 ? (
           <p className="text-sm text-text-secondary mb-0">{t("participants-empty")}</p>
@@ -374,7 +392,9 @@ export default function MissionControl() {
 
       <Card className="mt-4">
         <h2 className="text-base font-semibold m-0">{t("measurement-history")}</h2>
-        {!perf ? (
+        {initialLoading ? (
+          <p className="text-sm text-text-secondary mb-0">{tCommon("loading")}</p>
+        ) : !perf ? (
           <p className="text-sm text-text-secondary">{t("history-unavailable")}</p>
         ) : !perf.history?.length ? (
           <p className="text-sm text-text-secondary">{t("history-empty")}</p>
@@ -589,7 +609,7 @@ export default function MissionControl() {
         </div>
         {missions.length === 0 ? (
           <div className="text-sm text-text-secondary">
-            {t("recent-missions-empty")}
+            {initialLoading ? tCommon("loading") : t("recent-missions-empty")}
           </div>
         ) : (
           <div className="grid gap-2">
@@ -642,7 +662,7 @@ export default function MissionControl() {
         </div>
         {outcomes.length === 0 ? (
           <div className="text-sm text-text-secondary">
-            {t("outcomes-empty")}
+            {initialLoading ? tCommon("loading") : t("outcomes-empty")}
           </div>
         ) : (
           <div className="grid gap-2">
@@ -694,7 +714,9 @@ export default function MissionControl() {
       <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("ledger.heading")}</div>
         <div className="text-sm mt-1">
-          {ledger ? (
+          {initialLoading ? (
+            <span className="text-text-secondary">{tCommon("loading")}</span>
+          ) : ledger ? (
             <>
               {t("ledger.spent-cents")}=<code>{ledger.spent_cents}</code>{" "}
               {t("ledger.reserved-cents")}=<code>{ledger.reserved_cents}</code>{" "}

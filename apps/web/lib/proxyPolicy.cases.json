@@ -1,652 +1,747 @@
 [
-{
-"expected": "/v1/participants",
-"path_segments": ["v1", "participants"]
-},
-{
-"expected": "/v1/commands/generate",
-"path_segments": [
-"v1",
-"commands",
-"generate"
-]
-},
-{
-"expected": "/v1/objectives",
-"path_segments": [
-"v1",
-"objectives"
-]
-},
-{
-"expected": "/v1/candidates/review",
-"path_segments": [
-"v1",
-"candidates",
-"review"
-]
-},
-{
-"expected": "/v1/gates/evaluate",
-"path_segments": [
-"v1",
-"gates",
-"evaluate"
-]
-},
-{
-"expected": "/v1/runs",
-"path_segments": [
-"v1",
-"runs"
-]
-},
-{
-"expected": "/v1/pr/create",
-"path_segments": [
-"v1",
-"pr",
-"create"
-]
-},
-{
-"expected": "/v1/ledger",
-"path_segments": [
-"v1",
-"ledger"
-]
-},
-{
-"expected": "/v1/ledger/reconcile",
-"path_segments": [
-"v1",
-"ledger",
-"reconcile"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"eval",
-"sandbox"
-]
-},
-{
-"expected": "/v1/performance",
-"path_segments": [
-"v1",
-"performance"
-]
-},
-{
-"expected": "/v1/eval/suites",
-"path_segments": [
-"v1",
-"eval",
-"suites"
-]
-},
-{
-"expected": "/v1/eval/baseline",
-"path_segments": [
-"v1",
-"eval",
-"baseline"
-]
-},
-{
-"expected": "/v1/eval/pipeline",
-"path_segments": [
-"v1",
-"eval",
-"pipeline"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"eval",
-"unknown"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"eval",
-"baseline",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"eval",
-"pipeline",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"performance",
-"x"
-]
-},
-{
-"expected": "/v1/evidence/abc123",
-"path_segments": [
-"v1",
-"evidence",
-"abc123"
-]
-},
-{
-"expected": "/v1/evidence/aB0._~-x",
-"path_segments": [
-"v1",
-"evidence",
-"aB0._~-x"
-]
-},
-{
-"expected": "/v1/events/evt-1.2",
-"path_segments": [
-"v1",
-"events",
-"evt-1.2"
-]
-},
-{
-"expected": "/v1/commands/cmd-123",
-"path_segments": [
-"v1",
-"commands",
-"cmd-123"
-]
-},
-{
-"expected": "/v1/commands/cmd-123/advance",
-"path_segments": [
-"v1",
-"commands",
-"cmd-123",
-"advance"
-]
-},
-{
-"expected": null,
-"path_segments": []
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"..",
-"kernel",
-"reservations"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-".",
-"kernel"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-""
-]
-},
-{
-"expected": null,
-"path_segments": [
-"",
-"v1",
-"ledger"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"kernel",
-"reservations"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"kernel"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"commands",
-"x",
-"..",
-"kernel"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"%2e%2e"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"a%2fb"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"a%b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"a/b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"a\\b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"a b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"a:b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-".."
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"."
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"events"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"abc",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"events",
-"abc",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"commands",
-"cmd-123",
-"advance",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"commands",
-"cmd-123",
-"cancel"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"commands"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"ledger",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"runs",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"objectives",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"eval",
-"sandbox",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"ledger.",
-"reconcile!"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"caf\u0001e"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"caf\u007fe"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"caf\ne"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"*"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"evidence",
-"?"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v2",
-"ledger"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1"
-]
-},
-{
-"expected": "/v1/missions",
-"path_segments": [
-"v1",
-"missions"
-]
-},
-{
-"expected": "/v1/dashboard",
-"path_segments": [
-"v1",
-"dashboard"
-]
-},
-{
-"expected": "/v1/missions/msn-abc123",
-"path_segments": [
-"v1",
-"missions",
-"msn-abc123"
-]
-},
-{
-"expected": "/v1/missions/msn-abc123/advance",
-"path_segments": [
-"v1",
-"missions",
-"msn-abc123",
-"advance"
-]
-},
-{
-"expected": "/v1/missions/msn-abc123/cancel",
-"path_segments": [
-"v1",
-"missions",
-"msn-abc123",
-"cancel"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"x",
-"..",
-"kernel"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-".."
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"."
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-""
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"abc",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"abc",
-"advance",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"abc",
-"cancel",
-"extra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"abc",
-"delete"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"a%2fb"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"a%b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"a/b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"a b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"a:b"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missionsextra"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"dashboard",
-"x"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"dashboardx"
-]
-},
-{
-"expected": null,
-"path_segments": [
-"v1",
-"missions",
-"..",
-"dashboard"
-]
-}
+  {
+    "expected": "/v1/participants",
+    "path_segments": [
+      "v1",
+      "participants"
+    ]
+  },
+  {
+    "expected": "/v1/commands/generate",
+    "path_segments": [
+      "v1",
+      "commands",
+      "generate"
+    ]
+  },
+  {
+    "expected": "/v1/objectives",
+    "path_segments": [
+      "v1",
+      "objectives"
+    ]
+  },
+  {
+    "expected": "/v1/candidates/review",
+    "path_segments": [
+      "v1",
+      "candidates",
+      "review"
+    ]
+  },
+  {
+    "expected": "/v1/gates/evaluate",
+    "path_segments": [
+      "v1",
+      "gates",
+      "evaluate"
+    ]
+  },
+  {
+    "expected": "/v1/runs",
+    "path_segments": [
+      "v1",
+      "runs"
+    ]
+  },
+  {
+    "expected": "/v1/pr/create",
+    "path_segments": [
+      "v1",
+      "pr",
+      "create"
+    ]
+  },
+  {
+    "expected": "/v1/ledger",
+    "path_segments": [
+      "v1",
+      "ledger"
+    ]
+  },
+  {
+    "expected": "/v1/ledger/reconcile",
+    "path_segments": [
+      "v1",
+      "ledger",
+      "reconcile"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "eval",
+      "sandbox"
+    ]
+  },
+  {
+    "expected": "/v1/performance",
+    "path_segments": [
+      "v1",
+      "performance"
+    ]
+  },
+  {
+    "expected": "/v1/eval/suites",
+    "path_segments": [
+      "v1",
+      "eval",
+      "suites"
+    ]
+  },
+  {
+    "expected": "/v1/eval/baseline",
+    "path_segments": [
+      "v1",
+      "eval",
+      "baseline"
+    ]
+  },
+  {
+    "expected": "/v1/eval/pipeline",
+    "path_segments": [
+      "v1",
+      "eval",
+      "pipeline"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "eval",
+      "unknown"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "eval",
+      "baseline",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "eval",
+      "pipeline",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "performance",
+      "x"
+    ]
+  },
+  {
+    "expected": "/v1/evidence/abc123",
+    "path_segments": [
+      "v1",
+      "evidence",
+      "abc123"
+    ]
+  },
+  {
+    "expected": "/v1/evidence/aB0._~-x",
+    "path_segments": [
+      "v1",
+      "evidence",
+      "aB0._~-x"
+    ]
+  },
+  {
+    "expected": "/v1/events/evt-1.2",
+    "path_segments": [
+      "v1",
+      "events",
+      "evt-1.2"
+    ]
+  },
+  {
+    "expected": "/v1/commands/cmd-123",
+    "path_segments": [
+      "v1",
+      "commands",
+      "cmd-123"
+    ]
+  },
+  {
+    "expected": "/v1/commands/cmd-123/advance",
+    "path_segments": [
+      "v1",
+      "commands",
+      "cmd-123",
+      "advance"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": []
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "..",
+      "kernel",
+      "reservations"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      ".",
+      "kernel"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      ""
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "",
+      "v1",
+      "ledger"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "kernel",
+      "reservations"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "kernel"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "commands",
+      "x",
+      "..",
+      "kernel"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "%2e%2e"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "a%2fb"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "a%b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "a/b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "a\\b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "a b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "a:b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      ".."
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "."
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "events"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "abc",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "events",
+      "abc",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "commands",
+      "cmd-123",
+      "advance",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "commands",
+      "cmd-123",
+      "cancel"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "commands"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "ledger",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "runs",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "objectives",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "eval",
+      "sandbox",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "ledger.",
+      "reconcile!"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "caf\u0001e"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "caf\u007fe"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "caf\ne"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "*"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evidence",
+      "?"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v2",
+      "ledger"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1"
+    ]
+  },
+  {
+    "expected": "/v1/missions",
+    "path_segments": [
+      "v1",
+      "missions"
+    ]
+  },
+  {
+    "expected": "/v1/dashboard",
+    "path_segments": [
+      "v1",
+      "dashboard"
+    ]
+  },
+  {
+    "expected": "/v1/missions/msn-abc123",
+    "path_segments": [
+      "v1",
+      "missions",
+      "msn-abc123"
+    ]
+  },
+  {
+    "expected": "/v1/missions/msn-abc123/advance",
+    "path_segments": [
+      "v1",
+      "missions",
+      "msn-abc123",
+      "advance"
+    ]
+  },
+  {
+    "expected": "/v1/missions/msn-abc123/cancel",
+    "path_segments": [
+      "v1",
+      "missions",
+      "msn-abc123",
+      "cancel"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "x",
+      "..",
+      "kernel"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      ".."
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "."
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      ""
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "abc",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "abc",
+      "advance",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "abc",
+      "cancel",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "abc",
+      "delete"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "a%2fb"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "a%b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "a/b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "a b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "a:b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missionsextra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "dashboard",
+      "x"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "dashboardx"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "missions",
+      "..",
+      "dashboard"
+    ]
+  },
+  {
+    "expected": "/v1/evolution",
+    "path_segments": [
+      "v1",
+      "evolution"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/evo_abc123",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "evo_abc123"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/evo_abc123/step",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "evo_abc123",
+      "step"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/evo_abc123/run",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "evo_abc123",
+      "run"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/evo_abc123/cancel",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "evo_abc123",
+      "cancel"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/evo_abc123/promote",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "evo_abc123",
+      "promote"
+    ]
+  },
+  {
+    "expected": "/v1/proof/ev_abc123",
+    "path_segments": [
+      "v1",
+      "proof",
+      "ev_abc123"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evolution",
+      "evo_abc123",
+      "delete"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "proof"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evolution",
+      "..",
+      "kernel"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "proof",
+      "a/b"
+    ]
+  }
 ]
