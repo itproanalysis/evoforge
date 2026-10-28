@@ -1,0 +1,17 @@
+{
+  "id": "T39_durable_ledger",
+  "planned_by": "Claude (Critic): gap review R41-1/R09-2 — ledger resets on every deploy",
+  "goal": "T39 — make the cost ledger durable with the PostgreSQL backend (it resets to 0 on every deploy today).\n\nservices/api/evoforge/ledger.py keeps budgets, spend, reservations and overruns in process dicts. When\npostgres_state.backend() is configured (EVO_STATE_BACKEND=postgres), write every ledger event (reserve, settle,\nrefund, mark_unknown, reconcile, overrun) append-only to the existing evidence store\n(postgres_state.ScopedRecords(\"records\")) as records with document kind \"ledger_event\" (reservation_id, project,\nevent, cents, reason, ts), and rebuild the in-memory state from that journal lazily on first use in a new process\n(e.g. a module flag `_loaded`, set False -> the next reserve/settle/snapshot/available call replays the journal).\nReplaying must give identical snapshot() results; an open reservation can still be settled after a restart.\nMemory mode (no backend) behaves exactly as today, including reset() for tests. Never store secrets or prompts.\nTests: services/api/tests/test_muse_t39.py (memory mode) and live-PG tests using the test_postgres_kernel fixtures\n(`database`, `funded`) like tests/test_performance_persistence_pg.py. Do not change main.py endpoints.",
+  "edit": [
+    "services/api/evoforge/ledger.py",
+    "services/api/tests/test_muse_t39.py",
+    "services/api/tests/test_muse_t39_pg.py"
+  ],
+  "context": [
+    "services/api/evoforge/postgres_state.py",
+    "services/api/tests/test_performance_persistence_pg.py"
+  ],
+  "check": [
+    "set \"EVO_TEST_DATABASE_URL=postgresql://postgres@127.0.0.1:55432/postgres\" && python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
