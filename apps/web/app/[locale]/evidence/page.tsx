@@ -9,6 +9,8 @@ import {
   listOutcomes,
 } from "../../../lib/api";
 import { Button, Input, Card } from "../../../components/ui";
+import EvidenceGraph from "../../../components/EvidenceGraph";
+import { buildEvidenceGraph } from "../../../lib/evidenceGraph";
 import { getErrorMessageKey } from "../../../lib/apiErrors";
 
 interface Link {
@@ -19,6 +21,34 @@ interface Link {
 interface RecentEvidenceItem {
   eid: string;
   label: string;
+}
+
+interface GateInput {
+  gate: string;
+  result: string;
+  reason?: string;
+}
+
+function extractGates(raw: unknown): GateInput[] {
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    const gates = r.gates;
+    if (Array.isArray(gates)) {
+      return gates
+        .filter((g) => g && typeof g === "object")
+        .map((g) => {
+          const o = g as Record<string, unknown>;
+          const gate = typeof o.gate === "string" ? o.gate : "";
+          const result = typeof o.result === "string" ? o.result : "";
+          const reason = typeof o.reason === "string" ? o.reason : undefined;
+          return reason === undefined
+            ? { gate, result }
+            : { gate, result, reason };
+        })
+        .filter((g) => g.gate && g.result);
+    }
+  }
+  return [];
 }
 
 function normalize(raw: unknown, fallbackId: string): Link[] {
@@ -63,6 +93,10 @@ export default function EvidencePage() {
   const [id, setId] = useState("cmd_demo");
   const [recentIds, setRecentIds] = useState<RecentEvidenceItem[]>([]);
   const [links, setLinks] = useState<Link[] | null>(null);
+  const [evidence, setEvidence] = useState<{
+    chain: Link[];
+    gates: GateInput[];
+  } | null>(null);
   const [raw, setRaw] = useState("");
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
@@ -80,6 +114,7 @@ export default function EvidencePage() {
     try {
       const out = await getEvidence(clean);
       setLinks(normalize(out, clean));
+      setEvidence({ chain: normalize(out, clean), gates: extractGates(out) });
       setRaw(JSON.stringify(out, null, 2));
       setSelected(null);
       setDetail("");
@@ -88,6 +123,7 @@ export default function EvidencePage() {
       const errorKey = getErrorMessageKey(e);
       setErr(tErrors(errorKey as any));
       setLinks(normalize(null, clean));
+      setEvidence({ chain: normalize(null, clean), gates: [] });
       setRaw("");
     } finally {
       setLoading(false);
@@ -211,6 +247,14 @@ export default function EvidencePage() {
           </p>
         )}
       </Card>
+
+      {evidence && (
+        <Card className="mt-4">
+          <EvidenceGraph
+            graph={buildEvidenceGraph(evidence.chain, evidence.gates ?? [])}
+          />
+        </Card>
+      )}
 
       {links && (
         <Card className="mt-4">
