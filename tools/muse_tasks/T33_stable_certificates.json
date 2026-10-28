@@ -1,0 +1,18 @@
+{
+  "id": "T33_stable_certificates",
+  "planned_by": "Claude (Critic) review of T32",
+  "goal": "T33 — issue each proof certificate once, store it, and let anyone fetch it by id (closes the T32 gap).\n\nToday _mint_proof(evidence_id) creates a new certificate (new certificate_id, issued_at, signature) on every call, so the\nsignature quoted in a PR body (T32) can never be fetched again and checked. A reviewer must be able to take the\ncertificate id from the PR, fetch the certificate, and verify it offline with GET /v1/proof/key.\n\n1. services/api/main.py: _mint_proof(evidence_id) returns the stored certificate when one was already issued for that\n   evidence; otherwise it mints, stores and returns it. Store certificates durably in the existing evidence store\n   (_evidence = postgres_state.ScopedRecords(\"records\")) so it works in memory and PostgreSQL modes — e.g. a record with\n   a dedicated id that maps evidence -> certificate and certificate_id -> certificate. Store exactly the signed body\n   (never re-sign on read). The HTTP response keeps adding the \"verify\" envelope field on top.\n2. NEW GET /v1/proof/cert/{certificate_id} -> the stored certificate plus \"verify\"; 404 when unknown.\n3. _pr_core quotes the stored certificate (same certificate_id and signature as GET /v1/proof/{evidence_id}).\n4. apps/web/lib/proxyPolicy.ts and proxyPolicy.cases.json: allow GET /v1/proof/cert/<id> (same id rules as other id\n   routes) with allow and deny cases.\n5. Tests: services/api/tests/test_muse_t33.py. Keep all existing tests green.",
+  "edit": [
+    "services/api/main.py",
+    "services/api/tests/test_muse_t33.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/proof.py",
+    "services/api/evoforge/postgres_state.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

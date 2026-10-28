@@ -843,5 +843,51 @@
       "eval",
       "jobsx"
     ]
+  },
+  {
+    "expected": "/v1/proof/cert/cert_abc123",
+    "path_segments": [
+      "v1",
+      "proof",
+      "cert",
+      "cert_abc123"
+    ]
+  },
+  {
+    "expected": "/v1/proof/cert/aB0._~-x",
+    "path_segments": [
+      "v1",
+      "proof",
+      "cert",
+      "aB0._~-x"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "proof",
+      "cert",
+      "a:b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "proof",
+      "cert",
+      ".."
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "proof",
+      "cert",
+      "abc",
+      "extra"
+    ]
   }
 ]
