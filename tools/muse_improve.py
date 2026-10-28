@@ -18,6 +18,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -202,6 +203,30 @@ def _allowed_change(task: dict, rel: str) -> bool:
             and not _tracked(rel)) or rel.startswith("tools/muse_runs/")
 
 
+def _run_watched(cmd: list[str], timeout: int, stall: int, log) -> subprocess.CompletedProcess:
+    """Run OpenCode; a call that prints nothing for `stall` seconds is stuck before its session starts (seen on
+    2026-10-28: 19 min idle, 1.3 s CPU). Kill it and retry once instead of waiting for the full timeout."""
+    for attempt in (1, 2):
+        with tempfile.TemporaryFile("w+b") as out, tempfile.TemporaryFile("w+b") as err:
+            p = subprocess.Popen(cmd, cwd=ROOT, stdout=out, stderr=err)
+            t0 = time.time()
+            while p.poll() is None:
+                time.sleep(5)
+                waited = time.time() - t0
+                if waited > timeout:
+                    p.kill(); p.wait()
+                    raise subprocess.TimeoutExpired(cmd, timeout)
+                if waited > stall and out.tell() == 0:
+                    p.kill(); p.wait()
+                    log({"event": "builder_stall", "attempt": attempt, "seconds": int(waited)})
+                    break
+            else:
+                out.seek(0); err.seek(0)
+                return subprocess.CompletedProcess(cmd, p.returncode, out.read().decode("utf-8", "replace"),
+                                                   err.read().decode("utf-8", "replace"))
+    raise subprocess.TimeoutExpired(cmd, stall)
+
+
 def _opencode_round(task: dict, feedback: str, session: str | None, log) -> str | None:
     prompt = OC_RULES + f"\nSPEC ({task['id']}):\n{task['goal']}\n\nEDITABLE: {', '.join(task['edit'])}\n"
     if task.get("context"):
@@ -213,8 +238,8 @@ def _opencode_round(task: dict, feedback: str, session: str | None, log) -> str 
            "--title", f"evoforge {task['id']}"] + (["-s", session] if session else []) + [prompt]
     t0 = time.time()
     try:
-        r = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
-                           errors="replace", timeout=int(os.getenv("MUSE_OPENCODE_TIMEOUT", "3600")))
+        r = _run_watched(cmd, int(os.getenv("MUSE_OPENCODE_TIMEOUT", "3600")),
+                         int(os.getenv("MUSE_OPENCODE_STALL", "180")), log)
     except subprocess.TimeoutExpired as e:
         # A stuck or slow Builder call is a failed round, not a crash: checks run on whatever it left.
         log({"event": "builder_call", "via": "opencode", "model": model, "session": session,
