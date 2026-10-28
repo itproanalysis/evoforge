@@ -1,0 +1,25 @@
+{
+  "id": "T43_feedback_loop",
+  "planned_by": "Claude (Critic): blueprint §18 Feedback Intelligence (R18-1..3)",
+  "goal": "T43 — Feedback Intelligence: turn feedback on a mission into a linked improvement mission (closed loop).\n\n1. NEW services/api/evoforge/feedback.py + routes in services/api/main.py:\n   - POST /v1/feedback {mission_id, kind: \"bug\"|\"missed_case\"|\"praise\"|\"other\" (Literal, else 422), text (1..2000 chars)}\n     -> 201 {feedback_id, ...}. Unknown mission_id -> 404 (link integrity).\n   - Before storing, scrub personal data and secrets from text: email addresses -> \"[email]\", tokens such as\n     ghp_/gho_/github_pat_/sk-/sk-live_/AKIA... and long hex/base64 secrets (>= 24 chars) -> \"[secret]\".\n   - Store each item in the existing evidence store (postgres_state.ScopedRecords(\"records\"), kind \"feedback\") so it\n     survives redeploys; GET /v1/feedback -> {feedback: [...]} newest first (<= 100), each with feedback_id, mission_id,\n     kind, text (scrubbed), created_at, promoted_mission_id (null until promoted).\n   - POST /v1/feedback/{id}/promote -> creates a new mission through the existing missions store with goal =\n     \"<original mission goal>\n\nFollow-up from feedback (<kind>): <scrubbed text>\", same repo_ref/target_paths,\n     records promoted_mission_id on the feedback and the feedback_id on the new mission's evidence; returns 201\n     {mission_id, feedback_id}. Promoting again returns the same mission (200 or 409 naming it), never a second one.\n2. Web: apps/web/lib/api.ts postFeedback(), listFeedback(), promoteFeedback(); a feedback form (kind select + text) on\n   the Mission Control mission detail and a feedback list with a \"개선 미션으로 승격\" button (apps/web/components/\n   FeedbackPanel.tsx used from apps/web/app/[locale]/page.tsx); strings in both messages files.\n3. apps/web/lib/proxyPolicy.ts + cases: allow POST /v1/feedback, GET /v1/feedback, POST /v1/feedback/<id>/promote.\nTests: services/api/tests/test_muse_t43.py. Do not change sealed_eval.py or patch.py.",
+  "edit": [
+    "services/api/evoforge/feedback.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t43.py",
+    "apps/web/lib/api.ts",
+    "apps/web/components/FeedbackPanel.tsx",
+    "apps/web/app/[locale]/page.tsx",
+    "apps/web/messages/ko.json",
+    "apps/web/messages/en.json",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/missions.py",
+    "services/api/evoforge/postgres_state.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p ."
+  ]
+}
