@@ -149,6 +149,32 @@ export default function MissionControl() {
     return () => clearInterval(id);
   }, [mission?.mission_id, mission?.state, autoPoll]);
 
+  useEffect(() => {
+    if (!autoPoll) return;
+    if (typeof EventSource === "undefined") return;
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`${API_BASE}/v1/stream?wait=25`);
+    } catch {
+      return;
+    }
+    // Live updates: refresh on every streamed event. The polling loop above
+    // stays as the fallback when the stream errors.
+    es.onmessage = () => {
+      void refreshState(selectedIdRef.current);
+    };
+    es.onerror = () => {
+      try {
+        es?.close();
+      } catch {}
+    };
+    return () => {
+      try {
+        es?.close();
+      } catch {}
+    };
+  }, [autoPoll]);
+
   const fmtCents = (n: number | null | undefined) =>
     typeof n === "number" ? `${n}¢` : "—";
 

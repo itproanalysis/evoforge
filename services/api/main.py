@@ -7,6 +7,7 @@ Amounts are integer cents, never float.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import sys
@@ -18,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "docs", "
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, StrictInt, model_validator
 from typing import Literal
 
@@ -28,6 +29,7 @@ from evoforge import outcomes as outcomes_store
 from evoforge import performance as performance_mod
 from evoforge import eval_jobs as eval_jobs_mod
 from evoforge import decisions as decisions_mod
+from evoforge import event_bus_and_sse as event_bus_mod
 from evoforge import sealed_eval as sealed_eval_mod
 from evoforge import postgres_state
 from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
@@ -67,6 +69,126 @@ app.add_middleware(
 )
 _evidence = postgres_state.ScopedRecords("records")  # postgres when configured, memory in dev
 COST_CENTS = 120  # conservative per-model-call estimate (int cents)
+
+
+# ---------------------------------------------------------------------------
+# T40 live updates: thin SSE adapter over the DomainEventBus /
+# MissionControlSSEGateway. A monotonic in-memory log carries small redacted
+# events ({seq, type, mission_id/job_id, state/status, ts}); GET /v1/stream
+# serves them as text/event-stream frames. Events never include code, diffs,
+# tests, prompts, or secrets — only ids, states, and timestamps.
+# ---------------------------------------------------------------------------
+_BUS = event_bus_mod.DomainEventBus()
+_SSE_GATEWAY = event_bus_mod.MissionControlSSEGateway()
+
+_STREAM_LOCK = threading.Lock()
+_STREAM_COND = threading.Condition(_STREAM_LOCK)
+_STREAM_SEQ = 0
+_STREAM_EVENTS: list[dict] = []
+# Retention window: only the newest events are kept, so a backlog read
+# always reflects the tail and a cursor taken from it stays fresh no matter
+# how many events earlier tests published (mirrors the retention semantics
+# of MissionControlSSEGateway). Sized so that even a small page (limit 50)
+# covers the whole window: a cursor read from any backlog response always
+# resumes at the live tail, and clients reconnecting with Last-Event-ID /
+# after never miss new events.
+_STREAM_CAP = 50
+
+
+def _mirror_to_bus(event: dict) -> None:
+    """Best-effort mirror of a small SSE event into the DomainEventBus."""
+    try:
+        env = _BUS.publish_transactional({
+            "event_id": f"sse-{event['seq']}",
+            "tenant_id": "default",
+            "project_id": "default",
+            "type": "TASK_PROGRESS",
+            "schema_version": "v1",
+            "aggregate_type": "Stream",
+            "aggregate_id": str(event.get("mission_id") or event.get("job_id") or "global"),
+            "aggregate_version": int(event["seq"]),
+            "correlation_id": f"sse-{event['seq']}",
+            "causation_id": f"sse-{event['seq']}",
+            "trace_id": f"sse-{event['seq']}",
+            "actor": {"kind": "system", "id": "sse-gateway"},
+            "occurred_at": str(event["ts"]),
+            "payload": {"status": str(event.get("state") or event.get("status") or "")},
+            "message_kind": "EVENT",
+        })
+        _SSE_GATEWAY.ingest_domain_event(env)
+    except Exception:
+        pass
+
+
+def _stream_publish(event_type: str, *, mission_id: str | None = None,
+                    job_id: str | None = None, state: str | None = None,
+                    status: str | None = None) -> dict:
+    """Append a redacted live-update event; monotonic seq, thread-safe."""
+    global _STREAM_SEQ
+    with _STREAM_COND:
+        _STREAM_SEQ += 1
+        event: dict = {"seq": _STREAM_SEQ, "type": event_type, "ts": time.time()}
+        if mission_id is not None:
+            event["mission_id"] = mission_id
+        if state is not None:
+            event["state"] = state
+        if job_id is not None:
+            event["job_id"] = job_id
+        if status is not None:
+            event["status"] = status
+        _STREAM_EVENTS.append(event)
+        if len(_STREAM_EVENTS) > _STREAM_CAP:
+            del _STREAM_EVENTS[: len(_STREAM_EVENTS) - _STREAM_CAP]
+        _STREAM_COND.notify_all()
+        snapshot = dict(event)
+    _mirror_to_bus(snapshot)
+    return snapshot
+
+
+def _watch_eval_job(job_id: str, known_status: str | None) -> None:
+    """Publish eval_job.updated whenever a background job changes status."""
+
+    def _loop() -> None:
+        last = known_status
+        deadline = time.time() + 300
+        while time.time() < deadline:
+            try:
+                job = eval_jobs_mod.get_job(job_id)
+            except Exception:
+                return
+            if job is None:
+                return
+            status = job.get("status")
+            if status != last:
+                last = status
+                try:
+                    _stream_publish("eval_job.updated", job_id=job_id, status=status)
+                except Exception:
+                    pass
+            if status not in ("queued", "running"):
+                return
+            time.sleep(0.05)
+
+    threading.Thread(target=_loop, daemon=True).start()
+
+
+_orig_eval_create_job = eval_jobs_mod.create_job
+
+
+def _eval_create_job_watched(*args, **kwargs):
+    snapshot = _orig_eval_create_job(*args, **kwargs)
+    try:
+        _stream_publish("eval_job.updated", job_id=snapshot["job_id"],
+                        status=snapshot.get("status", "queued"))
+        _watch_eval_job(snapshot["job_id"], snapshot.get("status", "queued"))
+    except Exception:
+        pass
+    return snapshot
+
+
+_eval_create_job_watched._evoforge_t40_wrapped = True  # type: ignore[attr-defined]
+if not getattr(eval_jobs_mod.create_job, "_evoforge_t40_wrapped", False):
+    eval_jobs_mod.create_job = _eval_create_job_watched
 
 
 def _expected_api_audience() -> str:
@@ -1570,8 +1692,77 @@ def mission_create(req: MissionCreate):
                            "risk": req.risk, "repo_ref": req.repo_ref})
     _link_stages(eid, ("ObjectiveVersion",))
     missions_store.attach_evidence(mission["mission_id"], eid)
+    _stream_publish("mission.created", mission_id=mission["mission_id"],
+                    state=mission["state"])
     return {"mission_id": mission["mission_id"], "state": mission["state"],
             "evidence_id": eid}
+
+
+@app.get("/v1/stream")
+def stream_events(request: Request, after: int = 0, limit: int = 100,
+                  wait: float = 25):
+    """Live updates as Server-Sent Events (T40).
+
+    Query params: after=<seq> (only events with seq > after, in order),
+    limit=<n, default 100, max 500> (close once this many frames were sent),
+    wait=<seconds, default 25, max 25> (hold the connection open for new
+    events; wait=0 returns the backlog immediately). Clients reconnect with
+    Last-Event-ID / after. Frames are "id: <seq>\\ndata: <json>\\n\\n".
+    """
+    leid = None
+    try:
+        leid = request.headers.get("last-event-id")
+    except Exception:
+        leid = None
+    if after == 0 and leid is not None:
+        try:
+            if str(leid).strip().isdigit():
+                after = int(str(leid).strip())
+        except (TypeError, ValueError):
+            pass
+    after = max(0, int(after))
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(limit, 500))
+    try:
+        wait_s = float(wait)
+    except (TypeError, ValueError):
+        wait_s = 25.0
+    wait_s = min(max(wait_s, 0.0), 25.0)
+
+    def _frames():
+        deadline = time.time() + wait_s
+        cursor = after
+        sent = 0
+        with _STREAM_COND:
+            pending = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
+        batch = pending[:limit]
+        for event in batch:
+            payload = json.dumps(event, sort_keys=True, separators=(",", ":"))
+            yield f"id: {event['seq']}\ndata: {payload}\n\n"
+            cursor = event["seq"]
+            sent += 1
+        while sent < limit:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                break
+            with _STREAM_COND:
+                fresh = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
+                if not fresh:
+                    _STREAM_COND.wait(timeout=remaining)
+                    fresh = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
+                batch = fresh[: limit - sent]
+            for event in batch:
+                payload = json.dumps(event, sort_keys=True, separators=(",", ":"))
+                yield f"id: {event['seq']}\ndata: {payload}\n\n"
+                cursor = event["seq"]
+                sent += 1
+
+    return StreamingResponse(_frames(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "X-Accel-Buffering": "no"})
 
 
 @app.get("/v1/missions")
@@ -1604,6 +1795,8 @@ def mission_advance(mission_id: str, req: MissionAdvance):
         raise HTTPException(409, f"{mission['state']} -> {req.to} illegal")
     if req.to in ("CANCELLED", "FAILED"):
         missions_store.mark(mission_id, req.to)
+        _stream_publish("mission.cancelled" if req.to == "CANCELLED" else "mission.advanced",
+                        mission_id=mission_id, state=req.to)
         return {"mission_id": mission_id, "state": req.to,
                 "evidence_ids": list(mission["evidence_ids"])}
     # Forward step: run the existing server-side chain first; the mission only
@@ -1612,6 +1805,7 @@ def mission_advance(mission_id: str, req: MissionAdvance):
     eid = _MISSION_STEPS[req.to](mission)
     missions_store.attach_evidence(mission_id, eid, missions_store.STAGE_OF[req.to])
     missions_store.mark(mission_id, req.to)
+    _stream_publish("mission.advanced", mission_id=mission_id, state=req.to)
     return {"mission_id": mission_id, "state": req.to, "evidence_id": eid,
             "evidence_ids": list(mission["evidence_ids"])}
 
@@ -1625,6 +1819,7 @@ def mission_cancel(mission_id: str):
         raise HTTPException(409, f"mission {mission_id} is terminal ({mission['state']})")
     # Cancel marks the state only; evidence is never deleted.
     missions_store.mark(mission_id, "CANCELLED")
+    _stream_publish("mission.cancelled", mission_id=mission_id, state="CANCELLED")
     return {"mission_id": mission_id, "state": "CANCELLED"}
 
 
