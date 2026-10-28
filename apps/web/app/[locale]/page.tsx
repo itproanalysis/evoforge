@@ -24,6 +24,7 @@ import {
   postOutcome,
 } from "../../lib/api";
 import { Button, Input, Card, Badge } from "../../components/ui";
+import { ProofCard } from "../../components/ProofCard";
 import { Error as ErrorComponent } from "../../components/ui/Error";
 import { getErrorMessageKey } from "../../lib/apiErrors";
 import { comparisonProvenance, provenance, viewProvenance } from "../../lib/performanceProvenance";
@@ -310,6 +311,8 @@ export default function MissionControl() {
       </div>
 
       {syncError && <p role="alert" className="text-sm text-accent-amber mt-3">{t("sync-error-detail")}</p>}
+
+      <ProofCard history={perf?.history ?? null} loading={initialLoading} />
 
       <section className="flex gap-3 flex-wrap mt-4">
         {metrics.length === 0 && initialLoading ? (
