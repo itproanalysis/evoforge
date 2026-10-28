@@ -43,19 +43,24 @@ def _required_count(suite):
 
 def _result(run, visible, sealed):
     passed = True
+    report_ok = True
     counts = []
     for name,suite in (('visible',visible),('heldout',sealed)):
         expected = _required_count(suite)
         section = run.get(name)
         if not isinstance(section,dict):
             raise KernelRejected('Runner counts are missing')
+        if 'report_integrity' in section:
+            if type(section['report_integrity']) is not bool:
+                raise KernelRejected('Runner report integrity flag is invalid')
+            report_ok &= section['report_integrity']
         n,ok,timeout,code = (section.get(k) for k in ('n','pass','timed_out','exit_code'))
         if (type(n) is not int or type(ok) is not int or not 0 <= ok <= n
                 or type(timeout) is not bool or code is not None and type(code) is not int):
             raise KernelRejected('Runner counts are invalid')
         passed &= n >= expected and n > 0 and ok == n and not timeout and code == 0
         counts.append(f'{name} {ok}/{n} (at least {expected} definitions)')
-    return 'PASS' if passed else 'FAIL', '; '.join(counts)
+    return ('INCONCLUSIVE' if passed and not report_ok else 'PASS' if passed else 'FAIL'), '; '.join(counts)
 
 
 def _read(conn, scope, candidate_id, evidence_id):

@@ -648,6 +648,12 @@ def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
     verified_base = src["run"].get("base")
     if not isinstance(verified_base, str) or not re.fullmatch(r"[0-9a-f]{40}", verified_base):
         raise HTTPException(409, "server run has no immutable Git base SHA")
+    from evoforge.runner_diff_screen import report_tampering_risks
+    if report_tampering_risks(src["diff"], src.get("tests")):
+        # Recheck stored PASS evidence under current policy without rewriting it.
+        raise HTTPException(409, "PR blocked: GH_INTEGRITY=INCONCLUSIVE (Runner report integrity requires review)")
+    if any(src["run"].get(section, {}).get("report_integrity") is False for section in ("visible", "heldout")):
+        raise HTTPException(409, "PR blocked: G2_REQUIRED=INCONCLUSIVE (Runner report channels disagree)")
     blocked = [f"{g['gate']}={g['result']}" for g in gates if g.get("result") != "PASS"]
     if blocked:
         raise HTTPException(409, f"PR blocked by gates: {', '.join(blocked)}")
