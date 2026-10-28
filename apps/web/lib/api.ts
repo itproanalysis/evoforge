@@ -292,6 +292,7 @@ export function getEvalSuites() {
 }
 
 export interface MeasurementRecord {
+  provider_stub?: boolean;
   measurement_id: string;
   kind: string;
   suite_version: string;
@@ -310,6 +311,7 @@ export interface MeasurementRecord {
 }
 
 export interface MeasurementView {
+  provider_stub?: boolean;
   status: "measured" | "not_measured";
   reason: string;
   record: MeasurementRecord | null;

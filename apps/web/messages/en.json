@@ -57,6 +57,7 @@
     "performance-link": "Performance →",
     "not-measured": "Not measured",
     "performance-unavailable": "Performance data is unavailable.",
+    "provenance": {"simulated":"Simulated provider evaluation", "recorded":"Provider call path recorded · not independently verified", "unknown":"Provider provenance unknown"},
     "comparison": "Performance comparison",
     "comparison-empty": "No measurements are available to compare yet.",
     "verdicts": {"improved": "Improved", "worse": "Worse", "no_clear_difference": "No clear difference"},

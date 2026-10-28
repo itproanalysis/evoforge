@@ -25,6 +25,7 @@ import {
 import { Button, Input, Card, Badge } from "../../components/ui";
 import { Error as ErrorComponent } from "../../components/ui/Error";
 import { getErrorMessageKey } from "../../lib/apiErrors";
+import { comparisonProvenance, provenance, viewProvenance } from "../../lib/performanceProvenance";
 
 const TERMINAL: MissionState[] = ["PR_OPENED", "CANCELLED", "FAILED"];
 const CHAIN: MissionState[] = ["GENERATED", "REVIEWED", "RAN", "PR_OPENED"];
@@ -310,6 +311,7 @@ export default function MissionControl() {
             ) : (
               <span>{t(perf ? "not-measured" : "performance-unavailable")}</span>
             )}
+            {perf?.baseline?.status === "measured" && <span className="text-text-secondary"> · {t(`provenance.${viewProvenance(perf.baseline)}` as any)}</span>}
           </div>
           <div>
             <span className="text-text-secondary">PIPELINE: </span>
@@ -322,6 +324,7 @@ export default function MissionControl() {
             ) : (
               <span>{t(perf ? "not-measured" : "performance-unavailable")}</span>
             )}
+            {perf?.pipeline?.status === "measured" && <span className="text-text-secondary"> · {t(`provenance.${viewProvenance(perf.pipeline)}` as any)}</span>}
           </div>
           <div>
             {perf &&
@@ -332,6 +335,7 @@ export default function MissionControl() {
                 {typeof perf.comparison.delta_pp === "number"
                   ? `Δ${round1(perf.comparison.delta_pp)}%p`
                   : ""}
+                <span className="text-text-secondary"> · {t(`provenance.${comparisonProvenance(perf.baseline, perf.pipeline)}` as any)}</span>
               </>
             ) : (
               <span className="text-text-secondary">{t(perf ? "comparison-empty" : "performance-unavailable")}</span>
@@ -378,7 +382,7 @@ export default function MissionControl() {
           <div className="grid gap-2 mt-3">
             {[...perf.history].sort((a, b) => b.created_at - a.created_at).map((entry) => (
               <div key={entry.measurement_id} className="flex flex-wrap justify-between gap-2 p-2.5 rounded-lg border border-border text-sm">
-                <span>{entry.kind} · {entry.model} · {entry.suite_version}</span>
+                <span>{entry.kind} · {entry.model} · {entry.suite_version} · {t(`provenance.${provenance(entry.provider_stub)}` as any)}</span>
                 <span>{entry.passed}/{entry.n} · {formatRate(entry.pass_rate)} · {new Date(entry.created_at * 1000).toLocaleString()}</span>
                 {entry.evidence_id && <a href={`/evidence?id=${encodeURIComponent(entry.evidence_id)}`} className="text-accent-cyan hover:underline">{t("evidence-label")}</a>}
               </div>

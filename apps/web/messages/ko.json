@@ -57,6 +57,7 @@
     "performance-link": "성과 분석 상세 보기 →",
     "not-measured": "측정 전",
     "performance-unavailable": "성능 정보를 불러올 수 없습니다.",
+    "provenance": {"simulated":"모의 공급사 평가", "recorded":"공급사 호출 경로 기록 · 독립 검증 전", "unknown":"공급사 출처 미확인"},
     "comparison": "성능 비교",
     "comparison-empty": "비교할 측정 결과가 아직 없습니다.",
     "verdicts": {"improved": "개선", "worse": "악화", "no_clear_difference": "뚜렷한 차이 없음"},

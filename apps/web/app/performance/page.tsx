@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { comparisonProvenance, provenance, viewProvenance, type Provenance } from "../../lib/performanceProvenance";
 import {
   API_BASE,
   getEvalSuites,
@@ -34,6 +35,12 @@ const value: React.CSSProperties = {
 function fmtPct(rate: number): string {
   return `${(rate * 100).toFixed(1)}%`;
 }
+
+const provenanceLabel: Record<Provenance, string> = {
+  simulated: "모의 공급사 평가",
+  recorded: "공급사 호출 경로 기록 · 독립 검증 전",
+  unknown: "공급사 출처 미확인",
+};
 
 function fmtInterval(iv: [number, number] | undefined): string {
   if (!iv || iv.length !== 2) return "—";
@@ -96,6 +103,7 @@ function MeasureCard({
     <div style={{ ...card, flex: "1 1 160px", minWidth: 0 }}>
       <div style={label}>{title}</div>
       <div style={value}>{fmtPct(rate)}</div>
+      <div style={{ fontSize: 12, color: "#aeb9cf" }}>{provenanceLabel[viewProvenance(view)]}</div>
       <div style={{ fontSize: 13, color: "#aeb9cf", marginTop: 4 }}>
         {view.passed ?? rec?.passed} / {view.n ?? rec?.n} · 95% 구간{" "}
         {fmtInterval(view.wilson95 ?? rec?.wilson95)}
@@ -310,6 +318,7 @@ export default function PerformancePage() {
           {measured && perf ? (
             <>
               <div style={value}>{verdictKo(perf)}</div>
+              <div style={{ fontSize: 12, color: "#aeb9cf" }}>{provenanceLabel[comparisonProvenance(perf.baseline, perf.pipeline)]}</div>
               <div style={{ fontSize: 13, color: "#aeb9cf", marginTop: 4 }}>
                 변화량 {fmtDelta(perf.comparison.delta_pp)} · verdict=
                 {perf.comparison.verdict}
@@ -417,7 +426,7 @@ export default function PerformancePage() {
                     />
                   </div>
                   <div style={{ fontSize: 12, color: "#8b96ad", marginTop: 4 }}>
-                    {m.measurement_id} · {m.suite_version} · {m.model} · {new Date(m.created_at * 1000).toLocaleString()}
+                    {m.measurement_id} · {m.suite_version} · {m.model} · {provenanceLabel[provenance(m.provider_stub)]} · {new Date(m.created_at * 1000).toLocaleString()}
                   </div>
                 </div>
               );
