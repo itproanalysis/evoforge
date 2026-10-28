@@ -147,6 +147,10 @@ _LATEST: dict[str, dict] = {}
 
 
 def clear() -> None:
+    from evoforge.postgres_state import backend
+    if backend():
+        from evoforge.postgres_kernel import KernelRejected
+        raise KernelRejected("durable measurements cannot be cleared")
     _MEASUREMENTS.clear()
     _LATEST.clear()
 
@@ -206,16 +210,31 @@ def make_record(*, kind: str, suite_version: str = "v0",
 
 
 def record(measurement: dict) -> dict:
+    from evoforge.postgres_state import backend
+    store = backend()
+    if store:
+        from evoforge.postgres_performance import insert
+        return insert(store, measurement)
     _MEASUREMENTS.append(measurement)
     _LATEST[measurement["kind"]] = measurement
     return measurement
 
 
 def latest(kind: str):
+    from evoforge.postgres_state import backend
+    store = backend()
+    if store:
+        from evoforge.postgres_performance import latest as durable_latest
+        return durable_latest(store, kind)
     return _LATEST.get(kind)
 
 
 def history() -> list[dict]:
+    from evoforge.postgres_state import backend
+    store = backend()
+    if store:
+        from evoforge.postgres_performance import history as durable_history
+        return durable_history(store)
     return [dict(m) for m in _MEASUREMENTS]
 
 

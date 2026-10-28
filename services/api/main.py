@@ -1024,6 +1024,7 @@ def eval_baseline(req: EvalBaselineRequest):
         n=xs["n"], passed=passed, cost_cents=xs["cost_cents"],
         per_family=per_family, evidence_id=eid)
     measurement["wilson95"] = [lo, hi]
+    measurement["provider_stub"] = result["provider_stub"]
     performance_mod.record(measurement)
     return {"baseline_id": result["baseline_id"], "evidence_id": eid,
             "measurement_id": measurement["measurement_id"],
@@ -1102,6 +1103,7 @@ def eval_pipeline(req: EvalPipelineRequest):
         usage_missing=result["usage_missing"])
     measurement["wilson95"] = [result["pass_rate_wilson_lo"],
                                result["pass_rate_wilson_hi"]]
+    measurement["provider_stub"] = result["provider_stub"]
     performance_mod.record(measurement)
     return {"pipeline_id": result["pipeline_id"], "evidence_id": eid,
             "measurement_id": measurement["measurement_id"],
@@ -1142,7 +1144,7 @@ def performance():
                 "pipeline": performance_mod.cost_per_solved(pipeline)},
             "history": performance_mod.history(),
             "production": _production_stats(),
-            "storage": "memory"}
+            "storage": "postgres" if postgres_state.backend() else "memory"}
 
 
 @app.get("/v1/evidence/{eid}")
