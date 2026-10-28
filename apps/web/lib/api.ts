@@ -474,10 +474,10 @@ export interface ProofCertificate {
   verify?: { ok: boolean; reason: string };
 }
 
-export function startEvolution(goal: string, repo_ref = "HEAD", max_generations = 3, population = 2, use_memory = true) {
+export function startEvolution(goal: string, repo_ref = "HEAD", max_generations = 3, population = 2, use_memory = true, source_repo = "") {
   return req<EvolutionPublic & { evidence_id?: string }>("/v1/evolution/start", {
     method: "POST",
-    body: JSON.stringify({ goal, repo_ref, max_generations, population, use_memory }),
+    body: JSON.stringify({ goal, repo_ref, max_generations, population, use_memory, source_repo }),
   });
 }
 

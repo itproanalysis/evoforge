@@ -59,17 +59,47 @@
     "performance-link": "성과 분석 상세 보기 →",
     "not-measured": "측정 전",
     "performance-unavailable": "성능 정보를 불러올 수 없습니다.",
-    "provenance": {"simulated":"모의 공급사 평가", "recorded":"공급사 호출 경로 기록 · 독립 검증 전", "unknown":"공급사 출처 미확인"},
+    "provenance": {
+      "simulated": "모의 공급사 평가",
+      "recorded": "공급사 호출 경로 기록 · 독립 검증 전",
+      "unknown": "공급사 출처 미확인"
+    },
     "comparison": "성능 비교",
     "comparison-empty": "비교할 측정 결과가 아직 없습니다.",
-    "verdicts": {"improved": "개선", "worse": "악화", "no_clear_difference": "뚜렷한 차이 없음"},
+    "verdicts": {
+      "improved": "개선",
+      "worse": "악화",
+      "no_clear_difference": "뚜렷한 차이 없음"
+    },
     "participants-heading": "참여자 현황",
     "participants-unavailable": "참여자 정보를 불러올 수 없습니다. 서버 연결 또는 지원 여부를 확인해 주세요.",
     "participants-empty": "현재 프로젝트에 연결된 참여자가 없습니다.",
     "participants-more": "표시된 목록 외에 참여자가 더 있습니다.",
     "participant-roles": "역할",
     "participant-states": "참여 · 연결 · 실행 · 자격 상태",
-    "participant-values": {"lease_holder":"작업 할당", "builder":"생성", "reviewer":"검토", "REQUESTED":"요청", "PENDING_APPROVAL":"승인 대기", "AUTHORIZED":"승인됨", "REVOKED":"철회", "UNKNOWN":"알 수 없음", "PROBING":"확인 중", "READY":"준비됨", "DEGRADED":"저하", "OFFLINE":"오프라인", "IDLE":"대기", "ASSIGNED":"할당됨", "RUNNING":"실행 중", "WAITING_FOR_CLIENT":"클라이언트 대기", "BLOCKED":"차단됨", "FINISHED":"완료", "VALID":"유효", "EXPIRING":"만료 임박", "EXPIRED":"만료"},
+    "participant-values": {
+      "lease_holder": "작업 할당",
+      "builder": "생성",
+      "reviewer": "검토",
+      "REQUESTED": "요청",
+      "PENDING_APPROVAL": "승인 대기",
+      "AUTHORIZED": "승인됨",
+      "REVOKED": "철회",
+      "UNKNOWN": "알 수 없음",
+      "PROBING": "확인 중",
+      "READY": "준비됨",
+      "DEGRADED": "저하",
+      "OFFLINE": "오프라인",
+      "IDLE": "대기",
+      "ASSIGNED": "할당됨",
+      "RUNNING": "실행 중",
+      "WAITING_FOR_CLIENT": "클라이언트 대기",
+      "BLOCKED": "차단됨",
+      "FINISHED": "완료",
+      "VALID": "유효",
+      "EXPIRING": "만료 임박",
+      "EXPIRED": "만료"
+    },
     "stage-generate": "생성",
     "stage-review": "검토",
     "stage-run": "서버 실행",
@@ -100,7 +130,14 @@
       "spent-cents": "spent_cents",
       "reserved-cents": "reserved_cents",
       "unknown-reservations": "unknown_reservations"
-    }
+    },
+    "presets-heading": "실제 검증 사례 기반 목표 (Case-Based Contracts)",
+    "preset-wvi-btn": "WVI 검증 성공사례 (PR #6)",
+    "preset-contract-btn": "입력·예외 계약 명시형 (EVAL_V1)",
+    "preset-boundary-btn": "분할 임계치 보장형 (PM-01)",
+    "gate-diagnostics-heading": "게이트 무결성 진단 (Gate Diagnostics)",
+    "gate-integrity-w10-hint": "안정성 안내 (W10): 단언문 강도 비율이 미달하여 PR이 보류되었습니다. == 값 비교 및 pytest.raises 단언이 필요합니다.",
+    "storage-label": "스토리지 백엔드"
   },
   "lab": {
     "heading": "개선 랩",
@@ -140,7 +177,8 @@
     "suite-tasks": "작업 {count}개",
     "suite-kinds": "종류: {kinds}",
     "evidence-label": "증거",
-    "review-evidence-label": "검토 증거"
+    "review-evidence-label": "검토 증거",
+    "integrity-hint": "안정성 안내 (W10): GH_INTEGRITY 게이트는 동어반복(assert True)이나 빈 try/except를 제외한 엄격한 == 비교 및 pytest.raises를 요구합니다."
   },
   "evidence": {
     "heading": "증거 타임라인",
@@ -226,6 +264,7 @@
     "heading": "오토파일럿 — 목표 입력, 검증된 PR 출력",
     "description": "자율 진화: 후보를 생성하고 트러스트 커널로 채점한 뒤 Critic 피드백으로 재시도합니다. POST /v1/evolution/*",
     "goal-placeholder": "불안정한 로그인 재시도 수정",
+    "repo-placeholder": "저장소 경로 또는 비움 (서버 기본값)",
     "max-gen": "세대 수",
     "population": "개체 수",
     "use-memory": "팩토리 메모리 사용",
@@ -238,7 +277,20 @@
     "runs-heading": "진화 실행",
     "empty": "아직 진화가 없습니다 — 위에서 시작하세요.",
     "select-hint": "실행을 선택하면 진화를 지켜볼 수 있습니다.",
-    "proof-link": "증명서 보기 →"
+    "proof-link": "증명서 보기 →",
+    "case-w10-alert": "사례 W10 경고: GH_INTEGRITY 통과를 위해 'assert True'를 배제하고 명시적 '==' 값 비교 또는 pytest.raises를 사용해야 합니다.",
+    "failure-reasons": {
+      "weak_oracle": "약한 오라클 (단언문 강도 < 0.8) · 사례 W10",
+      "contract_gap": "계약 규격 미충족 · 사례 EVAL_V1",
+      "heldout_failed": "비공개 테스트 불합격",
+      "visible_failed": "공개 테스트 불합격",
+      "review_rejected": "리뷰 반려",
+      "budget_exhausted": "예산 한도 도달",
+      "syntax_error": "구문 오류",
+      "execution_error": "실행 오류",
+      "none": "모든 게이트 통과",
+      "inconclusive": "판정 보류"
+    }
   },
   "verify": {
     "heading": "증명서",

@@ -15,6 +15,7 @@ import uuid
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 _MAX_EXCERPT = 2000
 _MAX_GOAL_KEEP = 300
+_MAX_PATTERNS = 200
 
 _patterns: list[dict] = []
 
@@ -49,6 +50,10 @@ def record(evolution_id: str, goal: str, diff: str,
         "at": time.time(),
     }
     _patterns.append(pat)
+    while len(_patterns) > _MAX_PATTERNS:
+        # Evict the weakest (then oldest): memory stays bounded (stability).
+        _patterns.sort(key=lambda p: (p["fitness_score"], p["at"]))
+        _patterns.pop(0)
     return pat
 
 

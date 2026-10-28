@@ -11,6 +11,7 @@ import {
   type Outcome,
   type PerformanceSnapshot,
   getDashboard,
+  getEvidence,
   getLedger,
   getMission,
   getPerformance,
@@ -63,6 +64,9 @@ export default function MissionControl() {
   const [syncError, setSyncError] = useState(false);
   const [err, setErr] = useState("");
   const [mission, setMission] = useState<MissionDetail | null>(null);
+  const [missionEvidence, setMissionEvidence] = useState<{
+    gates?: Array<{ gate: string; result: string; reason?: string }>;
+  } | null>(null);
   const [missions, setMissions] = useState<MissionSummary[]>([]);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSnapshot | null>(null);
@@ -72,6 +76,24 @@ export default function MissionControl() {
   const stopRef = useRef(false);
   const selectedIdRef = useRef<string | null>(null);
   const refreshingRef = useRef(false);
+
+  const fetchMissionEvidence = async (m: MissionDetail) => {
+    const eid = m.run_evidence_id || m.generate_evidence_id;
+    if (!eid) {
+      setMissionEvidence(null);
+      return;
+    }
+    try {
+      const res = await getEvidence(eid);
+      if (res && typeof res === "object" && "gates" in res && Array.isArray((res as any).gates)) {
+        setMissionEvidence({ gates: (res as any).gates });
+      } else {
+        setMissionEvidence(null);
+      }
+    } catch {
+      setMissionEvidence(null);
+    }
+  };
 
   const refreshState = async (missionId: string | null) => {
     if (refreshingRef.current) return;
@@ -96,7 +118,10 @@ export default function MissionControl() {
         selectedIdRef.current = idToLoad;
         try {
           const detail = await getMission(idToLoad);
-          if (selectedIdRef.current === idToLoad) setMission(detail);
+          if (selectedIdRef.current === idToLoad) {
+            setMission(detail);
+            void fetchMissionEvidence(detail);
+          }
         } catch {
           failed = true;
         }
@@ -153,12 +178,14 @@ export default function MissionControl() {
   const selectMission = async (missionId: string) => {
     selectedIdRef.current = missionId;
     setMission(null);
+    setMissionEvidence(null);
     setOutcomePrUrl("");
     try {
       const m = await getMission(missionId);
       if (selectedIdRef.current === missionId) {
         setMission(m);
         setOutcomePrUrl(m.pr_url ?? "");
+        void fetchMissionEvidence(m);
       }
     } catch { setSyncError(true); }
   };
@@ -412,6 +439,46 @@ export default function MissionControl() {
       </Card>
 
       <Card className="mt-4">
+        <div className="mb-3">
+          <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+            {t("presets-heading")}
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setGoal(
+                  "should_retry(status) is True only for server errors (status >= 500). backoff(attempt) is 50 * 2**attempt ms with floor 100."
+                );
+              }}
+            >
+              {t("preset-wvi-btn")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setGoal(
+                  "pipe(items) returns each positive int doubled; non-positive ints skipped; non-int raises ValueError. Empty returns []."
+                );
+              }}
+            >
+              {t("preset-contract-btn")}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                setGoal(
+                  "shard(items, n) returns n lists differing by at most 1, larger first; n <= 0 raises ValueError. merge returns all."
+                );
+              }}
+            >
+              {t("preset-boundary-btn")}
+            </Button>
+          </div>
+        </div>
         <div className="text-xs text-text-secondary mb-2">{t("objective-label")}</div>
         <div className="flex gap-2 flex-wrap">
           <Input
@@ -535,6 +602,36 @@ export default function MissionControl() {
               </div>
             ))}
           </div>
+
+          {missionEvidence && missionEvidence.gates && missionEvidence.gates.length > 0 && (
+            <div className="mt-3 p-3 rounded-lg border border-border bg-background-elevated">
+              <div className="text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">
+                {t("gate-diagnostics-heading")}
+              </div>
+              <div className="flex gap-2 flex-wrap">
+                {missionEvidence.gates.map((g, idx) => (
+                  <span
+                    key={`${g.gate}-${idx}`}
+                    className={`text-xs px-2 py-1 rounded border font-mono ${
+                      g.result === "PASS"
+                        ? "bg-accent-green/20 text-accent-green border-accent-green/40"
+                        : g.result === "FAIL"
+                        ? "bg-accent-red/20 text-accent-red border-accent-red/40"
+                        : "bg-accent-amber/20 text-accent-amber border-accent-amber/40"
+                    }`}
+                    title={g.reason || ""}
+                  >
+                    {g.gate}: {g.result}
+                  </span>
+                ))}
+              </div>
+              {missionEvidence.gates.some((g) => g.gate === "GH_INTEGRITY" && g.result === "INCONCLUSIVE") && (
+                <p className="text-xs text-accent-amber mt-2 mb-0">
+                  {t("gate-integrity-w10-hint")}
+                </p>
+              )}
+            </div>
+          )}
 
           {mission.pr_url && (
             <div className="mt-3 text-sm">

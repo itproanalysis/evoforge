@@ -10,6 +10,7 @@ import {
   type Outcome,
   type PerformanceSnapshot,
   getDashboard,
+  getEvidence,
   getLedger,
   getMission,
   getPerformance,
@@ -60,6 +61,27 @@ export default function MissionControl() {
   const [err, setErr] = useState("");
   const [initialLoading, setInitialLoading] = useState(true);
   const [mission, setMission] = useState<MissionDetail | null>(null);
+  const [missionEvidence, setMissionEvidence] = useState<{
+    gates?: Array<{ gate: string; result: string; reason?: string }>;
+  } | null>(null);
+
+  const fetchMissionEvidence = async (m: MissionDetail) => {
+    const eid = m.run_evidence_id || m.generate_evidence_id;
+    if (!eid) {
+      setMissionEvidence(null);
+      return;
+    }
+    try {
+      const res = await getEvidence(eid);
+      if (res && typeof res === "object" && "gates" in res && Array.isArray((res as any).gates)) {
+        setMissionEvidence({ gates: (res as any).gates });
+      } else {
+        setMissionEvidence(null);
+      }
+    } catch {
+      setMissionEvidence(null);
+    }
+  };
   const [missions, setMissions] = useState<MissionSummary[]>([]);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [dashboard, setDashboard] = useState<DashboardSnapshot | null>(null);
@@ -93,7 +115,9 @@ export default function MissionControl() {
     if (idToLoad) {
       selectedIdRef.current = idToLoad;
       try {
-        setMission(await getMission(idToLoad));
+        const d = await getMission(idToLoad);
+        setMission(d);
+        void fetchMissionEvidence(d);
       } catch {}
     }
     setInitialLoading(false);
@@ -240,6 +264,39 @@ export default function MissionControl() {
       </section>
 
       <section style={{ ...card, marginTop: 16 }}>
+        <div style={{ ...label, textTransform: "uppercase", fontWeight: 600 }}>Case-Based Contract Presets</div>
+        <div style={{ display: "flex", gap: 8, marginTop: 6, marginBottom: 10, flexWrap: "wrap" }}>
+          <button
+            onClick={() => {
+              setGoal(
+                "should_retry(status) is True only for server errors (status >= 500). backoff(attempt) is 50 * 2**attempt ms with floor 100."
+              );
+            }}
+            style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #33405c", background: "#0b0e14", color: "#e8edf5", cursor: "pointer", fontSize: 12 }}
+          >
+            Verified WVI Fix (PR #6)
+          </button>
+          <button
+            onClick={() => {
+              setGoal(
+                "pipe(items) returns each positive int doubled; non-positive ints skipped; non-int raises ValueError. Empty returns []."
+              );
+            }}
+            style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #33405c", background: "#0b0e14", color: "#e8edf5", cursor: "pointer", fontSize: 12 }}
+          >
+            Input & Exception Contract (EVAL_V1)
+          </button>
+          <button
+            onClick={() => {
+              setGoal(
+                "shard(items, n) returns n lists differing by at most 1, larger first; n <= 0 raises ValueError. merge returns all."
+              );
+            }}
+            style={{ padding: "4px 10px", borderRadius: 6, border: "1px solid #33405c", background: "#0b0e14", color: "#e8edf5", cursor: "pointer", fontSize: 12 }}
+          >
+            Partition Boundary Guarantee (PM-01)
+          </button>
+        </div>
         <div style={label}>Objective</div>
         <div style={{ display: "flex", gap: 8, marginTop: 6, flexWrap: "wrap" }}>
           <input
@@ -304,6 +361,34 @@ export default function MissionControl() {
             evidence:{" "}
             {mission.evidence_ids.length ? mission.evidence_ids.join(", ") : "—"}
           </div>
+          {missionEvidence && missionEvidence.gates && missionEvidence.gates.length > 0 ? (
+            <div style={{ marginTop: 8, padding: 8, borderRadius: 6, border: "1px solid #33405c", background: "#0b0e14" }}>
+              <div style={{ ...label, textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>Gate Diagnostics</div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {missionEvidence.gates.map((g, idx) => (
+                  <span
+                    key={`${g.gate}-${idx}`}
+                    style={{
+                      fontSize: 12,
+                      fontFamily: "monospace",
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                      background: g.result === "PASS" ? "rgba(34,197,94,0.2)" : g.result === "FAIL" ? "rgba(239,68,68,0.2)" : "rgba(245,158,11,0.2)",
+                      color: g.result === "PASS" ? "#22c55e" : g.result === "FAIL" ? "#ef4444" : "#f59e0b",
+                    }}
+                    title={g.reason || ""}
+                  >
+                    {g.gate}: {g.result}
+                  </span>
+                ))}
+              </div>
+              {missionEvidence.gates.some((g) => g.gate === "GH_INTEGRITY" && g.result === "INCONCLUSIVE") ? (
+                <div style={{ color: "#f59e0b", fontSize: 12, marginTop: 4 }}>
+                  {"Stability Hint (W10): Weak assertions detected (< 0.8 threshold). Exact == comparisons and pytest.raises required."}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           {mission.state === "PR_OPENED" ? (
             <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap" }}>
               <input
@@ -338,7 +423,7 @@ export default function MissionControl() {
                 key={m.mission_id}
                 onClick={() => {
                   selectedIdRef.current = m.mission_id;
-                  void getMission(m.mission_id).then(setMission).catch(() => {});
+                  void getMission(m.mission_id).then((d) => { setMission(d); void fetchMissionEvidence(d); }).catch(() => {});
                 }}
                 style={{
                   display: "flex",

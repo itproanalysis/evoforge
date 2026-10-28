@@ -87,3 +87,67 @@ def test_proof_certificate_redacted_and_verifiable():
 
 def test_proof_unknown_404():
     assert client.get("/v1/proof/ev_nope123").status_code == 404
+
+
+def test_step_lock_rejects_concurrent_generation():
+    r = client.post("/v1/evolution/start", json={"goal": "lock probe", "max_generations": 1})
+    eid = r.json()["evolution_id"]
+    lock = evo_engine.lock_for(eid)
+    assert lock.acquire(blocking=False)
+    try:
+        s = client.post(f"/v1/evolution/{eid}/step")
+        assert s.status_code == 409, s.text
+        assert "already has a running generation" in s.text
+    finally:
+        lock.release()
+    # After release the step proceeds normally (offline stub path).
+    s = client.post(f"/v1/evolution/{eid}/step")
+    assert s.status_code == 200, s.text
+
+
+def test_start_source_repo_passthrough_and_validation():
+    r = client.post("/v1/evolution/start", json={"goal": "repo probe", "source_repo": ""})
+    assert r.status_code == 201
+    assert r.json()["source_repo"] == ""
+    bad = client.post("/v1/evolution/start",
+                      json={"goal": "repo probe", "source_repo": "C:/no/such/repo_xyz"})
+    assert bad.status_code == 400
+
+
+def test_case_w10_weak_oracle_diagnosis_and_feedback():
+    # Empirical Case W10: weak oracle (tautology / ratio < 0.8) yields weak_oracle classification
+    cand = {
+        "gates": [{"gate": "GH_INTEGRITY", "result": "INCONCLUSIVE", "reason": "strong fraction 0.67 < 0.8"}],
+        "run": {"visible": {"pass": 3, "n": 3}, "heldout": {"pass": 4, "n": 4}},
+    }
+    assert evo_engine.classify_failure(cand) == "weak_oracle"
+
+    gen = {"index": 1, "candidates": [cand]}
+    feedback = evo_engine.feedback_goal("Divide function", gen)
+    assert "ORACLE INTEGRITY RULE (Case W10)" in feedback
+    assert "pytest.raises" in feedback
+
+    # Bounded retention test (stability)
+    evo_engine.reset()
+    for i in range(105):
+        evo = evo_engine.start(f"goal {i}", max_generations=1)
+        evo["status"] = "EXHAUSTED"
+    assert len(evo_engine.list_all()) == 100
+
+
+def test_step_local_source_repo_context(tmp_path, monkeypatch):
+    """Regression: target_paths + local source_repo must load context (no remote)."""
+    import subprocess
+
+    repo = tmp_path / "case"
+    repo.mkdir()
+    (repo / "calc.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "init", "--quiet"], cwd=str(repo), check=True, timeout=60)
+    monkeypatch.setenv("EVO_REPO_ROOTS", str(repo))
+    r = client.post("/v1/evolution/start", json={
+        "goal": "context probe", "repo_ref": "HEAD", "source_repo": str(repo),
+        "target_paths": ["calc.py"], "max_generations": 1, "population": 1})
+    assert r.status_code == 201, r.text
+    s = client.post(f"/v1/evolution/{r.json()['evolution_id']}/step")
+    assert s.status_code == 200, s.text
+    assert s.json()["winner"]["generate_evidence_id"]

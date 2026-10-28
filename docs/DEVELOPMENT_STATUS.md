@@ -35,6 +35,16 @@
 - [x] Web UI 로딩 상태 가드(W5): Mission Control과 Performance에서 최초 응답 수신 전까지 "로딩 중…"을 유지하고, 실제 실패 시에만 "불러올 수 없음" 안내를 노출하도록 보강. 오류 문구 깜빡임 제거 및 375px 모바일 뷰포트 레이아웃 보존(`test_web_live_dashboard_cr.py` 8개 PASS, `tsc --noEmit` 0 error, Next.js 빌드 성공).
 - [x] Autonomous Evolution (Autopilot) + Proof Certificates (새 지평): N세대 × M개체 자율 번식·트러스트 커널 평가·Critic 피드백 진화 루프(`evolution.py`) 및 공용 증거 다이제스트 기반 변조 방지 증명서(`proof.py`, `/verify/[id]`) 구현·연결. 오프라인 EXHAUSTED 정직성 및 미검증 PR 승격 차단 409 검증(`test_evolution_autopilot.py` 6개 PASS, `proxyPolicy.ts` 92개 테스트 통과).
 - [x] Evolution Memory + Trust Leaderboard (Wave 2 진화 지평): 진화 성공(`CONVERGED`) 시 승리 접근법을 메모리에 증류(`memory.py`), 차기 진화 시 유사 과거 승리를 회상하여 빌더에 힌트 주입(서버 전용, HTTP 누출 방지). 검증된 승리를 적합도·증명서 링크 순으로 정렬하는 신뢰 리더보드(`/v1/leaderboard`, `/[locale]/leaderboard`) 및 메모리 패턴 뷰어 연결(`test_evolution_memory_leaderboard.py` 4개 PASS, 프록시 96건 PASS, Next.js 빌드 13개 라우트 정상 컴파일).
+- [x] 실제 프로덕션 검증 사례 기반 자율 진화 및 서비스 안정화 강화 (Case-Based Contracts & Gate Diagnostics):
+  - 실제 Muse Spark 자율 진화 실증 사례(`tools/autopilot_case.py`): 로컬 스크래치 저장소의 `calc.py` 버그를 대상으로 1세대 만에 `CONVERGED` 달성 (적합도 130.0점, 원장 실지출 360¢, Ed25519 증명서 검증 완료, [CASE_STUDY_AUTOPILOT_01.md](CASE_STUDY_AUTOPILOT_01.md) 문서화).
+  - 진화 루프 안정화 3종 패치:
+    1. `_load_builder_context` 저장소 경로 전달 누락 수정 (`source_repo` 인자 추가 및 전달).
+    2. 동시 `/step` 요청 경합 방지용 `lock_for(evolution_id)` 뮤텍스 도입 (경합 시 409 응답).
+    3. 진화 메모리 상한(최대 200개) 설정 및 초과 시 적합도 최저·오래된 패턴 우선 방출로 메모리 보호.
+  - 웹 대시보드(Mission Control 및 Improvement Lab) 실제 검증 사례 기반 프리셋 및 게이트 진단 UI:
+    - WVI 검증 머지 성공사례(PR #6), EVAL_V1 입력·예외 계약형, PM-01 파티션 임계치 보장형 프리셋 버튼 제공.
+    - W10 실측 사례(`msn_db7a9a9e80c9`) 기반 `GH_INTEGRITY=INCONCLUSIVE` 진단 및 동어반복(`assert True`) 배제, `==` 값 비교·`pytest.raises` 필수 단언 안정성 가이드 실시간 안내.
+  - 회귀 검증: `test_web_live_dashboard_cr.py` 8개, `test_evolution_autopilot.py` 10개, `test_evolution_memory_leaderboard.py` 5개 (총 23개 PASS), `check-admin-policy.mjs` 96개 프록시 케이스 통과, `tsc --noEmit` 0 error, Next.js 프로덕션 빌드 13개 라우트 정적/동적 생성 정상 완료.
 
 ## 이어서 수행할 작업
 

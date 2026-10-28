@@ -150,14 +150,15 @@ def _validate_target_paths(paths) -> list[str]:
     return out
 
 
-def _load_builder_context(repo_sha: str, target_paths: list[str]) -> list[dict]:
+def _load_builder_context(repo_sha: str, target_paths: list[str],
+                          source_repo: str = "") -> list[dict]:
     """Read target files at the T15-resolved base; 400 bad/missing, 413 over cap."""
     import shutil
 
     from evoforge import repo_source as _rs
 
     try:
-        resolved = _rs.resolve_repo_dir("", repo_sha)
+        resolved = _rs.resolve_repo_dir(source_repo, repo_sha)
     except Exception as e:
         raise HTTPException(400, _rs.redact(str(e)))
     try:
@@ -1550,7 +1551,7 @@ from evoforge import memory as evo_memory
 
 
 def _evo_candidate(goal: str, base_sha: str, file_context,
-                   store_extra: dict) -> dict:
+                   store_extra: dict, source_repo: str = "") -> dict:
     """One autopilot candidate: generate -> review -> run (best effort).
 
     Systemic failures (402 budget, 502 provider) propagate and abort the
@@ -1591,7 +1592,7 @@ def _evo_candidate(goal: str, base_sha: str, file_context,
     tests = candidate.get("tests") if isinstance(candidate.get("tests"), list) else []
     try:
         run_eid, gates, run = _run_core(
-            source_repo="", base_sha=base_sha, diff=diff, tests=tests,
+            source_repo=source_repo, base_sha=base_sha, diff=diff, tests=tests,
             review_evidence_id=rev_eid, timeout_s=120, store_extra={**store_extra, "autopilot": True})
     except HTTPException as e:
         out["candidate_error"] = f"run: {e.status_code} {e.detail}"
@@ -1609,6 +1610,7 @@ class EvolutionStart(BaseModel):
     max_generations: int = 3
     population: int = 2
     use_memory: bool = True
+    source_repo: str = ""
 
 
 @app.post("/v1/evolution/start", status_code=201)
@@ -1618,10 +1620,15 @@ def evolution_start(req: EvolutionStart):
     validated = None
     if req.target_paths is not None:
         validated = _validate_target_paths(req.target_paths)
+    if not isinstance(req.source_repo, str):
+        raise HTTPException(400, "source_repo must be a string")
+    if req.source_repo not in ("", "github") and not os.path.isdir(req.source_repo):
+        # Deep allowlist (EVO_REPO_ROOTS) is enforced at run time; fail fast here.
+        raise HTTPException(400, f"not a repo directory: {req.source_repo[:80]}")
     try:
         evo = evo_engine.start(req.goal, req.repo_ref, validated,
                                req.max_generations, req.population,
-                               req.use_memory)
+                               req.use_memory, req.source_repo)
     except ValueError as e:
         raise HTTPException(400, str(e))
     eid = _store_evidence({"evolution_id": evo["evolution_id"], "goal": req.goal,
@@ -1652,6 +1659,18 @@ def evolution_step(evolution_id: str):
         raise HTTPException(404, "unknown evolution")
     if evo["status"] in evo_engine.TERMINAL:
         raise HTTPException(409, f"evolution {evolution_id} is terminal ({evo['status']})")
+    lock = evo_engine.lock_for(evolution_id)
+    if not lock.acquire(blocking=False):
+        raise HTTPException(409, f"evolution {evolution_id} already has a running generation")
+    try:
+        return _evolution_step_locked(evolution_id)
+    finally:
+        lock.release()
+
+
+def _evolution_step_locked(evolution_id: str) -> dict:
+    evo = evo_engine.get(evolution_id)
+    assert evo is not None
     base_sha = evo["repo_ref"]
     if not _HEX40.match(base_sha.strip()):
         try:
@@ -1661,7 +1680,8 @@ def evolution_step(evolution_id: str):
     file_context = None
     if evo.get("target_paths"):
         try:
-            file_context = _load_builder_context(base_sha, evo["target_paths"])
+            file_context = _load_builder_context(base_sha, evo["target_paths"],
+                                                 evo.get("source_repo", ""))
         except HTTPException as e:
             raise e
     goal = evo["goal"]
@@ -1672,7 +1692,8 @@ def evolution_step(evolution_id: str):
     if evo["generations"]:
         goal = evo_engine.feedback_goal(goal, evo["generations"][-1])
     candidates = [_evo_candidate(goal, base_sha, file_context,
-                                 {"evolution_id": evolution_id})
+                                 {"evolution_id": evolution_id},
+                                 evo.get("source_repo", ""))
                   for _ in range(evo["population"])]
     gen = evo_engine.record_generation(evolution_id, candidates)
     _maybe_memorize(evo_engine.get(evolution_id))

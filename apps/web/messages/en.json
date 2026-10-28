@@ -59,17 +59,47 @@
     "performance-link": "Performance →",
     "not-measured": "Not measured",
     "performance-unavailable": "Performance data is unavailable.",
-    "provenance": {"simulated":"Simulated provider evaluation", "recorded":"Provider call path recorded · not independently verified", "unknown":"Provider provenance unknown"},
+    "provenance": {
+      "simulated": "Simulated provider evaluation",
+      "recorded": "Provider call path recorded · not independently verified",
+      "unknown": "Provider provenance unknown"
+    },
     "comparison": "Performance comparison",
     "comparison-empty": "No measurements are available to compare yet.",
-    "verdicts": {"improved": "Improved", "worse": "Worse", "no_clear_difference": "No clear difference"},
+    "verdicts": {
+      "improved": "Improved",
+      "worse": "Worse",
+      "no_clear_difference": "No clear difference"
+    },
     "participants-heading": "Participants",
     "participants-unavailable": "Participant data is not available from the server yet.",
     "participants-empty": "No participants are connected to this project.",
     "participants-more": "Additional participants are not shown.",
     "participant-roles": "Roles",
     "participant-states": "Membership · connection · execution · credentials",
-    "participant-values": {"lease_holder":"Task lease", "builder":"Builder", "reviewer":"Reviewer", "REQUESTED":"Requested", "PENDING_APPROVAL":"Pending approval", "AUTHORIZED":"Authorized", "REVOKED":"Revoked", "UNKNOWN":"Unknown", "PROBING":"Probing", "READY":"Ready", "DEGRADED":"Degraded", "OFFLINE":"Offline", "IDLE":"Idle", "ASSIGNED":"Assigned", "RUNNING":"Running", "WAITING_FOR_CLIENT":"Waiting for client", "BLOCKED":"Blocked", "FINISHED":"Finished", "VALID":"Valid", "EXPIRING":"Expiring", "EXPIRED":"Expired"},
+    "participant-values": {
+      "lease_holder": "Task lease",
+      "builder": "Builder",
+      "reviewer": "Reviewer",
+      "REQUESTED": "Requested",
+      "PENDING_APPROVAL": "Pending approval",
+      "AUTHORIZED": "Authorized",
+      "REVOKED": "Revoked",
+      "UNKNOWN": "Unknown",
+      "PROBING": "Probing",
+      "READY": "Ready",
+      "DEGRADED": "Degraded",
+      "OFFLINE": "Offline",
+      "IDLE": "Idle",
+      "ASSIGNED": "Assigned",
+      "RUNNING": "Running",
+      "WAITING_FOR_CLIENT": "Waiting for client",
+      "BLOCKED": "Blocked",
+      "FINISHED": "Finished",
+      "VALID": "Valid",
+      "EXPIRING": "Expiring",
+      "EXPIRED": "Expired"
+    },
     "stage-generate": "Generate",
     "stage-review": "Review",
     "stage-run": "Server Run",
@@ -100,7 +130,14 @@
       "spent-cents": "spent_cents",
       "reserved-cents": "reserved_cents",
       "unknown-reservations": "unknown_reservations"
-    }
+    },
+    "presets-heading": "Case-Based Contract Presets",
+    "preset-wvi-btn": "Verified WVI Fix (PR #6)",
+    "preset-contract-btn": "Input & Exception Contract (EVAL_V1)",
+    "preset-boundary-btn": "Partition Boundary Guarantee (PM-01)",
+    "gate-diagnostics-heading": "Gate Integrity Diagnostics",
+    "gate-integrity-w10-hint": "Stability Hint (W10): Weak assertions detected (< 0.8 threshold). Exact == comparisons and pytest.raises required.",
+    "storage-label": "Storage Backend"
   },
   "lab": {
     "heading": "Improvement Lab",
@@ -140,7 +177,8 @@
     "suite-tasks": "{count} tasks",
     "suite-kinds": "kinds: {kinds}",
     "evidence-label": "evidence",
-    "review-evidence-label": "review evidence"
+    "review-evidence-label": "review evidence",
+    "integrity-hint": "Stability Hint (W10): GH_INTEGRITY requires strict == value asserts and pytest.raises, rejecting tautologies (assert True)."
   },
   "evidence": {
     "heading": "Evidence Timeline",
@@ -226,6 +264,7 @@
     "heading": "Autopilot — goal in, verified PR out",
     "description": "Autonomous evolution: breeds candidates, scores them with the trust kernel, retries with Critic feedback. POST /v1/evolution/*",
     "goal-placeholder": "Fix flaky login retry",
+    "repo-placeholder": "repo path or empty (server default)",
     "max-gen": "generations",
     "population": "population",
     "use-memory": "use factory memory",
@@ -238,7 +277,20 @@
     "runs-heading": "Evolution runs",
     "empty": "No evolutions yet — start one above.",
     "select-hint": "Select a run to watch it evolve.",
-    "proof-link": "Proof certificate →"
+    "proof-link": "Proof certificate →",
+    "case-w10-alert": "Case W10 Alert: GH_INTEGRITY requires explicit '==' value asserts or pytest.raises. Avoid 'assert True'.",
+    "failure-reasons": {
+      "weak_oracle": "Weak Oracle (strength < 0.8) · Case W10",
+      "contract_gap": "Contract Gap · Case EVAL_V1",
+      "heldout_failed": "Held-out Failed",
+      "visible_failed": "Visible Failed",
+      "review_rejected": "Review Blocked",
+      "budget_exhausted": "Budget Cap",
+      "syntax_error": "Syntax Error",
+      "execution_error": "Execution Error",
+      "none": "All Gates Passed",
+      "inconclusive": "Inconclusive"
+    }
   },
   "verify": {
     "heading": "Proof certificate",

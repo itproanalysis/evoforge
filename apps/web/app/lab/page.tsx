@@ -338,10 +338,17 @@ export default function Lab() {
           </span>
         </div>
         {mergeBlocked ? (
-          <p style={{ color: "#f59e0b", fontSize: 13 }} title="예외 승인 필요">
-            INCONCLUSIVE/FAIL 게이트가 있어 Merge가 비활성화됩니다. 예외 승인이
-            필요합니다.
-          </p>
+          <div>
+            <p style={{ color: "#f59e0b", fontSize: 13 }} title="예외 승인 필요">
+              INCONCLUSIVE/FAIL 게이트가 있어 Merge가 비활성화됩니다. 예외 승인이
+              필요합니다.
+            </p>
+            {gates.some((g) => g.gate === "GH_INTEGRITY" && g.result !== "PASS") && (
+              <p style={{ color: "#8b96ad", fontSize: 12 }}>
+                안정성 안내 (W10): GH_INTEGRITY 게이트는 동어반복(assert True)이나 빈 try/except를 제외한 엄격한 == 비교 및 pytest.raises를 요구합니다.
+              </p>
+            )}
+          </div>
         ) : null}
         {err ? <p style={{ color: "#ef4444", fontSize: 13 }}>{err}</p> : null}
         {review ? (

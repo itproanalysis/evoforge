@@ -12,6 +12,7 @@ const card: React.CSSProperties = {
 
 export default function EvolutionPage() {
   const [goal, setGoal] = useState("");
+  const [repo, setRepo] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [evos, setEvos] = useState<EvolutionPublic[]>([]);
@@ -45,9 +46,11 @@ export default function EvolutionPage() {
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <input value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="Fix flaky login retry"
             style={{ flex: "2 1 260px", padding: 8, borderRadius: 6, background: "#0b0e14", color: "#e8edf5", border: "1px solid #33405c" }} />
+          <input value={repo} onChange={(e) => setRepo(e.target.value)} placeholder="source_repo (optional)"
+            style={{ flex: "1 1 160px", padding: 8, borderRadius: 6, background: "#0b0e14", color: "#e8edf5", border: "1px solid #33405c" }} />
           <button disabled={busy !== null || !goal.trim()}
             onClick={() => void act("start", async () => {
-              const r = await startEvolution(goal, "HEAD", 3, 2); setGoal(""); await refresh(r.evolution_id);
+              const r = await startEvolution(goal, "HEAD", 3, 2, true, repo.trim()); setGoal(""); await refresh(r.evolution_id);
             })}>Start evolution</button>
         </div>
         {err && <p style={{ color: "#f87171" }}>{err}</p>}

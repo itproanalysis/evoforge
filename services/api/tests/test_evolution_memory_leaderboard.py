@@ -86,3 +86,12 @@ def test_start_accepts_use_memory_flag():
     r = client.post("/v1/evolution/start", json={"goal": "flag probe", "use_memory": False})
     assert r.status_code == 201
     assert r.json()["use_memory"] is False
+
+
+def test_memory_bounded_evicts_weakest():
+    for i in range(205):
+        evo_memory.record(f"evo_{i}", f"goal number {i} cache", f"diff-{i}",
+                          float(i), None)
+    assert len(evo_memory._patterns) == 200
+    scores = sorted(p["fitness_score"] for p in evo_memory._patterns)
+    assert scores[0] == 5.0  # 0..4 evicted, 5..204 kept

@@ -379,9 +379,16 @@ export default function Lab() {
           </Button>
         </div>
         {mergeBlocked && (
-          <p className="text-accent-amber text-sm mt-2">
-            {t("merge-blocked-description")}
-          </p>
+          <div className="mt-2 space-y-1">
+            <p className="text-accent-amber text-sm m-0">
+              {t("merge-blocked-description")}
+            </p>
+            {gates.some((g) => g.gate === "GH_INTEGRITY" && g.result !== "PASS") && (
+              <p className="text-xs text-text-secondary m-0">
+                {t("integrity-hint")}
+              </p>
+            )}
+          </div>
         )}
         {err && <p className="text-accent-red text-sm mt-2">{t("error-prefix")}{err}</p>}
         {review && (

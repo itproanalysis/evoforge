@@ -33,6 +33,7 @@ export default function Evolution() {
   const t = useTranslations("evolution");
   const tErrors = useTranslations("errors");
   const [goal, setGoal] = useState("");
+  const [repo, setRepo] = useState("");
   const [maxGen, setMaxGen] = useState(3);
   const [pop, setPop] = useState(2);
   const [useMem, setUseMem] = useState(true);
@@ -90,6 +91,12 @@ export default function Evolution() {
             placeholder={t("goal-placeholder")}
             style={{ flex: "2 1 260px" }}
           />
+          <Input
+            value={repo}
+            onChange={(e) => setRepo(e.target.value)}
+            placeholder={t("repo-placeholder")}
+            style={{ flex: "1 1 160px" }}
+          />
           <label>
             {t("max-gen")} <Input type="number" value={maxGen} min={1} max={10}
               onChange={(e) => setMaxGen(Number(e.target.value) || 3)} style={{ width: 64 }} />
@@ -103,7 +110,7 @@ export default function Evolution() {
           </label>
           <Button disabled={busy !== null || !goal.trim()}
             onClick={() => void act("start", async () => {
-              const r = await startEvolution(goal, "HEAD", maxGen, pop, useMem);
+              const r = await startEvolution(goal, "HEAD", maxGen, pop, useMem, repo.trim());
               setGoal("");
               await refresh(r.evolution_id);
             })}>
