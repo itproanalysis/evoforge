@@ -1,0 +1,16 @@
+{
+  "id": "T37_durable_decisions",
+  "planned_by": "Claude (Critic): T35 decisions are lost on redeploy",
+  "goal": "T37 — store harness adoption decisions (T35) durably so they survive API redeploys.\n\nservices/api/evoforge/decisions.py keeps decisions in a process list; every deploy erases the adoption history that\n/performance shows. Store each decision in the existing evidence store used for measurements and certificates\n(main._evidence = postgres_state.ScopedRecords(\"records\"), memory or PostgreSQL) as a record with kind\n\"harness_decision\" and the full decision document; list_decisions() reads them back from that store (newest first by\ncreated_at, at most 50) instead of process memory. Keep the record()/list_decisions()/clear() API and the\nGET /v1/eval/decisions response shape. Avoid an import cycle with main.py (e.g. decisions.py takes the store lazily via\npostgres_state.ScopedRecords(\"records\")). Tests: services/api/tests/test_muse_t37.py. Do not change sealed_eval.py.",
+  "edit": [
+    "services/api/evoforge/decisions.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t37.py"
+  ],
+  "context": [
+    "services/api/evoforge/postgres_state.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

@@ -66,6 +66,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 _evidence = postgres_state.ScopedRecords("records")  # postgres when configured, memory in dev
+decisions_mod.configure(_evidence)
 COST_CENTS = 120  # conservative per-model-call estimate (int cents)
 
 
