@@ -61,7 +61,9 @@ export function Input({
     : 'border-border-secondary focus:border-accent-blue focus:ring-accent-blue';
   
   return (
-    <div className="flex flex-col gap-1">
+    // Layout classes (flex-*, w-*, ml-*) size the wrapper; the input fills it. On the input itself a flex-basis
+    // would size its height, because the wrapper is a flex column.
+    <div className={`flex flex-col gap-1 min-w-0 ${className}`}>
       {label && (
         <label
           htmlFor={inputId}
@@ -72,7 +74,7 @@ export function Input({
       )}
       <input
         id={inputId}
-        className={`${baseClasses} ${stateClasses} ${className} text-text-primary`}
+        className={`${baseClasses} ${stateClasses} text-text-primary`}
         aria-invalid={error}
         aria-describedby={error && errorMessage ? errorId : undefined}
         {...props}

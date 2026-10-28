@@ -232,7 +232,7 @@
   },
   "layout": {
     "title": "EvoForge — Mission Control",
-    "description": "Hackathon Indie-track UI: generate → gate → review → PR → evidence.",
+    "description": "Verified code improvement service: generate → gate → review → PR → evidence.",
     "footer": "Builder: Muse Spark 1.3 via Meta Model API · Gates: GH_INTEGRITY (oracle_ast + provisional D-054) · costs are provider_billed actuals in cents from GET /v1/ledger; UNKNOWN holds listed separately"
   },
   "errors": {
