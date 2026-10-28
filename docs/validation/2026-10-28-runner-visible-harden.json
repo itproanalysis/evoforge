@@ -1,0 +1,26 @@
+{
+  "tested_revision": "289fc3f",
+  "source_equivalent_revision": "348ba9d",
+  "checks": {
+    "api": "668 passed, 1 skipped",
+    "postgres_kernel": "169 passed",
+    "sql": "96 checks, 0 failures",
+    "focused": "37 passed"
+  },
+  "limitations": [
+    "A synthetic test process overwrote JUnit at atexit and falsely produced 2/2 success after mitigation.",
+    "Candidate-provided conftest fixtures and pytest plugins no longer load for visible tests; compatibility must be resolved.",
+    "This branch is not integrated or deployed."
+  ],
+  "source_sha256": {
+    "services/runner/app.py": "98ccb8c54f3100aeff06b5c77abef4c5257573d70feb877c73a5072efc87a58e",
+    "services/api/tests/test_runner_visible_isolation.py": "9a9e625c25dedf1c9dd7187034366199a0b2ceb49828557801c01dbbad475dba"
+  },
+  "logs": {
+    "C:\\evo_forge\\.local\\evidence\\runner-visible-harden-20261028\\api.log": "5124bd7f4a991069fee65f414b4834a25889acb69a0d6a0725c082ba101029bd",
+    "C:\\evo_forge\\.local\\evidence\\runner-visible-harden-20261028\\contract.log": "891acffea72f26568d5b6d8ce978f3884de73c5bc9ab65a9424ba4d017239624",
+    "C:\\evo_forge\\.local\\evidence\\runner-visible-harden-20261028\\focused.log": "9929a45731970a99a8deabaf886e41257e7aff701883421df7e4ed8992166d95",
+    "C:\\evo_forge\\.local\\evidence\\runner-visible-harden-20261028\\kernel.log": "ee980e0006d0432d0e24d80789120275ff6b8b7b29f8685fca9aeebf577438bc",
+    "C:\\evo_forge\\.local\\evidence\\runner-visible-harden-20261028\\postgres.log": "08676fb7ca126c5ac9ca4c4a5f86490abadeea118c237b1535edce2915244338"
+  }
+}

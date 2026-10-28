@@ -334,15 +334,21 @@ def _run_suite(sandbox: str, suite_dir: str, xml_path: str,
         return {"pass": 0, "n": 0, "timed_out": False, "exit_code": 0}
     env = {k: os.environ[k] for k in _ENV_ALLOW if k in os.environ}
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
     if sealed_ini:
-        env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
         cmd = [sys.executable, "-I", "-c", _SEALED_BOOT, sandbox,
                "-q", "-p", "no:cacheprovider", "-c", sealed_ini, "--rootdir", suite_dir,
                "--noconftest", "--junitxml", xml_path, suite_dir]
     else:
-        env["PYTHONPATH"] = sandbox
-        cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
-               "--rootdir", sandbox, "--junitxml", xml_path, suite_dir]
+        ini_path = xml_path + ".ini"
+        try:
+            with open(ini_path, "x", encoding="utf-8") as ini:
+                ini.write("[pytest]\n")
+        except OSError as exc:
+            raise _RunnerError("could not create Runner pytest configuration") from exc
+        cmd = [sys.executable, "-I", "-c", _SEALED_BOOT, sandbox,
+               "-q", "-p", "no:cacheprovider", "-c", ini_path,
+               "--rootdir", sandbox, "--noconftest", "--junitxml", xml_path, suite_dir]
     if os.path.exists(xml_path):
         raise _RunnerError("junit path pre-exists; refusing to read a planted report")
     try:
