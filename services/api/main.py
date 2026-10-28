@@ -35,6 +35,7 @@ from evoforge.patch import PatchError
 from evoforge.kernel_api import router as kernel_router
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
 from evoforge import missions as missions_store
+from evoforge import feedback as feedback_mod
 from evoforge.missions import NeedsConfirmation as MissionNeedsConfirmation
 from evoforge.missions import TransitionError as MissionTransitionError
 
@@ -67,6 +68,7 @@ app.add_middleware(
 )
 _evidence = postgres_state.ScopedRecords("records")  # postgres when configured, memory in dev
 decisions_mod.configure(_evidence)
+feedback_mod.configure(_evidence)
 COST_CENTS = 120  # conservative per-model-call estimate (int cents)
 
 
@@ -1703,6 +1705,65 @@ def outcome_record(req: OutcomeRequest):
 @app.get("/v1/outcomes")
 def outcomes_list():
     return {"outcomes": _all_validated()}
+
+
+class FeedbackRequest(BaseModel):
+    mission_id: str
+    kind: Literal["bug", "missed_case", "praise", "other"]
+    text: str = Field(min_length=1, max_length=2000)
+
+
+@app.post("/v1/feedback", status_code=201)
+def feedback_submit(req: FeedbackRequest):
+    mission = missions_store.get(req.mission_id)
+    if mission is None:
+        raise HTTPException(404, "unknown mission")
+    return feedback_mod.submit(req.mission_id, req.kind, req.text)
+
+
+@app.get("/v1/feedback")
+def feedback_list():
+    return {"feedback": feedback_mod.list_feedback()}
+
+
+@app.post("/v1/feedback/{feedback_id}/promote")
+def feedback_promote(feedback_id: str):
+    try:
+        item = feedback_mod.get(feedback_id)
+    except Exception:
+        item = None
+    if item is None:
+        raise HTTPException(404, "unknown feedback")
+    if isinstance(item.get("promoted_mission_id"), str) and item["promoted_mission_id"]:
+        return JSONResponse({"mission_id": item["promoted_mission_id"],
+                             "feedback_id": feedback_id}, status_code=200)
+
+    def _factory():
+        src = missions_store.get(item["mission_id"])
+        if src is None:
+            raise LookupError(item["mission_id"])
+        goal = (f"{src['goal']}\n\nFollow-up from feedback "
+                f"({item['kind']}): {item['text']}")
+        target_paths = src.get("target_paths")
+        new_mission = missions_store.create(
+            goal, src["repo_ref"],
+            list(target_paths) if target_paths is not None else None)
+        eid = _store_evidence({"mission_id": new_mission["mission_id"],
+                               "goal": goal, "feedback_id": feedback_id,
+                               "repo_ref": src["repo_ref"],
+                               "source_mission_id": item["mission_id"]})
+        _link_stages(eid, ("ObjectiveVersion",))
+        missions_store.attach_evidence(new_mission["mission_id"], eid)
+        return new_mission["mission_id"]
+
+    try:
+        mission_id, created = feedback_mod.promote_with(feedback_id, _factory)
+    except KeyError:
+        raise HTTPException(404, "unknown feedback")
+    except LookupError as e:
+        raise HTTPException(404, f"unknown mission: {e}")
+    return JSONResponse({"mission_id": mission_id, "feedback_id": feedback_id},
+                        status_code=201 if created else 200)
 
 
 @app.post("/v1/ledger/reconcile")
