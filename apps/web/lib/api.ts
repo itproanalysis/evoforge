@@ -658,3 +658,60 @@ export function promoteFeedback(feedback_id: string) {
     { method: "POST" },
   );
 }
+
+
+export interface ArenaEvent {
+  seq: number;
+  ts: number;
+  role: "builder" | "critic" | "runner" | "gate" | "system";
+  message: string;
+}
+
+export interface ArenaLane {
+  status: "running" | "succeeded" | "failed";
+  attempts: number;
+  heldout: { passed: number; n: number };
+  outcome: "passed" | "empty_diff" | "apply_failed" | "heldout_failed";
+  cost_cents: number;
+  elapsed_ms: number;
+  diff: string;
+  events: ArenaEvent[];
+  failing_tests?: string[];
+  error?: string | null;
+}
+
+export interface ArenaDoc {
+  arena_id: string;
+  status: "running" | "succeeded" | "failed";
+  suite_version: "v1" | "v2";
+  task_id: string;
+  model: string;
+  goal: string;
+  created_at: number;
+  started_at?: number | null;
+  finished_at?: number | null;
+  lanes: {
+    single: ArenaLane;
+    evoforge: ArenaLane;
+  };
+  verdict: {
+    winner: "evoforge" | "single" | "tie";
+    reason: string;
+  };
+  error?: string | null;
+}
+
+export function postArena(task_id: string, suite_version: "v1" | "v2" = "v2", model: string = "muse-spark-1.3") {
+  return req<{ arena_id: string; status: string }>("/v1/arena", {
+    method: "POST",
+    body: JSON.stringify({ task_id, suite_version, model }),
+  });
+}
+
+export function getArena(arena_id: string) {
+  return req<ArenaDoc>(`/v1/arena/${encodeURIComponent(arena_id)}`);
+}
+
+export function listArenas() {
+  return req<{ arenas: ArenaDoc[] }>("/v1/arena");
+}

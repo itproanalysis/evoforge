@@ -18,7 +18,8 @@
     "evidence": "Evidence",
     "performance": "Performance",
     "autopilot": "Autopilot",
-    "leaderboard": "Leaderboard"
+    "leaderboard": "Leaderboard",
+    "arena": "Arena"
   },
   "mission-control": {
     "heading": "Mission Control",
@@ -421,5 +422,31 @@
     "server-error": "Server error. Please try again later.",
     "unknown": "An unknown error occurred.",
     "status-code": "HTTP {code}: {message}"
+  },
+  "arena": {
+    "heading": "EvoForge Arena",
+    "description": "Side-by-side execution on the same sealed benchmark task: EvoForge vs Single AI",
+    "select-task": "Select sealed task",
+    "suite-version": "Suite version",
+    "run-match": "Start Arena Match",
+    "running-match": "Running match in parallel…",
+    "winner-label": "Verdict",
+    "evoforge-lane": "EvoForge Pipeline",
+    "evoforge-sub": "Harness /2 · Critic · Auto-feedback retries",
+    "single-lane": "Single AI (Direct chat)",
+    "single-sub": "Harness /1 · Strict apply · No retries",
+    "cost": "Cost",
+    "attempts": "Attempts",
+    "hidden-tests": "Hidden tests",
+    "patch": "Generated patch",
+    "events": "Live event stream",
+    "recent-matches": "Recent arena matches",
+    "empty-matches": "No arena matches run yet.",
+    "status": "Status",
+    "all-passed": "ALL PASS",
+    "failed": "FAIL",
+    "passed": "PASS",
+    "running": "RUNNING",
+    "succeeded": "FINISHED"
   }
 }
