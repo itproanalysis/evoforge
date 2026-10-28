@@ -16,6 +16,17 @@ API_URL="https://evoforge-api-${NUM}.${REGION}.run.app"
 RUNNER_URL="https://evoforge-runner-${NUM}.${REGION}.run.app"
 SA() { echo "evoforge-$1@${PROJECT}.iam.gserviceaccount.com"; }
 
+# State backend. Every deploy sets the full env (--set-env-vars replaces it), so the PostgreSQL
+# settings must travel with the provider/runner settings or one deploy silently drops the other.
+STATE_SECRETS=""
+STATE_ENV=""
+if [ "${STATE_BACKEND:-memory}" = "postgres" ]; then
+  : "${TENANT_ID:?set TENANT_ID (server-owned tenant UUID) for STATE_BACKEND=postgres}"
+  : "${PROJECT_UUID:?set PROJECT_UUID (server-owned project UUID) for STATE_BACKEND=postgres}"
+  STATE_SECRETS=",DATABASE_URL=DB_URL:latest"
+  STATE_ENV="|EVO_STATE_BACKEND=postgres|EVO_TENANT_ID=${TENANT_ID}|EVO_PROJECT_ID=${PROJECT_UUID}"
+fi
+
 if [ "${SKIP_BUILD:-0}" != "1" ]; then
   echo "== build (tests gate the images)"
   "$GCLOUD" builds submit --project "$PROJECT" --config infra/gcp/cloudbuild.prod.yaml \
@@ -32,8 +43,8 @@ echo "== api: private; only the web SA may invoke; Meta key + GitHub token from 
 "$GCLOUD" run deploy evoforge-api --project "$PROJECT" --region "$REGION" --image "${REG}/api:${TAG}" \
   --service-account "$(SA api)" --no-allow-unauthenticated --port 8080 \
   --cpu 1 --memory 1Gi --min-instances 1 --max-instances 1 --timeout 900 \
-  --set-secrets "MODEL_API_KEY=MODEL_API_KEY:latest,GITHUB_TOKEN=GITHUB_TOKEN:latest" \
-  --set-env-vars "^|^MODEL_API_BASE=https://api.meta.ai/v1|MODEL_BUILDER=muse-spark-1.3|MODEL_CRITIC=muse-spark-1.3|GITHUB_REPO=${GITHUB_REPO}|EVO_REQUIRE_ID_TOKEN=1|EVO_API_URL=${API_URL}|EVO_WEB_SERVICE_ACCOUNT=$(SA web)|EVO_RUNNER_URL=${RUNNER_URL}|EVO_RUNNER_AUDIENCE=${RUNNER_URL}|EVO_ALLOW_LOCAL_REPOS=0|EVO_WEB_ORIGINS=" \
+  --set-secrets "MODEL_API_KEY=MODEL_API_KEY:latest,GITHUB_TOKEN=GITHUB_TOKEN:latest${STATE_SECRETS}" \
+  --set-env-vars "^|^MODEL_API_BASE=https://api.meta.ai/v1|MODEL_BUILDER=muse-spark-1.3|MODEL_CRITIC=muse-spark-1.3|GITHUB_REPO=${GITHUB_REPO}|EVO_REQUIRE_ID_TOKEN=1|EVO_API_URL=${API_URL}|EVO_WEB_SERVICE_ACCOUNT=$(SA web)|EVO_RUNNER_URL=${RUNNER_URL}|EVO_RUNNER_AUDIENCE=${RUNNER_URL}|EVO_ALLOW_LOCAL_REPOS=0|EVO_WEB_ORIGINS=${STATE_ENV}" \
   --quiet
 
 echo "== web: public origin, owner-only without login (EVO_WEB_AUTH=none, POST rate limit); calls the API server-side with its ID token"
