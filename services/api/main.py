@@ -1880,13 +1880,42 @@ def evolution_promote(evolution_id: str):
     return {"pr": pr, "evidence_id": eid, "source_evidence_id": run_eid}
 
 
-def _mint_proof(evidence_id: str) -> dict:
-    """Mint the public proof certificate for one evidence id (shared helper).
+def _proof_evidence_key(evidence_id: str) -> str:
+    return f"proofcert_ev_{evidence_id}"
 
-    ONE implementation backs GET /v1/proof/{id} and _pr_core.
+
+def _proof_cert_key(certificate_id: str) -> str:
+    return f"proofcert_{certificate_id}"
+
+
+def _stored_cert_body(record) -> dict | None:
+    if isinstance(record, dict):
+        cert = record.get("certificate")
+        if isinstance(cert, dict) and isinstance(cert.get("certificate_id"), str):
+            return cert
+    return None
+
+
+def _mint_proof(evidence_id: str) -> dict:
+    """Return the stored proof certificate for one evidence id (shared helper).
+
+    The first call mints, stores exactly the signed body, and returns it;
+    later calls return the stored certificate (never re-signed). The HTTP
+    "verify" envelope is added on top on every read.
+
+    ONE implementation backs GET /v1/proof/{id},
+    GET /v1/proof/cert/{certificate_id}, and _pr_core.
     """
     if evidence_id not in _evidence:
         raise HTTPException(404, "unknown evidence id")
+    ev_key = _proof_evidence_key(evidence_id)
+    if ev_key in _evidence:
+        try:
+            cached = _stored_cert_body(_evidence[ev_key])
+        except KeyError:
+            cached = None
+        if cached is not None:
+            return {**cached, "verify": proof_mod.verify(cached)}
     stored = _evidence[evidence_id]
     public_view = _redact_value(stored)
     data = {k: v for k, v in public_view.items() if k not in ("chain", "data")}
@@ -1899,7 +1928,30 @@ def _mint_proof(evidence_id: str) -> dict:
         import hashlib as _hl3
         data["diff_sha256"] = _hl3.sha256(cand["diff"].encode("utf-8")).hexdigest()
     cert = proof_mod.mint(evidence_id, data, evidence_chain.chain(evidence_id))
-    return {**cert, "verify": proof_mod.verify(cert)}
+    cert_key = _proof_cert_key(cert.get("certificate_id", ""))
+    try:
+        _evidence[ev_key] = {"id": ev_key, "evidence_id": evidence_id,
+                             "certificate": cert}
+    except KernelRejected:
+        # A concurrent mint won: serve the stored winner, never a second id.
+        try:
+            winner = _stored_cert_body(_evidence[ev_key])
+        except KeyError:
+            winner = None
+        if winner is not None:
+            return {**winner, "verify": proof_mod.verify(winner)}
+        return {**cert, "verify": proof_mod.verify(cert)}
+    try:
+        _evidence[cert_key] = {"id": cert_key, "evidence_id": evidence_id,
+                               "certificate": cert}
+    except KernelRejected:
+        pass
+    try:
+        winner = _stored_cert_body(_evidence[ev_key])
+    except KeyError:
+        winner = None
+    final = winner if winner is not None else cert
+    return {**final, "verify": proof_mod.verify(final)}
 
 
 @app.get("/v1/proof/key")
@@ -1909,6 +1961,19 @@ def proof_key():
     if not pub:
         raise HTTPException(404, "proof signing not configured")
     return {"algorithm": "Ed25519", "public_key": pub}
+
+
+@app.get("/v1/proof/cert/{certificate_id}")
+def proof_certificate_by_id(certificate_id: str):
+    """Fetch a stored proof certificate by its id (stable since T33)."""
+    try:
+        record = _evidence[_proof_cert_key(certificate_id)]
+    except KeyError:
+        raise HTTPException(404, "unknown certificate id")
+    body = _stored_cert_body(record)
+    if body is None or body.get("certificate_id") != certificate_id:
+        raise HTTPException(404, "unknown certificate id")
+    return {**body, "verify": proof_mod.verify(body)}
 
 
 @app.get("/v1/proof/{evidence_id}")

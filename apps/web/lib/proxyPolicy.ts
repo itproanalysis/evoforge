@@ -69,6 +69,12 @@ export function resolveApiPath(segments: string[]): string | null {
     return apiPath;
   }
   if (
+    segments.length === 4 && segments[0] === "v1" &&
+    segments[1] === "proof" && segments[2] === "cert"
+  ) {
+    return apiPath;
+  }
+  if (
     segments.length === 4 && segments[0] === "v1" && segments[1] === "evolution" &&
     (segments[3] === "step" || segments[3] === "run" ||
      segments[3] === "cancel" || segments[3] === "promote")
