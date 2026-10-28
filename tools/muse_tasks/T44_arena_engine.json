@@ -1,0 +1,20 @@
+{
+  "id": "T44_arena_engine",
+  "planned_by": "Claude (Critic): docs/NORTH_STAR.md A1",
+  "goal": "T44 — Arena engine: the same sealed task runs in two lanes at once, EvoForge vs a single AI, scored the same way.\n\nRead docs/NORTH_STAR.md first. Build services/api/evoforge/arena.py and routes in services/api/main.py:\n- POST /v1/arena {suite_version (v1|v2, default v2), task_id, model (default muse-spark-1.3)} -> 202 {arena_id,\n  status:\"running\"}. Unknown task -> 404. Before any provider call run the budget guard for both lanes together\n  (single: 1 call; evoforge: PIPELINE_MAX_ATTEMPTS calls; same per-call cents as the eval endpoints) -> 402.\n- One background job (reuse services/api/evoforge/eval_jobs.py: one job at a time) runs both lanes concurrently\n  (two threads) on the same task, same files, same goal:\n  * lane \"single\" = what a single chat gives you: ONE Builder call, its diff applied strictly (harness\n    api-sealed-eval/1 semantics: patch.apply_unified_diff(..., recount=False)), no Critic, no retry.\n  * lane \"evoforge\" = the EvoForge pipeline for that task (harness api-sealed-eval/2, up to PIPELINE_MAX_ATTEMPTS\n    attempts with failing-test-name feedback, same helpers as run_pipeline).\n  * both lanes are scored by the task's sealed held-out tests in a fresh sandbox (same scorer as the evals).\n- Each lane records: status, attempts, heldout {passed, n}, outcome (passed|empty_diff|apply_failed|heldout_failed),\n  cost_cents (provider usage, like the evals), elapsed_ms, diff (the final candidate diff — the Builder's own output is\n  fine to show), and events: [{seq, ts, role: \"builder\"|\"critic\"|\"runner\"|\"gate\", message}] in order.\n- verdict {winner: \"evoforge\"|\"single\"|\"tie\", reason} from held-out results (more passed wins; equal -> tie).\n- GET /v1/arena/{id} (404 unknown) and GET /v1/arena -> {arenas: [...]} newest first (<= 20). Store arenas in the\n  evidence store (postgres_state.ScopedRecords(\"records\"), kind \"arena\") so they survive redeploys.\n- Never return held-out test code or the reference fix. Do not change patch.py semantics.\nTests: services/api/tests/test_muse_t44.py. Proxy: allow POST /v1/arena, GET /v1/arena, GET /v1/arena/<id> in\napps/web/lib/proxyPolicy.ts and proxyPolicy.cases.json.",
+  "edit": [
+    "services/api/evoforge/arena.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t44.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "docs/NORTH_STAR.md",
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/evoforge/eval_jobs.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
