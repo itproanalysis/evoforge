@@ -139,3 +139,13 @@ def test_locale_messages_have_key_parity_and_performance_page_is_localized():
     assert not re.search(r"[\uac00-\ud7a3]", src), "locale performance page must not hardcode Korean"
     assert "/evidence?id=" in src and "not_measured" in src
     assert "추정치" not in src and "estimate" not in src.lower()
+
+
+def test_locale_lab_evidence_and_mission_pages_do_not_hardcode_english_ui_strings():
+    lab = (WEB / "app" / "[locale]" / "lab" / "page.tsx").read_text(encoding="utf-8")
+    for s in ("sealed suites unavailable", '" (timeout)"', "(stub, no MODEL_API_KEY)", "review endpoint unavailable"):
+        assert s not in lab, s
+    ev = (WEB / "app" / "[locale]" / "evidence" / "page.tsx").read_text(encoding="utf-8")
+    assert "Review sealed summary" not in ev and "/v1/events/" in ev
+    mc = (WEB / "app" / "[locale]" / "page.tsx").read_text(encoding="utf-8")
+    assert 'label: "Generate"' not in mc and 'label: "Server Run"' not in mc

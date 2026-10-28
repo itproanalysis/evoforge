@@ -492,10 +492,10 @@ export default function MissionControl() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 text-xs">
             {[
-              { label: "Generate", eid: mission.generate_evidence_id },
-              { label: "Review", eid: mission.review_evidence_id },
-              { label: "Server Run", eid: mission.run_evidence_id },
-              { label: "Pull Request", eid: mission.pr_evidence_id },
+              { label: t("stage-generate"), eid: mission.generate_evidence_id },
+              { label: t("stage-review"), eid: mission.review_evidence_id },
+              { label: t("stage-run"), eid: mission.run_evidence_id },
+              { label: t("stage-pr"), eid: mission.pr_evidence_id },
             ].map((st) => (
               <div
                 key={st.label}

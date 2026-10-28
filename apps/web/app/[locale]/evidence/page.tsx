@@ -233,7 +233,7 @@ export default function EvidencePage() {
                     </button>
                     {l.stage === "Review" && (
                       <span className="text-xs text-text-secondary">
-                        Review sealed summary via GET /v1/events/{l.event_id}
+                        {t("review-summary-hint")} GET /v1/events/{l.event_id}
                       </span>
                     )}
                   </>

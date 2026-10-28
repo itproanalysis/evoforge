@@ -77,7 +77,9 @@ export default function Lab() {
       .catch((e) => {
         if (live)
           setSuitesNote(
-            `sealed suites unavailable: ${e instanceof Error ? e.message : String(e)}`
+            t("suites-unavailable", {
+              detail: e instanceof Error ? e.message : String(e),
+            })
           );
       });
     listMissions()
@@ -120,10 +122,10 @@ export default function Lab() {
         t("run-info", {
           visPass: v.pass,
           visN: v.n,
-          visTimeout: v.timed_out ? " (timeout)" : "",
+          visTimeout: v.timed_out ? t("timeout-suffix") : "",
           heldPass: h.pass,
           heldN: h.n,
-          heldTimeout: h.timed_out ? " (timeout)" : "",
+          heldTimeout: h.timed_out ? t("timeout-suffix") : "",
           base: out.run.base.slice(0, 12),
         })
       );
@@ -146,7 +148,11 @@ export default function Lab() {
       const n = out.review?.findings?.length ?? 0;
       setReview(
         t("review-verdict", {
-          verdict: `${result} findings=${n}${out.stub ? " (stub, no MODEL_API_KEY)" : ""}`,
+          verdict: t("review-findings", {
+            result,
+            count: n,
+            stub: out.stub ? t("stub-suffix") : "",
+          }),
         })
       );
       setReviewEvidenceId(out.evidence_id ?? "");
@@ -172,7 +178,7 @@ export default function Lab() {
       setSealed([]);
       setSealedTests([]);
       setReviewEvidenceId("");
-      setReview("verdict=INCONCLUSIVE reason=review endpoint unavailable, human needed");
+      setReview(t("review-unavailable"));
     } finally {
       setBusy(null);
     }
@@ -281,7 +287,7 @@ export default function Lab() {
         </div>
         {reviewEvidenceId && (
           <div className="text-xs text-text-secondary mt-2">
-            review_evidence_id:{" "}
+            {t("review-evidence-label")}:{" "}
             <a
               href={`/evidence?id=${encodeURIComponent(reviewEvidenceId)}`}
               className="text-accent-cyan hover:underline font-mono"
@@ -313,7 +319,7 @@ export default function Lab() {
               </li>
             ))}
             <li className="text-text-secondary">
-              evidence:{" "}
+              {t("evidence-label")}:{" "}
               <a
                 href={`/evidence?id=${encodeURIComponent(evalId)}`}
                 className="text-accent-cyan hover:underline font-mono"
@@ -336,9 +342,9 @@ export default function Lab() {
         <ul className="text-sm">
           {suites.map((s) => (
             <li key={s.family}>
-              <code>{s.family}</code> tasks={s.task_count}{" "}
+              <code>{s.family}</code> {t("suite-tasks", { count: s.task_count })}{" "}
               <span className="text-text-secondary">
-                kinds: {s.heldout_kinds.join(", ")}
+                {t("suite-kinds", { kinds: s.heldout_kinds.join(", ") })}
               </span>
             </li>
           ))}

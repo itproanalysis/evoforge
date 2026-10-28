@@ -68,6 +68,10 @@
     "participant-roles": "Roles",
     "participant-states": "Membership · connection · execution · credentials",
     "participant-values": {"lease_holder":"Task lease", "builder":"Builder", "reviewer":"Reviewer", "REQUESTED":"Requested", "PENDING_APPROVAL":"Pending approval", "AUTHORIZED":"Authorized", "REVOKED":"Revoked", "UNKNOWN":"Unknown", "PROBING":"Probing", "READY":"Ready", "DEGRADED":"Degraded", "OFFLINE":"Offline", "IDLE":"Idle", "ASSIGNED":"Assigned", "RUNNING":"Running", "WAITING_FOR_CLIENT":"Waiting for client", "BLOCKED":"Blocked", "FINISHED":"Finished", "VALID":"Valid", "EXPIRING":"Expiring", "EXPIRED":"Expired"},
+    "stage-generate": "Generate",
+    "stage-review": "Review",
+    "stage-run": "Server Run",
+    "stage-pr": "Pull Request",
     "measurement-history": "Performance measurement history",
     "history-unavailable": "Performance measurement history could not be loaded.",
     "history-empty": "No performance measurements have been recorded.",
@@ -125,7 +129,16 @@
     "run-info": "visible {visPass}/{visN}{visTimeout} · held-out {heldPass}/{heldN}{heldTimeout} · base {base}",
     "review-verdict": "review verdict: {verdict}",
     "pr-created": "PR: {url}",
-    "error-prefix": "Error: "
+    "error-prefix": "Error: ",
+    "suites-unavailable": "Sealed suites unavailable: {detail}",
+    "timeout-suffix": " (timeout)",
+    "stub-suffix": " (stub, no MODEL_API_KEY)",
+    "review-findings": "{result} findings={count}{stub}",
+    "review-unavailable": "verdict=INCONCLUSIVE reason=review endpoint unavailable, human needed",
+    "suite-tasks": "{count} tasks",
+    "suite-kinds": "kinds: {kinds}",
+    "evidence-label": "evidence",
+    "review-evidence-label": "review evidence"
   },
   "evidence": {
     "heading": "Evidence Timeline",
@@ -137,6 +150,7 @@
     "evidence-missing": "Evidence missing",
     "event-label": "Event {id}",
     "loading-event": "Loading event…",
+    "review-summary-hint": "Review sealed summary via",
     "recent-evidence-heading": "Quick-Select Live Server Evidence IDs",
     "recent-evidence-empty": "No recent mission/outcome evidence IDs found on server.",
     "stages": {
