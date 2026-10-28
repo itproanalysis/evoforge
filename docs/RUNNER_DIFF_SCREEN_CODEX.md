@@ -43,7 +43,13 @@ still preserved as reported, but the absent terminal summary causes the G2
 verdict to be INCONCLUSIVE. A normal parameterized class test passes the check.
 Focused cross-check/screen/attestation/coverage regressions: 44 passed.
 Existing actual Runner-service/client/PR tests plus the cross-check regressions:
-70 passed in 72.39s. Full release-7 API/SQL/kernel checks remain pending.
+70 passed in 72.39s. Release-7 source checks also passed 169 actual PostgreSQL
+kernel regressions (283.90s), SQL 96 checks and frozen package validation.
+Logs: `.local/validation-runner-r7-pg.log` and `.local/validation-postgres.log`.
+Full API was collected at production-code commit `7c45f16` and remains pending.
+The subsequent test-only commit `5bc7fe8` adds two more cases (real assertion
+failure and stale approval rejection); its ten cross-check tests passed
+separately. Do not count those two additions in the pending earlier collection.
 
 The two child-controlled channels can be forged together. This comparison
 does not independently establish which assertion bodies ran, does not derive
