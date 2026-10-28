@@ -18,6 +18,7 @@ EVO_REPO_ROOTS unset on any host holding secrets (unset = Runner refuses every r
 """
 from __future__ import annotations
 
+from collections import Counter
 import ntpath
 import os
 import re
@@ -195,6 +196,42 @@ def _parse_junit(xml_path: str, n_snippets: int) -> tuple[int, int]:
 _SEALED_BOOT = "import sys, pytest; sys.path.append(sys.argv[1]); sys.exit(pytest.main(sys.argv[2:]))"
 
 
+def _report_agrees(xml_path: str, output: bytes, returncode: int, prefix: str, count: int) -> bool:
+    """Cross-check child channels; both remain forgeable by same-UID code."""
+    try:
+        cases = list(ET.parse(xml_path).getroot().iter("testcase"))
+    except (OSError, ET.ParseError):
+        return False
+    expected = {f"{prefix}_{i}" for i in range(1, count + 1)}
+    junit = Counter()
+    modules = set()
+    for case in cases:
+        parts = case.get("classname", "").split(".")
+        index = next((i for i, p in enumerate(parts) if p in expected), None)
+        if index is None or not case.get("name"):
+            return False
+        modules.add(parts[index])
+        ident = "::".join(parts[index:] + [case.get("name")])
+        tags = {c.tag.rsplit("}", 1)[-1] for c in case}
+        status = "ERROR" if "error" in tags else "FAILED" if "failure" in tags else "SKIPPED" if "skipped" in tags else "PASSED"
+        junit[(status, ident)] += 1
+    summary = Counter()
+    for line in output.decode("utf-8", errors="replace").splitlines():
+        match = re.match(r"^(PASSED|FAILED|ERROR|SKIPPED|XFAIL|XPASS) (.+)$", line)
+        if match:
+            nodeid = match[2].split(" - ", 1)[0].replace("\\", "/")
+            path, sep, tail = nodeid.partition("::")
+            if not sep:
+                return False
+            module = path.rsplit("/", 1)[-1]
+            if not module.endswith(".py"):
+                return False
+            summary[(match[1], module[:-3] + "::" + tail)] += 1
+    return (bool(junit) and modules == expected and junit == summary
+            and all(n == 1 for n in junit.values())
+            and ((returncode == 0) == all(s == "PASSED" for s, _ in junit)))
+
+
 def _run_suite(sandbox: str, suite_dir: str, xml_path: str,
                suite: list[dict], timeout_s: int, sealed_ini: str | None = None) -> dict:
     """sealed_ini set = held-out run: candidate config/plugins/conftest/sitecustomize are not loaded."""
@@ -209,11 +246,11 @@ def _run_suite(sandbox: str, suite_dir: str, xml_path: str,
         # pytest.py (or any stdlib/site-packages name) cannot shadow the real module.
         env["PYTEST_DISABLE_PLUGIN_AUTOLOAD"] = "1"
         cmd = [sys.executable, "-I", "-c", _SEALED_BOOT, sandbox,
-               "-q", "-p", "no:cacheprovider", "-c", sealed_ini, "--rootdir", suite_dir,
+               "-q", "-rA", "--color=no", "-p", "no:cacheprovider", "-c", sealed_ini, "--rootdir", suite_dir,
                "--noconftest", "--junitxml", xml_path, suite_dir]
     else:
         env["PYTHONPATH"] = sandbox
-        cmd = [sys.executable, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+        cmd = [sys.executable, "-m", "pytest", "-q", "-rA", "--color=no", "-p", "no:cacheprovider",
                "--rootdir", sandbox, "--junitxml", xml_path, suite_dir]
     if os.path.exists(xml_path):
         raise RunnerError("junit path pre-exists; refusing to read a planted report")
@@ -222,7 +259,9 @@ def _run_suite(sandbox: str, suite_dir: str, xml_path: str,
     except subprocess.TimeoutExpired:
         return {"pass": 0, "n": len(suite), "timed_out": True, "exit_code": None}
     n, passed = _parse_junit(xml_path, len(suite))
-    return {"pass": passed, "n": n, "timed_out": False, "exit_code": proc.returncode}
+    prefix = "test_heldout" if sealed_ini else "test_visible"
+    return {"pass": passed, "n": n, "timed_out": False, "exit_code": proc.returncode,
+            "report_integrity": _report_agrees(xml_path, proc.stdout, proc.returncode, prefix, len(suite))}
 
 
 def _remove_tree(path: str) -> None:

@@ -392,6 +392,19 @@ def _check_size(heldout: list[dict]) -> None:
             raise SealedTooLarge("sealed test over size budget")
 
 
+def _heldout_result_passes(result: dict, expected: int) -> bool:
+    """Never credit counts contradicted by exit status or Runner evidence.
+
+    Missing integrity flags remain compatible with older remote Runners; an
+    explicitly supplied flag must be True. Local Runners always supply it.
+    """
+    n, passed = result.get("n"), result.get("pass")
+    return (type(n) is int and type(passed) is int
+            and n >= expected and n > 0 and passed == n
+            and type(result.get("exit_code")) is int and result["exit_code"] == 0
+            and ("report_integrity" not in result or result["report_integrity"] is True))
+
+
 def _run_heldout_local(sandbox: str, heldout: list[dict],
                        timeout_s: int, tmpbase: str) -> float:
     """Held-out run with the Runner sealed isolation; 1.0 iff all pass."""
@@ -417,9 +430,7 @@ def _run_heldout_local(sandbox: str, heldout: list[dict],
         raise SealedEvalError(f"sealed run failed: {type(e).__name__}")
     if not isinstance(result, dict) or result.get("timed_out"):
         raise SealedTimeout("sealed held-out run timed out")
-    n = result.get("n", 0)
-    passed = result.get("pass", 0)
-    if n < len(heldout) or passed != n:
+    if not _heldout_result_passes(result, len(heldout)):
         return 0.0
     return 1.0
 
@@ -445,9 +456,7 @@ def _run_heldout_remote(source: str, base: str, diff: str,
     held = run.get("heldout", {})
     if not isinstance(held, dict) or held.get("timed_out"):
         raise SealedTimeout("sealed held-out run timed out")
-    n = held.get("n", 0)
-    passed = held.get("pass", 0)
-    if n < len(heldout) or passed != n:
+    if not _heldout_result_passes(held, len(heldout)):
         return 0.0
     return 1.0
 
@@ -743,7 +752,7 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                     if score >= 1.0:
                         outcome = "passed"
                     else:
-                        outcome = "heldout_failed"
+                        outcome = _failed_run_outcome(failures)
                         failing = _failing_test_names(
                             failures, task["heldout"])
                 else:
@@ -861,7 +870,13 @@ def _call_pipeline_attempt(goal: str, base: str,
     return rsv, out, int(actual), missing
 
 
-SCORE_OUTCOMES = ("passed", "empty_diff", "apply_failed", "heldout_failed")
+def _failed_run_outcome(failures: list[dict]) -> str:
+    if any(f.get("verification") == "INCONCLUSIVE" for f in failures):
+        return "verification_inconclusive"
+    return "heldout_failed"
+
+
+SCORE_OUTCOMES = ("passed", "empty_diff", "apply_failed", "heldout_failed", "verification_inconclusive")
 
 _SCORE_BASE_KEYS = ("task_id", "score", "scaffold", "hygiene")
 
@@ -1005,9 +1020,10 @@ def _run_heldout_local_detail(sandbox: str, heldout: list[dict],
         raise SealedEvalError(f"sealed run failed: {type(e).__name__}")
     if not isinstance(result, dict) or result.get("timed_out"):
         raise SealedTimeout("sealed held-out run timed out")
-    n = result.get("n", 0)
-    passed = result.get("pass", 0)
-    if n < len(heldout) or passed != n:
+    if not _heldout_result_passes(result, len(heldout)):
+        if "report_integrity" in result and result["report_integrity"] is not True:
+            return 0.0, [{"test": "held-out", "message": "verification inconclusive",
+                          "verification": "INCONCLUSIVE"}]
         failures = _parse_failure_xml(xml)
         if not failures:
             failures = [{"test": "held-out", "message": "assertion failed"}]
@@ -1111,7 +1127,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                         if score >= 1.0:
                             outcome, failing = "passed", []
                         else:
-                            outcome = "heldout_failed"
+                            outcome = _failed_run_outcome(failures)
                             failing = _failing_test_names(
                                 failures, task["heldout"])
                     else:
