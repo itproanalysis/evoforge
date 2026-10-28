@@ -765,3 +765,11 @@ Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.
 `docs/validation/2026-10-28-runner-base-bundle.json`에 기록했다. 기존 미커밋 runner와
 Critic 테스트는 보존했으며 이 검증에 포함하지 않았다. 수집 결과 보강은 별도 검증 중이다.
 공개 PR의 검증 SHA 전달, 실제 provider 청구 출처, 공개 Broker/DB 연결과 배포는 미완료다.
+
+## 관리 화면 및 Runner 수집 검증 후속
+
+관리 화면 갱신 신뢰성 개선은 `77d018c`에 반영됐다. 동일 웹 tree의 npm ci·TypeScript·
+프로덕션 빌드는 통과했으며 통합 API/DB 전체 검증은 남아 있다. Runner 수집 검증은
+`2550dc1`에 반영됐고 검증본에서 전체 API 656 passed·1 skipped, 실제 PostgreSQL 169 passed,
+Runner 서비스 포함 52 passed다. 증거 해시는 `docs/validation/2026-10-28-runner-collection.json`.
+수집 수는 파일별 실행 증명이 아니다. 공개 PR 기준 SHA 바인딩은 별도 검증 중이다.

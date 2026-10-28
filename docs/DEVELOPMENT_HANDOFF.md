@@ -412,3 +412,13 @@ main 작업 중인 runner/승격 Critic 파일은 건드리지 않았다.
 Critic 테스트는 보존했고 검증본에 포함하지 않았다. 수집 수 검증은 별도 브랜치에서 진행 중이다.
 공개 PR의 SHA 전달은 승격 T17 fixture 충돌로 미완료이며 우회하지 않았다. 실제 provider 청구,
 공개 Broker/DB 연결·운영 배포도 미완료다. Muse Spark와 자동 재개를 유지한다.
+
+## 2026-10-28 관리 화면 및 Runner 수집 검증 후속
+
+`77d018c`에 관리 화면의 부분 동기화 실패와 오래된 데이터 경고, 중복 갱신 방지,
+미션 선택 응답 경합 방지 및 자동 갱신 중지 처리를 반영했다. 검증본과 통합 웹 tree가 같으며
+npm ci·TypeScript·프로덕션 빌드가 통과했다. 전체 통합 API/DB 검증은 별도로 필요하다.
+Runner 수집 검증은 `2550dc1`에 반영됐고 검증본에서 API 656 passed·1 skipped,
+실제 PostgreSQL 169 passed·Runner 서비스 포함 52 passed다. 원본 로그와 해시는
+`docs/validation/2026-10-28-runner-collection.json`에 있다. 수집 수만으로 각 파일 실행이
+증명되지는 않는다. 공개 PR의 기준 SHA 바인딩은 별도 브랜치에서 검증 중이다.
