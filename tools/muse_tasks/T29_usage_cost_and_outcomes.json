@@ -1,0 +1,16 @@
+{
+  "id": "T29_usage_cost_and_outcomes",
+  "planned_by": "Claude (Critic): board W4 + W9, needed for an honest proof",
+  "goal": "T29 — X_SINGLE cost from provider usage, and a reason for every task score (board W4 + W9).\n\nToday services/api/evoforge/sealed_eval.py::_call_builder_task reserves BASELINE_COST_CENTS (120c) and always settles 120c,\nso the production X_SINGLE cost (1440c for 12 tasks) is a constant while PIPELINE settles provider usage\n(performance.usage_cost_cents). Cost-per-solved is therefore not comparable. And eval scores carry only `score`, so a low\nnumber cannot be split into model vs harness vs spec causes (the 2026-10-28 diagnosis had to be done by hand).\n\n1. Baseline settles from usage exactly like the pipeline attempts: actual = performance.usage_cost_cents(\n   performance.usage_from_output(out)); when usage is missing settle at BASELINE_COST_CENTS and mark the measurement\n   usage_missing=True (record and /v1/performance view). Usage above the reservation is settled at its real value (the\n   ledger already records an overrun) — never capped or hidden. Measurement cost_cents = sum of settled amounts.\n   Refund/unknown handling for provider errors stays as today.\n2. Every entry in `scores` (baseline and pipeline, sync and job paths, and the stored evidence) gets\n   \"outcome\": one of \"passed\" | \"empty_diff\" | \"apply_failed\" | \"heldout_failed\", and \"failing_tests\": a list of failing\n   held-out test function names (only for heldout_failed; [] otherwise). Names only — never held-out code, assertion\n   text or reference fixes. For the pipeline, the outcome is that of the task's final attempt.\n3. Tests: services/api/tests/test_muse_t29.py. Keep every existing test green; do not change patch.py or main.py\n   request models.",
+  "edit": [
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/tests/test_muse_t29.py"
+  ],
+  "context": [
+    "services/api/evoforge/performance.py",
+    "services/api/evoforge/ledger.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
