@@ -1,0 +1,58 @@
+{
+  "family": "parallel_multi_file",
+  "suite_version": "v4",
+  "tasks": [
+    {
+      "id": "SV4-PM-01",
+      "goal": "Two files. In theme.py, css_vars(overrides=None) merges overrides into TOKENS and returns CSS custom properties \"--KEY: VALUE\" sorted by key and joined by \"; \". In card.py, render(title, body, tone=\"default\") returns <section class=\"card card-TONE\" style=\"STYLE\"><h2>TITLE</h2><p>BODY</p></section> where STYLE = theme.css_vars(TONES[tone]) with TONES default {}, warning {accent: #d97706}, danger {accent: #dc2626}; an unknown tone raises ValueError; title and body are HTML-escaped. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "theme.py": "TOKENS = {\"accent\": \"#2563eb\", \"radius\": \"8px\", \"muted\": \"#6b7280\"}\n\n\ndef css_vars(overrides=None):\n    return \", \".join(f\"{k}: {v}\" for k, v in TOKENS.items())\n",
+        "card.py": "def render(title, body, tone=\"default\"):\n    return f'<section class=\"card\"><h2>{title}</h2><p>{body}</p></section>'\n\n\ndef preview():\n    return \"<div>\" + render(\"Build\", \"All checks passed\") + render(\"Budget\", \"80% used\", \"warning\") + \"</div>\"\n"
+      },
+      "reference_fix": "--- a/card.py\n+++ b/card.py\n@@ -1,5 +1,15 @@\n+import html\n+\n+import theme\n+\n+TONES = {\"default\": {}, \"warning\": {\"accent\": \"#d97706\"}, \"danger\": {\"accent\": \"#dc2626\"}}\n+\n+\n def render(title, body, tone=\"default\"):\n-    return f'<section class=\"card\"><h2>{title}</h2><p>{body}</p></section>'\n+    if tone not in TONES:\n+        raise ValueError(f\"unknown tone: {tone!r}\")\n+    return (f'<section class=\"card card-{tone}\" style=\"{theme.css_vars(TONES[tone])}\">'\n+            f\"<h2>{html.escape(title)}</h2><p>{html.escape(body)}</p></section>\")\n \n \n def preview():\n--- a/theme.py\n+++ b/theme.py\n@@ -2,4 +2,6 @@\n \n \n def css_vars(overrides=None):\n-    return \", \".join(f\"{k}: {v}\" for k, v in TOKENS.items())\n+    merged = dict(TOKENS)\n+    merged.update(overrides or {})\n+    return \"; \".join(f\"--{k}: {merged[k]}\" for k in sorted(merged))\n",
+      "heldout": [
+        {
+          "id": "SV4-PM-01-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport card\nimport theme\n\n\ndef test_sv4pm01_compositional():\n    e = ET.fromstring(card.render('Build', 'ok'))\n    assert e.get('style') == theme.css_vars() == '--accent: #2563eb; --muted: #6b7280; --radius: 8px'\n    assert e.get('class') == 'card card-default' and e.find('h2').text == 'Build'\n"
+        },
+        {
+          "id": "SV4-PM-01-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport card\nimport theme\n\n\ndef test_sv4pm01_negative():\n    with pytest.raises(ValueError):\n        card.render('x', 'y', 'loud')\n"
+        },
+        {
+          "id": "SV4-PM-01-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport card\nimport theme\n\n\ndef test_sv4pm01_boundary():\n    e = ET.fromstring(card.render('A<B', 'x', 'danger'))\n    assert '--accent: #dc2626' in e.get('style') and e.find('h2').text == 'A<B'\n    assert theme.css_vars({'radius': '0'}) == '--accent: #2563eb; --muted: #6b7280; --radius: 0'\n"
+        }
+      ]
+    },
+    {
+      "id": "SV4-PM-02",
+      "goal": "Two files. In nav_model.py, items(tabs, active) takes (id, label) pairs and returns [{id, label, active}] where exactly the tab whose id == active is active, or the first tab when active is not an id; duplicate ids raise ValueError. In nav_view.py, render(tabs, active) returns <nav aria-label=\"Features\"> with one <a href=\"#ID\" class=\"tab\">LABEL</a> per item; the active one has class=\"tab active\" and aria-current=\"page\" (others have no aria-current). Labels are HTML-escaped. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "nav_model.py": "def items(tabs, active):\n    return [{\"id\": i, \"label\": label, \"active\": False} for i, label in tabs]\n",
+        "nav_view.py": "import nav_model\n\n\ndef render(tabs, active):\n    links = \"\".join(\n        f'<a href=\"#{t[\"id\"]}\" class=\"tab\">{t[\"label\"]}</a>' for t in nav_model.items(tabs, active))\n    return f\"<nav>{links}</nav>\"\n\n\ndef preview():\n    return render([(\"mission\", \"Mission\"), (\"arena\", \"Arena\"), (\"proof\", \"Proof\")], \"arena\")\n"
+      },
+      "reference_fix": "--- a/nav_model.py\n+++ b/nav_model.py\n@@ -1,2 +1,7 @@\n def items(tabs, active):\n-    return [{\"id\": i, \"label\": label, \"active\": False} for i, label in tabs]\n+    ids = [i for i, _ in tabs]\n+    if len(set(ids)) != len(ids):\n+        raise ValueError(\"tab ids must be unique\")\n+    if active not in ids:\n+        active = ids[0] if ids else None\n+    return [{\"id\": i, \"label\": label, \"active\": i == active} for i, label in tabs]\n--- a/nav_view.py\n+++ b/nav_view.py\n@@ -1,10 +1,17 @@\n+import html\n+\n import nav_model\n \n \n def render(tabs, active):\n-    links = \"\".join(\n-        f'<a href=\"#{t[\"id\"]}\" class=\"tab\">{t[\"label\"]}</a>' for t in nav_model.items(tabs, active))\n-    return f\"<nav>{links}</nav>\"\n+    links = []\n+    for t in nav_model.items(tabs, active):\n+        if t[\"active\"]:\n+            attrs = 'class=\"tab active\" aria-current=\"page\"'\n+        else:\n+            attrs = 'class=\"tab\"'\n+        links.append(f'<a href=\"#{html.escape(t[\"id\"], quote=True)}\" {attrs}>{html.escape(t[\"label\"])}</a>')\n+    return '<nav aria-label=\"Features\">' + \"\".join(links) + \"</nav>\"\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-PM-02-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport nav_model\nimport nav_view\n\n\ndef test_sv4pm02_compositional():\n    e = ET.fromstring(nav_view.render([('mission', 'Mission'), ('arena', 'Arena')], 'arena'))\n    links = e.findall('a')\n    assert [a.get('class') for a in links] == ['tab', 'tab active'] and links[1].get('aria-current') == 'page'\n    assert links[0].get('aria-current') is None and links[0].get('href') == '#mission' and e.get('aria-label') == 'Features'\n"
+        },
+        {
+          "id": "SV4-PM-02-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport nav_model\nimport nav_view\n\n\ndef test_sv4pm02_negative():\n    with pytest.raises(ValueError):\n        nav_model.items([('a', 'A'), ('a', 'B')], 'a')\n"
+        },
+        {
+          "id": "SV4-PM-02-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport nav_model\nimport nav_view\n\n\ndef test_sv4pm02_boundary():\n    assert nav_model.items([('x', 'X'), ('y', 'Y')], 'missing') == [{'id': 'x', 'label': 'X', 'active': True}, {'id': 'y', 'label': 'Y', 'active': False}]\n    assert ET.fromstring(nav_view.render([], 'x')).findall('a') == []\n"
+        }
+      ]
+    }
+  ]
+}

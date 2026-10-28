@@ -1,0 +1,56 @@
+{
+  "family": "ci_saturated",
+  "suite_version": "v4",
+  "tasks": [
+    {
+      "id": "SV4-CI-01",
+      "goal": "In results_table.py, render(results) takes dicts {name, status (pass|fail|skip), ms} and returns <table class=\"results\"> with <thead><tr><th>Test</th><th>Status</th><th>Time</th></tr></thead>, a <tbody> with one <tr class=\"row-STATUS\"><td>NAME</td><td>STATUS</td><td>MS ms</td></tr> per result, failures first and then by name, and <tfoot><tr><td colspan=\"3\">PASSED/TOTAL passed</td></tr></tfoot> where PASSED counts status pass. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "results_table.py": "def render(results):\n    rows = \"\".join(\n        f\"<tr><td>{r['name']}</td><td>{r['status']}</td><td>{r['ms']} ms</td></tr>\" for r in results)\n    return ('<table class=\"results\"><thead><tr><th>Test</th><th>Status</th><th>Time</th></tr></thead>'\n            f\"<tbody>{rows}</tbody></table>\")\n\n\ndef preview():\n    return render([{\"name\": \"test_login\", \"status\": \"pass\", \"ms\": 12},\n                   {\"name\": \"test_cart\", \"status\": \"fail\", \"ms\": 40},\n                   {\"name\": \"test_search\", \"status\": \"skip\", \"ms\": 0}])\n"
+      },
+      "reference_fix": "--- a/results_table.py\n+++ b/results_table.py\n@@ -1,8 +1,15 @@\n+import html\n+\n+\n def render(results):\n+    ordered = sorted(results, key=lambda r: (r[\"status\"] != \"fail\", r[\"name\"]))\n     rows = \"\".join(\n-        f\"<tr><td>{r['name']}</td><td>{r['status']}</td><td>{r['ms']} ms</td></tr>\" for r in results)\n+        f'<tr class=\"row-{r[\"status\"]}\"><td>{html.escape(r[\"name\"])}</td><td>{r[\"status\"]}</td>'\n+        f\"<td>{r['ms']} ms</td></tr>\" for r in ordered)\n+    passed = sum(1 for r in results if r[\"status\"] == \"pass\")\n     return ('<table class=\"results\"><thead><tr><th>Test</th><th>Status</th><th>Time</th></tr></thead>'\n-            f\"<tbody>{rows}</tbody></table>\")\n+            f'<tbody>{rows}</tbody><tfoot><tr><td colspan=\"3\">{passed}/{len(results)} passed</td></tr></tfoot>'\n+            \"</table>\")\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-CI-01-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport results_table\n\n\ndef test_sv4ci01_compositional():\n    e = ET.fromstring(results_table.render([{'name': 'b', 'status': 'pass', 'ms': 3}, {'name': 'c', 'status': 'fail', 'ms': 5}, {'name': 'a', 'status': 'pass', 'ms': 1}]))\n    rows = e.find('tbody').findall('tr')\n    assert [r.find('td').text for r in rows] == ['c', 'a', 'b'] and rows[0].get('class') == 'row-fail'\n    assert e.find('tfoot').find('tr').find('td').text == '2/3 passed'\n"
+        },
+        {
+          "id": "SV4-CI-01-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport results_table\n\n\ndef test_sv4ci01_negative():\n    e = ET.fromstring(results_table.render([]))\n    assert e.find('tbody').findall('tr') == [] and e.find('tfoot').find('tr').find('td').text == '0/0 passed'\n"
+        },
+        {
+          "id": "SV4-CI-01-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport results_table\n\n\ndef test_sv4ci01_boundary():\n    e = ET.fromstring(results_table.render([{'name': 'x<y', 'status': 'skip', 'ms': 0}]))\n    cells = e.find('tbody').find('tr').findall('td')\n    assert cells[0].text == 'x<y' and cells[2].text == '0 ms'\n    assert e.find('tfoot').find('tr').find('td').text == '0/1 passed'\n"
+        }
+      ]
+    },
+    {
+      "id": "SV4-CI-02",
+      "goal": "In queue_view.py, render(jobs, capacity) returns <ul class=\"queue\" data-capacity=\"CAPACITY\"> with one <li class=\"job running\"> for each of the first CAPACITY job names (in order) and <li class=\"job waiting\"> for the rest, each holding the job name, followed by a last <li class=\"summary\">R running, W waiting</li>. capacity < 1 raises ValueError. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "queue_view.py": "def render(jobs, capacity):\n    items = \"\".join(f'<li class=\"job\">{j}</li>' for j in jobs)\n    return f'<ul class=\"queue\">{items}</ul>'\n\n\ndef preview():\n    return render([\"lint\", \"unit\", \"e2e\", \"build\"], 2)\n"
+      },
+      "reference_fix": "--- a/queue_view.py\n+++ b/queue_view.py\n@@ -1,6 +1,16 @@\n+import html\n+\n+\n def render(jobs, capacity):\n-    items = \"\".join(f'<li class=\"job\">{j}</li>' for j in jobs)\n-    return f'<ul class=\"queue\">{items}</ul>'\n+    if capacity < 1:\n+        raise ValueError(\"capacity must be at least 1\")\n+    items = []\n+    for i, j in enumerate(jobs):\n+        state = \"running\" if i < capacity else \"waiting\"\n+        items.append(f'<li class=\"job {state}\">{html.escape(j)}</li>')\n+    running = min(len(jobs), capacity)\n+    items.append(f'<li class=\"summary\">{running} running, {len(jobs) - running} waiting</li>')\n+    return f'<ul class=\"queue\" data-capacity=\"{capacity}\">' + \"\".join(items) + \"</ul>\"\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-CI-02-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport queue_view\n\n\ndef test_sv4ci02_compositional():\n    e = ET.fromstring(queue_view.render(['a', 'b', 'c'], 2))\n    items = e.findall('li')\n    assert [i.get('class') for i in items[:3]] == ['job running', 'job running', 'job waiting']\n    assert items[-1].get('class') == 'summary' and items[-1].text == '2 running, 1 waiting'\n"
+        },
+        {
+          "id": "SV4-CI-02-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport queue_view\n\n\ndef test_sv4ci02_negative():\n    with pytest.raises(ValueError):\n        queue_view.render(['a'], 0)\n"
+        },
+        {
+          "id": "SV4-CI-02-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport queue_view\n\n\ndef test_sv4ci02_boundary():\n    e = ET.fromstring(queue_view.render([], 3))\n    items = e.findall('li')\n    assert len(items) == 1 and items[0].text == '0 running, 0 waiting' and e.get('data-capacity') == '3'\n"
+        }
+      ]
+    }
+  ]
+}
