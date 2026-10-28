@@ -60,3 +60,24 @@ your module, do not touch it — work on a branch.
 - 2026-10-28 (Claude): migration 011 applied to Cloud SQL via `infra/gcp/migrate_once.py` (ledger had
   001–010 + seed; RLS/force, `performance_scope`, `performance_immutable`, core_app SELECT/INSERT verified).
   Cloud SQL `postgres` password was reset (owner approved); the only copy is Secret Manager `SQLROOT_PW`.
+
+## 6. Work board (updated 2026-10-28 22:30 KST — read before starting; update your row when you start/finish)
+
+Priority order is Muse Spark 1 > Claude 2 > Codex 3 (owner decision). One owner per row; if a row is not
+yours, do not start it — add a row instead. Product copy says "service", never "demo"/"hackathon".
+
+| # | Work | Owner | Branch / state | Done when |
+|---|---|---|---|---|
+| W1 | **T24 async eval jobs**: `POST /v1/eval/jobs` (202), `GET /v1/eval/jobs[/{id}]`, one job at a time, same budget guard; performance page polls | Muse Spark (Builder), Claude (Critic: sealed tests, review) | `muse/round9`, building | sealed T24 tests + full suite green, reviewed, released |
+| W2 | **Release execution + live checks**: cut `release/*`, deploy with `infra/gcp/deploy_prod.sh STATE_BACKEND=postgres`, live mission, record here | Claude (on behalf of release captain Muse) | `release/2026-10-28-2` deploying | live check recorded in §5/§4 |
+| W3 | **Measurements**: X_SINGLE baseline and PIPELINE on production (postgres-backed). Nobody else starts `/v1/eval/*` on production — duplicate runs spend credit and the 22:13 run was lost when the API was replaced | Claude | baseline next; pipeline after W1 | numbers on `/performance`, spend read from dev.meta.ai billing |
+| W4 | **Usage-derived baseline cost**: `sealed_eval._call_builder_task` settles a fixed `BASELINE_COST_CENTS` (120¢/task) while the pipeline settles provider usage; settle baseline from usage the same way (`performance.usage_cost_cents`), keep the reservation cap, keep fail-closed on missing usage | Codex | open | X_SINGLE and PIPELINE cost-per-solved are comparable; tests show a baseline call billed from usage |
+| W5 | **Loading states**: Mission Control and Performance show "loading" until the first response; show "cannot load" only after a request actually failed (today the error text flashes on every page load) | agy | open | no error text before the first fetch settles; 375px layout intact |
+| W6 | Runner isolation / PR base binding follow-ups already in flight | Codex | `codex/*` | merged to main with full suite green |
+| W7 | Main worktree hygiene: uncommitted `services/api/evoforge/runner.py`, `services/api/tests/test_critic_t5_runner.py`, `apps/web/tsconfig.tsbuildinfo` sit in `C:\evo_forge` (cline checkpoints). Owner of that work: commit on your branch or discard; never leave WIP in the shared main worktree | whoever owns that WIP (cline) | open | `git status` clean in `C:\evo_forge` |
+
+Rules that came from today's incidents:
+- The env block of `evoforge-api` is owned by `deploy_prod.sh` (§5). One deploy at a time: check
+  `gcloud builds list` before submitting.
+- Web traffic follows the latest revision; do not pin traffic without writing it here.
+- A live eval that is still running dies when the API is redeployed. Check §6 W3 before deploying.
