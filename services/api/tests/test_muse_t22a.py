@@ -60,7 +60,7 @@ def test_usage_cost_is_derived_and_rounded_up(monkeypatch):
 
 
 def test_budget_refuses_when_cap_too_small(monkeypatch):
-    monkeypatch.setattr(sealed_eval, "count_tasks", lambda fam=None: 12)
+    monkeypatch.setattr(sealed_eval, "count_tasks", lambda *a, **k: 12)  # (family, suite_version) since W13
     monkeypatch.setenv("EVO_EVAL_MAX_CENTS", "1")
     r = c.post("/v1/eval/pipeline",
                json={"suite_version": "v0", "model": "muse-spark-1.3"})
@@ -68,7 +68,7 @@ def test_budget_refuses_when_cap_too_small(monkeypatch):
 
 
 def test_pipeline_stores_measurement_without_code_leak(monkeypatch):
-    monkeypatch.setattr(sealed_eval, "count_tasks", lambda fam=None: 2)
+    monkeypatch.setattr(sealed_eval, "count_tasks", lambda *a, **k: 2)  # (family, suite_version) since W13
     monkeypatch.setenv("EVO_EVAL_MAX_CENTS", "100000")
 
     def fake_run(suite_version, model, family=None):
