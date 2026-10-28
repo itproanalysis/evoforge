@@ -1,0 +1,19 @@
+{
+  "id": "T34_timeline_polish",
+  "planned_by": "Claude (Critic) from the live production timeline",
+  "goal": "T34 — polish the evolution timeline with what real production data showed (2026-10-29 screenshot).\n\nProduction now has: X_SINGLE v0 /1 2/12; X_SINGLE v1 /1 7/12; X_SINGLE v1 /2 11/12; PIPELINE v1 /2 12/12. Problems:\n1. The SVG is a fixed ~200px wide inside a wide card: make it fill the card (width 100%, keep the viewBox, scale nicely\n   at 375px and 1280px; spread points across the width).\n2. All points share one date: x labels must show date AND time (e.g. \"10-29 00:21\"), never ambiguous.\n3. The harness marker label \"하네스 api-sealed-eval/2\" is truncated and overlaps: show a short label like \"/2\" next to the\n   dashed line (text-anchor chosen so it stays inside the chart) and put the full harness name in a <title>.\n4. Family names wrap mid-word (\"algorithmic_optimizatio n\"): use whitespace-nowrap (or truncate with a title) in the\n   heatmap's first column.\n5. Each v1-style segment header shows the measured verdict between the latest X_SINGLE points of different harness\n   versions, or between X_SINGLE and PIPELINE, using the same rule as the API (improved only when intervals do not\n   overlap): text \"개선 확인\" / \"차이 불분명 (구간이 겹침)\" / \"악화\" with the delta in percentage points; English\n   equivalents. Compute it in lib/evolutionTimeline.ts (pure) from lo/hi, never hard-code numbers.\nKeep all existing timeline behaviour and tests (test_critic_t28_evolution_timeline.py) green. New strings in both\nmessages files with identical keys.",
+  "edit": [
+    "apps/web/components/EvolutionTimeline.tsx",
+    "apps/web/lib/evolutionTimeline.ts",
+    "apps/web/messages/ko.json",
+    "apps/web/messages/en.json"
+  ],
+  "context": [
+    "apps/web/app/[locale]/performance/page.tsx",
+    "services/api/tests/test_critic_t28_evolution_timeline.py"
+  ],
+  "check": [
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p .",
+    "python -m pytest services/api/tests -q -p no:cacheprovider -k \"web or i18n or locale or message or proxy or t28 or t34\""
+  ]
+}
