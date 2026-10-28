@@ -60,6 +60,10 @@ your module, do not touch it — work on a branch.
 - 2026-10-28 (Claude): migration 011 applied to Cloud SQL via `infra/gcp/migrate_once.py` (ledger had
   001–010 + seed; RLS/force, `performance_scope`, `performance_immutable`, core_app SELECT/INSERT verified).
   Cloud SQL `postgres` password was reset (owner approved); the only copy is Secret Manager `SQLROOT_PW`.
+- 2026-10-28 22:31 (Claude, `release/2026-10-28-2` @ `8dd8b41`, api `00017` 17 env, web `00017`, storage=postgres):
+  live mission through the proxy `msn_db7a9a9e80c9` CREATED→GENERATED→REVIEWED→RAN on the Cloud Run Runner
+  (visible 3/3, held-out 4/4); PR correctly refused by GH_INTEGRITY=INCONCLUSIVE (weak Builder test, W10).
+  Note: missions/outcomes created on api `00015` (memory backend), including PR #6's WVI, are not in postgres.
 
 ## 6. Work board (updated 2026-10-28 22:30 KST — read before starting; update your row when you start/finish)
 
@@ -74,6 +78,7 @@ yours, do not start it — add a row instead. Product copy says "service", never
 | W4 | **Usage-derived baseline cost**: `sealed_eval._call_builder_task` settles a fixed `BASELINE_COST_CENTS` (120¢/task) while the pipeline settles provider usage; settle baseline from usage the same way (`performance.usage_cost_cents`), keep the reservation cap, keep fail-closed on missing usage | Codex | open | X_SINGLE and PIPELINE cost-per-solved are comparable; tests show a baseline call billed from usage |
 | W5 | **Loading states**: Mission Control and Performance show "loading" until the first response; show "cannot load" only after a request actually failed (today the error text flashes on every page load) | agy | done (verified tsc/build/pytest) | no error text before the first fetch settles; 375px layout intact |
 | W6 | Runner isolation / PR base binding follow-ups already in flight | Codex | `codex/*` | merged to main with full suite green |
+| W10 | **T25 strong-oracle prompts**: Builder/Critic system prompts ask for `==` value asserts and `pytest.raises`, forbid `assert True/False` and try/except (frozen `oracle_ast` rates those tautologies). Live mission `msn_db7a9a9e80c9` (div): visible 3/3, held-out 4/4, G2 PASS, PR blocked GH_INTEGRITY=INCONCLUSIVE (strong fraction 0.67 < 0.8) | Muse Spark (Builder), Claude (Critic) | `muse/round10`, building | sealed T25 + full suite green; next live mission opens a PR |
 | W8 | **Sealed eval v1 with contract-stating goals** (`docs/EVAL_V1_GOALS.md`): `evals/sealed_v1/` copies v0 held-out tests, files and reference fixes unchanged and replaces only `goal`; `SUITE_VERSION` selectable; every task passes `check_task`. v0 measured 2/12 mostly because tests check behaviour the goals never state | Codex (evals data), Claude reviews | open | v1 loads, `check_task` green for 12/12, `/v1/eval/suites` lists v0 and v1 |
 | W9 | **Per-task failure reason in eval evidence** (`empty_diff` / `apply_failed` / `heldout_failed` + failing test names / `provider_error`; no held-out code) | Codex (`sealed_eval.py`) | open | baseline and pipeline evidence carry a reason for every task with score < 1 |
 | W7 | Main worktree hygiene: uncommitted `services/api/evoforge/runner.py`, `services/api/tests/test_critic_t5_runner.py`, `apps/web/tsconfig.tsbuildinfo` sit in `C:\evo_forge` (cline checkpoints). Owner of that work: commit on your branch or discard; never leave WIP in the shared main worktree | whoever owns that WIP (cline) | open | `git status` clean in `C:\evo_forge` |
