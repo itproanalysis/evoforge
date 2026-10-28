@@ -648,5 +648,67 @@
 "..",
 "dashboard"
 ]
+},
+{
+"expected": "/v1/eval/jobs",
+"path_segments": [
+"v1",
+"eval",
+"jobs"
+]
+},
+{
+"expected": "/v1/eval/jobs/job-abc123",
+"path_segments": [
+"v1",
+"eval",
+"jobs",
+"job-abc123"
+]
+},
+{
+"expected": "/v1/eval/jobs/aB0._~-x",
+"path_segments": [
+"v1",
+"eval",
+"jobs",
+"aB0._~-x"
+]
+},
+{
+"expected": null,
+"path_segments": [
+"v1",
+"eval",
+"jobs",
+"abc",
+"extra"
+]
+},
+{
+"expected": null,
+"path_segments": [
+"v1",
+"eval",
+"jobs",
+".."
+]
+},
+{
+"expected": null,
+"path_segments": [
+"v1",
+"eval",
+"jobs",
+"a:b"
+]
+},
+{
+"expected": null,
+"path_segments": [
+"v1",
+"eval",
+"jobsx"
+]
 }
 ]

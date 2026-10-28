@@ -204,7 +204,17 @@
     "how-attempts-latest": "최근 측정 시도 {count}회",
     "how-wilson": "Wilson 95% 구간으로 비교: PIPELINE 하한이 기준 상한을 넘을 때만 개선됨으로 판정",
     "how-budget": "예산 상한: 서버 설정 EVO_EVAL_MAX_CENTS를 초과하면 402로 거부",
-    "how-storage": "저장소: {storage}"
+    "how-storage": "저장소: {storage}",
+    "jobs": {
+      "title": "백그라운드 측정 작업",
+      "status": "작업 상태",
+      "elapsed": "경과 시간",
+      "error": "작업 오류",
+      "queued": "대기 중",
+      "running": "실행 중",
+      "succeeded": "완료됨",
+      "failed": "실패함"
+    }
   },
   "login": {
     "heading": "소유자 로그인",
