@@ -127,7 +127,14 @@ async function handle(req: NextRequest, params: { path?: string[] }) {
   const base = apiBase();
   const isAdvance =
     segs.length === 4 && segs[0] === "v1" && segs[1] === "commands" && segs[3] === "advance";
-  const qs = isAdvance ? (req.nextUrl.search ?? "") : "";
+  // Query strings are forwarded only where an endpoint needs one: mission advance, and the sealed-suite
+  // catalogue version (allowlisted values only).
+  const suiteVersion = req.nextUrl.searchParams.get("suite_version");
+  const qs = isAdvance
+    ? (req.nextUrl.search ?? "")
+    : req.method === "GET" && apiPath === "/v1/eval/suites" && (suiteVersion === "v0" || suiteVersion === "v1")
+      ? `?suite_version=${suiteVersion}`
+      : "";
   const target = `${base}${apiPath}${qs}`;
 
   const idToken = await fetchIdToken(base);
