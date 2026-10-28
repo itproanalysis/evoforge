@@ -42,6 +42,18 @@ def test_never_executed():
     assert verdicts[0].result == 'INCONCLUSIVE'
 
 
+def test_real_assertion_failure_stays_failure(tmp_path):
+    sandbox = tmp_path / 'repo'
+    sandbox.mkdir()
+    suite = [{'code': 'def test_bad():\n assert 1 == 2\n'}]
+    folder = runner._write_suite(str(sandbox), 'visible', 'test_visible', suite)
+    report = runner._run_suite(str(sandbox), folder, str(tmp_path / 'failed.xml'), suite, 30)
+    assert report['n'] == 1 and report['pass'] == 0 and report['exit_code'] == 1
+    assert report['report_integrity'] is True
+    from evoforge.gates import Verdict, apply_run
+    assert apply_run([Verdict('G2_REQUIRED', 'PASS')], {'visible': report, 'heldout': report})[0].result == 'FAIL'
+
+
 @pytest.mark.parametrize('output,code', [
     (b'', 0), (b'PASSED test_visible_1.py::test_other\n', 0),
     (b'PASSED test_visible_1.py::test_a\nPASSED test_visible_1.py::test_a\n', 0),
@@ -69,3 +81,15 @@ def test_flag_is_retained_and_bound_in_report_digest():
     before = result_digest(result)
     section['report_integrity'] = True
     assert result_digest(result) != before
+
+
+def test_stored_pass_with_disagreeing_channels_cannot_open_pr(monkeypatch):
+    import main
+    from fastapi import HTTPException
+    report = {'base': 'b' * 40, 'visible': {'report_integrity': False}, 'heldout': {}}
+    evidence = {'diff': '--- a/a.py\n+++ b/a.py\n@@ -1 +1 @@\n-old\n+return 1\n',
+                'tests': [], 'gates': [{'gate': 'G2_REQUIRED', 'result': 'PASS'}], 'run': report}
+    monkeypatch.setattr(main, '_evidence', {'ev_legacy': evidence})
+    with pytest.raises(HTTPException) as caught:
+        main._pr_core(source_evidence_id='ev_legacy', title='x', body_intro='x', branch='x', base='main', store_extra={})
+    assert caught.value.status_code == 409 and 'INCONCLUSIVE' in caught.value.detail
