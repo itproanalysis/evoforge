@@ -1,0 +1,15 @@
+{
+  "id": "T25_strong_oracle_prompts",
+  "planned_by": "Claude (Critic) after live mission msn_db7a9a9e80c9 gate analysis",
+  "goal": "T25 — Builder and Critic prompts must ask for tests that the frozen oracle classifier rates strong.\n\nLive evidence: mission msn_db7a9a9e80c9 ran visible 3/3 and held-out 4/4 (G2_REQUIRED PASS) but the PR was blocked with\nGH_INTEGRITY=INCONCLUSIVE: the Builder wrote `try: calc.div(1, 0); assert False` / `except ValueError: assert True`,\nwhich docs/evoforge-v4.2/reference_impl/oracle_ast.py (FROZEN, never edit) classifies as a tautology, so the strong-oracle\nfraction fell to 0.67 < 0.8. Strong forms in that classifier: value equality (`assert f(x) == y`), exceptions via\n`pytest.raises`, property checks.\n\nChange services/api/evoforge/broker_meta.py only (BUILDER_SYSTEM and CRITIC_SYSTEM text; keep their JSON output contracts\nexactly: Builder {\"diff\",\"tests\",\"rationale\"}, Critic {\"sealed_tests\",\"review\"}). Add test-writing rules to both:\n- every test is a top-level `def test_*():` function, runnable Python code, never prose;\n- assert concrete expected values with `==` (e.g. `assert calc.div(6, 3) == 2`);\n- expected exceptions use `import pytest` and `with pytest.raises(ValueError):` around the call;\n- never write `assert True`, `assert False`, or a try/except around the code under test, and never assert only that\n  something is truthy or not None when a concrete value is known.\nKeep the prompts short (each rule one line). Add services/api/tests/test_muse_t25.py checking the rules are present in\nboth prompts and that the JSON contract keys are still there. Do not change any other file.",
+  "edit": [
+    "services/api/evoforge/broker_meta.py",
+    "services/api/tests/test_muse_t25.py"
+  ],
+  "context": [
+    "docs/evoforge-v4.2/reference_impl/oracle_ast.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
