@@ -280,6 +280,20 @@
       "running": "Running",
       "succeeded": "Succeeded",
       "failed": "Failed"
+    },
+    "adoption": {
+      "heading": "Harness adoption history",
+      "empty": "No adoption decisions yet.",
+      "suite-label": "Suite",
+      "kind-label": "Kind",
+      "champion-label": "Champion",
+      "challenger-label": "Challenger",
+      "run": "Run A/B decision",
+      "running": "Running decision…",
+      "job-status": "Decision job",
+      "job-failed": "Decision job failed",
+      "adopted": "Adopted",
+      "kept": "Kept"
     }
   },
   "evolution": {

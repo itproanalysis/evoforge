@@ -280,6 +280,20 @@
       "running": "실행 중",
       "succeeded": "완료됨",
       "failed": "실패함"
+    },
+    "adoption": {
+      "heading": "하네스 채택 이력",
+      "empty": "아직 채택 판정 기록이 없습니다.",
+      "suite-label": "스위트",
+      "kind-label": "종류",
+      "champion-label": "챔피언",
+      "challenger-label": "챌린저",
+      "run": "A/B 판정 실행",
+      "running": "판정 실행 중…",
+      "job-status": "판정 작업",
+      "job-failed": "판정 작업 실패",
+      "adopted": "채택",
+      "kept": "유지"
     }
   },
   "evolution": {

@@ -1,0 +1,20 @@
+{
+  "id": "T36_adoption_history_ui",
+  "planned_by": "Claude (Critic): roadmap M2 exit (adoption history visible)",
+  "goal": "T36 — show the service deciding on its own harness: an adoption-history panel on /performance (roadmap M2).\n\nT35 added POST /v1/eval/abtest {suite_version, kind, family?, champion, challenger} -> 202 job (poll GET\n/v1/eval/jobs/{id}; result.decision) and GET /v1/eval/decisions -> {decisions: [...]}, each decision with champion,\nchallenger, champion_measurement / challenger_measurement (passed, n, pass_rate, wilson95), verdict\n(improved|no_clear_difference|worse), decision (adopt|keep), reason, suite_version, kind, created_at.\n\n1. apps/web/lib/api.ts: listDecisions(), startAbTest(body); typed Decision.\n2. NEW apps/web/components/AdoptionHistory.tsx used on apps/web/app/[locale]/performance/page.tsx under the timeline:\n   - newest-first list; each row: date+time, suite/kind, \"champion -> challenger\" (short harness labels like /1 -> /2),\n     both pass rates with passed/n and their Wilson intervals drawn as two small horizontal bars on one 0-100% axis so\n     overlap is visible at a glance, verdict text, and a clear badge: \"채택\"/\"Adopted\" (green) or \"유지\"/\"Kept\" (neutral).\n   - an \"A/B 판정 실행\" form: suite (v2 default), kind, champion, challenger (selects from the two harness versions);\n     submit calls startAbTest, then polls getEvalJob every 5 s; buttons disabled while a job is active; show errors.\n   - empty state text when there are no decisions; no hard-coded numbers.\n3. All strings in messages/ko.json and messages/en.json (identical keys). 375px friendly.\nDo not change API code.",
+  "edit": [
+    "apps/web/lib/api.ts",
+    "apps/web/components/AdoptionHistory.tsx",
+    "apps/web/app/[locale]/performance/page.tsx",
+    "apps/web/messages/ko.json",
+    "apps/web/messages/en.json"
+  ],
+  "context": [
+    "apps/web/components/EvolutionTimeline.tsx",
+    "services/api/evoforge/decisions.py"
+  ],
+  "check": [
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p .",
+    "python -m pytest services/api/tests -q -p no:cacheprovider -k \"web or i18n or locale or message or proxy or t28 or t34 or t36\""
+  ]
+}

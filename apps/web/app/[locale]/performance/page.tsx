@@ -20,6 +20,7 @@ import {
 } from "../../../lib/performanceProvenance";
 import { buildTimeline } from "../../../lib/evolutionTimeline";
 import { EvolutionTimeline } from "../../../components/EvolutionTimeline";
+import { AdoptionHistory } from "../../../components/AdoptionHistory";
 import { Button, Card } from "../../../components/ui";
 
 function fmtPct(rate: number): string {
@@ -314,6 +315,8 @@ export default function PerformancePage() {
           </div>
         )}
       </Card>
+
+      <AdoptionHistory />
 
       <section className="flex gap-3 flex-wrap mt-4">
         <MeasureCard

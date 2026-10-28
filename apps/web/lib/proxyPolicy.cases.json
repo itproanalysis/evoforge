@@ -889,5 +889,21 @@
       "abc",
       "extra"
     ]
+  },
+  {
+    "expected": "/v1/eval/abtest",
+    "path_segments": [
+      "v1",
+      "eval",
+      "abtest"
+    ]
+  },
+  {
+    "expected": "/v1/eval/decisions",
+    "path_segments": [
+      "v1",
+      "eval",
+      "decisions"
+    ]
   }
 ]

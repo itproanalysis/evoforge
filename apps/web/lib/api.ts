@@ -441,6 +441,54 @@ export function listEvalJobs() {
   return req<{ jobs: EvalJob[] }>("/v1/eval/jobs");
 }
 
+export interface DecisionMeasurement {
+  passed: number;
+  n: number;
+  pass_rate: number;
+  wilson95: [number, number];
+  [key: string]: unknown;
+}
+
+export type DecisionVerdict = "improved" | "no_clear_difference" | "worse";
+
+export type AdoptionDecision = "adopt" | "keep";
+
+export interface Decision {
+  decision_id?: string;
+  created_at: number;
+  suite_version: string;
+  kind: string;
+  model?: string;
+  family?: string | null;
+  champion: string;
+  challenger: string;
+  champion_measurement: DecisionMeasurement;
+  challenger_measurement: DecisionMeasurement;
+  verdict: DecisionVerdict;
+  decision: AdoptionDecision;
+  reason: string;
+  [key: string]: unknown;
+}
+
+export interface AbTestBody {
+  suite_version: string;
+  kind: string;
+  family?: string;
+  champion: string;
+  challenger: string;
+}
+
+export function startAbTest(body: AbTestBody) {
+  return req<{ job_id: string; kind: string; status: EvalJobStatus; created_at: number }>(
+    "/v1/eval/abtest",
+    { method: "POST", body: JSON.stringify(body) },
+  );
+}
+
+export function listDecisions() {
+  return req<{ decisions: Decision[] }>("/v1/eval/decisions");
+}
+
 export const EVIDENCE_STAGES = [
   "ObjectiveVersion",
   "Task",
