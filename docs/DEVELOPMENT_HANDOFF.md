@@ -431,3 +431,15 @@ T17·T18의 가짜 기준 SHA를 실제 실행 기준에 맞게 교정한 격리
 두 승격 테스트 fixture 교정은 소유권 때문에 미커밋이며 커밋 단독은 해당 fixture와 충돌한다.
 소유자 반영과 최종 트리 재검증 전에는 main에 통합하지 않는다. 상세는 격리 작업트리의
 `docs/PR_BASE_BINDING_CODEX.md`와 `.local/validation-pr-*-codex.log`에 있다.
+
+## 원격 Runner 파일별 수집 검사 통합
+
+`01eb708`까지 main에 반영했다. JUnit 결과에서 전달된 각 스니펫 모듈의 수집 여부를
+확인하며 누락 시 집계된 성공 수는 보존하고 종료 코드를 실패로 바꾼다. 원격 클라이언트는
+이 성공 주장을 거부한다. 검증본 `59a3b35`와 통합본의 API·Runner·웹·정본 tree가 같다.
+전체 API 665 passed·1 skipped, 실제 PostgreSQL 169 passed, SQL 96·정본 검사 0 failure,
+Runner 서비스 포함 집중 34 passed; 동일 웹 tree의 npm ci/tsc/build가 통과했다.
+로그와 해시는 `docs/validation/2026-10-28-runner-file-coverage.json`에 보존했다.
+기존 미커밋 runner와 T5 테스트는 그대로이며 검증에 포함하지 않았다. 이 검사는 신뢰된
+Runner의 JUnit을 전제로 하고 보고서 위조를 방어하지 않는다. 로컬 Runner의 파일별 검증과
+실제 모델·공개 PR·운영 경로 검증은 별도로 남아 있다.

@@ -766,6 +766,16 @@ Muse Spark 기본값과 현재 채팅 자동 재개를 유지한다.
 Critic 테스트는 보존했으며 이 검증에 포함하지 않았다. 수집 결과 보강은 별도 검증 중이다.
 공개 PR의 검증 SHA 전달, 실제 provider 청구 출처, 공개 Broker/DB 연결과 배포는 미완료다.
 
+## 원격 Runner 파일별 수집 검사 통합
+
+`01eb708`은 원격 Runner가 각 전달 스니펫 모듈의 JUnit 수집 여부를 확인하게 한다.
+누락 시 실제 집계는 보존하되 실패 종료 코드를 반환해 원격 클라이언트가 거부한다.
+전체 API 665 passed·1 skipped, 실제 PostgreSQL 169 passed, SQL 96·정본 검사 0 failure,
+Runner 서비스 포함 집중 34 passed. 동일 웹 tree의 npm ci/tsc/build도 통과했다.
+검증 근거: `docs/validation/2026-10-28-runner-file-coverage.json`. 다른 작업의 미커밋
+runner/T5 테스트는 보존했으며 검증에 포함하지 않았다. JUnit 위조 방어와 로컬 Runner의
+파일별 검사 및 실제 모델·운영 전체 검증은 미완료다.
+
 ## 관리 화면 및 Runner 수집 검증 후속
 
 관리 화면 갱신 신뢰성 개선은 `77d018c`에 반영됐다. 동일 웹 tree의 npm ci·TypeScript·

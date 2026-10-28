@@ -1,0 +1,26 @@
+{
+  "tested_revision": "59a3b35",
+  "integrated_revision": "01eb708",
+  "checks": {
+    "api": "665 passed, 1 skipped",
+    "postgres_kernel": "169 passed",
+    "sql": "96 checks; 0 failures",
+    "focused": "34 passed",
+    "web": "npm ci, tsc, production build passed for identical web tree at 77d018c"
+  },
+  "limitations": [
+    "Per-module coverage depends on trusted Runner JUnit output; it does not prevent report forgery.",
+    "Local in-process Runner remains unprotected by this change.",
+    "Existing main worktree changes were preserved and excluded from tests."
+  ],
+  "source_sha256": {
+    "services/runner/app.py": "972bb861015377b9ec7500a3d2e7e8cb5e3da0d05c46f8fd103b47ec10bd2459",
+    "services/api/tests/test_runner_suite_coverage.py": "ee978b4091e8d956affa9a8e769c71572ce020343d396710546d790339dfb700"
+  },
+  "logs": {
+    "C:\\evo_forge\\.local\\evidence\\runner-suite-file-v2-20261028\\api.log": "1c12bb36fc0b5b0b58ab38f40691a3e6a1f0b28b6e477633594cf1e1b992b9ef",
+    "C:\\evo_forge\\.local\\evidence\\runner-suite-file-v2-20261028\\contract.log": "8f02f13bac199dd71924824608eb10cf34c519a91db36e783bb90996c29669ef",
+    "C:\\evo_forge\\.local\\evidence\\runner-suite-file-v2-20261028\\kernel.log": "cf1b90348d483ec8c7b264366db245e58b6700c8713c137c217c365d47d07174",
+    "C:\\evo_forge\\.local\\evidence\\runner-suite-file-v2-20261028\\postgres.log": "27886ed9f297c3c43bdd241eda77a2633b2084bff064e3653ae302a85bc7f246"
+  }
+}
