@@ -481,6 +481,8 @@ export interface EvolutionPublic {
   max_generations: number;
   population: number;
   generations: EvolutionGeneration[];
+  run_active?: boolean;
+  run_error?: string | null;
   best: {
     generation?: number;
     run_evidence_id?: string | null;
@@ -504,6 +506,9 @@ export interface ProofCertificate {
   sealed_count: number;
   model: string;
   signature: string;
+  signed?: boolean | null;
+  algorithm?: string | null;
+  public_key?: string | null;
   verify?: { ok: boolean; reason: string };
 }
 
@@ -530,7 +535,7 @@ export function stepEvolution(evolution_id: string) {
 }
 
 export function runEvolution(evolution_id: string) {
-  return req<{ evolution_id: string; status: string; generations_ran: number; best: EvolutionPublic["best"] }>(
+  return req<{ evolution_id: string; status: string; run_active: boolean; run_error?: string | null }>(
     `/v1/evolution/${encodeURIComponent(evolution_id)}/run`,
     { method: "POST" },
   );
@@ -544,6 +549,10 @@ export function promoteEvolution(evolution_id: string) {
 
 export function getProof(evidence_id: string) {
   return req<ProofCertificate>(`/v1/proof/${encodeURIComponent(evidence_id)}`);
+}
+
+export function getProofKey() {
+  return req<{ algorithm: string; public_key: string }>(`/v1/proof/key`);
 }
 
 export interface LeaderEntry {

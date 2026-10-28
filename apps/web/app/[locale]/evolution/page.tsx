@@ -59,11 +59,14 @@ export default function Evolution() {
   }, []);
 
   useEffect(() => {
-    if (selected?.status !== "RUNNING") return;
-    const id = setInterval(() => void refresh(selected.evolution_id), 5000);
+    if (!selected) return;
+    if (!(selected.run_active || selected.status === "RUNNING")) return;
+    // Poll GET /v1/evolution/{id} every 3 s while run_active or status RUNNING,
+    // updating the generation timeline live.
+    const id = setInterval(() => void refresh(selected.evolution_id), 3000);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected?.evolution_id, selected?.status]);
+  }, [selected?.evolution_id, selected?.status, selected?.run_active]);
 
   const act = async (kind: string, fn: () => Promise<unknown>, id?: string) => {
     setBusy(kind);
@@ -142,13 +145,20 @@ export default function Evolution() {
             <div>
               <h3>{selected.evolution_id} <span style={{ fontSize: 12, background: "#263048", padding: "2px 8px", borderRadius: 12 }}>{selected.status}</span></h3>
               <p>{selected.goal}</p>
+              {selected.run_active && <p style={{ color: "#fbbf24", fontSize: 13 }}>{t("run-active")}</p>}
+              {selected.run_error && <p style={{ color: "#f87171", fontSize: 13 }}>{t("run-error")}: {selected.run_error}</p>}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
                 <Button disabled={busy !== null || selected.status !== "RUNNING"}
                   onClick={() => void act("step", () => stepEvolution(selected.evolution_id), selected.evolution_id)}>
                   {busy === "step" ? t("working") : t("step")}
                 </Button>
                 <Button disabled={busy !== null || selected.status !== "RUNNING"}
-                  onClick={() => void act("run", () => runEvolution(selected.evolution_id), selected.evolution_id)}>
+                  onClick={() => void act("run", async () => {
+                    // POST /v1/evolution/{id}/run starts a background run (202);
+                    // the 3 s poll above refreshes GET /v1/evolution/{id} live.
+                    await runEvolution(selected.evolution_id);
+                    await refresh(selected.evolution_id);
+                  }, selected.evolution_id)}>
                   {busy === "run" ? t("working") : t("run-all")}
                 </Button>
                 <Button disabled={busy !== null || !selected.best?.run_evidence_id}

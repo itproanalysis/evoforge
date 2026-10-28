@@ -288,6 +288,8 @@
     "empty": "아직 진화가 없습니다 — 위에서 시작하세요.",
     "select-hint": "실행을 선택하면 진화를 지켜볼 수 있습니다.",
     "proof-link": "증명서 보기 →",
+    "run-active": "백그라운드 실행 중 — 3초마다 실시간 조회 중…",
+    "run-error": "백그라운드 실행 오류",
     "case-w10-alert": "사례 W10 경고: GH_INTEGRITY 통과를 위해 'assert True'를 배제하고 명시적 '==' 값 비교 또는 pytest.raises를 사용해야 합니다.",
     "failure-reasons": {
       "weak_oracle": "약한 오라클 (단언문 강도 < 0.8) · 사례 W10",
@@ -307,7 +309,15 @@
     "description": "공개 증거 다이제스트 기반의 변조 방지 증명 — 코드는 서버를 떠나지 않습니다. 채팅 대신 이 URL을 공유하세요.",
     "loading": "증명서 불러오는 중…",
     "gates": "게이트",
-    "chain": "증거 체인"
+    "chain": "증거 체인",
+    "signed-fingerprint": "Ed25519 서명 지문",
+    "unsigned": "Unsigned — 서명 설정 안 됨",
+    "server-key-label": "서버 키",
+    "server-key-unavailable": "서버 키 없음 (서명 미설정)",
+    "key-match-label": "키 일치",
+    "key-match": "증명서 공개 키가 서버 키와 일치합니다 (Ed25519)",
+    "key-mismatch": "증명서 공개 키가 서버 키와 일치하지 않습니다",
+    "key-match-unknown": "키 일치 여부 알 수 없음"
   },
   "leaderboard": {
     "heading": "신뢰 리더보드",
