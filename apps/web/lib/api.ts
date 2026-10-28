@@ -408,6 +408,39 @@ export function runPipeline(suite_version = "v0", model = "muse-spark-1.3") {
   });
 }
 
+export type EvalJobKind = "X_SINGLE" | "PIPELINE";
+
+export type EvalJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export interface EvalJob {
+  job_id: string;
+  kind: EvalJobKind;
+  status: EvalJobStatus;
+  created_at: number;
+  started_at: number | null;
+  finished_at: number | null;
+  result: Record<string, unknown> | null;
+  error: string | null;
+}
+
+export function startEvalJob(kind: EvalJobKind, family?: string) {
+  return req<{ job_id: string; kind: EvalJobKind; status: EvalJobStatus; created_at: number }>(
+    "/v1/eval/jobs",
+    {
+      method: "POST",
+      body: JSON.stringify(family ? { kind, family } : { kind }),
+    },
+  );
+}
+
+export function getEvalJob(id: string) {
+  return req<EvalJob>(`/v1/eval/jobs/${encodeURIComponent(id)}`);
+}
+
+export function listEvalJobs() {
+  return req<{ jobs: EvalJob[] }>("/v1/eval/jobs");
+}
+
 export const EVIDENCE_STAGES = [
   "ObjectiveVersion",
   "Task",

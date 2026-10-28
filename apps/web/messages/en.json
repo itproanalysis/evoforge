@@ -258,7 +258,17 @@
     "how-attempts-latest": "latest measurement used {count} attempts",
     "how-wilson": "Compared by Wilson 95% interval: improved only when the PIPELINE lower bound exceeds the baseline upper bound",
     "how-budget": "Budget cap: requests above the server setting EVO_EVAL_MAX_CENTS are refused with 402",
-    "how-storage": "Storage: {storage}"
+    "how-storage": "Storage: {storage}",
+    "jobs": {
+      "title": "Background measurement job",
+      "status": "Job status",
+      "elapsed": "Elapsed",
+      "error": "Job error",
+      "queued": "Queued",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "failed": "Failed"
+    }
   },
   "evolution": {
     "heading": "Autopilot — goal in, verified PR out",

@@ -1,0 +1,25 @@
+{
+  "id": "T24_async_eval_jobs",
+  "planned_by": "Claude (Critic) after live timeouts analysis: web 300s / API 900s vs 12-36 Builder calls",
+  "goal": "T24 — run sealed measurements as background jobs so they never exceed HTTP timeouts.\n\nContext: POST /v1/eval/baseline and /v1/eval/pipeline run synchronously (12 or up to 36 Builder calls). Through the web proxy\n(Cloud Run default 300s) and the API (900s) these requests time out. Keep those two endpoints EXACTLY as they are (existing tests\ndepend on them) and ADD a job API.\n\n1. API (services/api/main.py, new module services/api/evoforge/eval_jobs.py):\n   - POST /v1/eval/jobs body {\"kind\": \"X_SINGLE\"|\"PIPELINE\", \"suite_version\": \"v0\" (default), \"model\": \"muse-spark-1.3\" (default),\n     \"family\": optional str}. Any other kind -> 422 (pydantic Literal).\n   - Before creating a job, run the SAME budget check the sync endpoint uses (_eval_budget_or_402 with the same task count and\n     per-attempt numbers). Refusal -> 402, no job created, no provider call, ledger untouched.\n   - At most one job queued/running at a time: a second POST -> 409 whose detail contains the active job_id.\n   - Otherwise create the job, start it on a daemon thread, and return 202 {\"job_id\", \"kind\", \"status\": \"queued\"|\"running\",\n     \"created_at\"} immediately (the Builder must not run inside the request).\n   - The worker executes the same code path as the sync endpoint (refactor the bodies of eval_baseline/eval_pipeline into shared\n     helpers that both the sync endpoints and the job worker call; the sync endpoints' responses must not change). On success the\n     job stores result = the body the sync endpoint would return, and the measurement is recorded exactly as the sync path does.\n     On exception: status \"failed\", error = short message (type and text, max 300 chars, never held-out code or reference fixes),\n     result null, no measurement recorded.\n   - GET /v1/eval/jobs/{job_id} -> {\"job_id\",\"kind\",\"status\",\"created_at\",\"started_at\",\"finished_at\",\"result\",\"error\"}\n     (started_at/finished_at null until set; epoch seconds floats). Unknown -> 404.\n   - GET /v1/eval/jobs -> {\"jobs\": [...]} newest first, at most 20, same shape.\n   - Jobs live in process memory (the API runs as a single instance); say so in a module docstring. Thread-safe (a lock).\n2. Web (apps/web):\n   - lib/api.ts: startEvalJob(kind, family?) -> POST /v1/eval/jobs, getEvalJob(id), listEvalJobs(); typed EvalJob.\n   - lib/proxyPolicy.ts and lib/proxyPolicy.cases.json: allow POST /v1/eval/jobs, GET /v1/eval/jobs, GET /v1/eval/jobs/<id>\n     (id pattern like the other id routes); add allow and deny cases in the cases file.\n   - app/[locale]/performance/page.tsx: the run buttons start a job via startEvalJob and poll getEvalJob every 5s (setInterval or\n     setTimeout) until succeeded/failed; show the job status, elapsed time and, on failure, the error; reload /v1/performance on\n     success. Disable both buttons while a job is active; on load, if listEvalJobs shows an active job, resume polling it.\n   - All new strings in messages/ko.json AND messages/en.json with identical key sets (a parity test exists); keys under a\n     \"jobs\" group.\n3. Tests: services/api/tests/test_muse_t24.py covering the API behaviour above with a stubbed broker_meta.call_builder.\nDo not touch services/api/evoforge/sealed_eval.py (Codex-owned) and do not change existing tests.",
+  "edit": [
+    "services/api/main.py",
+    "services/api/evoforge/eval_jobs.py",
+    "services/api/tests/test_muse_t24.py",
+    "apps/web/lib/api.ts",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json",
+    "apps/web/app/[locale]/performance/page.tsx",
+    "apps/web/messages/ko.json",
+    "apps/web/messages/en.json"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t22a_backend.py",
+    "services/api/evoforge/performance.py",
+    "apps/web/app/api/evoforge/[...path]/route.ts"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p ."
+  ]
+}

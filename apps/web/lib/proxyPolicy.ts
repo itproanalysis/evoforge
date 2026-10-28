@@ -18,6 +18,7 @@ const EXACT_ALLOW = new Set([
   "/v1/evolution",
   "/v1/leaderboard",
   "/v1/memory",
+  "/v1/eval/jobs",
 ]);
 
 const SEGMENT_RE = /^[A-Za-z0-9._~-]+$/;
@@ -70,6 +71,14 @@ export function resolveApiPath(segments: string[]): string | null {
     segments.length === 4 && segments[0] === "v1" && segments[1] === "evolution" &&
     (segments[3] === "step" || segments[3] === "run" ||
      segments[3] === "cancel" || segments[3] === "promote")
+  ) {
+    return apiPath;
+  }
+  if (
+    segments.length === 4 &&
+    segments[0] === "v1" &&
+    segments[1] === "eval" &&
+    segments[2] === "jobs"
   ) {
     return apiPath;
   }

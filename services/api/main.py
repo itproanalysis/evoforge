@@ -25,6 +25,7 @@ from evoforge import auth as auth_module
 from evoforge import broker_meta, evidence as evidence_chain, ledger
 from evoforge import outcomes as outcomes_store
 from evoforge import performance as performance_mod
+from evoforge import eval_jobs as eval_jobs_mod
 from evoforge import sealed_eval as sealed_eval_mod
 from evoforge import postgres_state
 from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
@@ -955,17 +956,12 @@ def eval_suites():
     return {"suite_version": sealed_eval_mod.SUITE_VERSION, "suites": suites}
 
 
-@app.post("/v1/eval/baseline", status_code=201)
-def eval_baseline(req: EvalBaselineRequest):
-    """X_SINGLE baseline over the sealed v0 set in hygiene sandboxes.
-
-    Runner-side trouble maps to 413/502/504 with a short message; a raw
-    traceback never leaves the server.
-    """
+def _do_eval_baseline(suite_version: str, model: str, family) -> dict:
+    """Shared X_SINGLE baseline core for the sync endpoint and job worker."""
     from evoforge import repo_source as _rs_eval2
 
     try:
-        n_tasks = sealed_eval_mod.count_tasks(req.family)
+        n_tasks = sealed_eval_mod.count_tasks(family)
     except ValueError as e:
         raise HTTPException(400, _rs_eval2.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
@@ -973,7 +969,7 @@ def eval_baseline(req: EvalBaselineRequest):
     _eval_budget_or_402(n_tasks, 1, sealed_eval_mod.BASELINE_COST_CENTS)
     try:
         result = sealed_eval_mod.run_baseline(
-            req.suite_version, req.model, family=req.family)
+            suite_version, model, family=family)
     except sealed_eval_mod.SealedTooLarge as e:
         raise HTTPException(413, _rs_eval2.redact(str(e)))
     except sealed_eval_mod.SealedTimeout:
@@ -1040,18 +1036,22 @@ def eval_baseline(req: EvalBaselineRequest):
             "chain": evidence_chain.chain(eid)}
 
 
-@app.post("/v1/eval/pipeline", status_code=201)
-def eval_pipeline(req: EvalPipelineRequest):
-    """Adaptive pipeline over the sealed v0 set (up to 3 attempts/task).
+@app.post("/v1/eval/baseline", status_code=201)
+def eval_baseline(req: EvalBaselineRequest):
+    """X_SINGLE baseline over the sealed v0 set in hygiene sandboxes.
 
-    Costs are usage-derived per attempt; the total is the sum of all
-    settled attempts. No held-out code, reference fix, or task file
-    contents ever leave the server.
+    Runner-side trouble maps to 413/502/504 with a short message; a raw
+    traceback never leaves the server.
     """
+    return _do_eval_baseline(req.suite_version, req.model, req.family)
+
+
+def _do_eval_pipeline(suite_version: str, model: str, family) -> dict:
+    """Shared adaptive-pipeline core for the sync endpoint and job worker."""
     from evoforge import repo_source as _rs_eval3
 
     try:
-        n_tasks = sealed_eval_mod.count_tasks(req.family)
+        n_tasks = sealed_eval_mod.count_tasks(family)
     except ValueError as e:
         raise HTTPException(400, _rs_eval3.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
@@ -1060,7 +1060,7 @@ def eval_pipeline(req: EvalPipelineRequest):
                         sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
     try:
         result = sealed_eval_mod.run_pipeline(
-            req.suite_version, req.model, family=req.family)
+            suite_version, model, family=family)
     except sealed_eval_mod.SealedTooLarge as e:
         raise HTTPException(413, _rs_eval3.redact(str(e)))
     except sealed_eval_mod.SealedTimeout:
@@ -1120,6 +1120,73 @@ def eval_pipeline(req: EvalPipelineRequest):
             "attempts_total": result["attempts_total"],
             "usage_missing": result["usage_missing"],
             "chain": evidence_chain.chain(eid)}
+
+
+@app.post("/v1/eval/pipeline", status_code=201)
+def eval_pipeline(req: EvalPipelineRequest):
+    """Adaptive pipeline over the sealed v0 set (up to 3 attempts/task).
+
+    Costs are usage-derived per attempt; the total is the sum of all
+    settled attempts. No held-out code, reference fix, or task file
+    contents ever leave the server.
+    """
+    return _do_eval_pipeline(req.suite_version, req.model, req.family)
+
+
+class EvalJobRequest(BaseModel):
+    kind: Literal["X_SINGLE", "PIPELINE"]
+    suite_version: Literal["v0"] = "v0"
+    model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
+    family: str | None = None
+
+
+def _eval_job_precheck(kind: str, family) -> None:
+    from evoforge import repo_source as _rs_job
+
+    try:
+        n_tasks = sealed_eval_mod.count_tasks(family)
+    except ValueError as e:
+        raise HTTPException(400, _rs_job.redact(str(e)))
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_job.redact(str(e) or "sealed eval failed"))
+    if kind == "X_SINGLE":
+        _eval_budget_or_402(n_tasks, 1, sealed_eval_mod.BASELINE_COST_CENTS)
+    else:
+        _eval_budget_or_402(n_tasks, sealed_eval_mod.PIPELINE_MAX_ATTEMPTS,
+                            sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
+
+
+@app.post("/v1/eval/jobs", status_code=202)
+def eval_job_create(req: EvalJobRequest):
+    _eval_job_precheck(req.kind, req.family)
+    if req.kind == "X_SINGLE":
+        def _runner(sv=req.suite_version, m=req.model, f=req.family):
+            return _do_eval_baseline(sv, m, f)
+    else:
+        def _runner(sv=req.suite_version, m=req.model, f=req.family):
+            return _do_eval_pipeline(sv, m, f)
+    try:
+        job = eval_jobs_mod.create_job(kind=req.kind,
+                                       suite_version=req.suite_version,
+                                       model=req.model, family=req.family,
+                                       runner=_runner)
+    except eval_jobs_mod.ActiveJobError as e:
+        raise HTTPException(409, f"another eval job is active: {e.job_id}")
+    return {"job_id": job["job_id"], "kind": job["kind"],
+            "status": job["status"], "created_at": job["created_at"]}
+
+
+@app.get("/v1/eval/jobs")
+def eval_jobs_list():
+    return {"jobs": eval_jobs_mod.list_jobs()}
+
+
+@app.get("/v1/eval/jobs/{job_id}")
+def eval_job_get(job_id: str):
+    job = eval_jobs_mod.get_job(job_id)
+    if job is None:
+        raise HTTPException(404, "unknown eval job")
+    return job
 
 
 @app.get("/v1/performance")

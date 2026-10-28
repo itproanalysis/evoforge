@@ -3,10 +3,12 @@ import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   API_BASE,
+  getEvalJob,
   getEvalSuites,
   getPerformance,
-  runBaseline,
-  runPipeline,
+  listEvalJobs,
+  startEvalJob,
+  type EvalJob,
   type EvalSuite,
   type MeasurementView,
   type PerformanceSnapshot,
@@ -117,6 +119,9 @@ export default function PerformancePage() {
   const [suites, setSuites] = useState<EvalSuite[]>([]);
   const [suiteVersion, setSuiteVersion] = useState<string>("v0");
   const [busy, setBusy] = useState<"baseline" | "pipeline" | null>(null);
+  const [job, setJob] = useState<EvalJob | null>(null);
+  const [jobError, setJobError] = useState("");
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState(false);
   const [autoPoll, setAutoPoll] = useState(true);
@@ -151,6 +156,14 @@ export default function PerformancePage() {
         if (out.suite_version) setSuiteVersion(out.suite_version);
       })
       .catch(() => {});
+    listEvalJobs()
+      .then((out) => {
+        const active = (out.jobs ?? []).find(
+          (j) => j.status === "queued" || j.status === "running",
+        );
+        if (active) setJob(active);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -161,14 +174,60 @@ export default function PerformancePage() {
     return () => clearInterval(id);
   }, [autoPoll, busy]);
 
+  const jobActive = job !== null && (job.status === "queued" || job.status === "running");
+
+  useEffect(() => {
+    if (!jobActive || !job) return;
+    const id = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(id);
+  }, [jobActive, job?.job_id]);
+
+  useEffect(() => {
+    if (!job || (job.status !== "queued" && job.status !== "running")) return;
+    const jobId = job.job_id;
+    const id = setInterval(() => {
+      void (async () => {
+        try {
+          const cur = await getEvalJob(jobId);
+          setJob(cur);
+          if (cur.status === "succeeded") {
+            setJobError("");
+            await refresh();
+          } else if (cur.status === "failed") {
+            setJobError(cur.error ?? "");
+          }
+        } catch {
+          // Keep polling; a transient fetch failure must not drop the job.
+        }
+      })();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [job?.job_id, job?.status]);
+
   const runMeasure = async (kind: "baseline" | "pipeline") => {
-    if (busy) return;
+    if (busy || jobActive) return;
     setBusy(kind);
     setErr("");
+    setJobError("");
     try {
-      await (kind === "baseline" ? runBaseline() : runPipeline());
-      await refresh();
+      const started = await startEvalJob(kind === "baseline" ? "X_SINGLE" : "PIPELINE");
+      const cur = await getEvalJob(started.job_id);
+      setJob(cur);
     } catch (e) {
+      try {
+        const listed = await listEvalJobs();
+        const active = (listed.jobs ?? []).find(
+          (j) => j.status === "queued" || j.status === "running",
+        );
+        if (active) {
+          setJob(active);
+          return;
+        }
+      } catch {
+        // Fall through to the start error below.
+      }
       const msg = e instanceof Error ? e.message : String(e);
       setErr(msg.includes("402") ? t(`budget-${kind}` as any, { detail: msg }) : msg);
     } finally {
@@ -291,21 +350,38 @@ export default function PerformancePage() {
         <div className="flex gap-2 mt-2 flex-wrap">
           <Button
             onClick={() => void runMeasure("baseline")}
-            disabled={busy !== null}
-            loading={busy === "baseline"}
+            disabled={busy !== null || jobActive}
+            loading={busy === "baseline" || (jobActive && job?.kind === "X_SINGLE")}
             variant="primary"
           >
-            {busy === "baseline" ? t("measuring") : t("run-baseline")}
+            {busy === "baseline" || (jobActive && job?.kind === "X_SINGLE") ? t("measuring") : t("run-baseline")}
           </Button>
           <Button
             onClick={() => void runMeasure("pipeline")}
-            disabled={busy !== null}
-            loading={busy === "pipeline"}
+            disabled={busy !== null || jobActive}
+            loading={busy === "pipeline" || (jobActive && job?.kind === "PIPELINE")}
             variant="primary"
           >
-            {busy === "pipeline" ? t("measuring") : t("run-pipeline")}
+            {busy === "pipeline" || (jobActive && job?.kind === "PIPELINE") ? t("measuring") : t("run-pipeline")}
           </Button>
         </div>
+        {job ? (
+          <div className="text-sm text-text-secondary mt-2 break-words">
+            <div>
+              {t("jobs.title")}: <code>{job.job_id}</code> · {t("jobs.status")}:{" "}
+              {t(`jobs.${job.status}` as any)}
+            </div>
+            <div>
+              {t("jobs.elapsed")}:{" "}
+              {Math.max(0, Math.round(((job.finished_at ?? nowMs / 1000) - job.created_at) * 10) / 10)}s
+            </div>
+            {job.status === "failed" && (jobError || job.error) ? (
+              <p role="alert" className="text-accent-red text-sm mt-1 break-words">
+                {t("jobs.error")}: {jobError || job.error}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         {err ? (
           <p role="alert" className="text-accent-red text-sm mt-2 break-words">
             {t("error-prefix")}
