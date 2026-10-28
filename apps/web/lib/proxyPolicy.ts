@@ -20,6 +20,8 @@ const EXACT_ALLOW = new Set([
   "/v1/leaderboard",
   "/v1/memory",
   "/v1/eval/jobs",
+  "/v1/eval/abtest",
+  "/v1/eval/decisions",
 ]);
 
 const SEGMENT_RE = /^[A-Za-z0-9._~-]+$/;

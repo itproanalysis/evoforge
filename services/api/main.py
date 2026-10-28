@@ -27,6 +27,7 @@ from evoforge import broker_meta, evidence as evidence_chain, ledger
 from evoforge import outcomes as outcomes_store
 from evoforge import performance as performance_mod
 from evoforge import eval_jobs as eval_jobs_mod
+from evoforge import decisions as decisions_mod
 from evoforge import sealed_eval as sealed_eval_mod
 from evoforge import postgres_state
 from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
@@ -1000,8 +1001,9 @@ def _do_eval_baseline(suite_version: str, model: str, family, harness: str | Non
         raise HTTPException(502, _rs_eval2.redact(str(e) or "sealed baseline failed"))
     _eval_budget_or_402(n_tasks, 1, sealed_eval_mod.BASELINE_COST_CENTS)
     try:
+        _harness_kw = {} if harness is None else {"harness": harness}
         result = sealed_eval_mod.run_baseline(
-            suite_version, model, family=family, harness=harness)
+            suite_version, model, family=family, **_harness_kw)
     except sealed_eval_mod.SealedTooLarge as e:
         raise HTTPException(413, _rs_eval2.redact(str(e)))
     except sealed_eval_mod.SealedTimeout:
@@ -1091,8 +1093,9 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
     _eval_budget_or_402(n_tasks, sealed_eval_mod.PIPELINE_MAX_ATTEMPTS,
                         sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
     try:
+        _harness_kw = {} if harness is None else {"harness": harness}
         result = sealed_eval_mod.run_pipeline(
-            suite_version, model, family=family, harness=harness)
+            suite_version, model, family=family, **_harness_kw)
     except sealed_eval_mod.SealedTooLarge as e:
         raise HTTPException(413, _rs_eval3.redact(str(e)))
     except sealed_eval_mod.SealedTimeout:
@@ -1220,6 +1223,103 @@ def eval_job_get(job_id: str):
     if job is None:
         raise HTTPException(404, "unknown eval job")
     return job
+
+
+class EvalABTestRequest(BaseModel):
+    suite_version: Literal["v0", "v1", "v2"] = "v2"
+    kind: Literal["X_SINGLE", "PIPELINE"]
+    family: str | None = None
+    model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
+    champion: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
+    challenger: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
+
+
+def _eval_abtest_precheck(kind: str, family, suite_version: str) -> None:
+    from evoforge import repo_source as _rs_ab
+
+    try:
+        n_tasks = sealed_eval_mod.count_tasks(family, suite_version)
+    except ValueError as e:
+        raise HTTPException(400, _rs_ab.redact(str(e)))
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_ab.redact(str(e) or "sealed eval failed"))
+    if kind == "X_SINGLE":
+        _eval_budget_or_402(2 * n_tasks, 1, sealed_eval_mod.BASELINE_COST_CENTS)
+    else:
+        _eval_budget_or_402(2 * n_tasks, sealed_eval_mod.PIPELINE_MAX_ATTEMPTS,
+                            sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
+
+
+def _abtest_interval(measurement: dict) -> tuple[float, float]:
+    iv = measurement.get("wilson95") if isinstance(measurement, dict) else None
+    if isinstance(iv, (list, tuple)) and len(iv) == 2:
+        try:
+            return float(iv[0]), float(iv[1])
+        except (TypeError, ValueError):
+            pass
+    return performance_mod._interval_of(measurement)
+
+
+@app.post("/v1/eval/abtest", status_code=202)
+def eval_abtest(req: EvalABTestRequest):
+    if req.champion == req.challenger:
+        raise HTTPException(400, "champion and challenger must differ")
+    _eval_abtest_precheck(req.kind, req.family, req.suite_version)
+
+    def _runner(sv=req.suite_version, kind=req.kind, m=req.model, f=req.family,
+                champ=req.champion, chall=req.challenger):
+        if kind == "X_SINGLE":
+            champ_out = _do_eval_baseline(sv, m, f, champ)
+            chall_out = _do_eval_baseline(sv, m, f, chall)
+        else:
+            champ_out = _do_eval_pipeline(sv, m, f, champ)
+            chall_out = _do_eval_pipeline(sv, m, f, chall)
+        champ_m = champ_out["measurement"]
+        chall_m = chall_out["measurement"]
+        cmp = performance_mod.compare(champ_m, chall_m)
+        verdict = cmp.get("verdict") if isinstance(cmp, dict) else None
+        if verdict not in ("improved", "no_clear_difference", "worse"):
+            verdict = "no_clear_difference"
+        clo, chi = _abtest_interval(champ_m)
+        plo, phi = _abtest_interval(chall_m)
+        if verdict == "improved":
+            reason = f"improved: lo {plo:.2f} > hi {chi:.2f}"
+        elif verdict == "worse":
+            reason = f"worse: hi {phi:.2f} < lo {clo:.2f}"
+        else:
+            reason = "no_clear_difference: intervals overlap"
+        decision = {
+            "decision_id": f"dec_{uuid.uuid4().hex[:12]}",
+            "created_at": time.time(),
+            "suite_version": sv,
+            "kind": kind,
+            "model": m,
+            "family": f,
+            "champion": champ,
+            "challenger": chall,
+            "champion_measurement": champ_m,
+            "challenger_measurement": chall_m,
+            "verdict": verdict,
+            "decision": "adopt" if verdict == "improved" else "keep",
+            "reason": reason,
+        }
+        decisions_mod.record(decision)
+        return {"decision": decision}
+
+    try:
+        job = eval_jobs_mod.create_job(kind=req.kind,
+                                       suite_version=req.suite_version,
+                                       model=req.model, family=req.family,
+                                       runner=_runner)
+    except eval_jobs_mod.ActiveJobError as e:
+        raise HTTPException(409, f"another eval job is active: {e.job_id}")
+    return {"job_id": job["job_id"], "kind": job["kind"],
+            "status": job["status"], "created_at": job["created_at"]}
+
+
+@app.get("/v1/eval/decisions")
+def eval_decisions_list():
+    return {"decisions": decisions_mod.list_decisions()}
 
 
 @app.get("/v1/performance")
