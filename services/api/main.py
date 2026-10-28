@@ -876,13 +876,13 @@ def eval_sandbox(req: SandboxRequest):
 
 
 class EvalBaselineRequest(BaseModel):
-    suite_version: Literal["v0"] = "v0"
+    suite_version: Literal["v0", "v1"] = "v0"
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
 
 class EvalPipelineRequest(BaseModel):
-    suite_version: Literal["v0"] = "v0"
+    suite_version: Literal["v0", "v1"] = "v0"
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
@@ -943,16 +943,17 @@ def _production_stats() -> dict:
 
 
 @app.get("/v1/eval/suites")
-def eval_suites():
-    """Redacted sealed v0 catalogue: families plus sha256/len metadata only."""
+def eval_suites(suite_version: Literal["v0", "v1"] = "v0"):
+    """Redacted sealed catalogue for one suite version: families plus sha256/len metadata only."""
     from evoforge import repo_source as _rs_eval
 
     try:
-        suites = sealed_eval_mod.public_suites()
+        suites = sealed_eval_mod.public_suites(suite_version)
     except Exception as e:
         raise HTTPException(
             502, _rs_eval.redact(f"sealed suites unavailable: {type(e).__name__}"))
-    return {"suite_version": sealed_eval_mod.SUITE_VERSION, "suites": suites}
+    return {"suite_version": suite_version,
+            "suite_versions": list(sealed_eval_mod.SUITE_VERSIONS), "suites": suites}
 
 
 @app.post("/v1/eval/baseline", status_code=201)
@@ -965,7 +966,7 @@ def eval_baseline(req: EvalBaselineRequest):
     from evoforge import repo_source as _rs_eval2
 
     try:
-        n_tasks = sealed_eval_mod.count_tasks(req.family)
+        n_tasks = sealed_eval_mod.count_tasks(req.family, req.suite_version)
     except ValueError as e:
         raise HTTPException(400, _rs_eval2.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
@@ -1051,7 +1052,7 @@ def eval_pipeline(req: EvalPipelineRequest):
     from evoforge import repo_source as _rs_eval3
 
     try:
-        n_tasks = sealed_eval_mod.count_tasks(req.family)
+        n_tasks = sealed_eval_mod.count_tasks(req.family, req.suite_version)
     except ValueError as e:
         raise HTTPException(400, _rs_eval3.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
