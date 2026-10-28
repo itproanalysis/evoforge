@@ -34,9 +34,16 @@ def test_start_step_exhausted_offline():
     assert body["winner"]["run_evidence_id"] is None  # stub review can't back a run
     assert body["winner"]["candidate_error"] is not None
     # Full run exhausts honestly (never fake-converges offline).
+    # /run is asynchronous since T31 (the web proxy cuts requests at 300 s): 202, then poll to the end.
     done = client.post(f"/v1/evolution/{eid}/run")
-    assert done.status_code == 200, done.text
-    assert done.json()["status"] == "EXHAUSTED"
+    assert done.status_code in (200, 202), done.text
+    import time as _t
+    for _ in range(300):
+        body = client.get(f"/v1/evolution/{eid}").json()
+        if body["status"] != "RUNNING" and not body.get("run_active"):
+            break
+        _t.sleep(0.1)
+    assert body["status"] == "EXHAUSTED"
     detail = client.get(f"/v1/evolution/{eid}")
     assert detail.json()["status"] == "EXHAUSTED"
     assert len(detail.json()["generations"]) == 2
