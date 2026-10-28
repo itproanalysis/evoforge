@@ -307,8 +307,14 @@ def _parse_junit(xml_path: str, n_snippets: int, prefix: str) -> tuple[int, int,
         return n_snippets, 0, False
     passed = 0
     covered = set()
+    expected = {f"{prefix}_{i}" for i in range(1, n_snippets + 1)}
     for tc in cases:
-        covered.update(tc.get("classname", "").split("."))
+        # The first matching component is the module; later components may be
+        # class names and must not claim coverage of a different module.
+        module = next((part for part in tc.get("classname", "").split(".")
+                       if part in expected), None)
+        if module:
+            covered.add(module)
         ok = True
         for child in tc:
             if child.tag.rsplit("}", 1)[-1] in ("failure", "error", "skipped"):
@@ -316,7 +322,6 @@ def _parse_junit(xml_path: str, n_snippets: int, prefix: str) -> tuple[int, int,
                 break
         if ok:
             passed += 1
-    expected = {f"{prefix}_{i}" for i in range(1, n_snippets + 1)}
     return len(cases), passed, expected.issubset(covered)
 
 

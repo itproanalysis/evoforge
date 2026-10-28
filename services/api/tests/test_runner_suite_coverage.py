@@ -3,6 +3,17 @@ import importlib.util
 from pathlib import Path
 
 
+def test_class_name_cannot_claim_another_module(tmp_path):
+    app_path = Path(__file__).resolve().parents[2] / "runner" / "app.py"
+    spec = importlib.util.spec_from_file_location("suite_coverage_runner", app_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    report = tmp_path / "result.xml"
+    report.write_text('<testsuite><testcase classname="visible.test_visible_1.test_visible_2" />'
+                      '<testcase classname="visible.test_visible_1" /></testsuite>')
+    assert module._parse_junit(str(report), 2, "test_visible") == (2, 2, False)
+
+
 def test_remote_runner_rejects_uncollected_suite_file(tmp_path):
     app_path = Path(__file__).resolve().parents[2] / "runner" / "app.py"
     spec = importlib.util.spec_from_file_location("suite_coverage_runner", app_path)
