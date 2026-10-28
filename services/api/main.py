@@ -28,6 +28,7 @@ from evoforge import outcomes as outcomes_store
 from evoforge import performance as performance_mod
 from evoforge import eval_jobs as eval_jobs_mod
 from evoforge import decisions as decisions_mod
+from evoforge import arena as arena_mod
 from evoforge import sealed_eval as sealed_eval_mod
 from evoforge import postgres_state
 from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
@@ -68,6 +69,7 @@ app.add_middleware(
 )
 _evidence = postgres_state.ScopedRecords("records")  # postgres when configured, memory in dev
 decisions_mod.configure(_evidence)
+arena_mod.configure(_evidence)
 feedback_mod.configure(_evidence)
 COST_CENTS = 120  # conservative per-model-call estimate (int cents)
 
@@ -1330,6 +1332,74 @@ def eval_abtest(req: EvalABTestRequest):
 @app.get("/v1/eval/decisions")
 def eval_decisions_list():
     return {"decisions": decisions_mod.list_decisions()}
+
+
+class ArenaRequest(BaseModel):
+    suite_version: Literal["v1", "v2"] = "v2"
+    task_id: str
+    model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
+
+
+def _arena_budget_or_402() -> None:
+    try:
+        arena_mod.check_budget()
+    except performance_mod.BudgetExceeded as e:
+        raise HTTPException(402, str(e))
+    except ledger.Overdraft:
+        raise HTTPException(402, "budget exhausted (reserve_cost refused)")
+
+
+@app.post("/v1/arena", status_code=202)
+def arena_create(req: ArenaRequest):
+    """Run one sealed task in two lanes at once (EvoForge vs single AI).
+
+    The budget guard for both lanes together runs before any provider
+    call; the lanes themselves run concurrently in one background job.
+    """
+    from evoforge import repo_source as _rs_arena
+
+    tid = req.task_id.strip() if isinstance(req.task_id, str) else ""
+    if not tid:
+        raise HTTPException(404, "unknown task")
+    try:
+        task = arena_mod.find_task(req.suite_version, tid)
+    except arena_mod.UnknownTask:
+        raise HTTPException(404, f"unknown task: {tid!r}")
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_arena.redact(str(e) or "sealed arena failed"))
+    _arena_budget_or_402()
+    box: dict = {}
+    ready = threading.Event()
+
+    def _runner(sv=req.suite_version, t=tid, m=req.model):
+        if not ready.wait(timeout=60):
+            raise RuntimeError("arena start sync failed")
+        return arena_mod.run_arena(sv, t, m, arena_id=box["arena_id"])
+
+    try:
+        job = eval_jobs_mod.create_job(kind="ARENA",
+                                       suite_version=req.suite_version,
+                                       model=req.model, runner=_runner)
+    except eval_jobs_mod.ActiveJobError as e:
+        raise HTTPException(409, f"another eval job is active: {e.job_id}")
+    box["arena_id"] = job["job_id"]
+    arena_mod.seed_running(job["job_id"], req.suite_version, tid,
+                           req.model, task)
+    ready.set()
+    return {"arena_id": job["job_id"], "status": "running"}
+
+
+@app.get("/v1/arena")
+def arena_list():
+    return {"arenas": arena_mod.list_arenas()}
+
+
+@app.get("/v1/arena/{arena_id}")
+def arena_get(arena_id: str):
+    doc = arena_mod.get_arena(arena_id)
+    if doc is None:
+        raise HTTPException(404, "unknown arena")
+    return doc
 
 
 @app.get("/v1/performance")

@@ -979,5 +979,53 @@
       "v1",
       "feedback"
     ]
+  },
+  {
+    "expected": "/v1/arena",
+    "path_segments": [
+      "v1",
+      "arena"
+    ]
+  },
+  {
+    "expected": "/v1/arena/arena_abc123",
+    "path_segments": [
+      "v1",
+      "arena",
+      "arena_abc123"
+    ]
+  },
+  {
+    "expected": "/v1/arena/aB0._~-x",
+    "path_segments": [
+      "v1",
+      "arena",
+      "aB0._~-x"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "arena",
+      "abc",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "arena",
+      "a:b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "arena",
+      ".."
+    ]
   }
 ]
