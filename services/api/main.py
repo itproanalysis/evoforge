@@ -1611,10 +1611,25 @@ class EvolutionStart(BaseModel):
     use_memory: bool = True
 
 
+def _evolution_budget_cap() -> int:
+    try:
+        return int(os.getenv("EVO_EVOLUTION_MAX_CENTS", "1500"))
+    except (TypeError, ValueError):
+        return 1500
+
+
 @app.post("/v1/evolution/start", status_code=201)
 def evolution_start(req: EvolutionStart):
     if not req.goal.strip():
         raise HTTPException(400, "goal required")
+    worst = int(req.max_generations) * int(req.population) * 2 * COST_CENTS
+    cap = _evolution_budget_cap()
+    if worst > cap:
+        raise HTTPException(
+            402,
+            f"evolution worst-case cost {worst}c exceeds cap {cap}c "
+            f"(max_generations={req.max_generations} x population={req.population} "
+            f"x 2 calls x {COST_CENTS}c)")
     validated = None
     if req.target_paths is not None:
         validated = _validate_target_paths(req.target_paths)
@@ -1746,6 +1761,15 @@ def evolution_promote(evolution_id: str):
                         branch=f"evoforge/evo-{uuid.uuid4().hex[:8]}", base="main",
                         store_extra={"evolution_id": evolution_id})
     return {"pr": pr, "evidence_id": eid, "source_evidence_id": run_eid}
+
+
+@app.get("/v1/proof/key")
+def proof_key():
+    """Server Ed25519 public key for proof certificates (404 when unsigned)."""
+    pub = proof_mod.server_public_key_b64()
+    if not pub:
+        raise HTTPException(404, "proof signing not configured")
+    return {"algorithm": "Ed25519", "public_key": pub}
 
 
 @app.get("/v1/proof/{evidence_id}")

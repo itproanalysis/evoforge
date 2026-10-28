@@ -67,7 +67,22 @@ def test_feedback_goal_carries_failures():
     assert "G2_REQUIRED" in nxt and "make it fast" in nxt
 
 
-def test_proof_certificate_redacted_and_verifiable():
+def _mint_signing_key(monkeypatch) -> str:
+    import base64
+
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+    raw = Ed25519PrivateKey.generate().private_bytes(
+        serialization.Encoding.Raw, serialization.PrivateFormat.Raw,
+        serialization.NoEncryption())
+    b64 = base64.b64encode(raw).decode("ascii")
+    monkeypatch.setenv("EVO_PROOF_SIGNING_KEY", b64)
+    return b64
+
+
+def test_proof_certificate_redacted_and_verifiable(monkeypatch):
+    _mint_signing_key(monkeypatch)
     g = client.post("/v1/gates/evaluate", json={
         "diff": "--- a\n+++ b\n@@\n+x", "tests": [{"code": "def test_x(): assert 1 == 1"}],
         "heldout_kinds": [], "vis_pass": 0, "vis_n": 0, "held_pass": 0, "held_n": 0})

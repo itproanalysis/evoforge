@@ -712,6 +712,14 @@
     ]
   },
   {
+    "expected": "/v1/proof/key",
+    "path_segments": [
+      "v1",
+      "proof",
+      "key"
+    ]
+  },
+  {
     "expected": null,
     "path_segments": [
       "v1",
