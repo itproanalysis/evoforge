@@ -44,7 +44,8 @@ regressions, not evidence of live model quality.
   its cases and the 18 non-orchestration checks passed again; raw log:
   `.local/validation-eval-evidence-final.log`.
 - Frozen package validation: zero failures (without `--pg`).
-- Existing Runner report checks plus the sealed baseline regression file are
-  still running separately. No full API result is claimed for this branch.
+- Initial focused checks plus the existing Runner report and sealed baseline
+  regression files: 36 passed, one upstream deprecation warning, in 452.24s.
+  No full API result is claimed for this branch.
 - No database or web changes in this branch. Full API/PG release gates and
   integration with the current release remain required before deployment.
