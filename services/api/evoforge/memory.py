@@ -20,7 +20,19 @@ _MAX_PATTERNS = 200
 _patterns: list[dict] = []
 
 
+def _backend():
+    from evoforge.postgres_state import backend
+    selected = backend()
+    if selected:
+        from evoforge.postgres_evolutions import EvolutionStore
+        return EvolutionStore(selected.kernel)
+    return None
+
+
 def reset() -> None:
+    if _backend():
+        from evoforge.postgres_kernel import KernelRejected
+        raise KernelRejected('durable evolution memory cannot be cleared')
     _patterns.clear()
 
 
@@ -36,6 +48,22 @@ def keywords(text: str) -> list[str]:
 def record(evolution_id: str, goal: str, diff: str,
            fitness_score: float, run_evidence_id: str | None) -> dict:
     """Distill one converged winner. Idempotent per evolution_id."""
+    store = _backend()
+    if store:
+        existing = store.find_pattern_by_evolution(evolution_id)
+        if existing is not None:
+            return existing
+        pat = {
+            "pattern_id": f"pat_{uuid.uuid4().hex[:12]}",
+            "evolution_id": evolution_id,
+            "goal": (goal or "")[:_MAX_GOAL_KEEP],
+            "keywords": keywords(goal),
+            "diff_excerpt": (diff or "")[:_MAX_EXCERPT],
+            "fitness_score": float(fitness_score),
+            "proof_evidence_id": run_evidence_id,
+            "at": time.time(),
+        }
+        return store.record_pattern(pat)
     for p in _patterns:
         if p["evolution_id"] == evolution_id:
             return p
@@ -57,13 +85,20 @@ def record(evolution_id: str, goal: str, diff: str,
     return pat
 
 
+def _all_patterns() -> list[dict]:
+    store = _backend()
+    if store:
+        return store.list_patterns()
+    return list(_patterns)
+
+
 def recall(goal: str, k: int = 2) -> list[dict]:
     """Rank patterns by keyword overlap (deterministic, no LLM)."""
     want = set(keywords(goal))
     if not want:
         return []
     scored = []
-    for p in _patterns:
+    for p in _all_patterns():
         overlap = len(want & set(p["keywords"]))
         if overlap:
             scored.append((overlap, p["fitness_score"], p))
@@ -94,4 +129,4 @@ def public_all() -> list[dict]:
         "proof_evidence_id": p["proof_evidence_id"],
         "proof_path": f"/v1/proof/{p['proof_evidence_id']}" if p["proof_evidence_id"] else None,
         "at": p["at"],
-    } for p in _patterns]
+    } for p in _all_patterns()]
