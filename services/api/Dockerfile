@@ -19,6 +19,7 @@ COPY docs/evoforge-v4.2/contracts/ /app/docs/evoforge-v4.2/contracts/
 COPY docs/evoforge-v4.2/tools/validate_package.py /app/docs/evoforge-v4.2/tools/validate_package.py
 # Sealed eval set v0 (server-only; HTTP view is redacted by sealed_eval.public_suites).
 COPY evals/sealed_v0/ /app/evals/sealed_v0/
+COPY evals/sealed_v1/ /app/evals/sealed_v1/
 
 WORKDIR /app/services/api
 USER evoforge
