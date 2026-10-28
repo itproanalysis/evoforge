@@ -1,0 +1,20 @@
+{
+  "id": "T38_home_proof_card",
+  "planned_by": "Claude (Critic): make the measured proof visible on the first screen",
+  "goal": "T38 — Mission Control (apps/web/app/[locale]/page.tsx) opens with a proof card built from measured data.\n\n1. apps/web/lib/evolutionTimeline.ts: export a pure `bestHarnessComparison(history)` that, for the newest suite with\n   X_SINGLE measurements on at least two harness versions, returns {suite_version, model, from: {harness_version,\n   passed, n, pass_rate, lo, hi}, to: {...same for the newest harness}, verdict: \"improved\"|\"no_clear_difference\"|\n   \"worse\" (improved only when to.lo > from.hi, worse only when to.hi < from.lo), delta_pp} or null. Also include the\n   newest PIPELINE point of that suite when present. Never invent numbers; lo/hi are the record's wilson95.\n2. NEW apps/web/components/ProofCard.tsx rendered first on the Mission Control page (fetch getPerformance()): headline\n   with the verdict badge (개선 확인 / 차이 불분명 / 악화), the two pass rates as large numbers with passed/n, both\n   Wilson intervals drawn on one 0-100% bar so the gap is visible, the pipeline result if present, a one-line rule\n   (\"95% 신뢰구간이 겹치지 않을 때만 개선으로 판정\") and a link to /performance. Loading and not-measured states.\n   Subtle entrance animation that respects prefers-reduced-motion; 375px friendly.\n3. Strings in messages/ko.json and messages/en.json (identical keys). No hard-coded results anywhere.",
+  "edit": [
+    "apps/web/lib/evolutionTimeline.ts",
+    "apps/web/components/ProofCard.tsx",
+    "apps/web/app/[locale]/page.tsx",
+    "apps/web/messages/ko.json",
+    "apps/web/messages/en.json"
+  ],
+  "context": [
+    "apps/web/components/EvolutionTimeline.tsx",
+    "apps/web/lib/api.ts"
+  ],
+  "check": [
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p .",
+    "python -m pytest services/api/tests -q -p no:cacheprovider -k \"web or i18n or locale or message or proxy or t28 or t34 or t36 or t38\""
+  ]
+}

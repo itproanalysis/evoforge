@@ -71,6 +71,19 @@
       "worse": "Worse",
       "no_clear_difference": "No clear difference"
     },
+    "proof": {
+      "heading": "Measured improvement proof",
+      "badge-improved": "Improvement confirmed",
+      "badge-unclear": "Unclear difference",
+      "badge-worse": "Worse",
+      "rule": "Improved only when the 95% confidence intervals do not overlap",
+      "link": "Performance details →",
+      "empty": "No comparable measurements yet. X_SINGLE measurements on two harness versions are needed.",
+      "from-label": "Previous harness",
+      "to-label": "Latest harness",
+      "pipeline-label": "PIPELINE",
+      "interval-label": "95% interval"
+    },
     "participants-heading": "Participants",
     "participants-unavailable": "Participant data is not available from the server yet.",
     "participants-empty": "No participants are connected to this project.",
