@@ -1,7 +1,12 @@
 "use client";
 import React from "react";
 import { useTranslations } from "next-intl";
-import { buildTimeline, type Timeline, type TimelineSegment } from "../lib/evolutionTimeline";
+import {
+  buildTimeline,
+  segmentVerdict,
+  type Timeline,
+  type TimelineSegment,
+} from "../lib/evolutionTimeline";
 import type { MeasurementRecord } from "../lib/api";
 
 export interface EvolutionTimelineProps {
@@ -19,14 +24,29 @@ const FALLBACK: Record<string, string> = {
   "timeline.legend-pipeline": "PIPELINE",
   "timeline.families-heading": "Per-family results",
   "timeline.harness": "harness {version}",
+  "timeline.verdict-improved": "Improvement confirmed ({delta})",
+  "timeline.verdict-unclear": "Unclear difference (intervals overlap, {delta})",
+  "timeline.verdict-worse": "Worse ({delta})",
 };
 
 function formatDate(createdAt: number): string {
   try {
-    return new Date(createdAt * 1000).toISOString().slice(0, 10);
+    const d = new Date(createdAt * 1000);
+    if (Number.isNaN(d.getTime())) return String(createdAt);
+    return d.toISOString().slice(5, 16).replace("T", " ");
   } catch {
     return String(createdAt);
   }
+}
+
+function shortHarness(version: string): string {
+  const i = version.lastIndexOf("/");
+  return i >= 0 ? version.slice(i) : version;
+}
+
+function formatDeltaPp(v: number): string {
+  if (typeof v !== "number" || Number.isNaN(v)) return "—";
+  return `${v > 0 ? "+" : ""}${v.toFixed(1)}%p`;
 }
 
 function clamp01(v: number): number {
@@ -47,6 +67,7 @@ function SegmentPanel({
   legendPipe,
   harnessLabel,
   familiesHeading,
+  formatVerdict,
 }: {
   seg: TimelineSegment;
   notComparableLabel: string;
@@ -54,19 +75,23 @@ function SegmentPanel({
   legendPipe: string;
   harnessLabel: (version: string) => string;
   familiesHeading: string;
+  formatVerdict: (c: { verdict: string; deltaPp: number }) => string;
 }) {
   void notComparableLabel;
   const LEFT = 48;
   const RIGHT = 14;
   const TOP = 20;
   const BOTTOM = 36;
-  const STEP = 76;
   const CHART_H = 180;
+  const VB_W = 640;
+  const VB_H = TOP + CHART_H + BOTTOM;
   const n = seg.points.length;
-  const width = Math.max(320, LEFT + RIGHT + STEP * Math.max(1, n));
-  const height = TOP + CHART_H + BOTTOM;
+  const innerW = VB_W - LEFT - RIGHT;
+  const height = VB_H;
   const y = (v: number) => TOP + CHART_H * (1 - clamp01(v));
-  const x = (i: number) => LEFT + STEP * (i + 0.5);
+  const x = (i: number) => (n <= 1 ? LEFT + innerW / 2 : LEFT + (innerW * i) / Math.max(1, n - 1));
+  const hxFor = (index: number) =>
+    n <= 1 ? LEFT : LEFT + (innerW * (index - 0.5)) / Math.max(1, n - 1);
   const gridVals = [0, 25, 50, 75, 100];
 
   const byKind = new Map<string, Array<{ i: number; px: number; py: number }>>();
@@ -78,7 +103,8 @@ function SegmentPanel({
     byKind.set(p.kind, arr);
   });
 
-  const minInner = LEFT + RIGHT + STEP * Math.max(1, n);
+  const comparison = segmentVerdict(seg);
+  const verdictText = comparison ? formatVerdict(comparison) : null;
 
   return (
     <section
@@ -91,6 +117,11 @@ function SegmentPanel({
       <h3 className="text-sm font-semibold text-text-primary break-words">
         {seg.suite_version} · {seg.model}
       </h3>
+      {verdictText ? (
+        <p data-testid="evolution-verdict" className="text-xs text-text-secondary mt-1 break-words">
+          {verdictText}
+        </p>
+      ) : null}
       <div className="flex items-center gap-4 mt-1 text-xs text-text-secondary flex-wrap">
         <span className="inline-flex items-center gap-1.5">
           <span
@@ -108,15 +139,16 @@ function SegmentPanel({
         </span>
       </div>
 
-      <div className="overflow-x-auto max-w-full mt-2" style={{ maxWidth: "100%" }}>
+      <div className="w-full max-w-full mt-2" style={{ maxWidth: "100%" }}>
         <svg
           role="img"
           aria-label={`${seg.suite_version} ${seg.model}`}
-          width={width}
+          width="100%"
           height={height}
-          viewBox={`0 0 ${width} ${height}`}
-          className="block"
-          style={{ minWidth: minInner, maxWidth: "none" }}
+          viewBox={`0 0 ${VB_W} ${height}`}
+          preserveAspectRatio="xMidYMid meet"
+          className="block w-full h-auto"
+          style={{ width: "100%", height: "auto", maxWidth: "100%" }}
         >
           <style>{`@keyframes evo-grow{from{opacity:0;transform:scale(0.6)}to{opacity:1;transform:scale(1)}}.evo-anim{animation:evo-grow 400ms ease-out;transform-box:fill-box;transform-origin:center}@media (prefers-reduced-motion:reduce){.evo-anim{animation:none !important}}`}</style>
           {gridVals.map((g) => {
@@ -126,7 +158,7 @@ function SegmentPanel({
               <g key={g}>
                 <line
                   x1={LEFT}
-                  x2={width - RIGHT}
+                  x2={VB_W - RIGHT}
                   y1={gy}
                   y2={gy}
                   stroke="#263048"
@@ -140,9 +172,13 @@ function SegmentPanel({
             );
           })}
           {seg.harnessChanges.map((hc) => {
-            const hx = LEFT + STEP * hc.index;
+            const hx = hxFor(hc.index);
+            const nearRight = hx > VB_W - RIGHT - 48;
+            const anchor = nearRight ? "end" : "start";
+            const tx = nearRight ? hx - 4 : hx + 4;
             return (
               <g key={`${hc.index}-${hc.to}`}>
+                <title>{harnessLabel(hc.to)}</title>
                 <line
                   x1={hx}
                   x2={hx}
@@ -153,8 +189,8 @@ function SegmentPanel({
                   strokeDasharray="4 4"
                   opacity={0.9}
                 />
-                <text x={hx + 4} y={TOP + 2} fontSize={10} fill="#f59e0b">
-                  {harnessLabel(hc.to)}
+                <text x={tx} y={TOP + 2} fontSize={10} fill="#f59e0b" textAnchor={anchor}>
+                  {shortHarness(hc.to)}
                 </text>
               </g>
             );
@@ -250,7 +286,8 @@ function SegmentPanel({
                   <tr key={row.family}>
                     <th
                       scope="row"
-                      className="text-left font-medium text-text-primary p-1 break-words min-w-[90px] max-w-[140px]"
+                      title={row.family}
+                      className="text-left font-medium text-text-primary p-1 whitespace-nowrap truncate min-w-[90px] max-w-[140px]"
                     >
                       {row.family}
                     </th>
@@ -336,6 +373,12 @@ export function EvolutionTimeline(props: EvolutionTimelineProps) {
   const legendPipe = translate("timeline.legend-pipeline");
   const familiesHeading = translate("timeline.families-heading");
   const harnessLabel = (version: string) => translate("timeline.harness", { version });
+  const formatVerdict = (c: { verdict: string; deltaPp: number }): string => {
+    const delta = formatDeltaPp(c.deltaPp);
+    if (c.verdict === "improved") return translate("timeline.verdict-improved", { delta });
+    if (c.verdict === "worse") return translate("timeline.verdict-worse", { delta });
+    return translate("timeline.verdict-unclear", { delta });
+  };
 
   if (!timeline || timeline.segments.length === 0) {
     return (
@@ -369,6 +412,7 @@ export function EvolutionTimeline(props: EvolutionTimelineProps) {
             legendPipe={legendPipe}
             harnessLabel={harnessLabel}
             familiesHeading={familiesHeading}
+            formatVerdict={formatVerdict}
           />
         </React.Fragment>
       ))}

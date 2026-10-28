@@ -266,7 +266,10 @@
       "legend-x-single": "X_SINGLE",
       "legend-pipeline": "PIPELINE",
       "harness": "하네스 {version}",
-      "families-heading": "분야별 결과"
+      "families-heading": "분야별 결과",
+      "verdict-improved": "개선 확인 ({delta})",
+      "verdict-unclear": "차이 불분명 (구간이 겹침, {delta})",
+      "verdict-worse": "악화 ({delta})"
     },
     "jobs": {
       "title": "백그라운드 측정 작업",
