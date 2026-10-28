@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getArena, listArenas, postArena, type ArenaDoc } from "../../lib/api";
+import { laneView, arenaVerdict } from "../../lib/arenaStatus";
 
 const card: React.CSSProperties = {
   background: "#141b2d",
@@ -44,7 +45,7 @@ export default function ArenaRootPage() {
           <div style={card}>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ fontSize: 13, fontWeight: "bold", color: "#10b981" }}>Task: {selected.task_id} ({selected.suite_version})</span>
-              <span style={{ fontSize: 12, color: "#8b93a7" }}>Verdict: <strong>{selected.verdict?.winner}</strong></span>
+              <span style={{ fontSize: 12, color: "#8b93a7" }}>Verdict: <strong>{arenaVerdict(selected)?.winner ?? (selected.verdict?.winner === "inconclusive" ? "verification inconclusive" : "pending")}</strong></span>
             </div>
             <p style={{ fontSize: 14, marginTop: 8 }}>{selected.goal}</p>
           </div>
@@ -53,8 +54,9 @@ export default function ArenaRootPage() {
             <div style={{ ...card, borderColor: "#10b981" }}>
               <h3 style={{ color: "#10b981", marginTop: 0 }}>EvoForge Pipeline (Harness /2)</h3>
               <p style={{ fontSize: 13 }}>Status: <strong>{selected.lanes?.evoforge?.status}</strong></p>
-              <p style={{ fontSize: 13 }}>Heldout: <strong>{selected.lanes?.evoforge?.heldout?.passed}/{selected.lanes?.evoforge?.heldout?.n}</strong> passed</p>
-              <p style={{ fontSize: 13 }}>Cost: <strong>{selected.lanes?.evoforge?.cost_cents}¢</strong> · Attempts: <strong>{selected.lanes?.evoforge?.attempts}</strong></p>
+              <p style={{ fontSize: 13 }}>Heldout: <strong>{laneView(selected.lanes?.evoforge).score ?? "pending / unverified"}</strong></p>
+              <p style={{ fontSize: 13 }}>Server-reported cost: <strong>{laneView(selected.lanes?.evoforge).cost === null ? "pending" : `${laneView(selected.lanes?.evoforge).cost}¢`}</strong> · Attempts: <strong>{laneView(selected.lanes?.evoforge).attempts ?? "—"}</strong></p>
+              {laneView(selected.lanes?.evoforge).status === "failed" && <p>Failed: {laneView(selected.lanes?.evoforge).error || "reason unavailable"}</p>}
               <pre style={{ background: "#06090e", padding: 12, borderRadius: 6, fontSize: 11, overflowX: "auto", maxHeight: 200, color: "#a7f3d0" }}>
                 {selected.lanes?.evoforge?.diff || "// No patch"}
               </pre>
@@ -63,8 +65,9 @@ export default function ArenaRootPage() {
             <div style={{ ...card, borderColor: "#3b82f6" }}>
               <h3 style={{ color: "#60a5fa", marginTop: 0 }}>Single AI (Harness /1, 1 attempt)</h3>
               <p style={{ fontSize: 13 }}>Status: <strong>{selected.lanes?.single?.status}</strong></p>
-              <p style={{ fontSize: 13 }}>Heldout: <strong>{selected.lanes?.single?.heldout?.passed}/{selected.lanes?.single?.heldout?.n}</strong> passed</p>
-              <p style={{ fontSize: 13 }}>Cost: <strong>{selected.lanes?.single?.cost_cents}¢</strong> · Attempts: <strong>{selected.lanes?.single?.attempts}</strong></p>
+              <p style={{ fontSize: 13 }}>Heldout: <strong>{laneView(selected.lanes?.single).score ?? "pending / unverified"}</strong></p>
+              <p style={{ fontSize: 13 }}>Server-reported cost: <strong>{laneView(selected.lanes?.single).cost === null ? "pending" : `${laneView(selected.lanes?.single).cost}¢`}</strong> · Attempts: <strong>{laneView(selected.lanes?.single).attempts ?? "—"}</strong></p>
+              {laneView(selected.lanes?.single).status === "failed" && <p>Failed: {laneView(selected.lanes?.single).error || "reason unavailable"}</p>}
               <pre style={{ background: "#06090e", padding: 12, borderRadius: 6, fontSize: 11, overflowX: "auto", maxHeight: 200, color: "#93c5fd" }}>
                 {selected.lanes?.single?.diff || "// No patch"}
               </pre>

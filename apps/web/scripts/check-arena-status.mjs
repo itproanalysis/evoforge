@@ -1,0 +1,51 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { runInNewContext } from "node:vm";
+import ts from "typescript";
+
+const require = createRequire(import.meta.url);
+const source = readFileSync(new URL("../lib/arenaStatus.ts", import.meta.url), "utf8");
+const compiled = ts.transpileModule(source, {compilerOptions: {module: ts.ModuleKind.CommonJS}}).outputText;
+const exports = {};
+runInNewContext(compiled, {exports, require});
+const pending = {status: "running", attempts: 0, heldout: {passed: 0, n: 2}, outcome: "heldout_failed", cost_cents: 0};
+assert.equal(exports.laneView(undefined).status, "pending");
+assert.equal(exports.laneView(pending).score, null);
+assert.equal(exports.laneView(pending).cost, null);
+assert.equal(exports.laneView(pending).outcome, null);
+const failed = {...pending, status: "failed", error: "runner unavailable"};
+assert.equal(exports.laneView(failed).score, null);
+assert.equal(exports.laneView(failed).cost, null);
+assert.equal(exports.laneView(failed).error, "runner unavailable");
+const done = {...pending, status: "succeeded", attempts: 1, heldout: {passed: 2, n: 2}, outcome: "passed"};
+assert.equal(exports.laneView(done).score, "2/2");
+assert.equal(exports.laneView(done).cost, 0);
+assert.equal(exports.laneView({...done, outcome: "empty_diff"}).score, null);
+const inconclusive = {...done, outcome: "verification_inconclusive"};
+assert.equal(exports.laneView(inconclusive).score, null);
+const arena = {status: "succeeded", lanes: {single: done, evoforge: done}, verdict: {winner: "tie", reason: "actual"}};
+assert.equal(exports.arenaVerdict(arena).winner, "tie");
+assert.equal(exports.arenaCost(arena), 0);
+assert.equal(exports.arenaVerdict({...arena, status: "running"}), null);
+assert.equal(exports.arenaVerdict({...arena, status: "failed"}), null);
+assert.equal(exports.arenaVerdict({...arena, lanes: {...arena.lanes, single: pending}}), null);
+assert.equal(exports.arenaCost({...arena, lanes: {...arena.lanes, single: pending}}), null);
+assert.equal(exports.arenaVerdict({...arena, verdict: {winner: "inconclusive"}, lanes: {...arena.lanes, single: inconclusive}}), null);
+console.log("Arena pending, failure, zero cost and inconclusive presentation passed");
+
+if (process.argv.includes("--http")) {
+  const input = JSON.parse(readFileSync(0, "utf8"));
+  assert.equal(exports.laneView(input.running.lanes.single).cost, null);
+  assert.equal(exports.laneView(input.running.lanes.single).score, null);
+  assert.equal(exports.arenaVerdict(input.running), null);
+  assert.equal(exports.laneView(input.failed.lanes.single).error, "test failure");
+  assert.equal(exports.arenaVerdict(input.failed), null);
+  assert.equal(exports.laneView(input.succeeded.lanes.single).cost, 0);
+  assert.equal(exports.laneView(input.succeeded.lanes.single).score, "1/1");
+  assert.equal(exports.arenaVerdict(input.succeeded).winner, "tie");
+  assert.equal(exports.laneView(input.inconclusive.lanes.evoforge).outcome, "verification_inconclusive");
+  assert.equal(exports.laneView(input.inconclusive.lanes.evoforge).score, null);
+  assert.equal(exports.arenaVerdict(input.inconclusive), null);
+  console.log("Real FastAPI Arena HTTP payloads passed presentation mapping");
+}

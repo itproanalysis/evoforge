@@ -674,7 +674,7 @@ export interface ArenaLane {
   status: "running" | "succeeded" | "failed";
   attempts: number;
   heldout: { passed: number; n: number };
-  outcome: "passed" | "empty_diff" | "apply_failed" | "heldout_failed";
+  outcome: "passed" | "empty_diff" | "apply_failed" | "heldout_failed" | "verification_inconclusive";
   cost_cents: number;
   elapsed_ms: number;
   diff: string;
@@ -698,7 +698,7 @@ export interface ArenaDoc {
     evoforge: ArenaLane;
   };
   verdict: {
-    winner: "evoforge" | "single" | "tie";
+    winner: "evoforge" | "single" | "tie" | "inconclusive";
     reason: string;
   };
   error?: string | null;
