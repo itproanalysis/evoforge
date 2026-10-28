@@ -17,7 +17,8 @@
     "improvement-lab": "개선 랩",
     "evidence": "증거",
     "performance": "성과 분석",
-    "autopilot": "오토파일럿"
+    "autopilot": "오토파일럿",
+    "leaderboard": "리더보드"
   },
   "mission-control": {
     "heading": "미션 컨트롤",
@@ -227,6 +228,7 @@
     "goal-placeholder": "불안정한 로그인 재시도 수정",
     "max-gen": "세대 수",
     "population": "개체 수",
+    "use-memory": "팩토리 메모리 사용",
     "start": "진화 시작",
     "starting": "시작 중…",
     "step": "1세대 진행",
@@ -244,6 +246,15 @@
     "loading": "증명서 불러오는 중…",
     "gates": "게이트",
     "chain": "증거 체인"
+  },
+  "leaderboard": {
+    "heading": "신뢰 리더보드",
+    "description": "검증된 수정과 증명서 링크로 순위 결정 — 명성은 주장하는 게 아니라 증명하는 것이다.",
+    "wins-heading": "검증된 승리 ({count})",
+    "empty": "아직 수렴한 진화가 없습니다.",
+    "memory-heading": "팩토리 메모리 ({count} 패턴 — 다이제스트만, 코드 없음)",
+    "score": "점수",
+    "proof-link": "증명서"
   },
   "login": {
     "heading": "소유자 로그인",

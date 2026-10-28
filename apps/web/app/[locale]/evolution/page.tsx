@@ -35,6 +35,7 @@ export default function Evolution() {
   const [goal, setGoal] = useState("");
   const [maxGen, setMaxGen] = useState(3);
   const [pop, setPop] = useState(2);
+  const [useMem, setUseMem] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [evos, setEvos] = useState<EvolutionPublic[]>([]);
@@ -97,9 +98,12 @@ export default function Evolution() {
             {t("population")} <Input type="number" value={pop} min={1} max={5}
               onChange={(e) => setPop(Number(e.target.value) || 2)} style={{ width: 64 }} />
           </label>
+          <label style={{ fontSize: 13 }}>
+            <input type="checkbox" checked={useMem} onChange={(e) => setUseMem(e.target.checked)} /> {t("use-memory")}
+          </label>
           <Button disabled={busy !== null || !goal.trim()}
             onClick={() => void act("start", async () => {
-              const r = await startEvolution(goal, "HEAD", maxGen, pop);
+              const r = await startEvolution(goal, "HEAD", maxGen, pop, useMem);
               setGoal("");
               await refresh(r.evolution_id);
             })}>

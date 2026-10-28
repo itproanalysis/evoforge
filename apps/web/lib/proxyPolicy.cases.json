@@ -743,5 +743,35 @@
       "proof",
       "a/b"
     ]
+  },
+  {
+    "expected": "/v1/leaderboard",
+    "path_segments": [
+      "v1",
+      "leaderboard"
+    ]
+  },
+  {
+    "expected": "/v1/memory",
+    "path_segments": [
+      "v1",
+      "memory"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "leaderboard",
+      "x"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "memory",
+      "x"
+    ]
   }
 ]

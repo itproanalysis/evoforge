@@ -17,7 +17,8 @@
     "improvement-lab": "Improvement Lab",
     "evidence": "Evidence",
     "performance": "Performance",
-    "autopilot": "Autopilot"
+    "autopilot": "Autopilot",
+    "leaderboard": "Leaderboard"
   },
   "mission-control": {
     "heading": "Mission Control",
@@ -227,6 +228,7 @@
     "goal-placeholder": "Fix flaky login retry",
     "max-gen": "generations",
     "population": "population",
+    "use-memory": "use factory memory",
     "start": "Start evolution",
     "starting": "Starting…",
     "step": "Step 1 generation",
@@ -244,6 +246,15 @@
     "loading": "Loading certificate…",
     "gates": "Gates",
     "chain": "Evidence chain"
+  },
+  "leaderboard": {
+    "heading": "Trust leaderboard",
+    "description": "Ranked by verified fixes with proof links — prestige is earned, never claimed.",
+    "wins-heading": "Verified wins ({count})",
+    "empty": "No converged evolutions yet.",
+    "memory-heading": "Factory memory ({count} patterns — digests only, no code)",
+    "score": "score",
+    "proof-link": "proof"
   },
   "login": {
     "heading": "Owner login",

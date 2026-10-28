@@ -474,10 +474,10 @@ export interface ProofCertificate {
   verify?: { ok: boolean; reason: string };
 }
 
-export function startEvolution(goal: string, repo_ref = "HEAD", max_generations = 3, population = 2) {
+export function startEvolution(goal: string, repo_ref = "HEAD", max_generations = 3, population = 2, use_memory = true) {
   return req<EvolutionPublic & { evidence_id?: string }>("/v1/evolution/start", {
     method: "POST",
-    body: JSON.stringify({ goal, repo_ref, max_generations, population }),
+    body: JSON.stringify({ goal, repo_ref, max_generations, population, use_memory }),
   });
 }
 
@@ -511,4 +511,31 @@ export function promoteEvolution(evolution_id: string) {
 
 export function getProof(evidence_id: string) {
   return req<ProofCertificate>(`/v1/proof/${encodeURIComponent(evidence_id)}`);
+}
+
+export interface LeaderEntry {
+  evolution_id: string;
+  goal: string;
+  generations_used: number;
+  best_score: number;
+  proof_evidence_id: string | null;
+  proof_path: string | null;
+}
+
+export interface MemoryPattern {
+  pattern_id: string;
+  evolution_id: string;
+  keywords: string[];
+  fitness_score: number;
+  proof_evidence_id: string | null;
+  proof_path: string | null;
+  at: number;
+}
+
+export function getLeaderboard() {
+  return req<{ leaders: LeaderEntry[]; count: number }>("/v1/leaderboard");
+}
+
+export function getMemory() {
+  return req<{ patterns: MemoryPattern[]; count: number }>("/v1/memory");
 }

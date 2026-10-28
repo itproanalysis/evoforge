@@ -42,6 +42,24 @@
 - `/verify/[id]` — 공개 증명서 뷰어 (로그인 없이 공유 가능).
 - 프록시 정책(`proxyPolicy.ts` + cases 11건 추가) — `/v1/kernel/*` 차단은 유지.
 
+## Wave 2 — Evolution Memory + Trust Leaderboard (2026-10-28)
+
+쓰면 쓸수록 똑똑해지는 팩토리 + 검증 경제의 순위표.
+
+- `evoforge/memory.py`: 수렴한 winner를 패턴(goal 키워드 + diff 발췌 ≤2000자 +
+  fitness)으로 증류. `recall()`은 결정적 키워드 겹침 순위 (LLM 없음).
+- `POST /v1/evolution/start`의 `use_memory=true`면 과거 승리 접근법이
+  Builder 프롬프트에 서버사이드로만 주입 (`hint_block` — HTTP 응답에 코드 유출 없음).
+- 수렴 시 `_maybe_memorize`가 자동 기록 (evolution당 1회, 멱등).
+- `GET /v1/leaderboard`: 수렴 진화를 fitness↓·세대수↑ 순으로 순위화.
+  명성의 단위는 주장이 아니라 proof 링크 (`/v1/proof/{run}`).
+- `GET /v1/memory`: 다이제스트 전용 공개 뷰 (코드 영원히 없음).
+- 웹: `/leaderboard` (+`/[locale]/leaderboard`), evolution 시작폼에 메모리 토글.
+  프록시 cases 4건 추가 (총 96).
+- 검증: `tests/test_evolution_memory_leaderboard.py` 4개 — recall 순위,
+  리더보드 proof 링크, 메모리 코드 비유출(HTTP 본문 검사),
+  `use_memory` 플래그. Wave 1 포함 10개 통과.
+
 ## 검증
 
 - `tests/test_evolution_autopilot.py` 6개: 오프라인 EXHAUSTED 정직성,

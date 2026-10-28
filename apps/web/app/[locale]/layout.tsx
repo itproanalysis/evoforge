@@ -84,6 +84,12 @@ export default async function LocaleLayout({
               >
                 {t('autopilot')}
               </a>
+              <a
+                href={`${prefix}/leaderboard`}
+                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
+              >
+                {t('leaderboard')}
+              </a>
             </nav>
             <div className="ml-auto flex items-center gap-4">
               <LanguageSwitcher />
