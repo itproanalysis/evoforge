@@ -877,13 +877,15 @@ def eval_sandbox(req: SandboxRequest):
 
 
 class EvalBaselineRequest(BaseModel):
-    suite_version: Literal["v0", "v1"] = "v0"
+    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
 
 class EvalPipelineRequest(BaseModel):
-    suite_version: Literal["v0", "v1"] = "v0"
+    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
@@ -944,7 +946,7 @@ def _production_stats() -> dict:
 
 
 @app.get("/v1/eval/suites")
-def eval_suites(suite_version: Literal["v0", "v1"] = "v0"):
+def eval_suites(suite_version: Literal["v0", "v1", "v2"] = "v0"):
     """Redacted sealed catalogue for one suite version: families plus sha256/len metadata only."""
     from evoforge import repo_source as _rs_eval
 
@@ -957,7 +959,7 @@ def eval_suites(suite_version: Literal["v0", "v1"] = "v0"):
             "suite_versions": list(sealed_eval_mod.SUITE_VERSIONS), "suites": suites}
 
 
-def _do_eval_baseline(suite_version: str, model: str, family) -> dict:
+def _do_eval_baseline(suite_version: str, model: str, family, harness: str | None = None) -> dict:
     """Shared X_SINGLE baseline core for the sync endpoint and job worker."""
     from evoforge import repo_source as _rs_eval2
 
@@ -970,7 +972,7 @@ def _do_eval_baseline(suite_version: str, model: str, family) -> dict:
     _eval_budget_or_402(n_tasks, 1, sealed_eval_mod.BASELINE_COST_CENTS)
     try:
         result = sealed_eval_mod.run_baseline(
-            suite_version, model, family=family)
+            suite_version, model, family=family, harness=harness)
     except sealed_eval_mod.SealedTooLarge as e:
         raise HTTPException(413, _rs_eval2.redact(str(e)))
     except sealed_eval_mod.SealedTimeout:
@@ -1022,7 +1024,7 @@ def _do_eval_baseline(suite_version: str, model: str, family) -> dict:
     measurement = performance_mod.make_record(
         kind="X_SINGLE", suite_version=result["suite_version"],
         model=result["model"],
-        harness_version=sealed_eval_mod.HARNESS_VERSION,
+        harness_version=result.get("harness_version", sealed_eval_mod.HARNESS_VERSION),
         n=xs["n"], passed=passed, cost_cents=xs["cost_cents"],
         per_family=per_family, evidence_id=eid)
     measurement["wilson95"] = [lo, hi]
@@ -1044,10 +1046,10 @@ def eval_baseline(req: EvalBaselineRequest):
     Runner-side trouble maps to 413/502/504 with a short message; a raw
     traceback never leaves the server.
     """
-    return _do_eval_baseline(req.suite_version, req.model, req.family)
+    return _do_eval_baseline(req.suite_version, req.model, req.family, req.harness_version)
 
 
-def _do_eval_pipeline(suite_version: str, model: str, family) -> dict:
+def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | None = None) -> dict:
     """Shared adaptive-pipeline core for the sync endpoint and job worker."""
     from evoforge import repo_source as _rs_eval3
 
@@ -1061,7 +1063,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family) -> dict:
                         sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
     try:
         result = sealed_eval_mod.run_pipeline(
-            suite_version, model, family=family)
+            suite_version, model, family=family, harness=harness)
     except sealed_eval_mod.SealedTooLarge as e:
         raise HTTPException(413, _rs_eval3.redact(str(e)))
     except sealed_eval_mod.SealedTimeout:
@@ -1102,7 +1104,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family) -> dict:
     measurement = performance_mod.make_record(
         kind="PIPELINE", suite_version=result["suite_version"],
         model=result["model"],
-        harness_version=sealed_eval_mod.HARNESS_VERSION,
+        harness_version=result.get("harness_version", sealed_eval_mod.HARNESS_VERSION),
         n=pipe["n"], passed=passed, cost_cents=pipe["cost_cents"],
         per_family=per_family, evidence_id=eid,
         attempts_total=result["attempts_total"],
@@ -1131,12 +1133,13 @@ def eval_pipeline(req: EvalPipelineRequest):
     settled attempts. No held-out code, reference fix, or task file
     contents ever leave the server.
     """
-    return _do_eval_pipeline(req.suite_version, req.model, req.family)
+    return _do_eval_pipeline(req.suite_version, req.model, req.family, req.harness_version)
 
 
 class EvalJobRequest(BaseModel):
     kind: Literal["X_SINGLE", "PIPELINE"]
-    suite_version: Literal["v0", "v1"] = "v0"
+    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
@@ -1161,11 +1164,11 @@ def _eval_job_precheck(kind: str, family, suite_version: str = "v0") -> None:
 def eval_job_create(req: EvalJobRequest):
     _eval_job_precheck(req.kind, req.family, req.suite_version)
     if req.kind == "X_SINGLE":
-        def _runner(sv=req.suite_version, m=req.model, f=req.family):
-            return _do_eval_baseline(sv, m, f)
+        def _runner(sv=req.suite_version, m=req.model, f=req.family, h=req.harness_version):
+            return _do_eval_baseline(sv, m, f, h)
     else:
-        def _runner(sv=req.suite_version, m=req.model, f=req.family):
-            return _do_eval_pipeline(sv, m, f)
+        def _runner(sv=req.suite_version, m=req.model, f=req.family, h=req.harness_version):
+            return _do_eval_pipeline(sv, m, f, h)
     try:
         job = eval_jobs_mod.create_job(kind=req.kind,
                                        suite_version=req.suite_version,

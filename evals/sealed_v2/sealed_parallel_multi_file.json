@@ -1,0 +1,150 @@
+{
+  "family": "parallel_multi_file",
+  "suite_version": "v2",
+  "tasks": [
+    {
+      "id": "SV2-PM-01",
+      "goal": "In shard.py, shard(items, n) deals items round-robin (item i goes to shard i % n) into exactly n lists (empty lists allowed) and raises ValueError when n <= 0. In merge.py, merge(chunks) returns all items of all chunks ([] for empty chunks).",
+      "files": {
+        "shard.py": "\"\"\"Split a sequence into n partitions.\"\"\"\n\n\ndef shard(items, n):\n    chunks = [[] for _ in range(n)]\n    for i, x in enumerate(items):\n        chunks[i % (n - 1 if n > 1 else 1)].append(x)\n    return chunks\n",
+        "merge.py": "\"\"\"Combine partitions back into one sequence.\"\"\"\n\n\ndef merge(chunks):\n    if not chunks:\n        return []\n    return list(chunks[0])\n"
+      },
+      "reference_fix": "--- a/merge.py\n+++ b/merge.py\n@@ -2,6 +2,7 @@\n \n \n def merge(chunks):\n-    if not chunks:\n-        return []\n-    return list(chunks[0])\n+    out = []\n+    for chunk in chunks:\n+        out.extend(chunk)\n+    return out\n--- a/shard.py\n+++ b/shard.py\n@@ -2,7 +2,9 @@\n \n \n def shard(items, n):\n+    if n <= 0:\n+        raise ValueError(\"n must be positive\")\n     chunks = [[] for _ in range(n)]\n     for i, x in enumerate(items):\n-        chunks[i % (n - 1 if n > 1 else 1)].append(x)\n+        chunks[i % n].append(x)\n     return chunks\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import merge\nimport shard\n\n\ndef test_pm01_compositional_round_trip():\n    items = list(range(7))\n    chunks = shard.shard(items, 3)\n    assert [len(c) for c in chunks] == [3, 2, 2]\n    assert sorted(merge.merge(chunks)) == items\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import shard\n\n\ndef test_pm01_negative_nonpositive_partitions_rejected():\n    try:\n        shard.shard([1, 2], 0)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import merge\nimport shard\n\n\ndef test_pm01_boundary_empty_input():\n    assert shard.shard([], 3) == [[], [], []]\n    assert merge.merge([[], [], []]) == []\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-PM-02",
+      "goal": "In workshare.py, split_work(items, n) deals items round-robin (item i goes to part i % n) into exactly n parts and raises ValueError when n <= 0. In addup.py, combine(partials) returns their sum (0 for an empty list).",
+      "files": {
+        "workshare.py": "\"\"\"Split work for parallel workers.\"\"\"\n\n\ndef split_work(items, n):\n    if n <= 0:\n        raise ValueError(\"n must be positive\")\n    if n == 1:\n        return [list(items)]\n    return [list(items[i::n]) for i in range(n - 1)]\n",
+        "addup.py": "\"\"\"Add partial worker results.\"\"\"\n\n\ndef combine(partials):\n    total = 0\n    for part in partials:\n        total += part\n    return total\n"
+      },
+      "reference_fix": "--- a/workshare.py\n+++ b/workshare.py\n@@ -4,6 +4,4 @@\n def split_work(items, n):\n     if n <= 0:\n         raise ValueError(\"n must be positive\")\n-    if n == 1:\n-        return [list(items)]\n-    return [list(items[i::n]) for i in range(n - 1)]\n+    return [list(items[i::n]) for i in range(n)]\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import addup\nimport workshare\n\n\ndef test_pm02_compositional_parallel_sum():\n    parts = workshare.split_work([1, 2, 3, 4, 5, 6], 3)\n    assert parts == [[1, 4], [2, 5], [3, 6]]\n    assert addup.combine([sum(p) for p in parts]) == 21\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import workshare\n\n\ndef test_pm02_negative_nonpositive_workers_rejected():\n    try:\n        workshare.split_work([1], 0)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import addup\nimport workshare\n\n\ndef test_pm02_boundary_empty_work():\n    assert workshare.split_work([], 2) == [[], []]\n    assert addup.combine([]) == 0\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-PM-03",
+      "goal": "In wordsplit.py, tokenize(text) splits on any whitespace and never returns empty tokens. In wordcount.py, count(texts) returns a dict word -> occurrences across all texts, case-insensitive (words lowercased).",
+      "files": {
+        "wordsplit.py": "def tokenize(text):\n    return text.split(\" \")\n",
+        "wordcount.py": "import wordsplit as tk\n\n\ndef count(texts):\n    counts = {}\n    for t in texts:\n        for w in tk.tokenize(t):\n            counts[w] = counts.get(w, 0) + 1\n    return counts\n"
+      },
+      "reference_fix": "--- a/wordcount.py\n+++ b/wordcount.py\n@@ -4,6 +4,6 @@\n def count(texts):\n     counts = {}\n     for t in texts:\n-        for w in tk.tokenize(t):\n+        for w in tk.tokenize(t.lower()):\n             counts[w] = counts.get(w, 0) + 1\n     return counts\n--- a/wordsplit.py\n+++ b/wordsplit.py\n@@ -1,2 +1,2 @@\n def tokenize(text):\n-    return text.split(\" \")\n+    return text.split()\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import wordcount\nimport wordsplit\n\n\ndef test_sv2pm03_compositional():\n    import wordcount\n    assert wordcount.count(['The cat', 'the  CAT sat']) == {'the': 2, 'cat': 2, 'sat': 1}\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import wordcount\nimport wordsplit\n\n\ndef test_sv2pm03_negative():\n    import wordsplit as tk\n    assert tk.tokenize('  a \\t b\\n') == ['a', 'b']\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import wordcount\nimport wordsplit\n\n\ndef test_sv2pm03_boundary():\n    import wordcount\n    assert wordcount.count([]) == {}\n    assert wordcount.count(['   ']) == {}\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-PM-04",
+      "goal": "In partition.py, partition(items, n) splits the list into exactly n contiguous parts whose sizes differ by at most one, larger parts first; n <= 0 raises ValueError. In gather.py, gather(parts) concatenates the parts in order, so gather(partition(items, n)) == items.",
+      "files": {
+        "partition.py": "def partition(items, n):\n    size = len(items) // n\n    return [items[i * size:(i + 1) * size] for i in range(n)]\n",
+        "gather.py": "def gather(parts):\n    return [x for p in parts for x in p][::-1]\n"
+      },
+      "reference_fix": "--- a/gather.py\n+++ b/gather.py\n@@ -1,2 +1,2 @@\n def gather(parts):\n-    return [x for p in parts for x in p][::-1]\n+    return [x for p in parts for x in p]\n--- a/partition.py\n+++ b/partition.py\n@@ -1,3 +1,10 @@\n def partition(items, n):\n-    size = len(items) // n\n-    return [items[i * size:(i + 1) * size] for i in range(n)]\n+    if n <= 0:\n+        raise ValueError(\"n must be positive\")\n+    base, extra = divmod(len(items), n)\n+    out, start = [], 0\n+    for i in range(n):\n+        end = start + base + (1 if i < extra else 0)\n+        out.append(items[start:end])\n+        start = end\n+    return out\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import gather\nimport partition\n\n\ndef test_sv2pm04_compositional():\n    import partition, gather\n    items = list(range(10))\n    parts = partition.partition(items, 3)\n    assert [len(p) for p in parts] == [4, 3, 3]\n    assert gather.gather(parts) == items\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import gather\nimport partition\n\n\ndef test_sv2pm04_negative():\n    import pytest, partition\n    with pytest.raises(ValueError):\n        partition.partition([1, 2], 0)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import gather\nimport partition\n\n\ndef test_sv2pm04_boundary():\n    import partition, gather\n    assert partition.partition([], 2) == [[], []]\n    assert gather.gather([[], []]) == []\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-PM-05",
+      "goal": "In config_load.py, load(text) parses KEY=VALUE lines (keys and values stripped; the value may contain '='), skipping blank lines and lines starting with '#'. In config_merge.py, merge(base, override) returns a new dict where override wins.",
+      "files": {
+        "config_load.py": "def load(text):\n    out = {}\n    for line in text.splitlines():\n        k, v = line.split(\"=\")\n        out[k] = v\n    return out\n",
+        "config_merge.py": "def merge(base, override):\n    out = dict(override)\n    out.update(base)\n    return out\n"
+      },
+      "reference_fix": "--- a/config_load.py\n+++ b/config_load.py\n@@ -1,6 +1,9 @@\n def load(text):\n     out = {}\n     for line in text.splitlines():\n-        k, v = line.split(\"=\")\n-        out[k] = v\n+        line = line.strip()\n+        if not line or line.startswith(\"#\"):\n+            continue\n+        k, v = line.split(\"=\", 1)\n+        out[k.strip()] = v.strip()\n     return out\n--- a/config_merge.py\n+++ b/config_merge.py\n@@ -1,4 +1,4 @@\n def merge(base, override):\n-    out = dict(override)\n-    out.update(base)\n+    out = dict(base)\n+    out.update(override)\n     return out\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import config_load\nimport config_merge\n\n\ndef test_sv2pm05_compositional():\n    import config_load, config_merge\n    base = config_load.load('a=1\\nb = 2\\n')\n    over = config_load.load('b=3\\n')\n    assert config_merge.merge(base, over) == {'a': '1', 'b': '3'}\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import config_load\nimport config_merge\n\n\ndef test_sv2pm05_negative():\n    import config_load\n    assert config_load.load('# c\\n\\nurl=http://x?a=b\\n') == {'url': 'http://x?a=b'}\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import config_load\nimport config_merge\n\n\ndef test_sv2pm05_boundary():\n    import config_load, config_merge\n    assert config_load.load('') == {}\n    assert config_merge.merge({}, {}) == {}\n"
+        }
+      ]
+    },
+    {
+      "id": "SV2-PM-06",
+      "goal": "In stats_map.py, partial(nums) returns {'sum': sum of nums, 'count': number of nums}. In stats_reduce.py, mean(partials) combines partial results into the overall mean (total sum / total count) and raises ValueError when there are no values at all.",
+      "files": {
+        "stats_map.py": "def partial(nums):\n    return {\"sum\": sum(nums), \"count\": len(nums) - 1}\n",
+        "stats_reduce.py": "def mean(partials):\n    return sum(p[\"sum\"] for p in partials) / len(partials)\n"
+      },
+      "reference_fix": "--- a/stats_map.py\n+++ b/stats_map.py\n@@ -1,2 +1,2 @@\n def partial(nums):\n-    return {\"sum\": sum(nums), \"count\": len(nums) - 1}\n+    return {\"sum\": sum(nums), \"count\": len(nums)}\n--- a/stats_reduce.py\n+++ b/stats_reduce.py\n@@ -1,2 +1,6 @@\n def mean(partials):\n-    return sum(p[\"sum\"] for p in partials) / len(partials)\n+    total = sum(p[\"sum\"] for p in partials)\n+    count = sum(p[\"count\"] for p in partials)\n+    if count == 0:\n+        raise ValueError(\"no values\")\n+    return total / count\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import stats_map\nimport stats_reduce\n\n\ndef test_sv2pm06_compositional():\n    import stats_map, stats_reduce\n    parts = [stats_map.partial([1, 2, 3]), stats_map.partial([10])]\n    assert stats_reduce.mean(parts) == 4.0\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import stats_map\nimport stats_reduce\n\n\ndef test_sv2pm06_negative():\n    import pytest, stats_map, stats_reduce\n    with pytest.raises(ValueError):\n        stats_reduce.mean([stats_map.partial([])])\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import stats_map\nimport stats_reduce\n\n\ndef test_sv2pm06_boundary():\n    import stats_map\n    assert stats_map.partial([]) == {'sum': 0, 'count': 0}\n    assert stats_map.partial([5]) == {'sum': 5, 'count': 1}\n"
+        }
+      ]
+    }
+  ]
+}

@@ -43,7 +43,7 @@ from evoforge import runner_client as _runner_client  # noqa: E402
 
 SUITE_VERSION = "v0"  # default suite
 # v1 keeps v0 held-out tests, files and reference fixes unchanged; only the goals state the contract.
-SUITE_VERSIONS = ("v0", "v1")
+SUITE_VERSIONS = ("v0", "v1", "v2")
 BASELINE_MODEL = "muse-spark-1.3"
 BASELINE_COST_CENTS = 120
 ALLOWED_KINDS = frozenset({"compositional", "negative", "boundary"})
@@ -55,6 +55,15 @@ MAX_TEST_BYTES = 64 * 1024
 PYTEST_TIMEOUT_S = 90
 SCAFFOLD_NAME = "evoforge-sealed-v0"
 HARNESS_VERSION = "api-sealed-eval/2"  # /2: hunk counts recomputed from the body (T26)
+# Selectable so the service can A/B its own harness on one suite (/1 = strict hunk counts).
+HARNESSES = ("api-sealed-eval/1", "api-sealed-eval/2")
+
+
+def _check_harness(harness: str | None) -> str:
+    harness = harness or HARNESS_VERSION
+    if harness not in HARNESSES:
+        raise ValueError(f"unknown harness_version: {harness!r}")
+    return harness
 
 _VALIDATED: dict[tuple, bool] = {}
 
@@ -516,7 +525,7 @@ def _safe_rel(path: str, sandbox_real: str, sandbox: str) -> bool:
     return common == sandbox_real
 
 
-def _apply_candidate(sandbox: str, diff) -> bool:
+def _apply_candidate(sandbox: str, diff, recount: bool = True) -> bool:
     """Apply a Builder diff; empty or unappliable diffs simply miss (score 0)."""
     if diff is None or (isinstance(diff, str) and not diff.strip()):
         return False
@@ -543,7 +552,7 @@ def _apply_candidate(sandbox: str, diff) -> bool:
                 return False
             else:
                 files[p] = None
-        changed = _patch.apply_unified_diff(files, diff)
+        changed = _patch.apply_unified_diff(files, diff, recount=recount)
     except Exception:
         return False
     try:
@@ -641,8 +650,9 @@ def _call_builder_task(goal: str, base: str,
 
 
 def run_baseline(suite_version: str, model: str, family: str | None = None,
-                 timeout_s: int | None = None) -> dict:
+                 timeout_s: int | None = None, harness: str | None = None) -> dict:
     """Execute the X_SINGLE baseline: one Builder attempt per sealed task."""
+    harness = _check_harness(harness)
     _check_version(suite_version)
     if model != BASELINE_MODEL:
         raise ValueError(f"unknown model: {model!r}")
@@ -657,7 +667,7 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
         for task in suite["tasks"]:
             _check_size(task["heldout"])
     scaffold = {"name": SCAFFOLD_NAME, "version": suite_version, "turn_cap": 1,
-                "model": model, "harness_version": HARNESS_VERSION}
+                "model": model, "harness_version": harness}
     baseline_id = f"bl_{uuid.uuid4().hex[:12]}"
     tmpbase = tempfile.mkdtemp(prefix="evoforge-sealed-")
     scores: list[dict] = []
@@ -690,7 +700,7 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                     provider_stub = False
                 diff = out.get("diff") if isinstance(out, dict) else ""
                 score = 0.0
-                if _apply_candidate(dest, diff):
+                if _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
                     # Local execution: the task source is an ephemeral local
                     # repo that a remote runner cannot read (same reason suite
                     # validation never uses the runner). Remote execution is
@@ -714,7 +724,7 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
     n = len(scores)
     rate = (passed / n) if n else 0.0
     lb, _hi = _quality_gate.wilson(passed, n)
-    return {"baseline_id": baseline_id, "suite_version": suite_version,
+    return {"baseline_id": baseline_id, "suite_version": suite_version, "harness_version": harness,
             "model": model,
             "X_SINGLE": {"pass_rate": rate, "n": n,
                          "cost_cents": settled_total},
@@ -891,7 +901,7 @@ def _pipeline_feedback(goal: str, failures: list[dict],
 
 def run_pipeline(suite_version: str, model: str, family: str | None = None,
                  timeout_s: int | None = None,
-                 max_attempts: int = PIPELINE_MAX_ATTEMPTS) -> dict:
+                 max_attempts: int = PIPELINE_MAX_ATTEMPTS, harness: str | None = None) -> dict:
     """Adaptive pipeline: up to 3 Builder attempts per sealed task.
 
     After a failed attempt the Builder receives only failing test names
@@ -900,6 +910,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
     Costs are usage-derived per attempt; the total is the sum of all
     settled attempts.
     """
+    harness = _check_harness(harness)
     _check_version(suite_version)
     if model != BASELINE_MODEL:
         raise ValueError(f"unknown model: {model!r}")
@@ -915,7 +926,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
         for task in suite["tasks"]:
             _check_size(task["heldout"])
     scaffold = {"name": SCAFFOLD_NAME, "version": suite_version, "turn_cap": 3,
-                "model": model, "harness_version": HARNESS_VERSION}
+                "model": model, "harness_version": harness}
     pipeline_id = f"pl_{uuid.uuid4().hex[:12]}"
     tmpbase = tempfile.mkdtemp(prefix="evoforge-pipeline-")
     scores: list[dict] = []
@@ -960,7 +971,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                     diff = out.get("diff") if isinstance(out, dict) else ""
                     score = 0.0
                     failures: list[dict] = []
-                    if _apply_candidate(dest, diff):
+                    if _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
                         # Always local, like the baseline: the task source is an ephemeral local repo that the remote
                         # runner cannot read (production returned RunnerBadRequest for every pipeline task).
                         score, failures = _run_heldout_local_detail(
@@ -992,7 +1003,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
     n = len(scores)
     rate = (passed / n) if n else 0.0
     lo, hi = _quality_gate.wilson(passed, n)
-    return {"pipeline_id": pipeline_id, "suite_version": suite_version,
+    return {"pipeline_id": pipeline_id, "suite_version": suite_version, "harness_version": harness,
             "model": model,
             "PIPELINE": {"pass_rate": rate, "n": n, "passed": passed,
                          "cost_cents": settled_total,
