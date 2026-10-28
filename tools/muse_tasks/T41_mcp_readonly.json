@@ -1,0 +1,18 @@
+{
+  "id": "T41_mcp_readonly",
+  "planned_by": "Claude (Critic): blueprint §23 Remote MCP, read-only first",
+  "goal": "T41 — a read-only MCP server so any MCP client (other agents included) can query EvoForge and verify its proofs.\n\nImplement MCP's JSON-RPC 2.0 over a single HTTP endpoint, POST /v1/mcp (stateless; no new dependency):\n- \"initialize\" -> {protocolVersion: echo the client's if it is \"2025-06-18\" or \"2025-03-26\", else \"2025-06-18\",\n  capabilities: {tools: {listChanged: false}}, serverInfo: {name: \"evoforge\", version}}; \"notifications/initialized\"\n  (no id) -> HTTP 202 with empty body.\n- \"tools/list\" -> exactly these read-only tools, each with a description and a JSON Schema inputSchema (type object):\n  get_performance {}, get_proof {evidence_id}, verify_certificate {certificate: object}, list_missions {},\n  get_mission {mission_id}.\n- \"tools/call\" -> {content: [{type: \"text\", text: <JSON string>}], isError: false}; reuse the existing handlers\n  (performance(), _mint_proof / stored certificates, proof.verify, missions_store) so results equal the REST API.\n  Unknown tool or bad arguments -> isError true with a short message (or JSON-RPC -32602).\n- Errors: unknown method -32601, invalid JSON -32700, invalid request -32600, with \"jsonrpc\": \"2.0\" and the request id.\n- No tool may write, start jobs, call the model or return code/diffs/sealed tests.\nAlso: apps/web/lib/proxyPolicy.ts + proxyPolicy.cases.json allow POST /v1/mcp; services/api/evoforge/mcp_server.py\nholds the dispatch (main.py only mounts the route). Tests: services/api/tests/test_muse_t41.py.",
+  "edit": [
+    "services/api/evoforge/mcp_server.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t41.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/proof.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
