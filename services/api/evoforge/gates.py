@@ -119,6 +119,11 @@ def evaluate_full(diff: str, tests: list[dict], heldout_kinds: list[str],
     if not ran and result != "FAIL":  # 0 runs is missing evidence, never a clean pass
         result = "INCONCLUSIVE"
         reasons = [*reasons, f"no execution evidence (visible n={vis_n}, held-out n={held_n})"]
+    from evoforge.runner_diff_screen import report_tampering_risks
+    report_risks = report_tampering_risks(diff, tests)
+    if report_risks and result != "FAIL":
+        result = "INCONCLUSIVE"
+        reasons = [*reasons, "Runner report integrity requires review: " + ", ".join(report_risks)]
     v = [Verdict("GH_INTEGRITY", result, "; ".join(reasons) or "integrity clean")]
     v.append(Verdict("GC_COMPOSITION", "PASS", "single candidate: no combined wave"))
     definitions_present = bool(tests) and not invalid
