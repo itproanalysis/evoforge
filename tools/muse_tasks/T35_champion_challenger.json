@@ -1,0 +1,19 @@
+{
+  "id": "T35_champion_challenger",
+  "planned_by": "Claude (Critic): roadmap M2",
+  "goal": "T35 — the service decides its own harness adoption (roadmap M2: champion vs challenger).\n\nSince release 5 every eval accepts harness_version (\"api-sealed-eval/1\" strict hunk counts, \"api-sealed-eval/2\" recount)\nand records it on the measurement; performance.compare implements the rule (improved only when the challenger's Wilson\nlower bound is above the champion's upper bound).\n\n1. services/api/main.py: POST /v1/eval/abtest {suite_version (v0|v1|v2, default v2), kind (X_SINGLE|PIPELINE),\n   family (optional), model (default muse-spark-1.3), champion, challenger} where champion/challenger are harness\n   versions (same Literal as the eval requests). Same harness for both -> 400. Budget guard for BOTH runs before any\n   provider call (402). Runs as ONE background eval job (reuse services/api/evoforge/eval_jobs.py: one job at a time,\n   202 + GET /v1/eval/jobs/{id}); the worker runs the champion measurement then the challenger measurement through the\n   same helpers as the sync endpoints (_do_eval_baseline/_do_eval_pipeline with the harness argument), so both are\n   recorded like any other measurement.\n2. The job result has \"decision\": {decision_id, created_at, suite_version, kind, model, family, champion, challenger,\n   champion_measurement, challenger_measurement, verdict (improved|no_clear_difference|worse from the same Wilson rule),\n   decision: \"adopt\" only when verdict == improved else \"keep\", reason (e.g. \"improved: lo 0.61 > hi 0.39\" or\n   \"no_clear_difference: intervals overlap\")}.\n3. Store decisions (NEW services/api/evoforge/decisions.py, in-process list like eval_jobs, thread-safe) and expose\n   GET /v1/eval/decisions -> {\"decisions\": [...]} newest first, at most 50. (Persistence can follow later.)\n4. apps/web/lib/proxyPolicy.ts + proxyPolicy.cases.json: allow POST /v1/eval/abtest and GET /v1/eval/decisions.\n5. Tests: services/api/tests/test_muse_t35.py. Do not change sealed_eval.py or patch.py.",
+  "edit": [
+    "services/api/main.py",
+    "services/api/evoforge/decisions.py",
+    "services/api/tests/test_muse_t35.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/eval_jobs.py",
+    "services/api/evoforge/performance.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
