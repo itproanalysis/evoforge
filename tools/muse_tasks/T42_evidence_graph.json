@@ -1,0 +1,20 @@
+{
+  "id": "T42_evidence_graph",
+  "planned_by": "Claude (Critic): blueprint §15/§17 — make each verified change visible as a graph",
+  "goal": "T42 — draw each mission's evidence chain as an intuitive graph on the Evidence page.\n\nGET /v1/evidence/{id} returns chain: [{stage, event_id}] in order (ObjectiveVersion, Task, Candidate, Gate, Review, PR,\nOutcome; event_id null when the stage has not happened) and, for gate/run evidence, gates: [{gate, result, reason}].\n1. NEW apps/web/lib/evidenceGraph.ts (pure, no imports except `import type`): export\n   buildEvidenceGraph(chain, gates) -> {nodes: [{stage, label, status: \"done\"|\"blocked\"|\"missing\", detail, href}],\n   edges: [{from, to}]}. Nodes keep chain order; status \"missing\" when event_id is null; the Gate node is \"blocked\"\n   when any gate result is not PASS (detail names those gates and results), \"done\" when all PASS; href is\n   `/evidence?id=<event_id>` (null when missing). Edges connect consecutive stages. Empty chain -> no nodes, no edges.\n2. NEW apps/web/components/EvidenceGraph.tsx: inline SVG (no new dependency), left-to-right flow that wraps to two rows\n   at 375px; nodes as rounded rectangles with stage label + short status, colors by status from the theme tokens\n   (done / blocked / missing clearly distinct, missing drawn dashed), animated edge reveal that respects\n   prefers-reduced-motion, every node has <title>/aria-label text and is a link when href is set; legend below.\n3. apps/web/app/[locale]/evidence/page.tsx renders <EvidenceGraph> above the existing details, using\n   buildEvidenceGraph(evidence.chain, evidence.gates ?? []).\n4. Strings in messages/ko.json and messages/en.json (identical keys). Do not change API code.",
+  "edit": [
+    "apps/web/lib/evidenceGraph.ts",
+    "apps/web/components/EvidenceGraph.tsx",
+    "apps/web/app/[locale]/evidence/page.tsx",
+    "apps/web/messages/ko.json",
+    "apps/web/messages/en.json"
+  ],
+  "context": [
+    "apps/web/lib/api.ts",
+    "apps/web/components/EvolutionTimeline.tsx"
+  ],
+  "check": [
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p .",
+    "python -m pytest services/api/tests -q -p no:cacheprovider -k \"web or i18n or locale or message or proxy or t28 or t34 or t36 or t38 or t42\""
+  ]
+}
