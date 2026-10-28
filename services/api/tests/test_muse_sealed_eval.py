@@ -100,8 +100,10 @@ def test_baseline_full_run_records_evidence():
     import eval_hygiene
 
     for s in body["scores"]:
-        assert eval_hygiene.score_record(s["task_id"], s["score"], s["scaffold"],
-                                         []) == s
+        # The hygiene score record is a subset; T29 adds outcome/failing_tests on top of it.
+        base = eval_hygiene.score_record(s["task_id"], s["score"], s["scaffold"], [])
+        assert {k: s[k] for k in base} == base
+        assert set(s) - set(base) <= {"outcome", "failing_tests"}
     for fam, audit in body["audit"].items():
         assert [a["check"] for a in audit] == list(sealed_eval.AUDIT_CHECKS)
         assert all(a["pass"] for a in audit), fam
