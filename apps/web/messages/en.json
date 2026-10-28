@@ -214,6 +214,16 @@
       "Review": "Review",
       "PR": "PR",
       "Outcome": "Outcome"
+    },
+    "graph": {
+      "heading": "Evidence chain",
+      "done": "Done",
+      "blocked": "Blocked",
+      "missing": "Missing",
+      "legend-done": "Done",
+      "legend-blocked": "Blocked",
+      "legend-missing": "Missing",
+      "empty": "No evidence chain yet."
     }
   },
   "performance": {

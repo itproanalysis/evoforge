@@ -214,6 +214,16 @@
       "Review": "검토",
       "PR": "PR",
       "Outcome": "결과"
+    },
+    "graph": {
+      "heading": "증거 체인",
+      "done": "완료",
+      "blocked": "차단됨",
+      "missing": "없음",
+      "legend-done": "완료",
+      "legend-blocked": "차단됨",
+      "legend-missing": "없음",
+      "empty": "증거 체인이 아직 없습니다."
     }
   },
   "performance": {
