@@ -1,9 +1,10 @@
 # EvoForge CI/CD -- API context: repo root; web context: apps/web.
-# Substitutions: _PROJECT (required), _REGION (default asia-northeast3),
-# _ENV (default hackathon). Images tagged :$COMMIT_SHA + :latest.
+# Substitutions: _PROJECT (required), _REGION (default asia-northeast3).
+# Images tagged :$COMMIT_SHA + :latest.
+# NOTE: keep every declared key referenced in steps below; Cloud Build
+# rejects unused substitution defaults ("not matched in the template").
 substitutions:
   _REGION: asia-northeast3
-  _ENV: hackathon
 
 options:
   logging: CLOUD_LOGGING_ONLY
