@@ -115,3 +115,27 @@ def test_live_dashboard_endpoints_roundtrip():
     perf = r_perf.json()
     assert perf["baseline"]["status"] == "not_measured"
     assert perf["pipeline"]["status"] == "not_measured"
+
+
+def test_locale_messages_have_key_parity_and_performance_page_is_localized():
+    import json
+
+    def keys(node, prefix=""):
+        out = set()
+        for k, v in node.items():
+            path = f"{prefix}.{k}" if prefix else k
+            out.add(path)
+            if isinstance(v, dict):
+                out |= keys(v, path)
+        return out
+
+    ko = json.loads((WEB / "messages" / "ko.json").read_text(encoding="utf-8"))
+    en = json.loads((WEB / "messages" / "en.json").read_text(encoding="utf-8"))
+    assert keys(ko) == keys(en)
+    assert "performance" in ko and "performance" in en
+
+    src = (WEB / "app" / "[locale]" / "performance" / "page.tsx").read_text(encoding="utf-8")
+    assert "useTranslations(\"performance\")" in src
+    assert not re.search(r"[\uac00-\ud7a3]", src), "locale performance page must not hardcode Korean"
+    assert "/evidence?id=" in src and "not_measured" in src
+    assert "추정치" not in src and "estimate" not in src.lower()
