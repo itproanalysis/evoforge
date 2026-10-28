@@ -1,0 +1,29 @@
+{
+  "tested_revision": "f894b30",
+  "integrated_revision": "2550dc1",
+  "checks": {
+    "api": "656 passed, 1 skipped",
+    "postgres_kernel": "169 passed",
+    "runner_service": "52 passed",
+    "before": "8 failed, 2 passed"
+  },
+  "limitations": [
+    "Only the listed Runner source files were checked for equality; later main changes include web and API tests.",
+    "Suite count is a lower bound, not proof each test file was collected.",
+    "External provider and deployment are not established by these checks."
+  ],
+  "source_sha256": {
+    "services/api/evoforge/runner_client.py": "1ff995752df85123e686346ce96b6a65b73da6b72dfb3d7d75e8d3b83968ccba",
+    "services/api/tests/test_runner_base_binding.py": "2399abaa89fb3fe483f41bfeccd8e6d020b312e842fee481e5c4af9ae1fc6ff1",
+    "docs/RUNNER_CORE_EVIDENCE.md": "8ff29b83cfe19da32a5ff10abdbab4ecd1ace3b50509106b33ab39b79b395530"
+  },
+  "logs": {
+    "C:\\evo_forge\\.local\\evidence\\runner-count-binding-20261028-svzs_kqd\\validation-runner-count-api.log": "c4b6d0648118f0b9fe7f016cb484ba1814d145a32b7589cdc66efad6ad6ca6ae",
+    "C:\\evo_forge\\.local\\evidence\\runner-count-binding-20261028-svzs_kqd\\validation-runner-count-before.log": "dc9c8048dd8a69371a88bb8af6aa872bf53401021fbcea19c88e8fea5ed59a7c",
+    "C:\\evo_forge\\.local\\evidence\\runner-count-binding-20261028-svzs_kqd\\validation-runner-count-contract-pg.log": "2ed839973cfeccf30fdb47aca1e70e7a4122ccfafcf027fb44df8e9a655f0e92",
+    "C:\\evo_forge\\.local\\evidence\\runner-count-binding-20261028-svzs_kqd\\validation-runner-count-integration.log": "7f01b3ee8448c94a27a9798b342aad51d5da2a47308d390ebafe78f70eaa2018",
+    "C:\\evo_forge\\.local\\evidence\\runner-count-binding-20261028-svzs_kqd\\validation-runner-count-kernel.log": "b9c20b8172d77d8aad29f654258e3da683f312ae796418d0113e2a2a1bdf2b20",
+    "C:\\evo_forge\\.local\\evidence\\runner-count-binding-20261028-svzs_kqd\\validation-runner-count-postgres.log": "cc9df4ce3f0d477dcd7957e96e0ed655e02765e906a543681de0493b62359c3b",
+    "C:\\evo_forge\\.local\\evidence\\runner-count-binding-20261028-svzs_kqd\\validation-runner-count-probe.log": "6cbb7dac0c82e187c12a90083d2bc0a52578f8d45ea5086bf6024411f5572072"
+  }
+}
