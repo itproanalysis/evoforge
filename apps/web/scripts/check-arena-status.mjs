@@ -21,6 +21,14 @@ assert.equal(exports.laneView(failed).error, "runner unavailable");
 const done = {...pending, status: "succeeded", attempts: 1, heldout: {passed: 2, n: 2}, outcome: "passed"};
 assert.equal(exports.laneView(done).score, "2/2");
 assert.equal(exports.laneView(done).cost, 0);
+assert.equal(exports.laneView(done).costState, "legacy");
+assert.equal(exports.laneView({...done, cost_status: "usage_reported", usage_missing: false}).costState, "usage_reported");
+assert.equal(exports.laneView({...done, cost_status: "estimated", usage_missing: true, cost_cents: 120}).costState, "estimated");
+assert.equal(exports.laneView({...done, cost_status: "pending"}).cost, null);
+assert.equal(exports.laneView({...done, cost_status: "incomplete"}).cost, null);
+assert.equal(exports.laneView({...done, cost_status: "usage_reported", usage_missing: true}).cost, null);
+assert.equal(exports.costLabel("estimated"), "예약 상한 추정 비용");
+assert.equal(exports.costLabel("usage_reported"), "사용량 기준 비용");
 assert.equal(exports.laneView({...done, outcome: "empty_diff"}).score, null);
 const inconclusive = {...done, outcome: "verification_inconclusive"};
 assert.equal(exports.laneView(inconclusive).score, null);
@@ -47,5 +55,9 @@ if (process.argv.includes("--http")) {
   assert.equal(exports.laneView(input.inconclusive.lanes.evoforge).outcome, "verification_inconclusive");
   assert.equal(exports.laneView(input.inconclusive.lanes.evoforge).score, null);
   assert.equal(exports.arenaVerdict(input.inconclusive), null);
+  assert.equal(exports.laneView(input.provenance.lanes.single).costState, "usage_reported");
+  assert.equal(exports.laneView(input.provenance.lanes.single).cost, 0);
+  assert.equal(exports.laneView(input.provenance.lanes.evoforge).costState, "estimated");
+  assert.equal(exports.laneView(input.provenance.lanes.evoforge).cost, 120);
   console.log("Real FastAPI Arena HTTP payloads passed presentation mapping");
 }

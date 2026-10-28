@@ -676,6 +676,8 @@ export interface ArenaLane {
   heldout: { passed: number; n: number };
   outcome: "passed" | "empty_diff" | "apply_failed" | "heldout_failed" | "verification_inconclusive";
   cost_cents: number;
+  usage_missing?: boolean | null;
+  cost_status?: "pending" | "incomplete" | "estimated" | "usage_reported";
   elapsed_ms: number;
   diff: string;
   events: ArenaEvent[];

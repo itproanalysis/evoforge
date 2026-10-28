@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getArena, listArenas, postArena, type ArenaDoc } from "../../lib/api";
-import { laneView, arenaVerdict } from "../../lib/arenaStatus";
+import { laneView, arenaVerdict, costLabel } from "../../lib/arenaStatus";
 
 const card: React.CSSProperties = {
   background: "#141b2d",
@@ -55,7 +55,7 @@ export default function ArenaRootPage() {
               <h3 style={{ color: "#10b981", marginTop: 0 }}>EvoForge Pipeline (Harness /2)</h3>
               <p style={{ fontSize: 13 }}>Status: <strong>{selected.lanes?.evoforge?.status}</strong></p>
               <p style={{ fontSize: 13 }}>Heldout: <strong>{laneView(selected.lanes?.evoforge).score ?? "pending / unverified"}</strong></p>
-              <p style={{ fontSize: 13 }}>Server-reported cost: <strong>{laneView(selected.lanes?.evoforge).cost === null ? "pending" : `${laneView(selected.lanes?.evoforge).cost}¢`}</strong> · Attempts: <strong>{laneView(selected.lanes?.evoforge).attempts ?? "—"}</strong></p>
+              <p style={{ fontSize: 13 }}>{costLabel(laneView(selected.lanes?.evoforge).costState)}: <strong>{laneView(selected.lanes?.evoforge).cost === null ? "—" : `${laneView(selected.lanes?.evoforge).cost}¢`}</strong> · Attempts: <strong>{laneView(selected.lanes?.evoforge).attempts ?? "—"}</strong></p>
               {laneView(selected.lanes?.evoforge).status === "failed" && <p>Failed: {laneView(selected.lanes?.evoforge).error || "reason unavailable"}</p>}
               <pre style={{ background: "#06090e", padding: 12, borderRadius: 6, fontSize: 11, overflowX: "auto", maxHeight: 200, color: "#a7f3d0" }}>
                 {selected.lanes?.evoforge?.diff || "// No patch"}
@@ -66,7 +66,7 @@ export default function ArenaRootPage() {
               <h3 style={{ color: "#60a5fa", marginTop: 0 }}>Single AI (Harness /1, 1 attempt)</h3>
               <p style={{ fontSize: 13 }}>Status: <strong>{selected.lanes?.single?.status}</strong></p>
               <p style={{ fontSize: 13 }}>Heldout: <strong>{laneView(selected.lanes?.single).score ?? "pending / unverified"}</strong></p>
-              <p style={{ fontSize: 13 }}>Server-reported cost: <strong>{laneView(selected.lanes?.single).cost === null ? "pending" : `${laneView(selected.lanes?.single).cost}¢`}</strong> · Attempts: <strong>{laneView(selected.lanes?.single).attempts ?? "—"}</strong></p>
+              <p style={{ fontSize: 13 }}>{costLabel(laneView(selected.lanes?.single).costState)}: <strong>{laneView(selected.lanes?.single).cost === null ? "—" : `${laneView(selected.lanes?.single).cost}¢`}</strong> · Attempts: <strong>{laneView(selected.lanes?.single).attempts ?? "—"}</strong></p>
               {laneView(selected.lanes?.single).status === "failed" && <p>Failed: {laneView(selected.lanes?.single).error || "reason unavailable"}</p>}
               <pre style={{ background: "#06090e", padding: 12, borderRadius: 6, fontSize: 11, overflowX: "auto", maxHeight: 200, color: "#93c5fd" }}>
                 {selected.lanes?.single?.diff || "// No patch"}

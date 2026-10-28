@@ -49,11 +49,18 @@ def test_arena_http_statuses_do_not_promote_placeholders(monkeypatch):
         arena._save(inconclusive)
         inconclusive_response = client.get("/v1/arena/arena_contract")
         assert inconclusive_response.status_code == 200
+        provenance = copy.deepcopy(succeeded)
+        provenance["lanes"]["single"].update(cost_status="usage_reported", usage_missing=False)
+        provenance["lanes"]["evoforge"].update(cost_status="estimated", usage_missing=True, cost_cents=120)
+        arena._save(provenance)
+        provenance_response = client.get("/v1/arena/arena_contract")
+        assert provenance_response.status_code == 200
         run = subprocess.run(
             [node, str(web / "scripts" / "check-arena-status.mjs"), "--http"],
             input=json.dumps({"running": running.json(), "failed": failed_response.json(),
                               "succeeded": success_response.json(),
-                              "inconclusive": inconclusive_response.json()}),
+                              "inconclusive": inconclusive_response.json(),
+                              "provenance": provenance_response.json()}),
             cwd=web, text=True, capture_output=True, timeout=30,
         )
         assert run.returncode == 0, run.stderr

@@ -9,7 +9,7 @@ import {
   type ArenaDoc,
 } from "../../../lib/api";
 import { Button, Card } from "../../../components/ui";
-import { laneView, arenaVerdict, arenaCost } from "../../../lib/arenaStatus";
+import { laneView, arenaVerdict, arenaCost, costLabel } from "../../../lib/arenaStatus";
 
 const BENCHMARK_TASKS: Record<"v2" | "v1", { id: string; goal: string }[]> = {
   v2: [
@@ -268,7 +268,7 @@ export default function ArenaPage() {
               {evoView.score && <span className="text-xs text-emerald-300 font-medium">봉인 테스트 통과</span>}
             </div>
             <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-emerald-500/20 pt-2">
-              <span>서버 비용 집계: <strong className="text-text-primary">{evoView.cost === null ? (evoView.status === "failed" ? "미확인" : "집계 대기") : `${evoView.cost}¢`}</strong></span>
+              <span>{costLabel(evoView.costState)}: <strong className="text-text-primary">{evoView.cost === null ? "—" : `${evoView.cost}¢`}</strong></span>
               <span>{t("attempts")}: <strong className="text-text-primary">{evoView.attempts ?? "—"}</strong></span>
               <span>결과: <strong className="text-text-primary font-mono">{evoView.outcome ?? "미확인"}</strong></span>
             </div>
@@ -326,7 +326,7 @@ export default function ArenaPage() {
               {singleView.score && <span className="text-xs text-blue-300 font-medium">봉인 테스트 통과</span>}
             </div>
             <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-blue-500/20 pt-2">
-              <span>서버 비용 집계: <strong className="text-text-primary">{singleView.cost === null ? (singleView.status === "failed" ? "미확인" : "집계 대기") : `${singleView.cost}¢`}</strong></span>
+              <span>{costLabel(singleView.costState)}: <strong className="text-text-primary">{singleView.cost === null ? "—" : `${singleView.cost}¢`}</strong></span>
               <span>{t("attempts")}: <strong className="text-text-primary">{singleView.attempts ?? "—"}</strong></span>
               <span>결과: <strong className="text-text-primary font-mono">{singleView.outcome ?? "미확인"}</strong></span>
             </div>
@@ -484,7 +484,7 @@ export default function ArenaPage() {
                   <span>Evo: {evoResult.score ?? (evoResult.outcome === "verification_inconclusive" ? "검증 불확실" : "결과 대기")}</span>
                   <span>Single: {singleResult.score ?? (singleResult.outcome === "verification_inconclusive" ? "검증 불확실" : "결과 대기")}</span>
                   <span className="font-semibold text-emerald-400">
-                    {cost === null ? "비용 집계 대기" : `서버 집계 ${cost}¢`}
+                    {cost === null ? "비용 미확인" : `서버 합계 ${cost}¢ · 출처 개별 확인`}
                   </span>
                 </div>
               </div>
