@@ -8,6 +8,7 @@ const EXACT_ALLOW = new Set([
   "/v1/ledger",
   "/v1/ledger/reconcile",
   "/v1/missions",
+  "/v1/feedback",
   "/v1/dashboard",
   "/v1/outcomes",
   "/v1/performance",
@@ -96,6 +97,14 @@ export function resolveApiPath(segments: string[]): string | null {
     segments[0] === "v1" &&
     segments[1] === "missions" &&
     (segments[3] === "advance" || segments[3] === "cancel")
+  ) {
+    return apiPath;
+  }
+  if (
+    segments.length === 4 &&
+    segments[0] === "v1" &&
+    segments[1] === "feedback" &&
+    segments[3] === "promote"
   ) {
     return apiPath;
   }

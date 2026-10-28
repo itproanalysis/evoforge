@@ -25,6 +25,7 @@ import {
 } from "../../lib/api";
 import { Button, Input, Card, Badge } from "../../components/ui";
 import { ProofCard } from "../../components/ProofCard";
+import { FeedbackPanel } from "../../components/FeedbackPanel";
 import { Error as ErrorComponent } from "../../components/ui/Error";
 import { getErrorMessageKey } from "../../lib/apiErrors";
 import { comparisonProvenance, provenance, viewProvenance } from "../../lib/performanceProvenance";
@@ -700,6 +701,11 @@ export default function MissionControl() {
               </div>
             </div>
           )}
+
+          <FeedbackPanel
+            key={mission.mission_id}
+            missionId={mission.mission_id}
+          />
         </Card>
       )}
 

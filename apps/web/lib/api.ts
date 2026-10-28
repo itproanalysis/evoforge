@@ -629,3 +629,32 @@ export function getLeaderboard() {
 export function getMemory() {
   return req<{ patterns: MemoryPattern[]; count: number }>("/v1/memory");
 }
+
+export type FeedbackKind = "bug" | "missed_case" | "praise" | "other";
+
+export interface FeedbackItem {
+  feedback_id: string;
+  mission_id: string;
+  kind: FeedbackKind;
+  text: string;
+  created_at: number;
+  promoted_mission_id: string | null;
+}
+
+export function postFeedback(mission_id: string, kind: FeedbackKind, text: string) {
+  return req<FeedbackItem>("/v1/feedback", {
+    method: "POST",
+    body: JSON.stringify({ mission_id, kind, text }),
+  });
+}
+
+export function listFeedback() {
+  return req<{ feedback: FeedbackItem[] }>("/v1/feedback");
+}
+
+export function promoteFeedback(feedback_id: string) {
+  return req<{ mission_id: string; feedback_id: string }>(
+    `/v1/feedback/${encodeURIComponent(feedback_id)}/promote`,
+    { method: "POST" },
+  );
+}

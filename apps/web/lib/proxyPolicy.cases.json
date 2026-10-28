@@ -905,5 +905,79 @@
       "eval",
       "decisions"
     ]
+  },
+  {
+    "expected": "/v1/feedback",
+    "path_segments": [
+      "v1",
+      "feedback"
+    ]
+  },
+  {
+    "expected": "/v1/feedback/fb_abc123/promote",
+    "path_segments": [
+      "v1",
+      "feedback",
+      "fb_abc123",
+      "promote"
+    ]
+  },
+  {
+    "expected": "/v1/feedback/fb-aB0._~-x/promote",
+    "path_segments": [
+      "v1",
+      "feedback",
+      "fb-aB0._~-x",
+      "promote"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "feedback",
+      "fb_abc123",
+      "delete"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "feedback",
+      "fb_abc123",
+      "promote",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "feedback",
+      ".."
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "feedback",
+      "a:b"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "feedbackx"
+    ]
+  },
+  {
+    "expected": "/v1/feedback",
+    "path_segments": [
+      "v1",
+      "feedback"
+    ]
   }
 ]
