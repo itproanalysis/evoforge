@@ -1452,6 +1452,13 @@ def dashboard():
     }
 
 
+@app.get("/v1/participants")
+def participants():
+    """Return only participants linked by recorded work in the current project."""
+    from evoforge.admin_participants import list_participants
+    return list_participants()
+
+
 class OutcomeRequest(BaseModel):
     mission_id: str
     merged_sha: str
