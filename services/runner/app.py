@@ -300,13 +300,15 @@ def _write_suite(sandbox: str, subdir: str, prefix: str, suite: list[dict]) -> s
     return suite_dir
 
 
-def _parse_junit(xml_path: str, n_snippets: int) -> tuple[int, int]:
+def _parse_junit(xml_path: str, n_snippets: int, prefix: str) -> tuple[int, int, bool]:
     try:
         cases = list(ET.parse(xml_path).getroot().iter("testcase"))
     except Exception:
-        return n_snippets, 0
+        return n_snippets, 0, False
     passed = 0
+    covered = set()
     for tc in cases:
+        covered.update(tc.get("classname", "").split("."))
         ok = True
         for child in tc:
             if child.tag.rsplit("}", 1)[-1] in ("failure", "error", "skipped"):
@@ -314,7 +316,8 @@ def _parse_junit(xml_path: str, n_snippets: int) -> tuple[int, int]:
                 break
         if ok:
             passed += 1
-    return len(cases), passed
+    expected = {f"{prefix}_{i}" for i in range(1, n_snippets + 1)}
+    return len(cases), passed, expected.issubset(covered)
 
 
 _SEALED_BOOT = "import sys, pytest; sys.path.append(sys.argv[1]); sys.exit(pytest.main(sys.argv[2:]))"
@@ -341,8 +344,10 @@ def _run_suite(sandbox: str, suite_dir: str, xml_path: str,
         proc = subprocess.run(cmd, cwd=sandbox, timeout=timeout_s, env=env, capture_output=True)
     except subprocess.TimeoutExpired:
         return {"pass": 0, "n": len(suite), "timed_out": True, "exit_code": None}
-    n, passed = _parse_junit(xml_path, len(suite))
-    return {"pass": passed, "n": n, "timed_out": False, "exit_code": proc.returncode}
+    prefix = "test_heldout" if sealed_ini else "test_visible"
+    n, passed, covered = _parse_junit(xml_path, len(suite), prefix)
+    exit_code = proc.returncode if proc.returncode != 0 or covered else 1
+    return {"pass": passed, "n": n, "timed_out": False, "exit_code": exit_code}
 
 
 def _remove_tree(path: str) -> None:
