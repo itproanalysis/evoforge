@@ -1,0 +1,16 @@
+{
+  "id": "T32_pr_signed_proof",
+  "planned_by": "Claude (Critic): v1.0 criterion 3 (signed proof on a live PR)",
+  "goal": "T32 — a verified PR carries its proof: a signed certificate summary and a public /verify link (roadmap M3).\n\nToday _pr_core (services/api/main.py) writes only gate verdicts and the evidence id into the PR body; a reviewer has to\ntrust EvoForge. T27 made certificates Ed25519-signed (proof.mint / proof.verify, GET /v1/proof/{evidence_id},\nGET /v1/proof/key).\n\n1. Factor the certificate minting in proof_certificate() into a helper `_mint_proof(evidence_id) -> dict` and use it\n   from both GET /v1/proof/{id} (unchanged response) and _pr_core.\n2. In _pr_core, after the gates pass and before github.create_pr, mint the certificate for source_evidence_id and append a\n   \"Proof\" section to the PR body:\n   - Verify link: f\"{EVO_PUBLIC_WEB_URL}/verify/{source_evidence_id}\" (env EVO_PUBLIC_WEB_URL, no trailing slash; when\n     unset use the relative path /verify/{id});\n   - when signed: \"Ed25519\", certificate_id, verdict, public key fingerprint (first 16 chars of the base64 public key)\n     and the full base64 signature on its own line labelled \"Signature:\";\n   - when unsigned: the line \"Proof certificate: unsigned (signing not configured)\" and no signature-like text.\n3. Store the certificate summary (certificate_id, algorithm, signed, signature, public_key fingerprint) in the PR evidence\n   via store_extra so GET /v1/evidence/{pr_evidence_id} shows it.\n4. Blocked gates still return 409 before any certificate or PR call.\n5. infra is not yours: do not edit infra/. Tests: services/api/tests/test_muse_t32.py.",
+  "edit": [
+    "services/api/main.py",
+    "services/api/tests/test_muse_t32.py"
+  ],
+  "context": [
+    "services/api/evoforge/proof.py",
+    "services/api/evoforge/github.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
