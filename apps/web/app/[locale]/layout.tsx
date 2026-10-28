@@ -61,6 +61,12 @@ export default async function LocaleLayout({
                 {t('mission-control')}
               </a>
               <a
+                href={`${prefix}/arena`}
+                className="text-emerald-400 no-underline text-sm font-semibold hover:text-emerald-300 flex items-center gap-1"
+              >
+                <span>⚔️</span> {t('arena')}
+              </a>
+              <a
                 href={`${prefix}/lab`}
                 className="text-text-tertiary no-underline text-sm hover:text-text-primary"
               >

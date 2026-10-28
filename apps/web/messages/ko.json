@@ -18,7 +18,8 @@
     "evidence": "증거",
     "performance": "성과 분석",
     "autopilot": "오토파일럿",
-    "leaderboard": "리더보드"
+    "leaderboard": "리더보드",
+    "arena": "아레나"
   },
   "mission-control": {
     "heading": "미션 컨트롤",
@@ -421,5 +422,31 @@
     "server-error": "서버 오류. 나중에 다시 시도하세요.",
     "unknown": "알 수 없는 오류가 발생했습니다.",
     "status-code": "HTTP {code}: {message}"
+  },
+  "arena": {
+    "heading": "EvoForge 아레나",
+    "description": "동일한 밀봉 벤치마크 태스크에서 펼쳐지는 실시간 1:1 대결: EvoForge vs 단일 AI",
+    "select-task": "밀봉 태스크 선택",
+    "suite-version": "스위트 버전",
+    "run-match": "아레나 대결 시작",
+    "running-match": "양측 동시 실행 중…",
+    "winner-label": "최종 판정",
+    "evoforge-lane": "EvoForge 파이프라인",
+    "evoforge-sub": "하네스 /2 · 독립 Critic · 자동 피드백 재시도",
+    "single-lane": "단일 AI (일반 챗)",
+    "single-sub": "하네스 /1 · 엄격 diff 적용 · 피드백 없음",
+    "cost": "비용",
+    "attempts": "시도 횟수",
+    "hidden-tests": "비공개 검증 테스트",
+    "patch": "생성된 패치",
+    "events": "실시간 이벤트 스트림",
+    "recent-matches": "최근 아레나 대결 기록",
+    "empty-matches": "진행된 아레나 대결이 없습니다.",
+    "status": "상태",
+    "all-passed": "전체 통과",
+    "failed": "실패",
+    "passed": "통과",
+    "running": "실행 중",
+    "succeeded": "완료"
   }
 }
