@@ -71,7 +71,7 @@ def test_pipeline_stores_measurement_without_code_leak(monkeypatch):
     monkeypatch.setattr(sealed_eval, "count_tasks", lambda *a, **k: 2)  # (family, suite_version) since W13
     monkeypatch.setenv("EVO_EVAL_MAX_CENTS", "100000")
 
-    def fake_run(suite_version, model, family=None):
+    def fake_run(suite_version, model, family=None, **_k):  # harness= since release 5
         return {"pipeline_id": "pl_test", "suite_version": "v0",
                 "model": "muse-spark-1.3",
                 "PIPELINE": {"pass_rate": 0.5, "n": 2, "cost_cents": 7,
