@@ -1,0 +1,23 @@
+{
+  "id": "T31_evolution_run_async_verify_ui",
+  "planned_by": "Claude (Critic): evolution /run vs 300 s proxy; signed-proof UI",
+  "goal": "T31 — evolution runs in the background, the web polls it, and /verify shows real signature status.\n\nProblem: POST /v1/evolution/{id}/run loops generations inside the HTTP request; through the web proxy (Cloud Run 300 s)\nany real run times out. And /verify must say whether a certificate is Ed25519-signed (T27 added cert.signed,\ncert.algorithm, cert.public_key and GET /v1/proof/key).\n\n1. services/api/main.py:\n   - POST /v1/evolution/{id}/run: 404 unknown; if a background run is already active for it -> 409; if the evolution is\n     terminal -> return 200 with its current public view (no new run); otherwise start a daemon thread and return 202\n     {evolution_id, status, run_active: true} immediately. The worker repeatedly calls the module-level\n     `_evolution_step_locked(evolution_id)` under the same per-evolution lock as /step until the evolution is no longer\n     RUNNING; on an exception it stops and records run_error (type + message, max 300 chars, never code).\n   - POST /v1/evolution/{id}/step while a background run is active -> 409.\n   - GET /v1/evolution and GET /v1/evolution/{id} include \"run_active\" (bool) and \"run_error\" (str|null).\n   - The per-evolution worst-case budget check from T27 stays in /start.\n2. apps/web/app/[locale]/evolution/page.tsx: \"run\" calls POST .../run, then polls GET /v1/evolution/{id} every 3 s\n   (setInterval/setTimeout) while run_active or status RUNNING, updating the generation timeline live; shows run_error.\n3. apps/web/app/[locale]/verify/[id]/page.tsx: show \"Ed25519 signed\" with a short public-key fingerprint (first 16 chars)\n   when cert.signed is true, a clear \"Unsigned — signing not configured\" state when false; fetch the server key from\n   GET /v1/proof/key (add getProofKey() to apps/web/lib/api.ts) and show whether cert.public_key matches it.\n4. New strings in messages/ko.json and messages/en.json (identical key sets), including \"Ed25519\" and an unsigned text.\n5. Tests: services/api/tests/test_muse_t31.py. Keep all existing tests green.",
+  "edit": [
+    "services/api/main.py",
+    "services/api/tests/test_muse_t31.py",
+    "apps/web/app/[locale]/evolution/page.tsx",
+    "apps/web/app/[locale]/verify/[id]/page.tsx",
+    "apps/web/lib/api.ts",
+    "apps/web/messages/ko.json",
+    "apps/web/messages/en.json"
+  ],
+  "context": [
+    "services/api/evoforge/evolution.py",
+    "services/api/evoforge/eval_jobs.py",
+    "services/api/evoforge/proof.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p ."
+  ]
+}

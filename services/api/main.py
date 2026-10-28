@@ -10,6 +10,7 @@ import hashlib
 import os
 import re
 import sys
+import threading
 import time
 import uuid
 
@@ -1620,6 +1621,71 @@ from evoforge import evolution as evo_engine
 from evoforge import proof as proof_mod
 from evoforge import memory as evo_memory
 
+# T31: background evolution runs. run_active tracks live daemon workers per
+# evolution; run_error records the last worker failure (type + message only).
+_evo_run_lock = threading.Lock()
+_evo_run_active: set[str] = set()
+_evo_run_errors: dict[str, str | None] = {}
+
+_orig_evo_reset = evo_engine.reset
+
+
+def _evo_reset_with_runs() -> None:
+    _orig_evo_reset()
+    with _evo_run_lock:
+        _evo_run_active.clear()
+        _evo_run_errors.clear()
+
+
+evo_engine.reset = _evo_reset_with_runs  # type: ignore[method-assign]
+
+
+def _evo_is_run_active(evolution_id: str) -> bool:
+    with _evo_run_lock:
+        return evolution_id in _evo_run_active
+
+
+def _evo_short_error(exc: BaseException) -> str:
+    try:
+        if isinstance(exc, HTTPException):
+            msg = f"{type(exc).__name__}: {exc.detail}"
+        else:
+            msg = f"{type(exc).__name__}: {exc}"
+    except Exception:
+        msg = "Error: failed"
+    msg = " ".join(str(msg).split())
+    return msg[:300]
+
+
+def _evo_public_with_run(evo: dict) -> dict:
+    view = evo_engine.public(evo)
+    with _evo_run_lock:
+        view["run_active"] = evo["evolution_id"] in _evo_run_active
+        view["run_error"] = _evo_run_errors.get(evo["evolution_id"])
+    return view
+
+
+def _evolution_run_worker(evolution_id: str) -> None:
+    try:
+        while True:
+            evo = evo_engine.get(evolution_id)
+            if evo is None or evo.get("status") != "RUNNING":
+                break
+            lock = evo_engine.lock_for(evolution_id)
+            with lock:
+                current = evo_engine.get(evolution_id)
+                if current is None or current.get("status") != "RUNNING":
+                    break
+                try:
+                    _evolution_step_locked(evolution_id)
+                except Exception as exc:
+                    with _evo_run_lock:
+                        _evo_run_errors[evolution_id] = _evo_short_error(exc)
+                    break
+    finally:
+        with _evo_run_lock:
+            _evo_run_active.discard(evolution_id)
+
 
 def _evo_candidate(goal: str, base_sha: str, file_context,
                    store_extra: dict, source_repo: str = "") -> dict:
@@ -1720,13 +1786,14 @@ def evolution_start(req: EvolutionStart):
     eid = _store_evidence({"evolution_id": evo["evolution_id"], "goal": req.goal,
                            "repo_ref": req.repo_ref})
     _link_stages(eid, ("ObjectiveVersion",))
+    view = _evo_public_with_run(evo)
     return {"evolution_id": evo["evolution_id"], "evidence_id": eid,
-            "status": evo["status"], **evo_engine.public(evo)}
+            "status": evo["status"], **view}
 
 
 @app.get("/v1/evolution")
 def evolution_list():
-    return {"evolutions": [evo_engine.public(e) for e in evo_engine.list_all()]}
+    return {"evolutions": [_evo_public_with_run(e) for e in evo_engine.list_all()]}
 
 
 @app.get("/v1/evolution/{evolution_id}")
@@ -1734,7 +1801,7 @@ def evolution_detail(evolution_id: str):
     evo = evo_engine.get(evolution_id)
     if evo is None:
         raise HTTPException(404, "unknown evolution")
-    return evo_engine.public(evo)
+    return _evo_public_with_run(evo)
 
 
 @app.post("/v1/evolution/{evolution_id}/step")
@@ -1743,6 +1810,8 @@ def evolution_step(evolution_id: str):
     evo = evo_engine.get(evolution_id)
     if evo is None:
         raise HTTPException(404, "unknown evolution")
+    if _evo_is_run_active(evolution_id):
+        raise HTTPException(409, f"evolution {evolution_id} has an active background run")
     if evo["status"] in evo_engine.TERMINAL:
         raise HTTPException(409, f"evolution {evolution_id} is terminal ({evo['status']})")
     lock = evo_engine.lock_for(evolution_id)
@@ -1811,21 +1880,56 @@ def _maybe_memorize(evo: dict | None) -> None:
 
 @app.post("/v1/evolution/{evolution_id}/run")
 def evolution_run(evolution_id: str):
-    """Run generations until CONVERGED or EXHAUSTED (bounded by max_generations)."""
+    """Run generations to completion without timing out the web proxy.
+
+    Fresh evolutions (no generations recorded yet) start a daemon worker
+    that loops the module-level `_evolution_step_locked` under the same
+    per-evolution lock as /step until the evolution leaves RUNNING, and
+    return 202 {evolution_id, status, run_active: true} immediately; the
+    web polls GET /v1/evolution/{id} until done. Evolutions already
+    stepped interactively drain their remaining generations inside the
+    request (legacy synchronous behaviour) and return 200.
+    """
     evo = evo_engine.get(evolution_id)
     if evo is None:
         raise HTTPException(404, "unknown evolution")
-    ran = 0
-    last: dict | None = None
-    while evo["status"] == "RUNNING":
-        step = evolution_step(evolution_id)
-        last = step
-        ran += 1
-        evo = evo_engine.get(evolution_id)
-        assert evo is not None
-    return {"evolution_id": evolution_id, "status": evo["status"],
-            "generations_ran": ran, "last_generation": (last or {}).get("generation"),
-            "best": (evo_engine.public(evo))["best"]}
+    if _evo_is_run_active(evolution_id):
+        raise HTTPException(409, f"evolution {evolution_id} already has an active background run")
+    if evo.get("status") in evo_engine.TERMINAL:
+        return _evo_public_with_run(evo)
+    if evo.get("generations"):
+        ran = 0
+        while True:
+            cur = evo_engine.get(evolution_id)
+            if cur is None:
+                raise HTTPException(404, "unknown evolution")
+            if cur.get("status") != "RUNNING":
+                break
+            lock = evo_engine.lock_for(evolution_id)
+            with lock:
+                inner = evo_engine.get(evolution_id)
+                if inner is None:
+                    raise HTTPException(404, "unknown evolution")
+                if inner.get("status") != "RUNNING":
+                    break
+                _evolution_step_locked(evolution_id)
+                ran += 1
+        done = evo_engine.get(evolution_id)
+        if done is None:
+            raise HTTPException(404, "unknown evolution")
+        view = _evo_public_with_run(done)
+        view["generations_ran"] = ran
+        return view
+    with _evo_run_lock:
+        if evolution_id in _evo_run_active:
+            raise HTTPException(409, f"evolution {evolution_id} already has an active background run")
+        _evo_run_active.add(evolution_id)
+        _evo_run_errors[evolution_id] = None
+    worker = threading.Thread(target=_evolution_run_worker, args=(evolution_id,), daemon=True)
+    worker.start()
+    return JSONResponse(status_code=202, content={
+        "evolution_id": evolution_id, "status": evo.get("status"),
+        "run_active": True, "run_error": None})
 
 
 @app.post("/v1/evolution/{evolution_id}/cancel")

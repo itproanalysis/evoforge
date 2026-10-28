@@ -300,6 +300,8 @@
     "empty": "No evolutions yet — start one above.",
     "select-hint": "Select a run to watch it evolve.",
     "proof-link": "Proof certificate →",
+    "run-active": "Background run active — polling live every 3 s…",
+    "run-error": "Background run error",
     "case-w10-alert": "Case W10 Alert: GH_INTEGRITY requires explicit '==' value asserts or pytest.raises. Avoid 'assert True'.",
     "failure-reasons": {
       "weak_oracle": "Weak Oracle (strength < 0.8) · Case W10",
@@ -319,7 +321,15 @@
     "description": "Tamper-evident proof over public evidence digests — code never leaves the server. Share this URL instead of a chat transcript.",
     "loading": "Loading certificate…",
     "gates": "Gates",
-    "chain": "Evidence chain"
+    "chain": "Evidence chain",
+    "signed-fingerprint": "Ed25519 signed fingerprint",
+    "unsigned": "Unsigned — signing not configured",
+    "server-key-label": "server key",
+    "server-key-unavailable": "server key unavailable (signing not configured)",
+    "key-match-label": "key match",
+    "key-match": "certificate public key matches the server key (Ed25519)",
+    "key-mismatch": "certificate public key does not match the server key",
+    "key-match-unknown": "key match unknown"
   },
   "leaderboard": {
     "heading": "Trust leaderboard",
