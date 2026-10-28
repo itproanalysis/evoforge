@@ -927,6 +927,7 @@ class EvalPipelineRequest(BaseModel):
     harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
+    feedback: Literal["heldout", "critic"] = "heldout"
 
 
 def _eval_budget_or_402(n_tasks: int, attempts: int, per_attempt: int) -> None:
@@ -1090,7 +1091,8 @@ def eval_baseline(req: EvalBaselineRequest):
     return _do_eval_baseline(req.suite_version, req.model, req.family, req.harness_version)
 
 
-def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | None = None) -> dict:
+def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | None = None,
+                      feedback: str = "heldout") -> dict:
     """Shared adaptive-pipeline core for the sync endpoint and job worker."""
     from evoforge import repo_source as _rs_eval3
 
@@ -1100,10 +1102,13 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
         raise HTTPException(400, _rs_eval3.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
         raise HTTPException(502, _rs_eval3.redact(str(e) or "sealed pipeline failed"))
-    _eval_budget_or_402(n_tasks, sealed_eval_mod.PIPELINE_MAX_ATTEMPTS,
+    _attempts = sealed_eval_mod.PIPELINE_MAX_ATTEMPTS + (1 if feedback == "critic" else 0)
+    _eval_budget_or_402(n_tasks, _attempts,
                         sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
     try:
         _harness_kw = {} if harness is None else {"harness": harness}
+        if feedback not in (None, "heldout"):
+            _harness_kw["feedback"] = feedback
         result = sealed_eval_mod.run_pipeline(
             suite_version, model, family=family, **_harness_kw)
     except sealed_eval_mod.SealedTooLarge as e:
@@ -1125,6 +1130,9 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
         raise HTTPException(502, _rs_eval3.redact(f"sealed pipeline failed: {name}"))
     pipe = result["PIPELINE"]
     passed = sum(1 for s in result["scores"] if s["score"] >= 1.0)
+    fb_source = result.get("feedback_source", feedback or "heldout")
+    if fb_source not in ("heldout", "critic"):
+        fb_source = feedback or "heldout"
     gates = [{"gate": "G2_REQUIRED",
               "result": "PASS" if (pipe["n"] > 0 and passed == pipe["n"]) else "FAIL",
               "reason": f"sealed v0 PIPELINE executed {passed}/{pipe['n']} held-out tasks"}]
@@ -1138,6 +1146,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
                            "reservation_id": result["reservation_id"],
                            "provider_stub": result["provider_stub"],
                            "attempts_total": result["attempts_total"],
+                           "feedback_source": fb_source,
                            "usage_missing": result["usage_missing"],
                            "gates": gates})
     _link_stages(eid, ("Gate", "Outcome"))
@@ -1150,6 +1159,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
         n=pipe["n"], passed=passed, cost_cents=pipe["cost_cents"],
         per_family=per_family, evidence_id=eid,
         attempts_total=result["attempts_total"],
+        feedback_source=fb_source,
         usage_missing=result["usage_missing"])
     measurement["wilson95"] = [result["pass_rate_wilson_lo"],
                                result["pass_rate_wilson_hi"]]
@@ -1163,6 +1173,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
             "scores": result["scores"], "tasks": result["tasks"],
             "by_family": result["by_family"],
             "attempts_total": result["attempts_total"],
+            "feedback_source": fb_source,
             "usage_missing": result["usage_missing"],
             "chain": evidence_chain.chain(eid)}
 
@@ -1175,7 +1186,8 @@ def eval_pipeline(req: EvalPipelineRequest):
     settled attempts. No held-out code, reference fix, or task file
     contents ever leave the server.
     """
-    return _do_eval_pipeline(req.suite_version, req.model, req.family, req.harness_version)
+    return _do_eval_pipeline(req.suite_version, req.model, req.family, req.harness_version,
+                             req.feedback)
 
 
 class EvalJobRequest(BaseModel):
@@ -1184,6 +1196,7 @@ class EvalJobRequest(BaseModel):
     harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
+    feedback: Literal["heldout", "critic"] = "heldout"
 
 
 def _eval_job_precheck(kind: str, family, suite_version: str = "v0") -> None:
@@ -1209,8 +1222,9 @@ def eval_job_create(req: EvalJobRequest):
         def _runner(sv=req.suite_version, m=req.model, f=req.family, h=req.harness_version):
             return _do_eval_baseline(sv, m, f, h)
     else:
-        def _runner(sv=req.suite_version, m=req.model, f=req.family, h=req.harness_version):
-            return _do_eval_pipeline(sv, m, f, h)
+        def _runner(sv=req.suite_version, m=req.model, f=req.family, h=req.harness_version,
+                    fb=req.feedback):
+            return _do_eval_pipeline(sv, m, f, h, fb)
     try:
         job = eval_jobs_mod.create_job(kind=req.kind,
                                        suite_version=req.suite_version,
@@ -1242,9 +1256,11 @@ class EvalABTestRequest(BaseModel):
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     champion: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
     challenger: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
+    feedback: Literal["heldout", "critic"] = "heldout"
 
 
-def _eval_abtest_precheck(kind: str, family, suite_version: str) -> None:
+def _eval_abtest_precheck(kind: str, family, suite_version: str,
+                          feedback: str = "heldout") -> None:
     from evoforge import repo_source as _rs_ab
 
     try:
@@ -1256,7 +1272,8 @@ def _eval_abtest_precheck(kind: str, family, suite_version: str) -> None:
     if kind == "X_SINGLE":
         _eval_budget_or_402(2 * n_tasks, 1, sealed_eval_mod.BASELINE_COST_CENTS)
     else:
-        _eval_budget_or_402(2 * n_tasks, sealed_eval_mod.PIPELINE_MAX_ATTEMPTS,
+        _attempts = sealed_eval_mod.PIPELINE_MAX_ATTEMPTS + (1 if feedback == "critic" else 0)
+        _eval_budget_or_402(2 * n_tasks, _attempts,
                             sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
 
 
@@ -1274,16 +1291,16 @@ def _abtest_interval(measurement: dict) -> tuple[float, float]:
 def eval_abtest(req: EvalABTestRequest):
     if req.champion == req.challenger:
         raise HTTPException(400, "champion and challenger must differ")
-    _eval_abtest_precheck(req.kind, req.family, req.suite_version)
+    _eval_abtest_precheck(req.kind, req.family, req.suite_version, req.feedback)
 
     def _runner(sv=req.suite_version, kind=req.kind, m=req.model, f=req.family,
-                champ=req.champion, chall=req.challenger):
+                champ=req.champion, chall=req.challenger, fb=req.feedback):
         if kind == "X_SINGLE":
             champ_out = _do_eval_baseline(sv, m, f, champ)
             chall_out = _do_eval_baseline(sv, m, f, chall)
         else:
-            champ_out = _do_eval_pipeline(sv, m, f, champ)
-            chall_out = _do_eval_pipeline(sv, m, f, chall)
+            champ_out = _do_eval_pipeline(sv, m, f, champ, fb)
+            chall_out = _do_eval_pipeline(sv, m, f, chall, fb)
         champ_m = champ_out["measurement"]
         chall_m = chall_out["measurement"]
         cmp = performance_mod.compare(champ_m, chall_m)
