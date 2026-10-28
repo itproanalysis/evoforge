@@ -1026,16 +1026,218 @@ def _pipeline_feedback(goal: str, failures: list[dict],
     return "\n".join(lines)[:4000]
 
 
+FEEDBACK_SOURCES = ("heldout", "critic")
+
+
+def _check_feedback(feedback) -> str:
+    """Retry-feedback source: held-out names/lines (default) or Critic tests."""
+    if feedback is None:
+        return "heldout"
+    if feedback not in FEEDBACK_SOURCES:
+        raise ValueError(f"unknown feedback: {feedback!r}")
+    return feedback
+
+
+def _critic_goal_for_task(task: dict, file_context: list[dict]) -> str:
+    """Critic Phase-A input: the task goal plus target file contents only.
+
+    Held-out code, held-out names and reference fixes are never included:
+    the Critic writes spec-first tests from this alone.
+    """
+    parts = [task.get("goal", "")]
+    blocks: list[str] = []
+    for entry in file_context or []:
+        if not isinstance(entry, dict):
+            continue
+        path = entry.get("path", "")
+        content = entry.get("content")
+        if isinstance(content, str):
+            blocks.append(f"```\n# path: {path}\n{content}\n```")
+    if blocks:
+        parts.append("File contents (target files at base):\n" + "\n".join(blocks))
+    return "\n\n".join(p for p in parts if p)
+
+
+def _call_critic_suite(critic_goal: str) -> tuple[str, object, int, bool]:
+    """One reserve -> Critic -> settle call with usage-derived cost.
+
+    Settles exactly like a Builder attempt: the reservation is made at the
+    conservative per-attempt maximum, then settled to the usage-derived
+    value. Missing usage settles at the maximum and is flagged; usage above
+    the reservation settles at its real value. Not-accepted refunds,
+    unknown outcomes are held for reconciliation.
+    """
+    rsv = _ledger.reserve(PIPELINE_PER_ATTEMPT_MAX_CENTS, "default")
+    try:
+        out = _broker.call_critic(critic_goal, "", "")
+    except _broker.ProviderNotAccepted:
+        _ledger.refund(rsv)
+        raise SealedEvalError("provider not accepted; reservation refunded")
+    except Exception as e:
+        try:
+            _ledger.mark_unknown(rsv, type(e).__name__)
+        except Exception:
+            pass
+        raise SealedEvalError(
+            f"provider outcome unknown ({type(e).__name__}); reservation held")
+    usage = _pipeline_usage_from_output(out) if isinstance(out, dict) else None
+    actual = _pipeline_usage_cost(usage)
+    missing = actual is None
+    if missing:
+        actual = PIPELINE_PER_ATTEMPT_MAX_CENTS
+    _ledger.settle(rsv, int(actual))
+    return rsv, out, int(actual), missing
+
+
+def _critic_suite_from_output(out) -> list[dict]:
+    """Critic sealed_tests entries carrying top-level def test_* code."""
+    sealed = out.get("sealed_tests") if isinstance(out, dict) else None
+    if not isinstance(sealed, list):
+        return []
+    suite: list[dict] = []
+    for entry in sealed:
+        code = entry.get("code") if isinstance(entry, dict) else None
+        if not isinstance(code, str) or "def test_" not in code:
+            continue
+        if not re.search(r"(?m)^[ \t]*def\s+test_[A-Za-z0-9_]+\s*\(", code):
+            continue
+        suite.append({"code": code})
+    return suite
+
+
+def _critic_feedback(goal: str, failures: list[dict],
+                     n: int, passed: int) -> str:
+    """Retry feedback from Critic failures only: names and assertion lines."""
+    lines = [goal, "",
+             f"Previous attempt failed {n - passed}/{n} critic tests. "
+             "Failing tests (names and assertion lines only):"]
+    for failure in failures[:10]:
+        lines.append(f"- {failure['test']}: {failure['message']}")
+    lines.append("Propose a corrected patch using only this feedback.")
+    return "\n".join(lines)[:4000]
+
+
+def _critic_empty_feedback(goal: str) -> str:
+    return (f"{goal}\n\nPrevious attempt produced an empty diff "
+            "(no patch was proposed). Propose a corrected patch.")
+
+
+def _critic_apply_failed_feedback(goal: str) -> str:
+    return (f"{goal}\n\nPrevious attempt's diff did not apply "
+            "to the task files. Propose a corrected patch that applies "
+            "cleanly.")
+
+
+def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
+                         source: str, base: str, future: list[str],
+                         file_context: list[dict], critic_suite: list[dict],
+                         timeout_s: int, max_attempts: int, harness: str | None,
+                         audits: dict, goal: str) -> tuple:
+    """Critic-feedback attempt loop: the retry signal comes only from the
+    independent Critic's own tests, never from the held-out suite.
+
+    Returns (best, outcome, failing_tests, reservation_ids, cost_cents,
+    attempts, usage_missing, saw_real_provider). The task score is decided
+    ONLY by the sealed held-out suite run on the final passing-Critic
+    attempt (or the last attempt); held-out results never enter feedback.
+    """
+    rsvs: list[str] = []
+    cost = 0
+    attempts = 0
+    missing = False
+    real = False
+    best = 0.0
+    final_outcome = "empty_diff"
+    final_failing: list[str] = []
+    decided = False
+    last_dest: str | None = None
+    last_outcome = "empty_diff"
+    for _attempt in range(max_attempts):
+        safe = re.sub(r"[^A-Za-z0-9_]+", "_", tid).strip("_") or "task"
+        dest = os.path.join(
+            tmpbase,
+            f"pipe-{fam}-{safe}-{secrets.token_hex(4)}")
+        audit = _build_clean_sandbox(source, base, dest, future)
+        audits[fam] = audit
+        rsv, out, actual, miss = _call_pipeline_attempt(
+            goal, base, file_context)
+        rsvs.append(rsv)
+        cost += actual
+        attempts += 1
+        if miss:
+            missing = True
+        if isinstance(out, dict) and not out.get("stub"):
+            real = True
+        diff = out.get("diff") if isinstance(out, dict) else ""
+        if _is_empty_diff(diff):
+            last_outcome = "empty_diff"
+            last_dest = None
+            goal = _critic_empty_feedback(task["goal"])
+            continue
+        if not _apply_candidate(dest, diff,
+                                recount=harness != "api-sealed-eval/1"):
+            last_outcome = "apply_failed"
+            last_dest = None
+            goal = _critic_apply_failed_feedback(task["goal"])
+            continue
+        last_dest = dest
+        if critic_suite:
+            c_score, c_failures = _run_heldout_local_detail(
+                dest, critic_suite, timeout_s, tmpbase)
+        else:
+            c_score, c_failures = 1.0, []
+        if c_score >= 1.0:
+            h_score, h_failures = _run_heldout_local_detail(
+                dest, task["heldout"], timeout_s, tmpbase)
+            if h_score >= 1.0:
+                best, final_outcome, final_failing = 1.0, "passed", []
+            else:
+                best = 0.0
+                final_outcome = "heldout_failed"
+                final_failing = _failing_test_names(
+                    h_failures, task["heldout"])
+            last_outcome = final_outcome
+            decided = True
+            break
+        last_outcome = "heldout_failed"
+        goal = _critic_feedback(
+            task["goal"],
+            c_failures or [{"test": "critic",
+                            "message": "assertion failed"}],
+            len(critic_suite), 0)
+    if not decided:
+        if last_dest is not None:
+            h_score, h_failures = _run_heldout_local_detail(
+                last_dest, task["heldout"], timeout_s, tmpbase)
+            best = h_score
+            if h_score >= 1.0:
+                final_outcome, final_failing = "passed", []
+            else:
+                final_outcome = "heldout_failed"
+                final_failing = _failing_test_names(
+                    h_failures, task["heldout"])
+        else:
+            best = 0.0
+            final_outcome, final_failing = last_outcome, []
+    return (best, final_outcome, final_failing, rsvs, cost, attempts,
+            missing, real)
+
+
 def run_pipeline(suite_version: str, model: str, family: str | None = None,
                  timeout_s: int | None = None,
-                 max_attempts: int = PIPELINE_MAX_ATTEMPTS, harness: str | None = None) -> dict:
+                 max_attempts: int = PIPELINE_MAX_ATTEMPTS, harness: str | None = None,
+                 feedback: str = "heldout") -> dict:
     """Adaptive pipeline: up to 3 Builder attempts per sealed task.
 
-    After a failed attempt the Builder receives only failing test names
-    and assertion error lines, never held-out code and never reference
-    fixes. A task passes when any attempt passes its held-out suite.
-    Costs are usage-derived per attempt; the total is the sum of all
-    settled attempts.
+    With ``feedback="heldout"`` (default) a failed attempt feeds back failing
+    held-out test names and assertion error lines, never held-out code and
+    never reference fixes. With ``feedback="critic"`` the retry signal comes
+    only from the independent Critic's own spec-first tests (written before
+    the first attempt from the goal and file contents); the sealed held-out
+    suite only judges the final passing-Critic attempt (or the last attempt)
+    and never enters feedback. A task passes when its judged attempt passes
+    its held-out suite. Costs are usage-derived per attempt (plus the Critic
+    call in critic mode); the total is the sum of all settled calls.
     """
     harness = _check_harness(harness)
     _check_version(suite_version)
@@ -1044,6 +1246,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
     if timeout_s is None:
         timeout_s = PYTEST_TIMEOUT_S
     max_attempts = max(1, min(int(max_attempts), PIPELINE_MAX_ATTEMPTS))
+    feedback = _check_feedback(feedback)
     suites = load_suites(suite_version)
     if family is not None:
         suites = [s for s in suites if s["family"] == family]
@@ -1077,55 +1280,82 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                 file_context = [{"path": p, "content": task["files"][p]}
                                 for p in sorted(task["files"])]
                 goal = task["goal"]
+                critic_suite: list[dict] = []
+                if feedback == "critic":
+                    crsv, cout, cactual, cmissing = _call_critic_suite(
+                        _critic_goal_for_task(task, file_context))
+                    reservation_ids.append(crsv)
+                    settled_total += cactual
+                    fam_cost += cactual
+                    if cmissing:
+                        usage_missing = True
+                    if isinstance(cout, dict) and not cout.get("stub"):
+                        provider_stub = False
+                    critic_suite = _critic_suite_from_output(cout)
                 best = 0.0
                 final_outcome = "empty_diff"
                 final_failing: list[str] = []
-                for _attempt in range(max_attempts):
-                    safe = re.sub(r"[^A-Za-z0-9_]+", "_", tid).strip("_") or "task"
-                    dest = os.path.join(
-                        tmpbase,
-                        f"pipe-{fam}-{safe}-{secrets.token_hex(4)}")
-                    audit = _build_clean_sandbox(source, base, dest, future)
-                    audits[fam] = audit
-                    rsv, out, actual, missing = _call_pipeline_attempt(
-                        goal, base, file_context)
-                    reservation_ids.append(rsv)
-                    settled_total += actual
-                    fam_cost += actual
-                    attempts_total += 1
-                    if missing:
+                if feedback == "critic":
+                    (best, final_outcome, final_failing, _crsvs, _ccost,
+                     _cattempts, _cmissing, _creal) = _run_critic_attempts(
+                        tmpbase, fam, tid, task, source, base, future,
+                        file_context, critic_suite, timeout_s, max_attempts,
+                        harness, audits, goal)
+                    reservation_ids.extend(_crsvs)
+                    settled_total += _ccost
+                    fam_cost += _ccost
+                    attempts_total += _cattempts
+                    if _cmissing:
                         usage_missing = True
-                    if isinstance(out, dict) and not out.get("stub"):
+                    if _creal:
                         provider_stub = False
-                    diff = out.get("diff") if isinstance(out, dict) else ""
-                    score = 0.0
-                    failures: list[dict] = []
-                    if _is_empty_diff(diff):
-                        outcome: str = "empty_diff"
-                        failing: list[str] = []
-                    elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
-                        # Always local, like the baseline: the task source is an ephemeral local repo that the remote
-                        # runner cannot read (production returned RunnerBadRequest for every pipeline task).
-                        score, failures = _run_heldout_local_detail(
-                            dest, task["heldout"], timeout_s, tmpbase)
-                        if score >= 1.0:
-                            outcome, failing = "passed", []
+                else:
+                    for _attempt in range(max_attempts):
+                        safe = re.sub(r"[^A-Za-z0-9_]+", "_", tid).strip("_") or "task"
+                        dest = os.path.join(
+                            tmpbase,
+                            f"pipe-{fam}-{safe}-{secrets.token_hex(4)}")
+                        audit = _build_clean_sandbox(source, base, dest, future)
+                        audits[fam] = audit
+                        rsv, out, actual, missing = _call_pipeline_attempt(
+                            goal, base, file_context)
+                        reservation_ids.append(rsv)
+                        settled_total += actual
+                        fam_cost += actual
+                        attempts_total += 1
+                        if missing:
+                            usage_missing = True
+                        if isinstance(out, dict) and not out.get("stub"):
+                            provider_stub = False
+                        diff = out.get("diff") if isinstance(out, dict) else ""
+                        score = 0.0
+                        failures: list[dict] = []
+                        if _is_empty_diff(diff):
+                            outcome: str = "empty_diff"
+                            failing: list[str] = []
+                        elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
+                            # Always local, like the baseline: the task source is an ephemeral local repo that the remote
+                            # runner cannot read (production returned RunnerBadRequest for every pipeline task).
+                            score, failures = _run_heldout_local_detail(
+                                dest, task["heldout"], timeout_s, tmpbase)
+                            if score >= 1.0:
+                                outcome, failing = "passed", []
+                            else:
+                                outcome = "heldout_failed"
+                                failing = _failing_test_names(
+                                    failures, task["heldout"])
                         else:
-                            outcome = "heldout_failed"
-                            failing = _failing_test_names(
-                                failures, task["heldout"])
-                    else:
-                        outcome, failing = "apply_failed", []
-                    final_outcome, final_failing = outcome, failing
-                    if score >= 1.0:
-                        best = 1.0
-                        break
-                    best = max(best, score)
-                    goal = _pipeline_feedback(task["goal"], failures or
-                                              [{"test": "held-out",
-                                                "message": "assertion failed"}],
-                                              len(task["heldout"]),
-                                              int(score >= 1.0) * len(task["heldout"]))
+                            outcome, failing = "apply_failed", []
+                        final_outcome, final_failing = outcome, failing
+                        if score >= 1.0:
+                            best = 1.0
+                            break
+                        best = max(best, score)
+                        goal = _pipeline_feedback(task["goal"], failures or
+                                                  [{"test": "held-out",
+                                                    "message": "assertion failed"}],
+                                                  len(task["heldout"]),
+                                                  int(score >= 1.0) * len(task["heldout"]))
                 record = _score_row(tid, best, scaffold,
                                     final_outcome, final_failing)
                 record["passed"] = bool(best >= 1.0)
@@ -1160,4 +1390,5 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
             "reservation_ids": reservation_ids,
             "provider_stub": provider_stub,
             "attempts_total": attempts_total,
+            "feedback_source": feedback,
             "usage_missing": usage_missing}
