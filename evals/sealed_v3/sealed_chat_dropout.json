@@ -1,0 +1,188 @@
+{
+  "family": "chat_dropout",
+  "suite_version": "v3",
+  "tasks": [
+    {
+      "id": "SV3-CD-01",
+      "goal": "In chatretry.py, should_resume(had_drop, saved_cursor) is True only when the session dropped and saved_cursor is an int >= 0. replay(messages, cursor) returns the messages from cursor onward ([] when cursor >= len(messages)) and raises ValueError for a negative cursor.",
+      "files": {
+        "chatretry.py": "\"\"\"Resume chat sessions after a dropped connection.\"\"\"\n\n\ndef should_resume(had_drop, saved_cursor):\n    return False\n\n\ndef replay(messages, cursor):\n    return list(messages)\n"
+      },
+      "reference_fix": "--- a/chatretry.py\n+++ b/chatretry.py\n@@ -2,8 +2,10 @@\n \n \n def should_resume(had_drop, saved_cursor):\n-    return False\n+    return bool(had_drop) and isinstance(saved_cursor, int) and saved_cursor >= 0\n \n \n def replay(messages, cursor):\n-    return list(messages)\n+    if cursor < 0:\n+        raise ValueError(\"bad cursor\")\n+    return list(messages[cursor:])\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import chatretry\n\n\ndef test_cd01_compositional_resume_then_replay():\n    assert chatretry.should_resume(True, 1) is True\n    assert chatretry.replay([\"a\", \"b\", \"c\"], 1) == [\"b\", \"c\"]\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import chatretry\n\n\ndef test_cd01_negative_clean_disconnect_stays_put():\n    assert chatretry.should_resume(False, 1) is False\n    assert chatretry.should_resume(True, -1) is False\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import chatretry\n\n\ndef test_cd01_boundary_cursor_edges():\n    assert chatretry.replay([\"a\", \"b\"], 0) == [\"a\", \"b\"]\n    assert chatretry.replay([\"a\", \"b\"], 2) == []\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-CD-02",
+      "goal": "In session.py, merge_turns(saved, live) returns saved followed by the live turns not already in saved, order preserved, no duplicates; both empty returns []; a non-list argument raises ValueError.",
+      "files": {
+        "session.py": "\"\"\"Merge saved and live chat transcripts.\"\"\"\n\n\ndef merge_turns(saved, live):\n    return list(live)\n"
+      },
+      "reference_fix": "--- a/session.py\n+++ b/session.py\n@@ -2,4 +2,6 @@\n \n \n def merge_turns(saved, live):\n-    return list(live)\n+    if not isinstance(saved, list) or not isinstance(live, list):\n+        raise ValueError(\"bad transcript\")\n+    return list(saved) + [m for m in live if m not in saved]\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import session\n\n\ndef test_cd02_compositional_merge_overlap():\n    assert session.merge_turns([1, 2], [2, 3]) == [1, 2, 3]\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import session\n\n\ndef test_cd02_negative_bad_transcript_rejected():\n    try:\n        session.merge_turns(\"nope\", [])\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import session\n\n\ndef test_cd02_boundary_empty_transcripts():\n    assert session.merge_turns([], []) == []\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-CD-03",
+      "goal": "In backlog.py, pending(sent, acked) returns the message ids in sent that are not in acked, in sent order; ids acked but never sent are ignored. Both arguments are lists; a non-list argument raises ValueError.",
+      "files": {
+        "backlog.py": "def pending(sent, acked):\n    return [m for m in acked if m not in sent]\n"
+      },
+      "reference_fix": "--- a/backlog.py\n+++ b/backlog.py\n@@ -1,2 +1,5 @@\n def pending(sent, acked):\n-    return [m for m in acked if m not in sent]\n+    if not isinstance(sent, list) or not isinstance(acked, list):\n+        raise ValueError(\"lists required\")\n+    done = set(acked)\n+    return [m for m in sent if m not in done]\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import backlog\n\n\ndef test_sv2cd03_compositional():\n    assert backlog.pending([1, 2, 3, 4], [2, 4]) == [1, 3]\n    assert backlog.pending([1, 2], [9]) == [1, 2]\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import backlog\n\n\ndef test_sv2cd03_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        backlog.pending('12', [])\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import backlog\n\n\ndef test_sv2cd03_boundary():\n    assert backlog.pending([], []) == []\n    assert backlog.pending([5], [5]) == []\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-CD-04",
+      "goal": "In reconnect.py, delays(attempts) returns the reconnect delays in seconds for attempts 0..attempts-1: 1, 2, 4, 8, ... doubling, each capped at 30. delays(0) returns []; a negative attempts raises ValueError.",
+      "files": {
+        "reconnect.py": "def delays(attempts):\n    return [2 ** i for i in range(1, attempts)]\n"
+      },
+      "reference_fix": "--- a/reconnect.py\n+++ b/reconnect.py\n@@ -1,2 +1,4 @@\n def delays(attempts):\n-    return [2 ** i for i in range(1, attempts)]\n+    if attempts < 0:\n+        raise ValueError(\"negative attempts\")\n+    return [min(30, 2 ** i) for i in range(attempts)]\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import reconnect\n\n\ndef test_sv2cd04_compositional():\n    assert reconnect.delays(4) == [1, 2, 4, 8]\n    assert reconnect.delays(7) == [1, 2, 4, 8, 16, 30, 30]\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import reconnect\n\n\ndef test_sv2cd04_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        reconnect.delays(-1)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import reconnect\n\n\ndef test_sv2cd04_boundary():\n    assert reconnect.delays(0) == []\n    assert reconnect.delays(1) == [1]\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-CD-05",
+      "goal": "In draft.py, restore(saved, typed) returns the text to show after reconnecting: the typed text when it is non-empty, otherwise the saved draft; None is treated as an empty string. The result is always a str.",
+      "files": {
+        "draft.py": "def restore(saved, typed):\n    return saved or typed\n"
+      },
+      "reference_fix": "--- a/draft.py\n+++ b/draft.py\n@@ -1,2 +1,4 @@\n def restore(saved, typed):\n-    return saved or typed\n+    typed = typed or \"\"\n+    saved = saved or \"\"\n+    return typed if typed else saved\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import draft\n\n\ndef test_sv2cd05_compositional():\n    assert draft.restore('old', 'new') == 'new'\n    assert draft.restore('old', '') == 'old'\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import draft\n\n\ndef test_sv2cd05_negative():\n    assert draft.restore(None, None) == ''\n    assert draft.restore(None, 'x') == 'x'\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import draft\n\n\ndef test_sv2cd05_boundary():\n    assert draft.restore('', '') == ''\n    assert draft.restore('keep', None) == 'keep'\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-CD-06",
+      "goal": "In seqcheck.py, gaps(seen) takes the sorted list of received sequence numbers starting at 1 and returns the missing numbers between 1 and the largest seen, ascending. gaps([]) returns []; an unsorted list raises ValueError.",
+      "files": {
+        "seqcheck.py": "def gaps(seen):\n    return [n for n in range(1, len(seen)) if n not in seen]\n"
+      },
+      "reference_fix": "--- a/seqcheck.py\n+++ b/seqcheck.py\n@@ -1,2 +1,7 @@\n def gaps(seen):\n-    return [n for n in range(1, len(seen)) if n not in seen]\n+    if list(seen) != sorted(seen):\n+        raise ValueError(\"unsorted\")\n+    if not seen:\n+        return []\n+    have = set(seen)\n+    return [n for n in range(1, max(seen) + 1) if n not in have]\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import seqcheck\n\n\ndef test_sv2cd06_compositional():\n    assert seqcheck.gaps([1, 2, 5, 7]) == [3, 4, 6]\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import seqcheck\n\n\ndef test_sv2cd06_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        seqcheck.gaps([3, 1])\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import seqcheck\n\n\ndef test_sv2cd06_boundary():\n    assert seqcheck.gaps([]) == []\n    assert seqcheck.gaps([1, 2, 3]) == []\n    assert seqcheck.gaps([4]) == [1, 2, 3]\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-CD-07",
+      "goal": "In resume.py, resume_plan(sent, acked, max_batch) returns the list of batches to resend after a reconnect: the ids in sent that are not in acked, in sent order, split into consecutive batches of at most max_batch ids. Duplicate ids in sent are resent once (first occurrence). max_batch <= 0 raises ValueError; nothing to resend returns [].",
+      "files": {
+        "resume.py": "def resume_plan(sent, acked, max_batch):\n    todo = [m for m in sent if m not in acked]\n    return [todo]\n"
+      },
+      "reference_fix": "--- a/resume.py\n+++ b/resume.py\n@@ -1,3 +1,11 @@\n def resume_plan(sent, acked, max_batch):\n-    todo = [m for m in sent if m not in acked]\n-    return [todo]\n+    if max_batch <= 0:\n+        raise ValueError(\"max_batch must be positive\")\n+    done = set(acked)\n+    todo, seen = [], set()\n+    for m in sent:\n+        if m in done or m in seen:\n+            continue\n+        seen.add(m)\n+        todo.append(m)\n+    return [todo[i:i + max_batch] for i in range(0, len(todo), max_batch)]\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import resume\n\n\ndef test_sv3cd07_compositional():\n    assert resume.resume_plan([1, 2, 3, 4, 5], [2], 2) == [[1, 3], [4, 5]]\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import resume\n\n\ndef test_sv3cd07_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        resume.resume_plan([1], [], 0)\n    assert resume.resume_plan([1, 1, 2, 1], [], 5) == [[1, 2]]\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import resume\n\n\ndef test_sv3cd07_boundary():\n    assert resume.resume_plan([1, 2], [1, 2], 3) == []\n    assert resume.resume_plan([], [], 1) == []\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-CD-08",
+      "goal": "In presence.py, status(last_seen, now, idle_after, offline_after) returns \"online\" when now - last_seen < idle_after, \"idle\" when idle_after <= now - last_seen < offline_after, and \"offline\" otherwise; last_seen None means \"offline\". It raises ValueError when idle_after <= 0 or offline_after <= idle_after, and when last_seen is later than now.",
+      "files": {
+        "presence.py": "def status(last_seen, now, idle_after, offline_after):\n    gap = now - last_seen\n    if gap < idle_after:\n        return \"online\"\n    if gap < offline_after:\n        return \"idle\"\n    return \"offline\"\n"
+      },
+      "reference_fix": "--- a/presence.py\n+++ b/presence.py\n@@ -1,4 +1,10 @@\n def status(last_seen, now, idle_after, offline_after):\n+    if idle_after <= 0 or offline_after <= idle_after:\n+        raise ValueError(\"bad thresholds\")\n+    if last_seen is None:\n+        return \"offline\"\n+    if last_seen > now:\n+        raise ValueError(\"last_seen in the future\")\n     gap = now - last_seen\n     if gap < idle_after:\n         return \"online\"\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import presence\n\n\ndef test_sv3cd08_compositional():\n    assert [presence.status(t, 100, 10, 60) for t in (95, 80, 30)] == ['online', 'idle', 'offline']\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import presence\n\n\ndef test_sv3cd08_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        presence.status(10, 20, 10, 10)\n    with pytest.raises(ValueError):\n        presence.status(30, 20, 5, 10)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import presence\n\n\ndef test_sv3cd08_boundary():\n    assert presence.status(None, 5, 1, 2) == 'offline'\n    assert presence.status(90, 100, 10, 60) == 'idle'\n"
+        }
+      ]
+    }
+  ]
+}

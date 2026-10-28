@@ -1041,14 +1041,14 @@ def eval_sandbox(req: SandboxRequest):
 
 
 class EvalBaselineRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
     harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
 
 class EvalPipelineRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
     harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
@@ -1110,7 +1110,7 @@ def _production_stats() -> dict:
 
 
 @app.get("/v1/eval/suites")
-def eval_suites(suite_version: Literal["v0", "v1", "v2"] = "v0"):
+def eval_suites(suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"):
     """Redacted sealed catalogue for one suite version: families plus sha256/len metadata only."""
     from evoforge import repo_source as _rs_eval
 
@@ -1305,7 +1305,7 @@ def eval_pipeline(req: EvalPipelineRequest):
 
 class EvalJobRequest(BaseModel):
     kind: Literal["X_SINGLE", "PIPELINE"]
-    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
     harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
@@ -1361,7 +1361,7 @@ def eval_job_get(job_id: str):
 
 
 class EvalABTestRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2"] = "v2"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v2"
     kind: Literal["X_SINGLE", "PIPELINE"]
     family: str | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"

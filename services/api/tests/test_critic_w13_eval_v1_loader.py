@@ -48,7 +48,7 @@ def test_default_is_v0_and_unknown_versions_are_refused():
 
 def test_suites_endpoint_lists_versions_and_serves_v1_redacted():
     body = c.get("/v1/eval/suites?suite_version=v1").json()
-    assert body["suite_version"] == "v1" and body["suite_versions"] == ["v0", "v1", "v2"]
+    assert body["suite_version"] == "v1" and body["suite_versions"] == ["v0", "v1", "v2", "v3", "v4"]
     blob = json.dumps(body)
     for s in sealed_eval.load_suites("v1"):
         for t in s["tasks"]:

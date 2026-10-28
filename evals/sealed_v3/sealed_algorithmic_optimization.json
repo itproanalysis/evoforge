@@ -1,0 +1,188 @@
+{
+  "family": "algorithmic_optimization",
+  "suite_version": "v3",
+  "tasks": [
+    {
+      "id": "SV3-AO-01",
+      "goal": "In bsearch.py, bsearch(seq, target) returns the index of target in a sorted sequence, or -1 when it is absent (including an empty sequence).",
+      "files": {
+        "bsearch.py": "\"\"\"Binary search over a sorted sequence.\"\"\"\n\n\ndef bsearch(sorted_items, target):\n    lo, hi = 0, len(sorted_items)\n    while lo < hi:\n        mid = (lo + hi) // 2\n        if sorted_items[mid] <= target:\n            lo = mid + 1\n        else:\n            hi = mid\n    return lo\n"
+      },
+      "reference_fix": "--- a/bsearch.py\n+++ b/bsearch.py\n@@ -2,11 +2,13 @@\n \n \n def bsearch(sorted_items, target):\n-    lo, hi = 0, len(sorted_items)\n-    while lo < hi:\n+    lo, hi = 0, len(sorted_items) - 1\n+    while lo <= hi:\n         mid = (lo + hi) // 2\n-        if sorted_items[mid] <= target:\n+        if sorted_items[mid] == target:\n+            return mid\n+        if sorted_items[mid] < target:\n             lo = mid + 1\n         else:\n-            hi = mid\n-    return lo\n+            hi = mid - 1\n+    return -1\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import bsearch\n\n\ndef test_ao01_compositional_hits():\n    assert bsearch.bsearch([1, 3, 5, 7, 9], 7) == 3\n    assert bsearch.bsearch([1, 3, 5, 7, 9], 5) == 2\n    assert bsearch.bsearch([1, 3, 5, 7, 9], 1) == 0\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import bsearch\n\n\ndef test_ao01_negative_missing_is_minus_one():\n    assert bsearch.bsearch([1, 3, 5], 4) == -1\n    assert bsearch.bsearch([1, 3, 5], 0) == -1\n    assert bsearch.bsearch([1, 3, 5], 9) == -1\n    assert bsearch.bsearch([], 1) == -1\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import bsearch\n\n\ndef test_ao01_boundary_single_element():\n    assert bsearch.bsearch([42], 42) == 0\n    assert bsearch.bsearch([42], 7) == -1\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-AO-02",
+      "goal": "In topk.py, topk(items, k) returns the k largest elements in descending order; k == 0 or empty items returns []; a negative k raises ValueError.",
+      "files": {
+        "topk.py": "\"\"\"Largest-k selection.\"\"\"\n\n\ndef topk(items, k):\n    if k < 0:\n        raise ValueError(\"k must be non-negative\")\n    return sorted(items)[:k]\n"
+      },
+      "reference_fix": "--- a/topk.py\n+++ b/topk.py\n@@ -4,4 +4,4 @@\n def topk(items, k):\n     if k < 0:\n         raise ValueError(\"k must be non-negative\")\n-    return sorted(items)[:k]\n+    return sorted(items, reverse=True)[:k]\n",
+      "heldout": [
+        {
+          "id": "H1",
+          "kind": "compositional",
+          "code": "import topk\n\n\ndef test_ao02_compositional_largest_first():\n    assert topk.topk([5, 1, 4, 2, 3], 2) == [5, 4]\n    assert topk.topk([5, 1, 4, 2, 3], 3) == [5, 4, 3]\n"
+        },
+        {
+          "id": "H2",
+          "kind": "negative",
+          "code": "import topk\n\n\ndef test_ao02_negative_bad_k_rejected():\n    try:\n        topk.topk([1], -1)\n    except ValueError:\n        pass\n    else:\n        raise AssertionError(\"expected ValueError\")\n"
+        },
+        {
+          "id": "H3",
+          "kind": "boundary",
+          "code": "import topk\n\n\ndef test_ao02_boundary_empty_selection():\n    assert topk.topk([3, 1], 0) == []\n    assert topk.topk([], 2) == []\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-AO-03",
+      "goal": "In dedupe.py, dedupe(items) returns the items with duplicates removed, keeping the first occurrence of each and the original order. dedupe([]) returns [].",
+      "files": {
+        "dedupe.py": "def dedupe(items):\n    return sorted(set(items))\n"
+      },
+      "reference_fix": "--- a/dedupe.py\n+++ b/dedupe.py\n@@ -1,2 +1,8 @@\n def dedupe(items):\n-    return sorted(set(items))\n+    seen = set()\n+    out = []\n+    for x in items:\n+        if x not in seen:\n+            seen.add(x)\n+            out.append(x)\n+    return out\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import dedupe\n\n\ndef test_sv2ao03_compositional():\n    assert dedupe.dedupe([3, 1, 3, 2, 1]) == [3, 1, 2]\n    assert dedupe.dedupe(['b', 'a', 'b']) == ['b', 'a']\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import dedupe\n\n\ndef test_sv2ao03_negative():\n    assert dedupe.dedupe([5, 5, 5]) == [5]\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import dedupe\n\n\ndef test_sv2ao03_boundary():\n    assert dedupe.dedupe([]) == []\n    assert dedupe.dedupe([7]) == [7]\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-AO-04",
+      "goal": "In window.py, max_window_sum(values, k) returns the largest sum of k consecutive values. It raises ValueError when k <= 0 or k > len(values).",
+      "files": {
+        "window.py": "def max_window_sum(values, k):\n    best = 0\n    for i in range(len(values) - k):\n        best = max(best, sum(values[i:i + k]))\n    return best\n"
+      },
+      "reference_fix": "--- a/window.py\n+++ b/window.py\n@@ -1,5 +1,9 @@\n def max_window_sum(values, k):\n-    best = 0\n-    for i in range(len(values) - k):\n-        best = max(best, sum(values[i:i + k]))\n+    if k <= 0 or k > len(values):\n+        raise ValueError(\"bad window\")\n+    cur = sum(values[:k])\n+    best = cur\n+    for i in range(k, len(values)):\n+        cur += values[i] - values[i - k]\n+        best = max(best, cur)\n     return best\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import window\n\n\ndef test_sv2ao04_compositional():\n    assert window.max_window_sum([1, 3, -1, 5, 2], 2) == 7\n    assert window.max_window_sum([-4, -2, -7], 2) == -6\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import window\n\n\ndef test_sv2ao04_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        window.max_window_sum([1, 2], 3)\n    with pytest.raises(ValueError):\n        window.max_window_sum([1, 2], 0)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import window\n\n\ndef test_sv2ao04_boundary():\n    assert window.max_window_sum([4, 9], 2) == 13\n    assert window.max_window_sum([6], 1) == 6\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-AO-05",
+      "goal": "In intervals.py, merge(intervals) takes [start, end] pairs (start <= end) in any order and returns the merged, sorted list of non-overlapping pairs; touching intervals such as [1, 2] and [2, 3] merge. merge([]) returns [].",
+      "files": {
+        "intervals.py": "def merge(intervals):\n    out = []\n    for s, e in intervals:\n        if out and s < out[-1][1]:\n            out[-1][1] = max(out[-1][1], e)\n        else:\n            out.append([s, e])\n    return out\n"
+      },
+      "reference_fix": "--- a/intervals.py\n+++ b/intervals.py\n@@ -1,7 +1,7 @@\n def merge(intervals):\n     out = []\n-    for s, e in intervals:\n-        if out and s < out[-1][1]:\n+    for s, e in sorted([list(p) for p in intervals]):\n+        if out and s <= out[-1][1]:\n             out[-1][1] = max(out[-1][1], e)\n         else:\n             out.append([s, e])\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import intervals\n\n\ndef test_sv2ao05_compositional():\n    assert intervals.merge([[5, 7], [1, 3], [2, 4]]) == [[1, 4], [5, 7]]\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import intervals\n\n\ndef test_sv2ao05_negative():\n    assert intervals.merge([[1, 2], [2, 3]]) == [[1, 3]]\n    assert intervals.merge([[1, 2], [4, 5]]) == [[1, 2], [4, 5]]\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import intervals\n\n\ndef test_sv2ao05_boundary():\n    assert intervals.merge([]) == []\n    assert intervals.merge([[3, 3]]) == [[3, 3]]\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-AO-06",
+      "goal": "In rank.py, kth_smallest(values, k) returns the k-th smallest value with k starting at 1 (duplicates count separately). It raises ValueError when k < 1 or k > len(values).",
+      "files": {
+        "rank.py": "def kth_smallest(values, k):\n    return sorted(set(values))[k]\n"
+      },
+      "reference_fix": "--- a/rank.py\n+++ b/rank.py\n@@ -1,2 +1,4 @@\n def kth_smallest(values, k):\n-    return sorted(set(values))[k]\n+    if k < 1 or k > len(values):\n+        raise ValueError(\"bad k\")\n+    return sorted(values)[k - 1]\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import rank\n\n\ndef test_sv2ao06_compositional():\n    assert rank.kth_smallest([7, 2, 9, 4], 2) == 4\n    assert rank.kth_smallest([3, 1, 3], 3) == 3\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import rank\n\n\ndef test_sv2ao06_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        rank.kth_smallest([1, 2], 0)\n    with pytest.raises(ValueError):\n        rank.kth_smallest([1, 2], 3)\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import rank\n\n\ndef test_sv2ao06_boundary():\n    assert rank.kth_smallest([5], 1) == 5\n    assert rank.kth_smallest([2, 2, 1], 2) == 2\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-AO-07",
+      "goal": "In lru.py, LRUCache(capacity) keeps at most capacity items. get(key) returns the value or None and marks the key as most recently used; put(key, value) inserts or updates (an update also marks it most recent) and, when over capacity, evicts the least recently used key. capacity <= 0 raises ValueError. keys() returns keys from least to most recently used.",
+      "files": {
+        "lru.py": "class LRUCache:\n    def __init__(self, capacity):\n        self.capacity = capacity\n        self.data = {}\n\n    def get(self, key):\n        return self.data.get(key)\n\n    def put(self, key, value):\n        self.data[key] = value\n        if len(self.data) > self.capacity:\n            first = next(iter(self.data))\n            del self.data[first]\n\n    def keys(self):\n        return list(self.data)\n"
+      },
+      "reference_fix": "--- a/lru.py\n+++ b/lru.py\n@@ -1,12 +1,20 @@\n class LRUCache:\n     def __init__(self, capacity):\n+        if capacity <= 0:\n+            raise ValueError(\"capacity must be positive\")\n         self.capacity = capacity\n         self.data = {}\n \n     def get(self, key):\n-        return self.data.get(key)\n+        if key not in self.data:\n+            return None\n+        value = self.data.pop(key)\n+        self.data[key] = value\n+        return value\n \n     def put(self, key, value):\n+        if key in self.data:\n+            self.data.pop(key)\n         self.data[key] = value\n         if len(self.data) > self.capacity:\n             first = next(iter(self.data))\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import lru\n\n\ndef test_sv3ao07_compositional():\n    c = lru.LRUCache(2)\n    c.put('a', 1); c.put('b', 2)\n    assert c.get('a') == 1\n    c.put('c', 3)\n    assert c.get('b') is None and c.keys() == ['a', 'c']\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import lru\n\n\ndef test_sv3ao07_negative():\n    import pytest\n    with pytest.raises(ValueError):\n        lru.LRUCache(0)\n    c = lru.LRUCache(1)\n    assert c.get('missing') is None\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import lru\n\n\ndef test_sv3ao07_boundary():\n    c = lru.LRUCache(2)\n    c.put('a', 1); c.put('b', 2); c.put('a', 9)\n    c.put('c', 3)\n    assert c.keys() == ['a', 'c'] and c.get('a') == 9\n"
+        }
+      ]
+    },
+    {
+      "id": "SV3-AO-08",
+      "goal": "In dijkstra.py, shortest(graph, start, goal) returns (cost, path) for the cheapest path in a dict graph {node: {neighbor: weight}} with non-negative weights; path is the list of nodes from start to goal. Unreachable goal returns (None, []); start == goal returns (0, [start]); a negative weight raises ValueError.",
+      "files": {
+        "dijkstra.py": "def shortest(graph, start, goal):\n    best = {start: 0}\n    frontier = [start]\n    while frontier:\n        node = frontier.pop(0)\n        for nxt, w in graph.get(node, {}).items():\n            if nxt not in best:\n                best[nxt] = best[node] + w\n                frontier.append(nxt)\n    return best.get(goal), []\n"
+      },
+      "reference_fix": "--- a/dijkstra.py\n+++ b/dijkstra.py\n@@ -1,10 +1,31 @@\n+import heapq\n+\n+\n def shortest(graph, start, goal):\n-    best = {start: 0}\n-    frontier = [start]\n-    while frontier:\n-        node = frontier.pop(0)\n+    for edges in graph.values():\n+        for w in edges.values():\n+            if w < 0:\n+                raise ValueError(\"negative weight\")\n+    dist = {start: 0}\n+    prev = {}\n+    heap = [(0, start)]\n+    seen = set()\n+    while heap:\n+        d, node = heapq.heappop(heap)\n+        if node in seen:\n+            continue\n+        seen.add(node)\n+        if node == goal:\n+            break\n         for nxt, w in graph.get(node, {}).items():\n-            if nxt not in best:\n-                best[nxt] = best[node] + w\n-                frontier.append(nxt)\n-    return best.get(goal), []\n+            nd = d + w\n+            if nxt not in dist or nd < dist[nxt]:\n+                dist[nxt] = nd\n+                prev[nxt] = node\n+                heapq.heappush(heap, (nd, nxt))\n+    if goal not in dist:\n+        return None, []\n+    path = [goal]\n+    while path[-1] != start:\n+        path.append(prev[path[-1]])\n+    return dist[goal], path[::-1]\n",
+      "heldout": [
+        {
+          "kind": "compositional",
+          "code": "import dijkstra\n\n\ndef test_sv3ao08_compositional():\n    g = {'a': {'b': 5, 'c': 1}, 'c': {'b': 1}, 'b': {'d': 1}}\n    assert dijkstra.shortest(g, 'a', 'd') == (3, ['a', 'c', 'b', 'd'])\n"
+        },
+        {
+          "kind": "negative",
+          "code": "import dijkstra\n\n\ndef test_sv3ao08_negative():\n    import pytest\n    assert dijkstra.shortest({'a': {}}, 'a', 'z') == (None, [])\n    with pytest.raises(ValueError):\n        dijkstra.shortest({'a': {'b': -1}}, 'a', 'b')\n"
+        },
+        {
+          "kind": "boundary",
+          "code": "import dijkstra\n\n\ndef test_sv3ao08_boundary():\n    assert dijkstra.shortest({'a': {'b': 2}}, 'a', 'a') == (0, ['a'])\n"
+        }
+      ]
+    }
+  ]
+}

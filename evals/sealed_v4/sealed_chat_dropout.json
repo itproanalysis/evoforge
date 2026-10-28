@@ -1,0 +1,56 @@
+{
+  "family": "chat_dropout",
+  "suite_version": "v4",
+  "tasks": [
+    {
+      "id": "SV4-CD-01",
+      "goal": "In transcript.py, render(messages) takes dicts {seq, author, text} and returns <ol class=\"transcript\"> with one <li data-seq=\"SEQ\"><b>AUTHOR</b> TEXT</li> per message in seq order (a repeated seq is shown once, the first one); for every run of missing seq numbers between two shown messages insert <li class=\"gap\" data-missing=\"A-B\">N message missing</li> (\"N messages missing\" when N > 1). Author and text are HTML-escaped. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "transcript.py": "def render(messages):\n    items = \"\".join(\n        f'<li data-seq=\"{m[\"seq\"]}\"><b>{m[\"author\"]}</b> {m[\"text\"]}</li>' for m in messages)\n    return f'<ol class=\"transcript\">{items}</ol>'\n\n\ndef preview():\n    return render([{\"seq\": 1, \"author\": \"Builder\", \"text\": \"patch ready\"},\n                   {\"seq\": 2, \"author\": \"Critic\", \"text\": \"one test fails\"},\n                   {\"seq\": 5, \"author\": \"Builder\", \"text\": \"fixed\"}])\n"
+      },
+      "reference_fix": "--- a/transcript.py\n+++ b/transcript.py\n@@ -1,7 +1,21 @@\n+import html\n+\n+\n def render(messages):\n-    items = \"\".join(\n-        f'<li data-seq=\"{m[\"seq\"]}\"><b>{m[\"author\"]}</b> {m[\"text\"]}</li>' for m in messages)\n-    return f'<ol class=\"transcript\">{items}</ol>'\n+    seen = {}\n+    for m in messages:\n+        seen.setdefault(m[\"seq\"], m)\n+    items = []\n+    prev = None\n+    for seq in sorted(seen):\n+        if prev is not None and seq - prev > 1:\n+            n = seq - prev - 1\n+            word = \"message\" if n == 1 else \"messages\"\n+            items.append(f'<li class=\"gap\" data-missing=\"{prev + 1}-{seq - 1}\">{n} {word} missing</li>')\n+        m = seen[seq]\n+        items.append(f'<li data-seq=\"{seq}\"><b>{html.escape(m[\"author\"])}</b> {html.escape(m[\"text\"])}</li>')\n+        prev = seq\n+    return '<ol class=\"transcript\">' + \"\".join(items) + \"</ol>\"\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-CD-01-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport transcript\n\n\ndef test_sv4cd01_compositional():\n    e = ET.fromstring(transcript.render([{'seq': 1, 'author': 'a', 'text': 'hi'}, {'seq': 4, 'author': 'b', 'text': 'yo'}, {'seq': 2, 'author': 'a', 'text': 'ok'}]))\n    items = e.findall('li')\n    assert [i.get('data-seq') for i in items] == ['1', '2', None, '4']\n    assert items[2].get('data-missing') == '3-3' and items[2].text == '1 message missing'\n    assert items[3].find('b').text == 'b' and items[3].find('b').tail == ' yo'\n"
+        },
+        {
+          "id": "SV4-CD-01-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport transcript\n\n\ndef test_sv4cd01_negative():\n    e = ET.fromstring(transcript.render([{'seq': 1, 'author': 'a', 'text': 'x'}, {'seq': 1, 'author': 'a', 'text': 'y'}]))\n    items = e.findall('li')\n    assert len(items) == 1 and items[0].find('b').tail == ' x'\n"
+        },
+        {
+          "id": "SV4-CD-01-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport transcript\n\n\ndef test_sv4cd01_boundary():\n    assert ET.fromstring(transcript.render([])).findall('li') == []\n    e = ET.fromstring(transcript.render([{'seq': 1, 'author': '<a>', 'text': '&'}, {'seq': 5, 'author': 'b', 'text': 'z'}]))\n    gap = e.findall('li')[1]\n    assert gap.get('data-missing') == '2-4' and gap.text == '3 messages missing'\n    assert e.findall('li')[0].find('b').text == '<a>'\n"
+        }
+      ]
+    },
+    {
+      "id": "SV4-CD-02",
+      "goal": "In presence_bar.py, render(agents, now) takes dicts {name, last_seen} and returns <div class=\"presence\" aria-label=\"K of N online\"> holding one <span class=\"dot STATE\" title=\"NAME: STATE\">NAME</span> per agent. STATE is online when now - last_seen <= 30 (a last_seen in the future counts as online), idle when <= 300, else offline. Spans are ordered online, idle, offline, then by name; K counts online agents. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "presence_bar.py": "def render(agents, now):\n    spans = \"\".join(\n        f'<span class=\"dot online\" title=\"{a[\"name\"]}: online\">{a[\"name\"]}</span>' for a in agents)\n    return f'<div class=\"presence\">{spans}</div>'\n\n\ndef preview():\n    return render([{\"name\": \"Muse\", \"last_seen\": 98}, {\"name\": \"Codex\", \"last_seen\": 0},\n                   {\"name\": \"Claude\", \"last_seen\": 100}], 100)\n"
+      },
+      "reference_fix": "--- a/presence_bar.py\n+++ b/presence_bar.py\n@@ -1,7 +1,23 @@\n+import html\n+\n+ORDER = {\"online\": 0, \"idle\": 1, \"offline\": 2}\n+\n+\n+def _state(age):\n+    if age <= 30:\n+        return \"online\"\n+    if age <= 300:\n+        return \"idle\"\n+    return \"offline\"\n+\n+\n def render(agents, now):\n+    rows = [(_state(now - a[\"last_seen\"]), a[\"name\"]) for a in agents]\n+    rows.sort(key=lambda r: (ORDER[r[0]], r[1]))\n+    online = sum(1 for s, _ in rows if s == \"online\")\n     spans = \"\".join(\n-        f'<span class=\"dot online\" title=\"{a[\"name\"]}: online\">{a[\"name\"]}</span>' for a in agents)\n-    return f'<div class=\"presence\">{spans}</div>'\n+        f'<span class=\"dot {s}\" title=\"{html.escape(n, quote=True)}: {s}\">{html.escape(n)}</span>' for s, n in rows)\n+    return f'<div class=\"presence\" aria-label=\"{online} of {len(rows)} online\">{spans}</div>'\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-CD-02-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport presence_bar\n\n\ndef test_sv4cd02_compositional():\n    e = ET.fromstring(presence_bar.render([{'name': 'b', 'last_seen': 0}, {'name': 'a', 'last_seen': 95}, {'name': 'c', 'last_seen': 99}], 100))\n    spans = e.findall('span')\n    assert [s.text for s in spans] == ['a', 'c', 'b']\n    assert [s.get('class') for s in spans] == ['dot online', 'dot online', 'dot idle'] and e.get('aria-label') == '2 of 3 online'\n"
+        },
+        {
+          "id": "SV4-CD-02-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport presence_bar\n\n\ndef test_sv4cd02_negative():\n    e = ET.fromstring(presence_bar.render([{'name': 'z', 'last_seen': 0}], 1000))\n    s = e.find('span')\n    assert s.get('class') == 'dot offline' and s.get('title') == 'z: offline' and e.get('aria-label') == '0 of 1 online'\n"
+        },
+        {
+          "id": "SV4-CD-02-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport presence_bar\n\n\ndef test_sv4cd02_boundary():\n    e = ET.fromstring(presence_bar.render([{'name': 'p', 'last_seen': 70}, {'name': 'q', 'last_seen': -200}, {'name': 'r', 'last_seen': 500}], 100))\n    spans = e.findall('span')\n    assert [s.text for s in spans] == ['p', 'r', 'q']\n    assert [s.get('class') for s in spans] == ['dot online', 'dot online', 'dot idle']\n"
+        }
+      ]
+    }
+  ]
+}

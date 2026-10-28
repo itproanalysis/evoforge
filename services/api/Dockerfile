@@ -21,6 +21,8 @@ COPY docs/evoforge-v4.2/tools/validate_package.py /app/docs/evoforge-v4.2/tools/
 COPY evals/sealed_v0/ /app/evals/sealed_v0/
 COPY evals/sealed_v1/ /app/evals/sealed_v1/
 COPY evals/sealed_v2/ /app/evals/sealed_v2/
+COPY evals/sealed_v3/ /app/evals/sealed_v3/
+COPY evals/sealed_v4/ /app/evals/sealed_v4/
 
 WORKDIR /app/services/api
 USER evoforge
