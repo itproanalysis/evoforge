@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "docs", "
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, StrictInt, model_validator
 from typing import Literal
 
@@ -39,6 +39,7 @@ from evoforge.kernel_api import router as kernel_router
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
 from evoforge import missions as missions_store
 from evoforge import feedback as feedback_mod
+from evoforge import mcp_server as _mcp_server
 from evoforge.missions import NeedsConfirmation as MissionNeedsConfirmation
 from evoforge.missions import TransitionError as MissionTransitionError
 
@@ -2552,3 +2553,12 @@ def leaderboard():
 def memory_list():
     """Digest-only view of what the factory has learned. No code, ever."""
     return {"patterns": evo_memory.public_all(), "count": len(evo_memory.public_all())}
+
+
+@app.post("/v1/mcp")
+async def mcp(request: Request):
+    raw = await request.body()
+    status, body = _mcp_server.handle_raw(raw)
+    if status == 202:
+        return Response(status_code=202)
+    return JSONResponse(body, status_code=status)

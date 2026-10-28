@@ -25,6 +25,7 @@ const EXACT_ALLOW = new Set([
   "/v1/eval/decisions",
   "/v1/arena",
   "/v1/stream",
+  "/v1/mcp",
 ]);
 
 const SEGMENT_RE = /^[A-Za-z0-9._~-]+$/;
