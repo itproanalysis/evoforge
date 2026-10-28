@@ -680,6 +680,20 @@ def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
                       f"Evidence: {source_evidence_id}"])
     if extra_files:
         body = body + f"\nTests: {', '.join(sorted(extra_files))}"
+    cert = _mint_proof(source_evidence_id)
+    _web_base = os.getenv("EVO_PUBLIC_WEB_URL", "").strip().rstrip("/")
+    verify_url = f"{_web_base}/verify/{source_evidence_id}" if _web_base else f"/verify/{source_evidence_id}"
+    if cert.get("signed"):
+        _fp_full = cert.get("public_key") if isinstance(cert.get("public_key"), str) else ""
+        _fp = _fp_full[:16]
+        body = body + (f"\n\nProof\nVerify: {verify_url}\n"
+                       f"Proof certificate: {cert.get('certificate_id')} ({cert.get('algorithm')})\n"
+                       f"Verdict: {cert.get('verdict')}\n"
+                       f"Public key fingerprint: {_fp}\n"
+                       f"Signature: {cert.get('signature')}\n")
+    else:
+        body = body + (f"\n\nProof\nVerify: {verify_url}\n"
+                       "Proof certificate: unsigned (signing not configured)\n")
     try:
         pr = github.create_pr(src["diff"], title, body,
                               branch, base,
@@ -689,8 +703,22 @@ def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
         raise HTTPException(409, str(e))
     except RuntimeError as e:
         raise HTTPException(400, str(e))
+    _pub_full = cert.get("public_key") if isinstance(cert.get("public_key"), str) else None
+    _pub_fp = _pub_full[:16] if _pub_full else None
+    _proof_summary = {
+        "certificate_id": cert.get("certificate_id"),
+        "algorithm": cert.get("algorithm"),
+        "signed": cert.get("signed"),
+        "signature": cert.get("signature"),
+        "public_key_fingerprint": _pub_fp,
+        "verdict": cert.get("verdict"),
+        "verify_url": verify_url,
+        "evidence_id": source_evidence_id,
+    }
+
     eid = _store_evidence({"pr": pr.get("html_url"), "title": title,
-                           "source_evidence_id": source_evidence_id, **store_extra})
+                           "source_evidence_id": source_evidence_id, **store_extra,
+                           "proof": _proof_summary})
     for entry in evidence_chain.chain(source_evidence_id):
         if entry.get("event_id") is not None:
             evidence_chain.link(eid, entry["stage"], entry["event_id"])
@@ -1852,18 +1880,11 @@ def evolution_promote(evolution_id: str):
     return {"pr": pr, "evidence_id": eid, "source_evidence_id": run_eid}
 
 
-@app.get("/v1/proof/key")
-def proof_key():
-    """Server Ed25519 public key for proof certificates (404 when unsigned)."""
-    pub = proof_mod.server_public_key_b64()
-    if not pub:
-        raise HTTPException(404, "proof signing not configured")
-    return {"algorithm": "Ed25519", "public_key": pub}
+def _mint_proof(evidence_id: str) -> dict:
+    """Mint the public proof certificate for one evidence id (shared helper).
 
-
-@app.get("/v1/proof/{evidence_id}")
-def proof_certificate(evidence_id: str):
-    """Public proof certificate over redacted evidence: digests, never code."""
+    ONE implementation backs GET /v1/proof/{id} and _pr_core.
+    """
     if evidence_id not in _evidence:
         raise HTTPException(404, "unknown evidence id")
     stored = _evidence[evidence_id]
@@ -1879,6 +1900,21 @@ def proof_certificate(evidence_id: str):
         data["diff_sha256"] = _hl3.sha256(cand["diff"].encode("utf-8")).hexdigest()
     cert = proof_mod.mint(evidence_id, data, evidence_chain.chain(evidence_id))
     return {**cert, "verify": proof_mod.verify(cert)}
+
+
+@app.get("/v1/proof/key")
+def proof_key():
+    """Server Ed25519 public key for proof certificates (404 when unsigned)."""
+    pub = proof_mod.server_public_key_b64()
+    if not pub:
+        raise HTTPException(404, "proof signing not configured")
+    return {"algorithm": "Ed25519", "public_key": pub}
+
+
+@app.get("/v1/proof/{evidence_id}")
+def proof_certificate(evidence_id: str):
+    """Public proof certificate over redacted evidence: digests, never code."""
+    return _mint_proof(evidence_id)
 
 
 @app.get("/v1/leaderboard")
