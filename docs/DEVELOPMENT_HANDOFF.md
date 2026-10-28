@@ -462,3 +462,16 @@ task lease holder·candidate 작성자·review 작성자로 실제 연결된 age
 별도 트랜잭션이므로 후자 저장 실패 시 evidence만 남는다. 이 결과는 실제 Muse 호출·공급사 청구 검증,
 공개 PR SHA 연결 또는 운영 배포 완료를 의미하지 않는다. 상세: `docs/ADMIN_PARTICIPANTS_CODEX.md`,
 `docs/PERFORMANCE_PERSISTENCE_CODEX.md`. Muse Spark 기본값과 자동 재개를 유지한다.
+
+## 2026-10-28 마이그레이션 복구 가드
+
+`57c4cb0`을 main에 반영했다. 복구 대상은 계약과 001–010의 고정 목록으로 제한하고,
+`core.tenants` 존재만으로 적용 여부를 추정하지 않는다. 해당 초기 설치 기록을 운영자가 독립 확인한
+경우에만 명시적 복구 설정을 사용한다. 011 이후는 복구 표시 대상이 아니며, 011이 이미 표시됐지만
+테이블이 없으면 ledger를 변경하지 않고 중단한다. 테이블 존재만으로 권한·정책·트리거의 완전성을
+증명하지 않는다. 이전 버전이 다른 미래 마이그레이션도 잘못 표시했을 수 있으므로 운영 ledger와
+실제 스키마·배포 증거를 독립적으로 확인하고 필요 시 운영자가 조정해야 한다.
+
+전체 API 671 passed·4 skipped, 격리 PostgreSQL에서 실제 011 실행 및 잘못된 표시 차단과 정본 검사,
+집중 회귀 4개 통과. 웹 tree는 기존 빌드 검증본과 같다. 운영 DB는 조회·변경하지 않았다.
+SQL 실행과 ledger 표시가 별도 트랜잭션인 한계와 복구 설정은 `docs/MIGRATION_RECOVERY_CODEX.md`에 기록했다.
