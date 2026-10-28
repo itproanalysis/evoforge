@@ -39,10 +39,11 @@ echo "== runner: no secrets, no roles, private, one job per instance"
   --cpu 2 --memory 2Gi --concurrency 1 --min-instances 0 --max-instances 3 --timeout 900 --quiet
 
 echo "== api: private; only the web SA may invoke; Meta key + GitHub token from Secret Manager"
+# CPU always allocated: eval jobs (T24) run after the response returns.
 # max-instances 1 until the request path is on Cloud SQL (in-memory evidence/ledger must stay on one instance).
 "$GCLOUD" run deploy evoforge-api --project "$PROJECT" --region "$REGION" --image "${REG}/api:${TAG}" \
   --service-account "$(SA api)" --no-allow-unauthenticated --port 8080 \
-  --cpu 1 --memory 1Gi --min-instances 1 --max-instances 1 --timeout 900 \
+  --cpu 1 --memory 1Gi --min-instances 1 --max-instances 1 --timeout 900 --no-cpu-throttling \
   --set-secrets "MODEL_API_KEY=MODEL_API_KEY:latest,GITHUB_TOKEN=GITHUB_TOKEN:latest${STATE_SECRETS}" \
   --set-env-vars "^|^MODEL_API_BASE=https://api.meta.ai/v1|MODEL_BUILDER=muse-spark-1.3|MODEL_CRITIC=muse-spark-1.3|GITHUB_REPO=${GITHUB_REPO}|EVO_REQUIRE_ID_TOKEN=1|EVO_API_URL=${API_URL}|EVO_WEB_SERVICE_ACCOUNT=$(SA web)|EVO_RUNNER_URL=${RUNNER_URL}|EVO_RUNNER_AUDIENCE=${RUNNER_URL}|EVO_ALLOW_LOCAL_REPOS=0|EVO_WEB_ORIGINS=${STATE_ENV}" \
   --quiet
