@@ -961,17 +961,10 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                     score = 0.0
                     failures: list[dict] = []
                     if _apply_candidate(dest, diff):
-                        if _runner_client.runner_url():
-                            score = _score_heldout(
-                                dest, source, base,
-                                diff if isinstance(diff, str) else "",
-                                task["heldout"], timeout_s, tmpbase)
-                            if score < 1.0:
-                                failures = [{"test": "held-out",
-                                             "message": "assertion failed"}]
-                        else:
-                            score, failures = _run_heldout_local_detail(
-                                dest, task["heldout"], timeout_s, tmpbase)
+                        # Always local, like the baseline: the task source is an ephemeral local repo that the remote
+                        # runner cannot read (production returned RunnerBadRequest for every pipeline task).
+                        score, failures = _run_heldout_local_detail(
+                            dest, task["heldout"], timeout_s, tmpbase)
                     if score >= 1.0:
                         best = 1.0
                         break
