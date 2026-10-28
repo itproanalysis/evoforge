@@ -905,5 +905,12 @@
       "eval",
       "decisions"
     ]
+  },
+  {
+    "expected": "/v1/mcp",
+    "path_segments": [
+      "v1",
+      "mcp"
+    ]
   }
 ]
