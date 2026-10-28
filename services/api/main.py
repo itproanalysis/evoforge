@@ -420,7 +420,7 @@ def _stage_summary(eid: str, stage: str) -> dict:
             "baseline_id": stored.get("baseline_id"),
             "suite_version": stored.get("suite_version"),
             "model": stored.get("model"),
-            "X_SINGLE": {k: xs.get(k) for k in ("pass_rate", "n", "cost_cents")},
+            "X_SINGLE": {k: xs.get(k) for k in ("pass_rate", "n", "cost_cents", "usage_missing") if k in xs},
             "pass_rate": xs.get("pass_rate"),
             "n": xs.get("n"),
             "cost_cents": xs.get("cost_cents"),
@@ -1057,7 +1057,8 @@ def _do_eval_baseline(suite_version: str, model: str, family, harness: str | Non
         model=result["model"],
         harness_version=result.get("harness_version", sealed_eval_mod.HARNESS_VERSION),
         n=xs["n"], passed=passed, cost_cents=xs["cost_cents"],
-        per_family=per_family, evidence_id=eid)
+        per_family=per_family, evidence_id=eid,
+        usage_missing=bool(result.get("usage_missing", False)))
     measurement["wilson95"] = [lo, hi]
     measurement["provider_stub"] = result["provider_stub"]
     performance_mod.record(measurement)
