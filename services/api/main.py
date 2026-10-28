@@ -652,6 +652,8 @@ def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
     if report_tampering_risks(src["diff"], src.get("tests")):
         # Recheck stored PASS evidence under current policy without rewriting it.
         raise HTTPException(409, "PR blocked: GH_INTEGRITY=INCONCLUSIVE (Runner report integrity requires review)")
+    if any(src["run"].get(section, {}).get("report_integrity") is False for section in ("visible", "heldout")):
+        raise HTTPException(409, "PR blocked: G2_REQUIRED=INCONCLUSIVE (Runner report channels disagree)")
     blocked = [f"{g['gate']}={g['result']}" for g in gates if g.get("result") != "PASS"]
     if blocked:
         raise HTTPException(409, f"PR blocked by gates: {', '.join(blocked)}")

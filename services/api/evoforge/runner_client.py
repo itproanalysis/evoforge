@@ -172,8 +172,13 @@ def _validate_counts(section: object, name: str) -> dict:
     exit_code = section.get("exit_code")
     if exit_code is not None and (isinstance(exit_code, bool) or not isinstance(exit_code, int)):
         raise RunnerClientError(f"malformed runner reply ({name}.exit_code)")
-    return {"pass": section["pass"], "n": section["n"],
-            "timed_out": section["timed_out"], "exit_code": exit_code}
+    result = {"pass": section["pass"], "n": section["n"],
+              "timed_out": section["timed_out"], "exit_code": exit_code}
+    if "report_integrity" in section:
+        if type(section["report_integrity"]) is not bool:
+            raise RunnerClientError(f"malformed runner reply ({name}.report_integrity)")
+        result["report_integrity"] = section["report_integrity"]
+    return result
 
 
 def _validate_collection(section: dict, supplied_count: int, name: str) -> None:

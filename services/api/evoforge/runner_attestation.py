@@ -37,7 +37,10 @@ def input_digest(base, diff, visible, sealed):
 def result_digest(report):
     def counts(name):
         section = report[name]
-        return {key: section.get(key) for key in ('pass', 'n', 'timed_out', 'exit_code')}
+        result = {key: section.get(key) for key in ('pass', 'n', 'timed_out', 'exit_code')}
+        if 'report_integrity' in section:
+            result['report_integrity'] = section['report_integrity']
+        return result
     return digest({'base': report['base'], 'hygiene': report.get('hygiene', []),
                    'visible': counts('visible'), 'heldout': counts('heldout'),
                    'heldout_kinds': report['heldout_kinds']})

@@ -77,6 +77,8 @@ def apply_run(verdicts: list[Verdict], run: dict) -> list[Verdict]:
             v.result, v.reason = "FAIL", f"required suite missing or not collected ({counts})"
         elif vis["pass"] < vis["n"] or held["pass"] < held["n"]:
             v.result, v.reason = "FAIL", f"required tests failing ({counts})"
+        elif vis.get("report_integrity") is False or held.get("report_integrity") is False:
+            v.result, v.reason = "INCONCLUSIVE", "Runner report channels disagree; independent review required"
         else:
             v.result, v.reason = "PASS", f"required tests executed and passed ({counts})"
     return verdicts
