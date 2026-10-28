@@ -16,6 +16,8 @@ RUN pip install --no-cache-dir -r /app/services/runner/requirements.txt
 COPY services/runner/ /app/services/runner/
 # Shared stdlib-only provenance hashing; no API dependencies or credentials.
 COPY services/api/evoforge/runner_attestation.py /app/services/runner/runner_attestation.py
+# Shared stdlib-only diff application (same semantics as the API: hunk recount, exact context).
+COPY services/api/evoforge/patch.py /app/services/runner/patch.py
 
 WORKDIR /app/services/runner
 USER evoforge
