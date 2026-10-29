@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "source_commit": "f5216d00ce76dfa8aa880b03a9b35d87c74872d8",
+  "branch": "codex/sealed-scoring-r8",
+  "source_blob_sha256": {
+    "apps/web/middleware.ts": "440a82abe096800a7f10b00d567e88ab8308474774ec5650d1764496eef53920",
+    "apps/web/i18n.ts": "14a86bb019e6a3435b7e787174c5b395565a2f83e488a0349eb4eeed91a810f0",
+    "apps/web/app/login/page.tsx": "087dbc3260efba0152059e61d7f29cb79da24f3fc43fc6df3c7b42a2333b1443",
+    "apps/web/app/login/layout.tsx": "c195302702dd991a546f62f6bbeeaa4938ea7ade98e938994413eba3430aa62e",
+    "apps/web/app/[locale]/replay/page.tsx": "bf9dcf8e847235b048be2b0d31333bcc6b513da6aa6d0c09d762b6aa042291b1",
+    "apps/web/lib/replaySelection.ts": "c9e9d0ee93ffcaae1b3c7016240ec2a9144816c5409eff9ac13a1b71788b24c0",
+    "apps/web/messages/en.json": "c26ea30c7bc63dd88cab2b1b46e9ee04172ff1dcd02d2126d357a97aca0181f1",
+    "apps/web/messages/ko.json": "49fa98e1f631c23c3382b2cadbd6ddc2b92dc799203bcb925aff3ed16aa15cf1",
+    "apps/web/scripts/check-login-routing.mjs": "0bbf9f54ccf14196e2e910c98a2254493763e1135464ff3fec55607633e9de74",
+    "apps/web/scripts/check-login-http.mjs": "9670294c37ec414e39b27fa8a146e66ddd2827c49b49c2abd5843e075c2c7ab3",
+    "apps/web/scripts/check-replay-selection.mjs": "8df78acf9ebdf1a0febd016f9e1ef626a9d6e7da1c1672c6a460040ce29fd7e6",
+    "services/api/tests/test_replay_selection_http_codex.py": "c1e4b93b9d52563b99cd11648c8f30455727f458a3dc60864dc6b3b4382b017e",
+    "services/api/tests/test_muse_t52.py": "254d7a06f24d330284606843eb842fc2066813998298d73aeb26bcd38348a4de"
+  },
+  "local_log_sha256": {
+    "validation-login-http.log": "81762c1a723d5e3f4d4516f6aead61c494914bf17546cf93602d2e106d52a25f",
+    "validation-login-build.log": "99699ba7be4d3e95b6544181304e95b864c6d43c5889558345af1ed482526b0c",
+    "validation-replay-selection.log": "5f097a968068d56dce4f8efeefda2222d0c44a654919efc543f042824e412746",
+    "validation-replay-build.log": "1d7cd5ef40093b92c862879e067b37525cca2ca77a3534d7cfa6aecb5bda0916"
+  },
+  "checks": {
+    "existing_auth": "11 passed (tool output)",
+    "login_policy_unit": "passed (test-double locale routing; valid/expired/invalid synthetic sessions)",
+    "built_login_http": "passed, Korean default, English and unauthenticated protected redirects",
+    "login_browser": "Korean login AX and screenshot observed through computer-use, no credentials entered",
+    "replay_http_and_T52": "14 passed, 1 warning",
+    "typescript": 0,
+    "production_build": 0
+  },
+  "limits": [
+    "No production deploy or model calls",
+    "No authentication-mode changes",
+    "Login browser validation is not authenticated Arena/Replay E2E",
+    "No screenshot artifact persisted; this is not R1-R5 capture evidence",
+    "Full API/PostgreSQL gates remain for release integration"
+  ]
+}

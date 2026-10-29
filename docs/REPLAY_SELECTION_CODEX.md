@@ -30,7 +30,8 @@ rendered. All calls remain the existing read-only Evolution GET endpoints.
 - One Builder source-wiring assertion now reads the extracted loader's polling
   settings rather than requiring their literal text in the page. Its behavior
   is exercised by the new runtime tests; independent Critic tests are unchanged.
-- TypeScript passed; final production build is recorded separately.
+- TypeScript and the final clean production build passed. Build log:
+  `.local/validation-replay-build.log`.
 
 This is an isolated Web ownership exception on the Codex integration branch.
 It does not establish authenticated Replay browser E2E, live model quality,
