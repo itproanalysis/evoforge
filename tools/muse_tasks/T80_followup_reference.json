@@ -1,0 +1,17 @@
+{
+  "id": "T80_followup_reference",
+  "planned_by": "Claude (Critic): T76 for follow-up rounds",
+  "goal": "T80 — prompt-Arena follow-ups check the judge's NEW tests against a judge reference build too (T76 covered only the\nfirst round; a wrong follow-up test would again score both lanes 0 for it). API only.\nIn run_followup_arena, after the new judge tests are filtered on the two starting files (kept_new): build ONE judge\nreference with _build_judge_reference(goal) where goal is the follow-up task goal with the acceptance interface of\nparent + new tests (from the TEMPLATE, like the first round); keep only the kept_new tests that pass on it\n(_filter_on_reference; fail closed); inherited tests are not re-checked. Add its cost to judge_cost_cents; manifest\n\"reference_checked\": true and \"acceptance_reference_dropped\"; acceptance counts describe the scored suite. The\nreference never reaches a lane, a lane goal or the response. Update YOUR earlier follow-up tests (test_muse_t66.py,\ntest_muse_t67.py) whose Builder stubs do not expect a reference call: answer a REFERENCE_MARKER goal with a correct page\nfirst, without changing what those tests check.\nTests: services/api/tests/test_muse_t80.py.",
+  "edit": [
+    "services/api/evoforge/arena_prompt.py",
+    "services/api/tests/test_muse_t80.py",
+    "services/api/tests/test_muse_t66.py",
+    "services/api/tests/test_muse_t67.py"
+  ],
+  "context": [
+    "services/api/evoforge/sealed_eval.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t80.py services/api/tests/test_sealed_t80_followup_reference.py services/api/tests/test_arena_status_http_codex.py services/api/tests/test_arena_verification_codex.py services/api/tests/test_claude_arena_equal_tools.py services/api/tests/test_critic_t48_arena_manifest.py services/api/tests/test_critic_t49_arena_preview.py services/api/tests/test_critic_t50_arena_critic_lane.py services/api/tests/test_critic_t64_prompt_arena.py services/api/tests/test_critic_t65_prompt_bar.py services/api/tests/test_critic_t66_prompt_followup.py services/api/tests/test_critic_t67_prompt_chain_ui.py services/api/tests/test_critic_t68_candidate_code_in_runner.py services/api/tests/test_critic_t70_arena_certificates.py services/api/tests/test_muse_t44.py services/api/tests/test_muse_t48.py services/api/tests/test_muse_t50.py services/api/tests/test_muse_t59.py services/api/tests/test_muse_t64.py services/api/tests/test_muse_t65.py services/api/tests/test_muse_t66.py services/api/tests/test_muse_t67.py services/api/tests/test_muse_t70.py services/api/tests/test_muse_t72.py services/api/tests/test_muse_t73.py services/api/tests/test_muse_t74.py services/api/tests/test_muse_t75.py services/api/tests/test_muse_t76.py services/api/tests/test_muse_t78.py services/api/tests/test_muse_t79.py services/api/tests/test_sealed_t44_arena.py services/api/tests/test_sealed_t70_arena_certificates.py services/api/tests/test_sealed_t72_second_meta_critic.py services/api/tests/test_sealed_t73_acceptance_interface.py services/api/tests/test_sealed_t74_arena_summary.py services/api/tests/test_sealed_t75_live_arena_progress.py services/api/tests/test_sealed_t76_judge_reference.py services/api/tests/test_sealed_t78_home_scoreboard.py services/api/tests/test_sealed_t79_equal_tools_summary.py -q -p no:cacheprovider"
+  ]
+}
