@@ -183,6 +183,93 @@ def list_arenas(limit: int = LIST_LIMIT) -> list[dict]:
     return [copy.deepcopy(d) for d in ordered[:n]]
 
 
+SUMMARY_BASIS = ("Totals cover every stored arena match, while wins, held-out "
+                 "passes and costs count only scored matches with a clear winner.")
+
+
+def _summary_int(value) -> int:
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, int) and value >= 0:
+        return value
+    return 0
+
+
+def summary() -> dict:
+    """Scoreboard over EVERY stored arena document, sealed and prompt alike.
+
+    One ``postgres_state.scan`` over the arena records (not the 20-newest
+    list). ``scored`` counts succeeded arenas with a clear winner
+    (evoforge/single/tie); held-out totals and costs are summed over scored
+    arenas only. Money is integer cents; zeros when there is nothing.
+    """
+    try:
+        pairs = _postgres_state.scan(_store(), kind=KIND)
+    except Exception:
+        pairs = []
+    cands: dict[str, dict] = {}
+    for _key, rec in pairs:
+        inner = rec.get("arena") if isinstance(rec, dict) else None
+        if isinstance(inner, dict) and isinstance(inner.get("arena_id"), str):
+            cands[inner["arena_id"]] = inner
+    if _is_pg():
+        try:
+            with _MIRROR_LOCK:
+                for aid, doc in _MIRROR.items():
+                    if isinstance(doc, dict) and isinstance(
+                            doc.get("arena_id"), str):
+                        cands[aid] = doc
+        except Exception:
+            pass
+    total = len(cands)
+    running = 0
+    failed = 0
+    scored = 0
+    unscorable = 0
+    inconclusive = 0
+    wins = {"evoforge": 0, "single": 0, "tie": 0}
+    heldout = {"single": {"passed": 0, "n": 0},
+               "evoforge": {"passed": 0, "n": 0}}
+    cost_cents = {"single": 0, "evoforge": 0, "judge": 0}
+    for doc in cands.values():
+        if not isinstance(doc, dict):
+            continue
+        status = doc.get("status")
+        if status in ("queued", "running"):
+            running += 1
+        elif status == "failed":
+            failed += 1
+        verdict = doc.get("verdict")
+        winner = verdict.get("winner") if isinstance(verdict, dict) else None
+        if winner == "unscorable":
+            unscorable += 1
+        elif winner == "inconclusive":
+            inconclusive += 1
+        if status == "succeeded" and winner in wins:
+            scored += 1
+            wins[winner] += 1
+            lanes = doc.get("lanes")
+            if not isinstance(lanes, dict):
+                lanes = {}
+            for side in ("single", "evoforge"):
+                lane = lanes.get(side)
+                if not isinstance(lane, dict):
+                    continue
+                held = lane.get("heldout")
+                if isinstance(held, dict):
+                    heldout[side]["passed"] += _summary_int(
+                        held.get("passed"))
+                    heldout[side]["n"] += _summary_int(held.get("n"))
+                cost_cents[side] += _summary_int(lane.get("cost_cents"))
+            cost_cents["judge"] += _summary_int(
+                doc.get("judge_cost_cents"))
+    return {"total": total, "running": running, "failed": failed,
+            "scored": scored, "unscorable": unscorable,
+            "inconclusive": inconclusive, "wins": wins,
+            "heldout": heldout, "cost_cents": cost_cents,
+            "basis": SUMMARY_BASIS}
+
+
 def clear() -> None:
     with _MIRROR_LOCK:
         _MIRROR.clear()

@@ -504,7 +504,22 @@
     "prompt-acceptance": "{count} acceptance tests written by an independent judge before either side ran ({dropped} dropped as already passing)",
     "prompt-unscorable": "Too few meaningful acceptance tests remained after filtering — shown as unscorable, not a win.",
     "prompt-judge-cost": "Independent judge cost: {cost}",
-    "prompt-equal-tools": "Equal tools: both lanes apply diffs with tolerant recounting."
+    "prompt-equal-tools": "Equal tools: both lanes apply diffs with tolerant recounting.",
+    "summary-heading": "Arena scoreboard",
+    "summary-evoforge-wins": "EvoForge wins",
+    "summary-single-wins": "Single wins",
+    "summary-ties": "Ties",
+    "summary-total": "Matches",
+    "summary-scored": "Scored",
+    "summary-running": "Running",
+    "summary-failed": "Failed",
+    "summary-heldout-evoforge": "EvoForge hidden tests",
+    "summary-heldout-single": "Single hidden tests",
+    "summary-cost-evoforge": "EvoForge cost",
+    "summary-cost-single": "Single cost",
+    "summary-cost-judge": "Judge cost",
+    "summary-unscorable": "Too few tests to score",
+    "summary-inconclusive": "Needs another check"
   },
   "replay": {
     "title": "Round Replay",

@@ -1584,6 +1584,12 @@ def arena_list():
     return {"arenas": arena_mod.list_arenas()}
 
 
+@app.get("/v1/arena/summary")
+def arena_summary():
+    """Scoreboard over every stored arena (sealed and prompt alike)."""
+    return arena_mod.summary()
+
+
 @app.get("/v1/arena/{arena_id}")
 def arena_get(arena_id: str):
     doc = arena_mod.get_arena(arena_id)
