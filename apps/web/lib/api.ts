@@ -891,3 +891,66 @@ export function getEvolutionStats(feedback?: string) {
   const q = feedback ? `?feedback=${encodeURIComponent(feedback)}` : "";
   return req<EvolutionStatsResponse>(`/v1/evolution/stats${q}`);
 }
+
+export interface EvolutionStrategyConfig {
+  max_attempts: number;
+  accumulate_critic: boolean;
+  retire_stale: boolean;
+  [key: string]: unknown;
+}
+
+export interface EvolutionStrategyCandidate {
+  strategy_id: string;
+  strategy: EvolutionStrategyConfig;
+  runs: number;
+  evoforge: { rounds: number; verified: number; wilson95: [number, number] };
+  [key: string]: unknown;
+}
+
+export interface EvolutionStrategiesOverview {
+  champion: { strategy_id: string; strategy: EvolutionStrategyConfig; since: number };
+  candidates: EvolutionStrategyCandidate[];
+  decisions: Array<{ promoted: string; previous: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+}
+
+export interface EvolutionStrategiesResult {
+  status: number;
+  body: unknown;
+}
+
+export function getEvolutionStrategies(): Promise<EvolutionStrategiesResult> {
+  // Returns {status, body} and never throws for HTTP statuses: the caller
+  // renders the overview from the body on 200.
+  return (async () => {
+    const r = await fetch(`${API_BASE}/v1/evolution/strategies`);
+    let body: unknown = null;
+    try {
+      body = await r.json();
+    } catch {
+      body = null;
+    }
+    return { status: r.status, body };
+  })();
+}
+
+export function promoteEvolutionStrategy(
+  strategy_id: string,
+): Promise<EvolutionStrategiesResult> {
+  // Returns {status, body} and never throws for 404/409: the caller maps
+  // the HTTP status to a badge and shows the server's reason on 409.
+  return (async () => {
+    const r = await fetch(`${API_BASE}/v1/evolution/strategies/promote`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ strategy_id }),
+    });
+    let body: unknown = null;
+    try {
+      body = await r.json();
+    } catch {
+      body = null;
+    }
+    return { status: r.status, body };
+  })();
+}

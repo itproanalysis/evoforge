@@ -545,3 +545,177 @@ export function presentationFrames(run: EvolutionRun | null | undefined): Presen
   };
   return [...roundFrames, summary];
 }
+
+export interface StrategyConfig {
+  max_attempts?: unknown;
+  accumulate_critic?: unknown;
+  retire_stale?: unknown;
+  [key: string]: unknown;
+}
+
+export interface StrategiesOverview {
+  champion?: unknown;
+  candidates?: unknown;
+  decisions?: unknown;
+  [key: string]: unknown;
+}
+
+export interface StrategyChampionView {
+  id: string;
+  label: string;
+}
+
+export interface StrategyRow {
+  id: string;
+  label: string;
+  isChampion: boolean;
+  runs: number;
+  verified: string;
+  rate: string;
+  interval: string;
+  promotable: boolean;
+}
+
+export interface StrategyDecisionView {
+  promoted: string;
+  previous: string;
+}
+
+export interface StrategiesView {
+  champion: StrategyChampionView;
+  rows: StrategyRow[];
+  decisions: StrategyDecisionView[];
+}
+
+/** Human label for a build strategy: attempts · critic accumulation · stale handling. */
+export function strategyLabel(strategy: StrategyConfig | null | undefined): string {
+  const s =
+    strategy && typeof strategy === "object"
+      ? (strategy as Record<string, unknown>)
+      : null;
+  const ma = s?.max_attempts;
+  const n = typeof ma === "number" && Number.isFinite(ma) ? ma : 0;
+  const attempts = n === 1 ? "1 attempt" : `${n} attempts`;
+  const critic =
+    s?.accumulate_critic === true ? "accumulate critic" : "this round's critic only";
+  const stale = s?.retire_stale === true ? "retire stale" : "keep stale";
+  return `${attempts} · ${critic} · ${stale}`;
+}
+
+function strategyIntervalParts(evoforge: unknown): {
+  rounds: number;
+  verified: number;
+  lo: number | null;
+  hi: number | null;
+} {
+  const evo =
+    evoforge && typeof evoforge === "object"
+      ? (evoforge as Record<string, unknown>)
+      : null;
+  const rounds =
+    typeof evo?.rounds === "number" && Number.isFinite(evo.rounds)
+      ? (evo.rounds as number)
+      : 0;
+  const verified =
+    typeof evo?.verified === "number" && Number.isFinite(evo.verified)
+      ? (evo.verified as number)
+      : 0;
+  let lo: number | null = null;
+  let hi: number | null = null;
+  const w = evo?.wilson95;
+  if (
+    Array.isArray(w) &&
+    w.length >= 2 &&
+    typeof w[0] === "number" &&
+    Number.isFinite(w[0]) &&
+    typeof w[1] === "number" &&
+    Number.isFinite(w[1])
+  ) {
+    lo = w[0] as number;
+    hi = w[1] as number;
+  }
+  return { rounds, verified, lo, hi };
+}
+
+/** Strategies panel view: promotability mirrors the server's Wilson-bound rule. */
+export function strategiesView(overview: StrategiesOverview | null | undefined): StrategiesView | null {
+  if (overview === null || overview === undefined) return null;
+  if (typeof overview !== "object") return null;
+  const o = overview as Record<string, unknown>;
+  const champRaw =
+    o.champion && typeof o.champion === "object"
+      ? (o.champion as Record<string, unknown>)
+      : null;
+  const championId =
+    typeof champRaw?.strategy_id === "string" ? (champRaw.strategy_id as string) : "";
+  const champion: StrategyChampionView = {
+    id: championId,
+    label: strategyLabel(
+      (champRaw?.strategy as StrategyConfig | null | undefined) ?? null,
+    ),
+  };
+  const rawCandidates = Array.isArray(o.candidates) ? o.candidates : [];
+  const parsed = rawCandidates.map((c) => {
+    const cand =
+      c && typeof c === "object" ? (c as Record<string, unknown>) : null;
+    const id = typeof cand?.strategy_id === "string" ? (cand.strategy_id as string) : "";
+    const label = strategyLabel(
+      (cand?.strategy as StrategyConfig | null | undefined) ?? null,
+    );
+    const runs =
+      typeof cand?.runs === "number" && Number.isFinite(cand.runs)
+        ? (cand.runs as number)
+        : 0;
+    const parts = strategyIntervalParts(cand?.evoforge);
+    const verified = `${parts.verified}/${parts.rounds}`;
+    const rate =
+      parts.rounds === 0 ? EM_DASH_PLACEHOLDER : `${Math.round((100 * parts.verified) / parts.rounds)}%`;
+    const interval =
+      parts.rounds === 0 || parts.lo === null || parts.hi === null
+        ? EM_DASH_PLACEHOLDER
+        : `${Math.round(parts.lo * 100)}–${Math.round(parts.hi * 100)}%`;
+    return {
+      id,
+      label,
+      isChampion: id !== "" && id === championId,
+      runs,
+      verified,
+      rate,
+      interval,
+      lo: parts.lo,
+      hi: parts.hi,
+      rounds: parts.rounds,
+    };
+  });
+  let championHi = 0;
+  for (const p of parsed) {
+    if (p.id !== "" && p.id === championId) {
+      if (p.rounds > 0 && p.hi !== null) championHi = p.hi;
+      else championHi = 0;
+      break;
+    }
+  }
+  const rows: StrategyRow[] = parsed.map((p) => ({
+    id: p.id,
+    label: p.label,
+    isChampion: p.isChampion,
+    runs: p.runs,
+    verified: p.verified,
+    rate: p.rate,
+    interval: p.interval,
+    promotable: !p.isChampion && p.rounds > 0 && p.lo !== null && p.lo > championHi,
+  }));
+  rows.sort((a, b) => {
+    if (a.isChampion === b.isChampion) return 0;
+    return a.isChampion ? -1 : 1;
+  });
+  const rawDecisions = Array.isArray(o.decisions) ? o.decisions : [];
+  const decisions: StrategyDecisionView[] = rawDecisions.map((d) => {
+    const dec = d && typeof d === "object" ? (d as Record<string, unknown>) : null;
+    return {
+      promoted: typeof dec?.promoted === "string" ? (dec.promoted as string) : "",
+      previous: typeof dec?.previous === "string" ? (dec.previous as string) : "",
+    };
+  });
+  return { champion, rows, decisions };
+}
