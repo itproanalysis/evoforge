@@ -1,0 +1,56 @@
+{
+  "family": "chat_dropout",
+  "suite_version": "v5",
+  "tasks": [
+    {
+      "id": "SV5-CD-01",
+      "goal": "In reassemble.py, reassemble(chunks) rebuilds chat messages delivered in chunks that may arrive out of order, repeated or not at all. Each chunk is {msg_id, seq (0-based), total, data}. Return a dict keyed by msg_id in order of first appearance. A message whose chunks 0..total-1 are all present is {\"status\": \"complete\", \"text\": data joined in seq order, \"missing\": []}; otherwise {\"status\": \"incomplete\", \"text\": None, \"missing\": sorted missing seqs}. A repeated seq with identical data is ignored; a repeated seq with different data makes the message {\"status\": \"conflict\", \"text\": None, \"missing\": sorted missing seqs, \"conflict_seq\": sorted conflicting seqs} (conflict wins over incomplete). A chunk whose total differs from the message's first chunk, or whose seq is not an int in 0..total-1, raises ValueError.",
+      "files": {
+        "reassemble.py": "def reassemble(chunks):\n    out = {}\n    for c in chunks:\n        out.setdefault(c[\"msg_id\"], []).append(c[\"data\"])\n    return {k: {\"status\": \"complete\", \"text\": \"\".join(v), \"missing\": []} for k, v in out.items()}\n"
+      },
+      "reference_fix": "--- a/reassemble.py\n+++ b/reassemble.py\n@@ -1,5 +1,24 @@\n def reassemble(chunks):\n+    msgs = {}\n+    for c in chunks:\n+        mid, seq, total, data = c[\"msg_id\"], c[\"seq\"], c[\"total\"], c[\"data\"]\n+        m = msgs.setdefault(mid, {\"total\": total, \"parts\": {}, \"conflicts\": set()})\n+        if total != m[\"total\"]:\n+            raise ValueError(f\"inconsistent total for {mid!r}\")\n+        if not isinstance(seq, int) or not 0 <= seq < total:\n+            raise ValueError(f\"seq out of range for {mid!r}: {seq!r}\")\n+        if seq in m[\"parts\"] and m[\"parts\"][seq] != data:\n+            m[\"conflicts\"].add(seq)\n+        m[\"parts\"].setdefault(seq, data)\n     out = {}\n-    for c in chunks:\n-        out.setdefault(c[\"msg_id\"], []).append(c[\"data\"])\n-    return {k: {\"status\": \"complete\", \"text\": \"\".join(v), \"missing\": []} for k, v in out.items()}\n+    for mid, m in msgs.items():\n+        missing = [i for i in range(m[\"total\"]) if i not in m[\"parts\"]]\n+        if m[\"conflicts\"]:\n+            out[mid] = {\"status\": \"conflict\", \"text\": None, \"missing\": missing,\n+                        \"conflict_seq\": sorted(m[\"conflicts\"])}\n+        elif missing:\n+            out[mid] = {\"status\": \"incomplete\", \"text\": None, \"missing\": missing}\n+        else:\n+            out[mid] = {\"status\": \"complete\", \"text\": \"\".join(m[\"parts\"][i] for i in range(m[\"total\"])),\n+                        \"missing\": []}\n+    return out\n",
+      "heldout": [
+        {
+          "id": "SV5-CD-01-C",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport reassemble\n\n\ndef test_sv5cd01_compositional():\n    c = lambda m, s, t, d: {'msg_id': m, 'seq': s, 'total': t, 'data': d}\n    r = reassemble.reassemble([c('b', 1, 2, 'lo'), c('a', 2, 3, '!'), c('a', 0, 3, 'he'), c('b', 0, 2, 'hel'), c('a', 1, 3, 'y')])\n    assert list(r) == ['b', 'a']\n    assert r['a'] == {'status': 'complete', 'text': 'hey!', 'missing': []} and r['b']['text'] == 'hello'\n"
+        },
+        {
+          "id": "SV5-CD-01-N",
+          "kind": "negative",
+          "code": "import pytest\n\nimport reassemble\n\n\ndef test_sv5cd01_negative():\n    c = lambda m, s, t, d: {'msg_id': m, 'seq': s, 'total': t, 'data': d}\n    r = reassemble.reassemble([c('a', 0, 3, 'x'), c('a', 0, 3, 'y'), c('a', 2, 3, 'z')])\n    assert r['a'] == {'status': 'conflict', 'text': None, 'missing': [1], 'conflict_seq': [0]}\n    for bad in ([c('a', 0, 2, 'x'), c('a', 1, 3, 'y')], [c('a', 2, 2, 'x')], [c('a', -1, 2, 'x')], [c('a', '0', 2, 'x')]):\n        with pytest.raises(ValueError):\n            reassemble.reassemble(bad)\n"
+        },
+        {
+          "id": "SV5-CD-01-B",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport reassemble\n\n\ndef test_sv5cd01_boundary():\n    c = lambda m, s, t, d: {'msg_id': m, 'seq': s, 'total': t, 'data': d}\n    r = reassemble.reassemble([c('a', 3, 5, 'd'), c('a', 0, 5, 'a'), c('a', 0, 5, 'a')])\n    assert r['a'] == {'status': 'incomplete', 'text': None, 'missing': [1, 2, 4]}\n    assert reassemble.reassemble([c('s', 0, 1, '')]) == {'s': {'status': 'complete', 'text': '', 'missing': []}}\n    assert reassemble.reassemble([]) == {}\n"
+        }
+      ]
+    },
+    {
+      "id": "SV5-CD-02",
+      "goal": "In retry.py, schedule(attempts, base=1.0, factor=2.0, cap=30.0, jitter=0.0, seed=0, retry_after=None, budget=None) returns the list of waits (seconds) before each retry. attempts must be an int >= 0; base > 0, factor >= 1, cap > 0 and 0 <= jitter <= 1, else ValueError. Wait i (0-based) = min(cap, base * factor**i). With jitter > 0, advance a deterministic generator state = (1103515245 * state + 12345) % 2**31 starting from state = seed & 0xFFFFFFFF, and scale the wait by (1 - jitter + 2 * jitter * (state / 2**31)), then cap it again. retry_after (a server hint, >= 0 else ValueError) raises only the FIRST wait to at least that value, even above the cap. Each wait is rounded to 3 decimals. With budget set, stop before the first wait that would make the sum of waits exceed the budget.",
+      "files": {
+        "retry.py": "def schedule(attempts, base=1.0):\n    return [base * 2 ** i for i in range(attempts)]\n"
+      },
+      "reference_fix": "--- a/retry.py\n+++ b/retry.py\n@@ -1,2 +1,24 @@\n-def schedule(attempts, base=1.0):\n-    return [base * 2 ** i for i in range(attempts)]\n+def schedule(attempts, base=1.0, factor=2.0, cap=30.0, jitter=0.0, seed=0, retry_after=None, budget=None):\n+    if not isinstance(attempts, int) or attempts < 0:\n+        raise ValueError(\"attempts must be a non-negative int\")\n+    if base <= 0 or factor < 1 or cap <= 0 or not 0 <= jitter <= 1:\n+        raise ValueError(\"bad backoff parameters\")\n+    state = seed & 0xFFFFFFFF\n+    out = []\n+    spent = 0.0\n+    for i in range(attempts):\n+        delay = min(cap, base * factor ** i)\n+        if jitter:\n+            state = (1103515245 * state + 12345) % 2 ** 31\n+            delay = delay * (1 - jitter + 2 * jitter * (state / 2 ** 31))\n+            delay = min(cap, delay)\n+        if i == 0 and retry_after is not None:\n+            if retry_after < 0:\n+                raise ValueError(\"retry_after must be >= 0\")\n+            delay = max(delay, float(retry_after))\n+        delay = round(delay, 3)\n+        if budget is not None and spent + delay > budget:\n+            break\n+        spent += delay\n+        out.append(delay)\n+    return out\n",
+      "heldout": [
+        {
+          "id": "SV5-CD-02-C",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport retry\n\n\ndef test_sv5cd02_compositional():\n    assert retry.schedule(6, base=1, cap=10) == [1.0, 2.0, 4.0, 8.0, 10.0, 10.0]\n    assert retry.schedule(4, base=0.5, factor=3, cap=100, retry_after=7) == [7.0, 1.5, 4.5, 13.5]\n    assert retry.schedule(5, base=1, budget=10) == [1.0, 2.0, 4.0]\n"
+        },
+        {
+          "id": "SV5-CD-02-N",
+          "kind": "negative",
+          "code": "import pytest\n\nimport retry\n\n\ndef test_sv5cd02_negative():\n    for kw in ({'attempts': -1}, {'attempts': 2, 'base': 0}, {'attempts': 2, 'factor': 0.5}, {'attempts': 2, 'jitter': 1.5}, {'attempts': 2, 'retry_after': -1}, {'attempts': 1.5}):\n        with pytest.raises(ValueError):\n            retry.schedule(**kw)\n    assert retry.schedule(0) == []\n"
+        },
+        {
+          "id": "SV5-CD-02-B",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport retry\n\n\ndef test_sv5cd02_boundary():\n    a = retry.schedule(3, base=2, cap=5, jitter=0.5, seed=42)\n    assert a == retry.schedule(3, base=2, cap=5, jitter=0.5, seed=42) and a != retry.schedule(3, base=2, cap=5, jitter=0.5, seed=7)\n    assert all(1.0 <= w <= 5.0 for w in a) and a == [round(w, 3) for w in a]\n    assert retry.schedule(2, base=1, cap=3, retry_after=60) == [60.0, 2.0] and retry.schedule(3, budget=0) == []\n"
+        }
+      ]
+    }
+  ]
+}

@@ -43,7 +43,7 @@ DISCLOSURE_CRITIC = ("The EvoForge lane gets no held-out signal; it retries usin
                      "and reported costs cover only model API usage, not Runner compute.")
 
 KIND = "arena"
-SUITE_VERSIONS = ("v1", "v2", "v3", "v4")
+SUITE_VERSIONS = ("v1", "v2", "v3", "v4", "v5")
 BASELINE_MODEL = "muse-spark-1.3"
 LIST_LIMIT = 20
 PREVIEW_TIMEOUT_S = 10

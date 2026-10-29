@@ -43,7 +43,7 @@ from evoforge import runner_client as _runner_client  # noqa: E402
 
 SUITE_VERSION = "v0"  # default suite
 # v1 keeps v0 held-out tests, files and reference fixes unchanged; only the goals state the contract.
-SUITE_VERSIONS = ("v0", "v1", "v2", "v3", "v4")
+SUITE_VERSIONS = ("v0", "v1", "v2", "v3", "v4", "v5")
 BASELINE_MODEL = "muse-spark-1.3"
 BASELINE_COST_CENTS = 120
 ALLOWED_KINDS = frozenset({"compositional", "negative", "boundary"})
