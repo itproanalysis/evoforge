@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   API_BASE,
+  type ArenaDoc,
   type DashboardSnapshot,
   type LedgerSnapshot,
   type MissionDetail,
@@ -10,12 +11,14 @@ import {
   type MissionSummary,
   type Outcome,
   type PerformanceSnapshot,
+  getArena,
   getDashboard,
   getEvidence,
   getLedger,
   getMission,
   getPerformance,
   getParticipants,
+  listArenas,
   listMissions,
   listOutcomes,
   postMission,
@@ -29,6 +32,16 @@ import { FeedbackPanel } from "../../components/FeedbackPanel";
 import { Error as ErrorComponent } from "../../components/ui/Error";
 import { getErrorMessageKey } from "../../lib/apiErrors";
 import { comparisonProvenance, provenance, viewProvenance } from "../../lib/performanceProvenance";
+import {
+  arenaAgentPanel,
+  arenaVerdict,
+  canFollowUp,
+  laneView,
+  previewView,
+  promptArenaView,
+} from "../../lib/arenaStatus";
+import { PromptBar } from "../../components/PromptBar";
+import { SandboxedPreview } from "../../components/SandboxedPreview";
 
 const TERMINAL: MissionState[] = ["PR_OPENED", "CANCELLED", "FAILED"];
 const CHAIN: MissionState[] = ["GENERATED", "REVIEWED", "RAN", "PR_OPENED"];
@@ -48,10 +61,21 @@ function formatRate(rate: number | null | undefined): string {
   return typeof rate === "number" && Number.isFinite(rate) ? `${round1(rate * 100)}%` : "—";
 }
 
+const WS_SIDES: ("evoforge" | "single")[] = ["evoforge", "single"];
+
+function pickWorkspaceArena(list: ArenaDoc[]): ArenaDoc | null {
+  if (list.length === 0) return null;
+  const sorted = [...list].sort(
+    (a, b) => (b.created_at ?? 0) - (a.created_at ?? 0),
+  );
+  return sorted.find((a) => a.mode === "prompt") ?? sorted[0];
+}
+
 export default function MissionControl() {
   const t = useTranslations("mission-control");
   const tErrors = useTranslations("errors");
   const tCommon = useTranslations("common");
+  const tWorkspace = useTranslations("workspace");
 
   const [goal, setGoal] = useState("");
   const [repoRef, setRepoRef] = useState("HEAD");
@@ -75,6 +99,9 @@ export default function MissionControl() {
   const [ledger, setLedger] = useState<LedgerSnapshot | null>(null);
   const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
   const [participants, setParticipants] = useState<Awaited<ReturnType<typeof getParticipants>> | null>(null);
+  const [workspaceArena, setWorkspaceArena] = useState<ArenaDoc | null>(null);
+  const [arenaPendingId, setArenaPendingId] = useState<string | null>(null);
+  const [arenaPollError, setArenaPollError] = useState(false);
   const stopRef = useRef(false);
   const selectedIdRef = useRef<string | null>(null);
   const refreshingRef = useRef(false);
@@ -176,6 +203,55 @@ export default function MissionControl() {
       } catch {}
     };
   }, [autoPoll]);
+
+  // Home workspace: latest arena (GET /v1/arena newest first; prefer a prompt
+  // arena). After a PromptBar start, show the new arena here and poll it.
+  useEffect(() => {
+    let cancelled = false;
+    void listArenas()
+      .then((res) => {
+        if (cancelled) return;
+        const list = res && Array.isArray(res.arenas) ? res.arenas : [];
+        setWorkspaceArena((cur) => cur ?? pickWorkspaceArena(list));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const wsTrackedId =
+    arenaPendingId ??
+    (workspaceArena?.status === "running" ? workspaceArena.arena_id : null);
+
+  useEffect(() => {
+    if (!wsTrackedId || arenaPollError) return;
+    let active = true;
+    let inFlight = false;
+    const poll = async () => {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const doc = await getArena(wsTrackedId);
+        if (!active) return;
+        if (doc.arena_id !== wsTrackedId) throw new Error("arena id mismatch");
+        setWorkspaceArena(doc);
+        setArenaPendingId(null);
+      } catch {
+        if (active) setArenaPollError(true);
+      } finally {
+        inFlight = false;
+      }
+    };
+    void poll();
+    const id = setInterval(() => {
+      void poll();
+    }, 1500);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [wsTrackedId, arenaPollError]);
 
   const fmtCents = (n: number | null | undefined) =>
     typeof n === "number" ? `${n}¢` : "—";
@@ -302,8 +378,212 @@ export default function MissionControl() {
   const active = mission && !TERMINAL.includes(mission.state);
   const currentStepIdx = mission ? PIPELINE_STEPS.indexOf(mission.state) : -1;
 
+  const evoWsLane = workspaceArena?.lanes?.evoforge;
+  const singleWsLane = workspaceArena?.lanes?.single;
+  const evoWsView = laneView(evoWsLane);
+  const singleWsView = laneView(singleWsLane);
+  const evoWsPreview = previewView(evoWsLane);
+  const singleWsPreview = previewView(singleWsLane);
+  const wsVerdict = arenaVerdict(workspaceArena);
+  const wsPromptView = promptArenaView(workspaceArena);
+  const wsPrompt =
+    wsPromptView?.prompt || workspaceArena?.prompt || workspaceArena?.goal || "";
+  const wsFollowUp = canFollowUp(workspaceArena) ? workspaceArena : null;
+  const wsRunning =
+    arenaPendingId !== null || workspaceArena?.status === "running";
+
   return (
-    <main>
+    <main className="pb-40">
+      {/* Home workspace: AI status left (~1/3), implementation right (~2/3).
+          Mobile (<768px): grid stacks AI status above the implementation;
+          the PromptBar stays fixed at the bottom. */}
+      <section aria-label={tWorkspace("heading")} className="mt-2">
+        <h1 className="my-1 text-2xl font-bold">{tWorkspace("heading")}</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
+          <div className="md:col-span-1 space-y-3">
+            <h2 className="text-base font-semibold m-0">
+              {tWorkspace("ai-status-heading")}
+            </h2>
+            {!workspaceArena ? (
+              <p className="text-sm text-text-secondary">
+                {arenaPendingId
+                  ? `${tWorkspace("running")} ${arenaPendingId}`
+                  : tWorkspace("empty")}
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
+                  {WS_SIDES.map((side) => {
+                    const rows = arenaAgentPanel(workspaceArena, side);
+                    const label =
+                      side === "evoforge"
+                        ? tWorkspace("evoforge")
+                        : tWorkspace("single");
+                    return (
+                      <div
+                        key={side}
+                        className="p-3 rounded-lg border border-border bg-background-secondary"
+                        data-side={side}
+                      >
+                        <strong className="text-sm">{label}</strong>
+                        <ul className="mt-2 space-y-1.5">
+                          {rows.map((row) => (
+                            <li
+                              key={row.role}
+                              className="flex items-start gap-2 text-xs"
+                            >
+                              <span
+                                className={`state-dot state-dot-${row.state}`}
+                                title={row.state}
+                                style={{
+                                  background:
+                                    row.state === "active"
+                                      ? "#34d399"
+                                      : row.state === "done"
+                                      ? "#94a3b8"
+                                      : "#64748b",
+                                  width: 8,
+                                  height: 8,
+                                  borderRadius: 9999,
+                                  display: "inline-block",
+                                  marginTop: 3,
+                                  flexShrink: 0,
+                                }}
+                              />
+                              <span className="font-mono font-semibold w-14 flex-shrink-0">
+                                {row.role}
+                              </span>
+                              <span className="text-text-secondary">
+                                {row.state}
+                              </span>
+                              <span className="text-text-primary break-words">
+                                {row.message ?? "—"}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    );
+                  })}
+                </div>
+                <Card className="bg-background-secondary border border-border p-3">
+                  <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
+                    {tWorkspace("prompt-heading")}
+                  </span>
+                  <p className="text-sm font-medium text-text-primary mt-1 whitespace-pre-wrap">
+                    {wsPrompt || tWorkspace("no-prompt")}
+                  </p>
+                  <p className="mt-2 text-xs text-text-secondary">
+                    {tWorkspace("verdict-label")}:{" "}
+                    {wsVerdict
+                      ? `${wsVerdict.winner} — ${wsVerdict.reason}`
+                      : workspaceArena.status === "running"
+                      ? tWorkspace("running")
+                      : workspaceArena.verdict?.winner ?? "—"}
+                  </p>
+                </Card>
+              </>
+            )}
+          </div>
+          <div className="md:col-span-2 space-y-3">
+            <h2 className="text-base font-semibold m-0">
+              {tWorkspace("implementation-heading")}
+            </h2>
+            {!workspaceArena ? (
+              <p className="text-sm text-text-secondary">
+                {tWorkspace("empty")}
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {(
+                    [
+                      {
+                        side: "evoforge" as const,
+                        label: tWorkspace("evoforge"),
+                        view: evoWsView,
+                        preview: evoWsPreview,
+                      },
+                      {
+                        side: "single" as const,
+                        label: tWorkspace("single"),
+                        view: singleWsView,
+                        preview: singleWsPreview,
+                      },
+                    ]
+                  ).map((lane) => (
+                    <Card
+                      key={lane.side}
+                      className="bg-background-secondary border border-border p-3 space-y-2"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <strong>{lane.label}</strong>
+                        <span className="font-mono text-text-secondary">
+                          {tWorkspace("scores-label")}:{" "}
+                          {lane.view.score ?? "—"}
+                        </span>
+                      </div>
+                      {lane.preview.html ? (
+                        <SandboxedPreview
+                          html={lane.preview.html}
+                          title={`workspace-${workspaceArena.arena_id}-${lane.side}`}
+                        />
+                      ) : (
+                        <p className="text-xs text-text-tertiary">
+                          {lane.preview.source === "pending"
+                            ? tWorkspace("running")
+                            : tWorkspace("no-prompt")}
+                        </p>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  <a
+                    href="/arena"
+                    className="text-accent-cyan hover:underline"
+                  >
+                    {tWorkspace("view-arena")}
+                  </a>
+                  <a
+                    href="/replay"
+                    className="text-accent-cyan hover:underline"
+                  >
+                    {tWorkspace("view-replay")}
+                  </a>
+                </div>
+              </>
+            )}
+            {arenaPollError && wsTrackedId && (
+              <p role="alert" className="text-xs text-accent-amber">
+                {tWorkspace("running")}{" "}
+                <button
+                  type="button"
+                  onClick={() => setArenaPollError(false)}
+                  className="underline bg-transparent border-0 cursor-pointer p-0 text-xs"
+                >
+                  {t("refresh-now")}
+                </button>
+              </p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <PromptBar
+        disabled={wsRunning}
+        followUpArena={wsFollowUp}
+        onStarted={(id) => {
+          setArenaPendingId(id);
+          setArenaPollError(false);
+        }}
+      />
+
+      <details className="mt-8" data-testid="mission-control-details">
+        <summary className="cursor-pointer text-sm font-semibold text-text-primary">
+          {tWorkspace("mission-control-toggle")}
+        </summary>
+        <div className="mt-3">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="my-1 text-2xl font-bold">{t("heading")}</h1>
@@ -871,6 +1151,8 @@ export default function MissionControl() {
           )}
         </div>
       </Card>
+        </div>
+      </details>
     </main>
   );
 }
