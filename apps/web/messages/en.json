@@ -176,7 +176,9 @@
     "intro": "Compare EvoForge with a single AI call on what you ask for: both use the same Meta model, and hidden tests the judge wrote beforehand decide which result is better.",
     "intro-step-1": "You type what you want built.",
     "intro-step-2": "The same model builds it twice: once as a single AI call, once as EvoForge, where a Critic writes tests and the Builder retries against them.",
-    "intro-step-3": "Hidden acceptance tests pick the better result, with each side's cost shown."
+    "intro-step-3": "Hidden acceptance tests pick the better result, with each side's cost shown.",
+    "scoreboard-heading": "Measured Arena results",
+    "scoreboard-empty": "No scored Arena matches yet. Run a match and the measured results will appear here."
   },
   "lab": {
     "heading": "Improvement Lab",
