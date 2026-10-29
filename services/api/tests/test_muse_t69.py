@@ -11,6 +11,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
+import pytest
+
 WEB = Path(__file__).resolve().parents[3] / "apps" / "web"
 
 DRIVER = """import { arenaAgentPanel } from "./arenaStatus.ts";
@@ -50,7 +52,8 @@ console.log(JSON.stringify({
 
 def _run_driver(tmp_path: Path):
     node = shutil.which("node")
-    assert node is not None, "node is required"
+    if node is None:
+        pytest.skip("node required (the Cloud Build test image has none; CI web job runs it)")
     for name in ("arenaStatus.ts", "api.ts"):
         shutil.copy(WEB / "lib" / name, tmp_path / name)
     text = (tmp_path / "arenaStatus.ts").read_text(encoding="utf-8")
