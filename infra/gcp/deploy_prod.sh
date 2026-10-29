@@ -46,7 +46,7 @@ echo "== api: private; only the web SA may invoke; Meta key + GitHub token from 
   --service-account "$(SA api)" --no-allow-unauthenticated --port 8080 \
   --cpu 1 --memory 1Gi --min-instances 1 --max-instances 1 --timeout 900 --no-cpu-throttling \
   --set-secrets "MODEL_API_KEY=MODEL_API_KEY:latest,GITHUB_TOKEN=GITHUB_TOKEN:latest,EVO_PROOF_SIGNING_KEY=EVO_PROOF_SIGNING_KEY:latest${STATE_SECRETS}" \
-  --set-env-vars "^|^MODEL_API_BASE=https://api.meta.ai/v1|MODEL_BUILDER=muse-spark-1.3|MODEL_CRITIC=muse-spark-1.3|GITHUB_REPO=${GITHUB_REPO}|EVO_REQUIRE_ID_TOKEN=1|EVO_API_URL=${API_URL}|EVO_WEB_SERVICE_ACCOUNT=$(SA web)|EVO_RUNNER_URL=${RUNNER_URL}|EVO_RUNNER_AUDIENCE=${RUNNER_URL}|EVO_ALLOW_LOCAL_REPOS=0|EVO_WEB_ORIGINS=|EVO_PUBLIC_WEB_URL=${WEB_URL}${STATE_ENV}" \
+  --set-env-vars "^|^MODEL_API_BASE=https://api.meta.ai/v1|MODEL_BUILDER=muse-spark-1.3|MODEL_CRITIC=muse-spark-1.3|MODEL_MAX_TOKENS=${MODEL_MAX_TOKENS:-32000}|GITHUB_REPO=${GITHUB_REPO}|EVO_REQUIRE_ID_TOKEN=1|EVO_API_URL=${API_URL}|EVO_WEB_SERVICE_ACCOUNT=$(SA web)|EVO_RUNNER_URL=${RUNNER_URL}|EVO_RUNNER_AUDIENCE=${RUNNER_URL}|EVO_ALLOW_LOCAL_REPOS=0|EVO_WEB_ORIGINS=|EVO_PUBLIC_WEB_URL=${WEB_URL}${STATE_ENV}" \
   --quiet
 
 echo "== web: public origin, owner-only without login (EVO_WEB_AUTH=none, POST rate limit); calls the API server-side with its ID token"

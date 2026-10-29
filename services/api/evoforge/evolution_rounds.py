@@ -290,6 +290,12 @@ def _short_error(exc: BaseException) -> str:
     return " ".join(str(msg).split())[:300]
 
 
+
+def _why_empty(out) -> str:
+    """Builder's own short reason for an empty candidate (e.g. truncated output), safe to show."""
+    why = out.get("rationale") if isinstance(out, dict) else None
+    return f" ({' '.join(why.split())[:120]})" if isinstance(why, str) and why.strip() else ""
+
 def _emit(events: list[dict], role: str, message: str) -> None:
     events.append({"seq": len(events) + 1, "ts": time.time(),
                    "role": role, "message": str(message)[:300]})
@@ -668,7 +674,7 @@ def _run_single_round(app_round: dict, cumulative: list[dict],
         _emit(events, "builder", f"single: Builder returned a {len(diff)}-char diff")
         if _sealed._is_empty_diff(diff):
             applied = False
-            _emit(events, "runner", "single: empty diff, scoring current files")
+            _emit(events, "runner", f"single: empty diff{_why_empty(out)}, scoring current files")
         else:
             nxt, ok = _apply_diff_to_files(lane_files, diff, recount=False)
             if ok and nxt is not None:
@@ -788,7 +794,7 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
             cand = out.get("diff") if isinstance(out, dict) else ""
             cand = cand if isinstance(cand, str) else ""
             if _sealed._is_empty_diff(cand):
-                _emit(events, "runner", f"evoforge: attempt {attempts} empty diff")
+                _emit(events, "runner", f"evoforge: attempt {attempts} empty diff{_why_empty(out)}")
                 if feedback == "critic":
                     goal_attempt = _sealed._critic_empty_feedback(goal)
                 else:
