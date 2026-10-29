@@ -41,7 +41,6 @@ export default async function LocaleLayout({
   const tLayout = await getTranslations('layout');
   const prefix = locale === 'en' ? '' : `/${locale}`;
 
-
   return (
     <html lang={locale}>
       <body className="m-0 font-sans bg-background-primary text-text-primary">

@@ -34,7 +34,7 @@ export function FeatureRail() {
   const ts = useTranslations('studio');
   const pathname = usePathname() ?? '';
   const [open, setOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(() => MORE_ITEMS.some(({ path }) => stripLocalePrefix(pathname) === path));
   const menuButton = useRef<HTMLButtonElement>(null);
   const drawer = useRef<HTMLDivElement>(null);
   useEffect(() => {
