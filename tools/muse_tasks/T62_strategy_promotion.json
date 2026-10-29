@@ -1,0 +1,21 @@
+{
+  "id": "T62_strategy_promotion",
+  "planned_by": "Claude (Critic): v3.8 §5 EvoCore",
+  "goal": "T62 — EvoCore strategy promotion (v3.8 §5: Route -> Verify -> Evolve -> Promote; product line \"AI that evolves how AI\nbuilds\"). In services/api/evoforge/evolution_rounds.py + services/api/main.py:\n1. Strategy = {\"max_attempts\": int 1..3, \"accumulate_critic\": bool, \"retire_stale\": bool} (exactly these keys; anything\n   else, missing keys or wrong types -> 422). DEFAULT = {max_attempts: 3, accumulate_critic: true, retire_stale: true}\n   (today's behaviour). strategy_id = \"st_\" + first 10 hex chars of sha256(json.dumps(strategy, sort_keys=True,\n   separators=(\",\", \":\"))).\n2. POST /v1/evolution/runs accepts optional \"strategy\". Omitted -> the current champion strategy. The EvoForge lane\n   uses it: max_attempts caps attempts per round; accumulate_critic false = T53 off (only this round's Critic tests);\n   retire_stale false = T57 off. The run document stores \"strategy\" and \"strategy_id\"; manifest gets strategy_id and\n   strategy. Runs stored without a strategy count as DEFAULT.\n3. GET /v1/evolution/strategies -> {champion: {strategy_id, strategy, since}, candidates: [{strategy_id, strategy, runs,\n   evoforge: {rounds, verified, wilson95}}] (finished runs only, EvoForge side, same counting and Wilson helper as\n   /v1/evolution/stats), decisions: [...] oldest first}. With no decision the champion is DEFAULT.\n4. POST /v1/evolution/strategies/promote {strategy_id}: unknown id (no finished run used it) -> 404; promote only when\n   the candidate's EvoForge wilson95 lower bound > the champion's upper bound (champion with no rounds counts as\n   [0, 0]); otherwise 409 with a reason that says the intervals overlap. On success store a decision {promoted,\n   previous, candidate_interval, champion_interval, at} in the evidence store (kind \"strategy_decision\", survives\n   redeploys) and make it the champion for new runs. Promoting the champion itself -> 409.\n5. evolution_rounds.clear() also resets the champion and decisions (tests rely on it).\n6. Proxy: allow GET /v1/evolution/strategies and POST /v1/evolution/strategies/promote (proxyPolicy.ts + cases).\nNothing else changes. Tests: services/api/tests/test_muse_t62.py.",
+  "edit": [
+    "services/api/evoforge/evolution_rounds.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t62.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "docs/V38_EVOLUTION_ARENA_PLAN.md",
+    "services/api/tests/test_critic_t55_evolution_stats.py",
+    "services/api/tests/test_critic_t57_stale_critic_retire.py",
+    "services/api/evoforge/decisions.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t62.py services/api/tests/test_sealed_t62_strategy_promotion.py services/api/tests/test_critic_t51_evolution_rounds.py services/api/tests/test_critic_t53_cumulative_critic.py services/api/tests/test_critic_t55_evolution_stats.py services/api/tests/test_critic_t57_stale_critic_retire.py services/api/tests/test_critic_t60_single_tolerant_apply.py -q -p no:cacheprovider"
+  ]
+}
