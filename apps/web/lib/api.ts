@@ -822,3 +822,27 @@ export async function startEvolutionRun(
   }
   return { status: r.status, body };
 }
+
+export type EvolutionStatsComparison = "evoforge_better" | "single_better" | "not_significant";
+
+export interface EvolutionStatsSide {
+  rounds: number;
+  verified: number;
+  wilson95: [number, number];
+  cost_cents: number;
+  cost_per_verified_cents: number | null;
+  [key: string]: unknown;
+}
+
+export interface EvolutionStatsResponse {
+  runs: number;
+  comparison: EvolutionStatsComparison;
+  method: string;
+  by_side: { evoforge: EvolutionStatsSide; single: EvolutionStatsSide };
+  [key: string]: unknown;
+}
+
+export function getEvolutionStats(feedback?: string) {
+  const q = feedback ? `?feedback=${encodeURIComponent(feedback)}` : "";
+  return req<EvolutionStatsResponse>(`/v1/evolution/stats${q}`);
+}

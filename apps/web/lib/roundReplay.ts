@@ -339,3 +339,90 @@ export function commandState(
   if (runStatus === "failed") return { state: "FAILED", reason: null };
   return { state: "QUEUED", reason: null };
 }
+
+export type EvolutionStatsComparison = "evoforge_better" | "single_better" | "not_significant";
+
+export interface EvolutionStatsSide {
+  rounds: number;
+  verified: number;
+  wilson95: [number, number];
+  cost_cents: number;
+  cost_per_verified_cents: number | null;
+}
+
+export interface EvolutionStats {
+  runs: number;
+  comparison: EvolutionStatsComparison;
+  method: string;
+  by_side: Record<ReplaySideKey, EvolutionStatsSide>;
+}
+
+export interface StatsSideView {
+  verified: string;
+  rate: string;
+  interval: string;
+  costPerVerified: string;
+}
+
+export interface StatsView {
+  runs: number;
+  verdict: string;
+  evoforge: StatsSideView;
+  single: StatsSideView;
+}
+
+const EM_DASH_PLACEHOLDER = "—";
+
+function statsSideView(side: EvolutionStatsSide | null | undefined): StatsSideView {
+  const raw = (side && typeof side === "object" ? side : null) as {
+    rounds?: unknown;
+    verified?: unknown;
+    wilson95?: unknown;
+    cost_per_verified_cents?: unknown;
+  } | null;
+  const n = typeof raw?.rounds === "number" && Number.isFinite(raw.rounds) ? raw.rounds : 0;
+  const k = typeof raw?.verified === "number" && Number.isFinite(raw.verified) ? raw.verified : 0;
+  const verified = `${k}/${n}`;
+  const rate = n === 0 ? EM_DASH_PLACEHOLDER : `${Math.round((100 * k) / n)}%`;
+  let interval = EM_DASH_PLACEHOLDER;
+  if (n !== 0) {
+    const w = raw?.wilson95;
+    if (
+      Array.isArray(w) &&
+      w.length >= 2 &&
+      typeof w[0] === "number" &&
+      Number.isFinite(w[0]) &&
+      typeof w[1] === "number" &&
+      Number.isFinite(w[1])
+    ) {
+      interval = `${Math.round((w[0] as number) * 100)}–${Math.round((w[1] as number) * 100)}%`;
+    }
+  }
+  const cpv = raw?.cost_per_verified_cents;
+  const costPerVerified =
+    typeof cpv === "number" && Number.isFinite(cpv) ? `${cpv}¢` : EM_DASH_PLACEHOLDER;
+  return { verified, rate, interval, costPerVerified };
+}
+
+/** Stats panel view: verdict is the server's comparison, never computed here. */
+export function statsView(stats: EvolutionStats | null | undefined): StatsView | null {
+  if (stats === null || stats === undefined) return null;
+  if (typeof stats !== "object") return null;
+  const s = stats as {
+    runs?: unknown;
+    comparison?: unknown;
+    by_side?: unknown;
+  };
+  const runs = typeof s.runs === "number" && Number.isFinite(s.runs) ? s.runs : 0;
+  const verdict = typeof s.comparison === "string" ? s.comparison : "not_significant";
+  const bySide =
+    s.by_side && typeof s.by_side === "object"
+      ? (s.by_side as Record<string, EvolutionStatsSide | null | undefined>)
+      : null;
+  return {
+    runs,
+    verdict,
+    evoforge: statsSideView(bySide?.evoforge),
+    single: statsSideView(bySide?.single),
+  };
+}

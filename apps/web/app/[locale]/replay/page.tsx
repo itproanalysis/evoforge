@@ -11,6 +11,7 @@ import {
 import { RoundReplay } from "../../../components/RoundReplay";
 import { AgentPanel } from "../../../components/AgentPanel";
 import { CommandBar } from "../../../components/CommandBar";
+import { EvolutionStats } from "../../../components/EvolutionStats";
 
 export default function ReplayPage() {
   const t = useTranslations("replay");
@@ -86,6 +87,7 @@ export default function ReplayPage() {
     <div style={{ paddingBottom: 110 }}>
       <h1>{t("title")}</h1>
       {error && <p style={{ color: "#f87171" }}>{error}</p>}
+      <EvolutionStats />
       {runs.length === 0 ? (
         <p style={{ color: "#8b93a7" }}>{t("empty")}</p>
       ) : (

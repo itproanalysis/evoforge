@@ -486,6 +486,16 @@
     "feedback-critic": "Critic",
     "feedback-heldout": "Held-out",
     "command-label": "Command",
-    "operator-only": "Live runs are started by the operator; recorded runs are shown here."
+    "operator-only": "Live runs are started by the operator; recorded runs are shown here.",
+    "stats-title": "Evolution stats",
+    "stats-runs": "Runs: {count}",
+    "stats-not-significant": "No significant difference",
+    "stats-evoforge-better": "EvoForge better",
+    "stats-single-better": "Single AI better",
+    "stats-method": "Method",
+    "stats-verified": "Verified",
+    "stats-rate": "Rate",
+    "stats-interval": "95% interval",
+    "stats-cost-per-verified": "Cost per verified round"
   }
 }
