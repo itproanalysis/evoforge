@@ -166,7 +166,10 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
     model = endpoint["model"]
     provider = endpoint["provider"]
     client = openai.OpenAI(base_url=endpoint["base_url"],
-                           api_key=os.getenv("CRITIC_API_KEY") or os.environ["MODEL_API_KEY"],
+                           # A provider's key goes only to that provider: CRITIC_API_KEY never reaches the Meta
+                           # endpoint when CRITIC_API_BASE is unset.
+                           api_key=(os.environ["CRITIC_API_KEY"] if endpoint["second"]
+                                    else os.environ["MODEL_API_KEY"]),
                            max_retries=0)
     completed = []
 
