@@ -16,7 +16,21 @@ import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView
 import { SandboxedPreview } from "../../../components/SandboxedPreview";
 import { PromptBar } from "../../../components/PromptBar";
 
-const BENCHMARK_TASKS: Record<"v1" | "v2" | "v3" | "v4", { id: string; goal: string }[]> = {
+const BENCHMARK_TASKS: Record<"v1" | "v2" | "v3" | "v4" | "v5", { id: string; goal: string }[]> = {
+  v5: [
+    { id: "SV5-AO-01", goal: "In semver_range.py, check if a version satisfies an npm-style range" },
+    { id: "SV5-AO-02", goal: "In intervals.py, merge labelled half-open intervals by priority" },
+    { id: "SV5-CD-01", goal: "In reassemble.py, rebuild chat messages from out-of-order chunks" },
+    { id: "SV5-CD-02", goal: "In retry.py, compute backoff waits with cap, jitter and budget" },
+    { id: "SV5-CI-01", goal: "In shard_plan.py, split CI tests across shards with pinning" },
+    { id: "SV5-CI-02", goal: "In junit_merge.py, merge CI attempts into final suite results" },
+    { id: "SV5-PM-01", goal: "In tokens.py and calc.py, tokenize and evaluate expressions" },
+    { id: "SV5-PM-02", goal: "In money.py and invoice.py, price invoice lines with tax" },
+    { id: "SV5-SEC-01", goal: "In path_guard.py, join user paths safely under a root" },
+    { id: "SV5-SEC-02", goal: "In jwt_lite.py, verify HS256 JWTs and return payload" },
+    { id: "SV5-SS-01", goal: "In duration.py, parse and format durations like 1h30m" },
+    { id: "SV5-SS-02", goal: "In slugify.py, make URL slugs like cafe-au-lait" },
+  ],
   v2: [
     { id: "SV2-AO-01", goal: "In bsearch.py, bsearch(seq, target) returns index in sorted sequence, or -1" },
     { id: "SV2-AO-02", goal: "In qsort.py, quicksort in-place with 3-way partition" },
@@ -82,8 +96,8 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
 
 export default function ArenaPage() {
   const t = useTranslations("arena");
-  const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2" | "v3" | "v4">("v2");
-  const [selectedTaskId, setSelectedTaskId] = useState<string>("SV2-AO-01");
+  const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2" | "v3" | "v4" | "v5">("v5");
+  const [selectedTaskId, setSelectedTaskId] = useState<string>("SV5-AO-01");
   const [customTaskId, setCustomTaskId] = useState<string>("");
   const [feedback, setFeedback] = useState<"heldout" | "critic">("critic");
   const [starting, setStarting] = useState(false);
@@ -217,7 +231,7 @@ export default function ArenaPage() {
     setStarting(true);
     setActiveArena(null);
     try {
-      const res = await postArena(activeTaskId, suiteVersion, feedback);
+      const res = await postArena(activeTaskId, suiteVersion as "v1" | "v2" | "v3" | "v4", feedback);
       if (!res?.arena_id) throw new Error("missing arena id");
       setPendingId(res.arena_id);
     } catch (cause) {
@@ -270,13 +284,14 @@ export default function ArenaPage() {
             <select
               value={suiteVersion}
               onChange={(e) => {
-                const sv = e.target.value as "v1" | "v2" | "v3" | "v4";
+                const sv = e.target.value as "v1" | "v2" | "v3" | "v4" | "v5";
                 setSuiteVersion(sv);
                 setSelectedTaskId(BENCHMARK_TASKS[sv]?.[0]?.id || "");
               }}
               className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary flex-1 min-w-0 sm:flex-none"
               disabled={running}
             >
+              <option value="v5">Sealed v5 (12 hard tasks)</option>
               <option value="v4">Sealed v4 (12 tasks)</option>
               <option value="v3">Sealed v3 (48 tasks)</option>
               <option value="v2">Sealed v2 (36 tasks)</option>
