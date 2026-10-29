@@ -1111,5 +1111,22 @@
       "runs",
       "a:b"
     ]
+  },
+  {
+    "expected": "/v1/evolution/strategies",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "strategies"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/strategies/promote",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "strategies",
+      "promote"
+    ]
   }
 ]

@@ -20,6 +20,8 @@ const EXACT_ALLOW = new Set([
   "/v1/evolution/apps",
   "/v1/evolution/runs",
   "/v1/evolution/stats",
+  "/v1/evolution/strategies",
+  "/v1/evolution/strategies/promote",
   "/v1/proof/key",
   "/v1/leaderboard",
   "/v1/memory",
