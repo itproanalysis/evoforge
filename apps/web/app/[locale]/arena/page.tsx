@@ -231,7 +231,7 @@ export default function ArenaPage() {
     setStarting(true);
     setActiveArena(null);
     try {
-      const res = await postArena(activeTaskId, suiteVersion as "v1" | "v2" | "v3" | "v4", feedback);
+      const res = await postArena(activeTaskId, suiteVersion, feedback);
       if (!res?.arena_id) throw new Error("missing arena id");
       setPendingId(res.arena_id);
     } catch (cause) {
