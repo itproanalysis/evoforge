@@ -77,7 +77,8 @@ def test_run_candidate_pass_counts(monkeypatch, tmp_path):
     assert res["visible"]["pass"] == 1 and res["visible"]["n"] == 1
     assert res["visible"]["timed_out"] is False
     assert res["heldout"] == {"pass": 1, "n": 1, "timed_out": False,
-                              "exit_code": res["heldout"]["exit_code"]}
+                              "exit_code": res["heldout"]["exit_code"],
+                              "report_integrity": True}  # W22 cross-check (JUnit/summary/exit code agree)
     assert res["heldout_kinds"] == ["boundary"]
     assert "def test_h" not in str(res)
 
