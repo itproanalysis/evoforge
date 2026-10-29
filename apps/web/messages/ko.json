@@ -517,6 +517,13 @@
     "stats-cost-per-verified": "검증된 라운드당 비용",
     "load-failed": "기록을 불러오지 못했습니다.",
     "refresh-failed": "갱신에 실패해 마지막으로 확인한 결과를 표시합니다.",
-    "retry": "다시 불러오기"
+    "retry": "다시 불러오기",
+    "present": "프레젠트",
+    "next": "다음",
+    "previous": "이전",
+    "exit": "종료",
+    "summary": "요약",
+    "verified": "검증됨",
+    "comparison-mode": "비교 모드"
   }
 }

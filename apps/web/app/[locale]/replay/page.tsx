@@ -8,6 +8,7 @@ import {
   type EvolutionRunSummary,
 } from "../../../lib/api";
 import { RoundReplay } from "../../../components/RoundReplay";
+import { PresentationView } from "../../../components/PresentationView";
 import { watchReplaySelection, type ReplaySelection } from "../../../lib/replaySelection";
 import { AgentPanel } from "../../../components/AgentPanel";
 import { CommandBar } from "../../../components/CommandBar";
@@ -23,9 +24,30 @@ export default function ReplayPage() {
   const [listError, setListError] = useState(false);
   const [listAttempt, setListAttempt] = useState(0);
   const [loadAttempt, setLoadAttempt] = useState(0);
+  const [presentRunId, setPresentRunId] = useState<string | null>(null);
   // Hide the prior run immediately, even before the selection effect runs.
   const current = selection?.runId === selectedId ? selection : null;
   const selected = current?.status === "ready" ? current.run : null;
+
+  useEffect(() => {
+    const update = () => {
+      try {
+        const q = new URLSearchParams(window.location.search);
+        setPresentRunId(q.get("present") === "1" ? q.get("run") : null);
+      } catch {
+        setPresentRunId(null);
+      }
+    };
+    update();
+    window.addEventListener("popstate", update);
+    return () => window.removeEventListener("popstate", update);
+  }, []);
+
+  useEffect(() => {
+    if (presentRunId) {
+      setSelectedId((id) => (id === presentRunId ? id : presentRunId));
+    }
+  }, [presentRunId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,7 +59,17 @@ export default function ReplayPage() {
         if (cancelled) return;
         const list = Array.isArray(res.runs) ? res.runs : [];
         setRuns(list);
-        setSelectedId((id) => list.some((run) => run.run_id === id) ? id : list[0]?.run_id ?? null);
+        setSelectedId((id) => {
+          try {
+            const q = new URLSearchParams(window.location.search);
+            const pr = q.get("present") === "1" ? q.get("run") : null;
+            if (pr && list.some((run) => run.run_id === pr)) return pr;
+            if (pr && id === pr) return pr;
+          } catch {
+            /* ignore */
+          }
+          return list.some((run) => run.run_id === id) ? id : list[0]?.run_id ?? null;
+        });
       } catch {
         if (!cancelled) setListError(true);
       } finally {
@@ -62,6 +94,31 @@ export default function ReplayPage() {
     setSelectedId(runId);
     setListAttempt((n) => n + 1);
   };
+
+  const handlePresent = (runId: string) => {
+    const url = `?present=1&run=${encodeURIComponent(runId)}`;
+    window.history.pushState(null, "", url);
+    setPresentRunId(runId);
+    setSelectedId(runId);
+  };
+
+  const handleExitPresent = () => {
+    window.history.pushState(null, "", window.location.pathname);
+    setPresentRunId(null);
+  };
+
+  if (presentRunId) {
+    const presentRun = selected && selected.run_id === presentRunId ? selected : null;
+    return (
+      <div>
+        {presentRun ? (
+          <PresentationView run={presentRun} onExit={handleExitPresent} />
+        ) : (
+          <p role="status" style={{ color: "#8b93a7" }}>{tCommon("loading")}</p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -99,6 +156,9 @@ export default function ReplayPage() {
             </p>}
             {selected ? (
               <>
+                <button type="button" onClick={() => handlePresent(selected.run_id)}>
+                  {t("present")}
+                </button>
                 <RoundReplay key={selected.run_id} run={selected} />
                 <AgentPanel run={selected} />
               </>
