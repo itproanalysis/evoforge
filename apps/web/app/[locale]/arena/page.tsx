@@ -4,10 +4,12 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   getArena,
+  getArenaSummary,
   getPromptChain,
   listArenas,
   postArena,
   type ArenaDoc,
+  type ArenaSummary,
 } from "../../../lib/api";
 import { Button, Card } from "../../../components/ui";
 import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView, promptArenaView, canFollowUp, promptChainView } from "../../../lib/arenaStatus";
@@ -89,6 +91,7 @@ export default function ArenaPage() {
   const [pollError, setPollError] = useState(false);
   const [activeArena, setActiveArena] = useState<ArenaDoc | null>(null);
   const [recentArenas, setRecentArenas] = useState<ArenaDoc[]>([]);
+  const [summary, setSummary] = useState<ArenaSummary | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [chainRounds, setChainRounds] = useState<ArenaDoc[] | null>(null);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
@@ -100,6 +103,17 @@ export default function ArenaPage() {
   const running = starting || !!trackedId;
 
   // Load recent arenas
+  const refreshSummary = async () => {
+    try {
+      const s = await getArenaSummary();
+      if (s && typeof s === "object") {
+        setSummary(s);
+      }
+    } catch (e) {
+      console.warn("Failed to load arena summary", e);
+    }
+  };
+
   const refreshRecent = async () => {
     try {
       const res = await listArenas();
@@ -109,6 +123,7 @@ export default function ArenaPage() {
     } catch (e) {
       console.warn("Failed to list arenas", e);
     }
+    void refreshSummary();
   };
 
   useEffect(() => {
@@ -315,6 +330,38 @@ export default function ArenaPage() {
       </div>
       {!operator && (
         <p className="text-xs text-text-secondary">{t("operator-only")}</p>
+      )}
+
+      {/* Scoreboard over every stored arena match */}
+      {summary && (
+        <Card className="bg-background-secondary border border-border p-4">
+          <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
+            {t("summary-heading")}
+          </span>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+            <span>{t("summary-evoforge-wins")}: <strong className="text-text-primary">{summary.wins?.evoforge ?? 0}</strong></span>
+            <span>{t("summary-single-wins")}: <strong className="text-text-primary">{summary.wins?.single ?? 0}</strong></span>
+            <span>{t("summary-ties")}: <strong className="text-text-primary">{summary.wins?.tie ?? 0}</strong></span>
+            <span>{t("summary-total")}: <strong className="text-text-primary">{summary.total ?? 0}</strong></span>
+            <span>{t("summary-scored")}: <strong className="text-text-primary">{summary.scored ?? 0}</strong></span>
+            <span>{t("summary-running")}: <strong className="text-text-primary">{summary.running ?? 0}</strong></span>
+            <span>{t("summary-failed")}: <strong className="text-text-primary">{summary.failed ?? 0}</strong></span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+            <span>{t("summary-heldout-evoforge")}: <strong className="text-text-primary">{summary.heldout?.evoforge?.passed ?? 0}/{summary.heldout?.evoforge?.n ?? 0}</strong></span>
+            <span>{t("summary-heldout-single")}: <strong className="text-text-primary">{summary.heldout?.single?.passed ?? 0}/{summary.heldout?.single?.n ?? 0}</strong></span>
+            <span>{t("summary-cost-evoforge")}: <strong className="text-text-primary">{summary.cost_cents?.evoforge ?? 0}¢</strong></span>
+            <span>{t("summary-cost-single")}: <strong className="text-text-primary">{summary.cost_cents?.single ?? 0}¢</strong></span>
+            <span>{t("summary-cost-judge")}: <strong className="text-text-primary">{summary.cost_cents?.judge ?? 0}¢</strong></span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+            <span>{t("summary-unscorable")}: <strong className="text-text-primary">{summary.unscorable ?? 0}</strong></span>
+            <span>{t("summary-inconclusive")}: <strong className="text-text-primary">{summary.inconclusive ?? 0}</strong></span>
+          </div>
+          {typeof summary.basis === "string" && summary.basis.length > 0 && (
+            <p className="mt-2 text-xs text-text-tertiary">{summary.basis}</p>
+          )}
+        </Card>
       )}
 
       {error && (

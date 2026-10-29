@@ -504,7 +504,22 @@
     "prompt-acceptance": "어느 쪽이 실행되기 전에 독립 심사가 작성한 수락 테스트 {count}개 (이미 통과되어 제외 {dropped}개)",
     "prompt-unscorable": "의미 있는 수락 테스트가 너무 적게 남아 점수 비교 없이 표시합니다.",
     "prompt-judge-cost": "독립 심사 비용: {cost}",
-    "prompt-equal-tools": "동등한 도구: 양쪽 레인 모두 tolerant recounting으로 diff를 적용합니다."
+    "prompt-equal-tools": "동등한 도구: 양쪽 레인 모두 tolerant recounting으로 diff를 적용합니다.",
+    "summary-heading": "아레나 스코어보드",
+    "summary-evoforge-wins": "EvoForge 승리",
+    "summary-single-wins": "단일 AI 승리",
+    "summary-ties": "무승부",
+    "summary-total": "전체 대결",
+    "summary-scored": "판정 완료",
+    "summary-running": "실행 중",
+    "summary-failed": "실패",
+    "summary-heldout-evoforge": "EvoForge 숨은 테스트",
+    "summary-heldout-single": "단일 AI 숨은 테스트",
+    "summary-cost-evoforge": "EvoForge 비용",
+    "summary-cost-single": "단일 AI 비용",
+    "summary-cost-judge": "심사 비용",
+    "summary-unscorable": "점수 낼 테스트 부족",
+    "summary-inconclusive": "추가 확인 필요"
   },
   "replay": {
     "title": "라운드 리플레이",

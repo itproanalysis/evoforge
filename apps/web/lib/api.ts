@@ -797,6 +797,23 @@ export function listArenas() {
   return req<{ arenas: ArenaDoc[] }>("/v1/arena");
 }
 
+export interface ArenaSummary {
+  total: number;
+  running: number;
+  failed: number;
+  scored: number;
+  unscorable: number;
+  inconclusive: number;
+  wins: { evoforge: number; single: number; tie: number };
+  heldout: { single: { passed: number; n: number }; evoforge: { passed: number; n: number } };
+  cost_cents: { single: number; evoforge: number; judge: number };
+  basis: string;
+}
+
+export function getArenaSummary() {
+  return req<ArenaSummary>("/v1/arena/summary");
+}
+
 // --- R1-R5 round replay (recorded evolution runs) ---
 
 export type EvolutionSnapStatus = "READY" | "UNVERIFIED" | "FAILED" | "PENDING";
