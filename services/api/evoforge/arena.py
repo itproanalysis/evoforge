@@ -19,6 +19,7 @@ code or the reference fix.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import re
@@ -32,6 +33,10 @@ import uuid
 
 from evoforge import postgres_state as _postgres_state
 from evoforge import sealed_eval as _sealed
+
+DISCLOSURE = ("The EvoForge lane may retry using the names of failing held-out "
+              "tests, an upper-bound oracle signal the single lane does not get, "
+              "and reported costs cover only model API usage, not Runner compute.")
 
 KIND = "arena"
 SUITE_VERSIONS = ("v1", "v2", "v3", "v4")
@@ -441,16 +446,89 @@ def _attach_preview(lane: dict, task: dict, recount: bool) -> dict:
     return lane
 
 
+def _task_spec_hash(task: dict) -> str:
+    payload = {"goal": task.get("goal", ""),
+               "files": task.get("files", {})}
+    raw = json.dumps(payload, sort_keys=True,
+                     separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _heldout_hash(task: dict) -> str:
+    items = [{"id": h.get("id", ""), "code": h.get("code", "")}
+             for h in (task.get("heldout") or [])]
+    raw = json.dumps(items, sort_keys=True,
+                     separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _compute_base_tree_sha(task_id: str, files: dict) -> str:
+    """40-hex git tree id of the task base commit (deterministic in files)."""
+    tmp = tempfile.mkdtemp(prefix="evoforge-arena-manifest-")
+    try:
+        source, base, _future = _sealed._make_task_source_repo(
+            tmp, task_id, dict(files or {}))
+        proc = _sealed._git(source, "rev-parse", f"{base}^{{tree}}")
+        sha = (proc.stdout or "").strip() if proc.returncode == 0 else ""
+        if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+            raise _sealed.SealedEvalError("could not resolve base tree")
+        return sha
+    finally:
+        _sealed._remove_tree(tmp)
+
+
+def _lane_tree_sha(source: str, base: str) -> str | None:
+    try:
+        proc = _sealed._git(source, "rev-parse", f"{base}^{{tree}}")
+        sha = (proc.stdout or "").strip() if proc.returncode == 0 else ""
+        if re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+            return sha
+    except Exception:
+        pass
+    return None
+
+
+def build_manifest(suite_version: str, task_id: str,
+                   model: str, task: dict) -> dict:
+    """Fairness manifest: same task + same held-out tests for both lanes."""
+    files = task.get("files", {}) if isinstance(task, dict) else {}
+    heldout = task.get("heldout", []) if isinstance(task, dict) else []
+    tid = task.get("id", task_id) if isinstance(task, dict) else task_id
+    return {
+        "comparison_mode": "same_task_same_tests_concurrent",
+        "suite_version": suite_version,
+        "task_id": task_id,
+        "task_spec_hash": _task_spec_hash(task),
+        "heldout_hash": _heldout_hash(task),
+        "heldout_count": len(heldout),
+        "base_tree_sha": _compute_base_tree_sha(
+            tid if isinstance(tid, str) else task_id, files),
+        "lanes": {
+            "single": {"model": model, "harness": "api-sealed-eval/1",
+                       "max_attempts": 1, "critic": False,
+                       "feedback": "none"},
+            "evoforge": {"model": model, "harness": "api-sealed-eval/2",
+                         "max_attempts": _sealed.PIPELINE_MAX_ATTEMPTS,
+                         "feedback": "heldout_failing_test_names"},
+        },
+        "cost_basis": "model_api_usage",
+        "runner_cost": "not_measured",
+        "disclosure": DISCLOSURE,
+    }
+
+
 def seed_running(arena_id: str, suite_version: str, task_id: str,
                  model: str, task: dict) -> dict:
     """Seed the ``running`` document synchronously at POST time."""
     n = len(task.get("heldout") or []) if isinstance(task, dict) else 0
     goal = task.get("goal", "") if isinstance(task, dict) else ""
     now = time.time()
+    manifest = build_manifest(suite_version, task_id, model, task)
     doc = {"arena_id": arena_id, "status": "running",
            "suite_version": suite_version, "task_id": task_id,
            "model": model, "goal": goal if isinstance(goal, str) else "",
            "created_at": now, "started_at": now, "finished_at": None,
+           "manifest": manifest,
            "lanes": {"single": _lane_skeleton("running", n),
                      "evoforge": _lane_skeleton("running", n)},
            "verdict": {"winner": "tie", "reason": "arena running"},
@@ -531,9 +609,11 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
     error = None
     status = "succeeded"
     tmpbase = tempfile.mkdtemp(prefix="evoforge-arena-single-")
+    base_tree_sha = None
     try:
         source, base, future = _sealed._make_task_source_repo(
             tmpbase, task["id"], task["files"])
+        base_tree_sha = _lane_tree_sha(source, base)
         dest = os.path.join(tmpbase, "sandbox-single")
         _sealed._build_clean_sandbox(source, base, dest, future)
         file_context = [{"path": p, "content": task["files"][p]}
@@ -596,6 +676,8 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
             "outcome": outcome, "cost_cents": int(cost),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
+    if base_tree_sha is not None:
+        lane["base_tree_sha"] = base_tree_sha
     if failing:
         lane["failing_tests"] = list(failing)
     if error is not None:
@@ -627,9 +709,11 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
     error = None
     status = "succeeded"
     tmpbase = tempfile.mkdtemp(prefix="evoforge-arena-evo-")
+    base_tree_sha = None
     try:
         source, base, future = _sealed._make_task_source_repo(
             tmpbase, task["id"], task["files"])
+        base_tree_sha = _lane_tree_sha(source, base)
         file_context = [{"path": p, "content": task["files"][p]}
                         for p in sorted(task["files"])]
         goal = task["goal"]
@@ -714,6 +798,8 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
             "outcome": outcome, "cost_cents": int(cost),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
+    if base_tree_sha is not None:
+        lane["base_tree_sha"] = base_tree_sha
     if failing:
         lane["failing_tests"] = list(failing)
     if error is not None:
@@ -777,6 +863,7 @@ def run_arena(suite_version: str, task_id: str, model: str,
         timeout_s = _sealed.PYTEST_TIMEOUT_S
     aid = arena_id or f"arena_{uuid.uuid4().hex[:12]}"
     goal = ""
+    manifest = None
     try:
         if model != BASELINE_MODEL:
             raise ValueError(f"unknown model: {model!r}")
@@ -784,6 +871,15 @@ def run_arena(suite_version: str, task_id: str, model: str,
             raise ValueError(f"unknown suite_version: {suite_version!r}")
         task = find_task(suite_version, task_id)
         _sealed._check_size(task["heldout"])
+        try:
+            prev = get_arena(aid)
+            if isinstance(prev, dict) and isinstance(
+                    prev.get("manifest"), dict):
+                manifest = copy.deepcopy(prev["manifest"])
+        except Exception:
+            manifest = None
+        if manifest is None:
+            manifest = build_manifest(suite_version, task_id, model, task)
         maybe_goal = task.get("goal", "")
         goal = maybe_goal if isinstance(maybe_goal, str) else ""
         single, evo = _run_lanes(task, model, timeout_s)
@@ -820,6 +916,21 @@ def run_arena(suite_version: str, task_id: str, model: str,
         evo["error"] = error
         status = "failed"
         verdict = _verdict(0, 0)
+        if manifest is None:
+            try:
+                prev = get_arena(aid)
+                if isinstance(prev, dict) and isinstance(
+                        prev.get("manifest"), dict):
+                    manifest = copy.deepcopy(prev["manifest"])
+            except Exception:
+                manifest = None
+            if manifest is None:
+                try:
+                    _t = find_task(suite_version, task_id)
+                    manifest = build_manifest(
+                        suite_version, task_id, model, _t)
+                except Exception:
+                    manifest = None
     doc = {"arena_id": aid, "status": status,
            "suite_version": suite_version, "task_id": task_id,
            "model": model, "goal": goal,
@@ -827,5 +938,7 @@ def run_arena(suite_version: str, task_id: str, model: str,
            "finished_at": time.time(),
            "lanes": {"single": single, "evoforge": evo},
            "verdict": verdict, "error": error}
+    if manifest is not None:
+        doc["manifest"] = manifest
     _save(doc)
     return copy.deepcopy(doc)
