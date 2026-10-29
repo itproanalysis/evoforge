@@ -552,13 +552,13 @@ export default function MissionControl() {
                 </div>
                 <div className="flex items-center gap-4 text-xs">
                   <a
-                    href="/arena"
+                    href={`${locale === "en" ? "" : `/${locale}`}/arena`}
                     className="text-accent-cyan hover:underline"
                   >
                     {tWorkspace("view-arena")}
                   </a>
                   <a
-                    href="/replay"
+                    href={`${locale === "en" ? "" : `/${locale}`}/replay`}
                     className="text-accent-cyan hover:underline"
                   >
                     {tWorkspace("view-replay")}

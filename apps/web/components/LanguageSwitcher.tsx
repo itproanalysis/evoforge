@@ -37,7 +37,7 @@ export function LanguageSwitcher() {
       const pathnameWithoutLocale = pathname.replace(/^\/(en|ko)(?=\/|$)/, '') || '/';
       
       // Navigate to new locale path
-      const newPath = newLocale === 'ko'
+      const newPath = newLocale === 'en'
         ? pathnameWithoutLocale 
         : `/${newLocale}${pathnameWithoutLocale}`;
       

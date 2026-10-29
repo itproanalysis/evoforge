@@ -36,7 +36,7 @@ export function FeatureRail() {
   const pathname = usePathname() ?? '';
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-  const prefix = locale === 'ko' ? '' : `/${locale}`;
+  const prefix = locale === 'en' ? '' : `/${locale}`;
   const routePath = stripLocalePrefix(pathname);
 
   const renderLink = ({ path, key, icon }: { path: string; key: string; icon: string }) => {
