@@ -89,17 +89,12 @@ def list_decisions(limit: int = 50) -> list[dict]:
         return []
     store = _store()
     try:
-        keys = list(store)
+        from evoforge import postgres_state as _ps
+        recs = [rec for _k, rec in _ps.scan(store, kind=KIND)]
     except Exception:
         return []
     cands: list[dict] = []
-    for key in keys:
-        try:
-            rec = store.get(key, None)
-        except Exception:
-            continue
-        if not isinstance(rec, dict) or rec.get("kind") != KIND:
-            continue
+    for rec in recs:
         inner = rec.get("decision")
         if isinstance(inner, dict):
             cands.append(dict(inner))
@@ -120,16 +115,12 @@ def clear() -> None:
         _DECISIONS.clear()
         store = _store()
         try:
-            keys = list(store)
+            from evoforge import postgres_state as _ps
+            keys = [k for k, _rec in _ps.scan(store, kind=KIND)]
         except Exception:
             return
         for key in keys:
-            try:
-                rec = store.get(key, None)
-            except Exception:
-                continue
-            if isinstance(rec, dict) and rec.get("kind") == KIND:
-                del store[key]
+            del store[key]
 
 
 def reset() -> None:

@@ -49,6 +49,14 @@ ledger.configure({"default": int(os.getenv("EVO_PROJECT_BUDGET_CENTS", "50000"))
 app = FastAPI(title="EvoForge API", version="0.2.0-hackathon")
 
 
+@app.on_event("startup")
+async def _widen_threadpool():
+    # Sync endpoints share anyio's 40-thread pool; a few slow calls (model, Runner) used to queue every page load.
+    # DB access stays bounded by the connection pool (EVO_PG_POOL_SIZE), not by thread count.
+    import anyio
+    anyio.to_thread.current_default_thread_limiter().total_tokens = int(os.getenv("EVO_API_THREADS", "100"))
+
+
 @app.exception_handler(KernelUnavailable)
 async def state_unavailable(request: Request, exc):
     return JSONResponse({"detail": "state storage unavailable"}, status_code=503)
@@ -1073,15 +1081,11 @@ def _production_stats() -> dict:
     held_pass = 0
     held_n = 0
     try:
-        keys = list(_evidence)
+        stored_runs = [doc for _k, doc in postgres_state.scan(_evidence, has="run")]
     except Exception:
-        keys = []
-    for key in keys:
-        try:
-            stored = _evidence.get(key, {})
-        except Exception:
-            continue
-        if not isinstance(stored, dict) or not isinstance(stored.get("run"), dict):
+        stored_runs = []
+    for stored in stored_runs:
+        if not isinstance(stored.get("run"), dict):
             continue
         run = stored["run"]
         runs += 1
@@ -1695,8 +1699,34 @@ def evidence(eid: str):
         for ck in ("sealed_count", "sealed_tests_count", "sealed_kinds"):
             if ck in inner:
                 public.setdefault(ck, inner[ck])
-    data = {k: v for k, v in public.items() if k not in ("chain", "data")}
-    return {**public, "chain": evidence_chain.chain(eid), "data": data}
+    data = {k: v for k, v in public.items() if k not in ("chain", "data", "mission_chain")}
+    out = {**public, "chain": evidence_chain.chain(eid), "data": data}
+    mission_chain = _mission_chain(stored.get("mission_id") if isinstance(stored, dict) else None)
+    if mission_chain is not None:
+        out["mission_chain"] = mission_chain
+    return out
+
+
+def _mission_chain(mission_id):
+    """Each record links only the stages known when it was written (a run record predates its PR), so a viewer of
+    one record saw PR/Outcome empty although the PR was open. This merges the stages over all of the mission's
+    evidence: per stage the first recorded event, None when no record of the mission has it."""
+    if not isinstance(mission_id, str):
+        return None
+    mission = missions_store.get(mission_id)
+    if mission is None:
+        return None
+    merged: dict[str, str | None] = {}
+    order: list[str] = []
+    for other in mission.get("evidence_ids") or []:
+        for entry in evidence_chain.chain(other):
+            stage = entry.get("stage")
+            if stage not in merged:
+                order.append(stage)
+                merged[stage] = None
+            if merged[stage] is None and entry.get("event_id") is not None:
+                merged[stage] = entry["event_id"]
+    return [{"stage": st, "event_id": merged[st]} for st in order]
 
 
 @app.get("/v1/events/{event_id}")
@@ -1938,33 +1968,24 @@ def stream_events(request: Request, after: int = 0, limit: int = 100,
         wait_s = 25.0
     wait_s = min(max(wait_s, 0.0), 25.0)
 
-    def _frames():
+    async def _frames():
+        # Async on purpose: a sync generator blocked in _STREAM_COND.wait held one of the 40 worker threads for up
+        # to 25 s per open tab, so a few viewers starved every other endpoint (release 17 timeouts / 429s).
+        import asyncio
         deadline = time.time() + wait_s
         cursor = after
         sent = 0
-        with _STREAM_COND:
-            pending = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
-        batch = pending[:limit]
-        for event in batch:
-            payload = json.dumps(event, sort_keys=True, separators=(",", ":"))
-            yield f"id: {event['seq']}\ndata: {payload}\n\n"
-            cursor = event["seq"]
-            sent += 1
         while sent < limit:
-            remaining = deadline - time.time()
-            if remaining <= 0:
-                break
             with _STREAM_COND:
-                fresh = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
-                if not fresh:
-                    _STREAM_COND.wait(timeout=remaining)
-                    fresh = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
-                batch = fresh[: limit - sent]
+                batch = [e for e in _STREAM_EVENTS if e["seq"] > cursor][: limit - sent]
             for event in batch:
                 payload = json.dumps(event, sort_keys=True, separators=(",", ":"))
                 yield f"id: {event['seq']}\ndata: {payload}\n\n"
                 cursor = event["seq"]
                 sent += 1
+            if sent >= limit or time.time() >= deadline:
+                break
+            await asyncio.sleep(min(0.25, max(deadline - time.time(), 0.0)))
 
     return StreamingResponse(_frames(), media_type="text/event-stream",
                              headers={"Cache-Control": "no-cache",
@@ -2186,16 +2207,10 @@ def _all_validated() -> list[dict]:
     for o in outcomes_store.all():
         seen[o["mission_id"]] = o
     try:
-        ids = list(_evidence)
+        docs = [doc for _k, doc in postgres_state.scan(_evidence, has="outcome")]
     except Exception:
-        ids = []
-    for eid in ids:
-        try:
-            doc = _evidence[eid]
-        except Exception:
-            continue
-        if not isinstance(doc, dict):
-            continue
+        docs = []
+    for doc in docs:
         out = doc.get("outcome")
         if (isinstance(out, dict) and out.get("outcome_status") == "VALIDATED"
                 and isinstance(out.get("mission_id"), str)

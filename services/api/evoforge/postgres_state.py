@@ -72,6 +72,22 @@ class EvidenceStore:
             return [row["id"] for row in conn.execute(
                 f"SELECT id FROM {_TABLES[namespace]} WHERE tenant_id=%s AND project_id=%s ORDER BY id", self.scope)]
 
+    def scan(self, namespace, kind=None, has=None):
+        """Every (id, document) in scope in ONE query, optionally only document.kind == kind / documents with key has.
+
+        List endpoints used to read ids and then each document in its own transaction (N+1), which took the
+        dashboard past the 40 s proxy timeout once the store held a few thousand records."""
+        sql = f"SELECT id, document FROM {_TABLES[namespace]} WHERE tenant_id=%s AND project_id=%s"
+        params = [*self.scope]
+        if kind is not None:
+            sql += " AND document->>'kind' = %s"
+            params.append(kind)
+        if has is not None:
+            sql += " AND document ? %s"
+            params.append(has)
+        with self.kernel._transaction() as conn:
+            return [(row["id"], row["document"]) for row in conn.execute(sql + " ORDER BY id", params)]
+
     def link(self, evidence_id, stage, event_id):
         with self.kernel._transaction() as conn:
             event = conn.execute("SELECT document FROM runtime.api_evidence_events "
@@ -126,6 +142,12 @@ class ScopedRecords(MutableMapping):
     def __len__(self):
         return len(list(iter(self)))
 
+    def scan(self, kind=None, has=None):
+        store = backend()
+        if store:
+            return store.scan(self.namespace, kind=kind, has=has)
+        return _filter(list(self._memory.items()), kind, has)
+
     def __delitem__(self, key):
         if backend():
             raise KernelRejected("durable evidence cannot be deleted")
@@ -135,3 +157,21 @@ class ScopedRecords(MutableMapping):
         if backend():
             raise KernelRejected("durable evidence cannot be cleared")
         self._memory.clear()
+
+
+def _filter(items, kind, has):
+    return [(k, v) for k, v in items if isinstance(v, dict)
+            and (kind is None or v.get("kind") == kind) and (has is None or has in v)]
+
+
+def scan(store, kind=None, has=None):
+    """(id, document) pairs of `store` — one SQL query for ScopedRecords, a filtered walk for a plain dict."""
+    if hasattr(store, "scan"):
+        return store.scan(kind=kind, has=has)
+    out = []
+    for key in list(store):
+        try:
+            out.append((key, store[key]))
+        except KeyError:
+            continue
+    return _filter(out, kind, has)

@@ -18,6 +18,8 @@ import threading
 import time
 import uuid
 
+from evoforge import postgres_state as _ps
+
 KINDS = ("bug", "missed_case", "praise", "other")
 KIND = "feedback"
 PROMOTION_KIND = "feedback_promotion"
@@ -88,16 +90,10 @@ def _promotions(store) -> dict[str, str]:
     """feedback_id -> promoted_mission_id from durable promotion records."""
     found: dict[str, str] = {}
     try:
-        keys = list(store)
+        recs = [rec for _k, rec in _ps.scan(store, kind=PROMOTION_KIND)]
     except Exception:
         return found
-    for key in keys:
-        try:
-            rec = store.get(key, None)
-        except Exception:
-            continue
-        if not isinstance(rec, dict) or rec.get("kind") != PROMOTION_KIND:
-            continue
+    for rec in recs:
         fid = rec.get("feedback_id")
         mid = rec.get("promoted_mission_id")
         if isinstance(fid, str) and isinstance(mid, str) and fid not in found:
@@ -185,7 +181,7 @@ def list_feedback(limit: int = 100) -> list[dict]:
         return []
     store = _store()
     try:
-        keys = list(store)
+        recs = [rec for _k, rec in _ps.scan(store, kind=KIND)]
     except Exception:
         return []
     try:
@@ -193,13 +189,7 @@ def list_feedback(limit: int = 100) -> list[dict]:
     except Exception:
         promos = {}
     cands: list[dict] = []
-    for key in keys:
-        try:
-            rec = store.get(key, None)
-        except Exception:
-            continue
-        if not isinstance(rec, dict) or rec.get("kind") != KIND:
-            continue
+    for rec in recs:
         item = _view(rec, promos.get(rec.get("feedback_id") if isinstance(rec.get("feedback_id"), str) else key))
         if item is not None:
             cands.append(item)
@@ -306,19 +296,14 @@ def clear() -> None:
     with _LOCK:
         store = _store()
         try:
-            keys = list(store)
+            keys = [k for kind in (KIND, PROMOTION_KIND) for k, _rec in _ps.scan(store, kind=kind)]
         except Exception:
             return
         for key in keys:
             try:
-                rec = store.get(key, None)
+                del store[key]
             except Exception:
                 continue
-            if isinstance(rec, dict) and rec.get("kind") in (KIND, PROMOTION_KIND):
-                try:
-                    del store[key]
-                except Exception:
-                    continue
 
 
 def reset() -> None:

@@ -112,13 +112,7 @@ def _ensure_loaded() -> None:
     _reservations.clear()
     _overruns.clear()
     events: list[dict] = []
-    for key in list(records):
-        try:
-            doc = records[key]
-        except KeyError:
-            continue
-        if not isinstance(doc, dict) or doc.get("kind") != "ledger_event":
-            continue
+    for _key, doc in records.scan(kind="ledger_event"):
         events.append(doc)
     def _sort_key(d: dict):
         try:

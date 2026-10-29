@@ -54,7 +54,8 @@ function extractGates(raw: unknown): GateInput[] {
 function normalize(raw: unknown, fallbackId: string): Link[] {
   if (raw && typeof raw === "object") {
     const r = raw as Record<string, unknown>;
-    const chain = r.chain as
+    // mission_chain merges the stages over all of the mission's records (a run record predates its PR).
+    const chain = (Array.isArray(r.mission_chain) ? r.mission_chain : r.chain) as
       | Array<{ stage?: string; event_id?: string | null }>
       | undefined;
     if (Array.isArray(chain)) {
