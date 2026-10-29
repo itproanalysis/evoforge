@@ -63,3 +63,15 @@ iteration only. The second iteration's final result is recorded separately.
 Root registered worktrees fell from 125 to 27. Dirty/latest paths stayed in place.
 Index, manifest, Korean guide and tested restore tool: C:/Projects/EvoForge/.
 One restore-and-rearchive round trip passed. See main docs/WORKSPACE_ORGANIZATION.md.
+
+## Second iteration final verification
+
+Source 333d88d9: 64 existing UI/mapper/HTTP regressions, 81 actual-component SSR
+assertions, TypeScript, clean Next production build and the local review bundle
+passed. The expanded old regression set initially caught three source-wiring
+expectations (fixed bottom input, existing start label, responsive layout);
+explicit positioning classes and the original translated key were retained,
+without editing Critic tests. Logs/source hashes and review limits are in
+docs/validation/2026-10-30-paper-workspace.json. The local review and script return
+HTTP 200; a POST to its model-action path returns 404. Browser interaction,
+screenshot and deployment remain unverified/not performed.

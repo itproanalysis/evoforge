@@ -1,0 +1,47 @@
+{
+  "source_commit": "333d88d9d9d04929bef05b3b9785893dacb42101",
+  "branch": "codex/design-studio",
+  "base_release": "44e5ec9e",
+  "results": {
+    "existing_regressions": 64,
+    "actual_component_ssr_assertions": 81,
+    "typescript": "passed",
+    "clean_next_build": "passed",
+    "local_review_bundle": "passed",
+    "snapshot_responses": 8,
+    "http_preview": 200,
+    "http_script": 200,
+    "http_mutation_route": 404
+  },
+  "logs": [
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\paper-render-final.log",
+      "sha256": "5bc01dbd511d4a14de1e94cbd81a9b9d77b55e98704eb0cc8d01316830c58eaa"
+    },
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\paper-typescript-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\paper-build-final.log",
+      "sha256": "b6523dfc4420cd77ff4eb5e36cf1375d628560f36c222e5a6a187e38d77de6b3"
+    },
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\paper-web-regression-pass.log",
+      "sha256": "d4cc8ef74def675efce086c53663007a3bae9dc70ce66fce400c65cb1db0c32f"
+    },
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\paper-interactive-review.log",
+      "sha256": "f09812cd1b149f9b7937bd6fced9036a892438247822567909ba23bbba955c45"
+    }
+  ],
+  "review": {
+    "url": "http://127.0.0.1:47839",
+    "snapshot_sha256": "8c7e85909ca8d216bd980f99b80410aa1f57e04426b6a0768f89f2f8c551dd55",
+    "bundle_sha256": "925bafe717ab131d07a715a560ea20c71406a81152fc2913e14bb063dd863746",
+    "source": "Saved public production GET responses, timestamp labelled KST; not live data. No new model run.",
+    "client_boundary": "Only recorded same-origin GET responses; POST, external and unrecorded requests rejected. Operator controls disabled.",
+    "browser": "UNVERIFIED: local browser control is disabled; no screenshot, mobile, hydration or input verification."
+  },
+  "deployment": "NOT DEPLOYED; release-captain integration required."
+}
