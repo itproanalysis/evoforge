@@ -1,0 +1,17 @@
+{
+  "id": "T53_cumulative_critic",
+  "planned_by": "Claude (Critic): T51 review follow-up",
+  "goal": "T53 — cumulative Critic suite in evolution runs (v3.8 §3.2: regressions must show and be repaired). Today, in\ncritic mode, the EvoForge lane of an evolution run (services/api/evoforge/evolution_rounds.py, T51) asks the Critic for\ntests of the CURRENT round only, so a candidate that adds the new feature but breaks an earlier one passes the Critic\nand only the held-out judge sees the regression.\n\nChange: the EvoForge lane keeps every Critic test it received in earlier rounds of the same run (per lane, in memory\nfor the run) and, each round, runs the accumulated Critic suite (earlier rounds' + this round's) on every applied\nattempt. Retry feedback lists failing Critic tests from any round (sealed_eval._critic_feedback). The held-out suite\nstill only judges and never enters feedback. Record \"critic_tests\": size of the accumulated suite used this round on the\nEvoForge snapshot (single lane: 0 or absent). Emit a role \"critic\" event \"Critic suite: N tests (k new)\". Nothing else\nchanges (scoring, statuses, manifest, previews, single lane).\nTests: services/api/tests/test_muse_t53.py.",
+  "edit": [
+    "services/api/evoforge/evolution_rounds.py",
+    "services/api/tests/test_muse_t53.py"
+  ],
+  "context": [
+    "evals/rounds_v1/mission_board.json",
+    "services/api/tests/test_critic_t51_evolution_rounds.py",
+    "services/api/evoforge/sealed_eval.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t53.py services/api/tests/test_sealed_t53_cumulative_critic.py services/api/tests/test_critic_t51_evolution_rounds.py services/api/tests/test_muse_t51.py -q -p no:cacheprovider"
+  ]
+}
