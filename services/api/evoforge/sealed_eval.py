@@ -392,6 +392,31 @@ def _check_size(heldout: list[dict]) -> None:
             raise SealedTooLarge("sealed test over size budget")
 
 
+def _candidate_verification_failures(diff: str) -> list[dict]:
+    from evoforge.runner_diff_screen import report_tampering_risks
+
+    if report_tampering_risks(diff):
+        return [{"test": "held-out", "message": "candidate requires independent execution verification",
+                 "verification": "INCONCLUSIVE"}]
+    return []
+
+
+def _heldout_result_is_consistent(result: dict, expected: int) -> bool:
+    """Check count/exit consistency; missing legacy remote flags stay compatible."""
+    n, passed, exit_code = result.get("n"), result.get("pass"), result.get("exit_code")
+    return (type(n) is int and type(passed) is int
+            and n >= expected and n > 0 and 0 <= passed <= n
+            and type(exit_code) is int and exit_code in (0, 1)
+            and ((exit_code == 0) == (passed == n))
+            and ("report_integrity" not in result or result["report_integrity"] is True))
+
+
+def _heldout_result_passes(result: dict, expected: int) -> bool:
+    """Never credit counts contradicted by exit status or Runner evidence."""
+    return (_heldout_result_is_consistent(result, expected)
+            and result["pass"] == result["n"])
+
+
 def _run_heldout_local(sandbox: str, heldout: list[dict],
                        timeout_s: int, tmpbase: str) -> float:
     """Held-out run with the Runner sealed isolation; 1.0 iff all pass."""
@@ -417,9 +442,7 @@ def _run_heldout_local(sandbox: str, heldout: list[dict],
         raise SealedEvalError(f"sealed run failed: {type(e).__name__}")
     if not isinstance(result, dict) or result.get("timed_out"):
         raise SealedTimeout("sealed held-out run timed out")
-    n = result.get("n", 0)
-    passed = result.get("pass", 0)
-    if n < len(heldout) or passed != n:
+    if not _heldout_result_passes(result, len(heldout)):
         return 0.0
     return 1.0
 
@@ -445,15 +468,15 @@ def _run_heldout_remote(source: str, base: str, diff: str,
     held = run.get("heldout", {})
     if not isinstance(held, dict) or held.get("timed_out"):
         raise SealedTimeout("sealed held-out run timed out")
-    n = held.get("n", 0)
-    passed = held.get("pass", 0)
-    if n < len(heldout) or passed != n:
+    if not _heldout_result_passes(held, len(heldout)):
         return 0.0
     return 1.0
 
 
 def _score_heldout(sandbox: str, source: str, base: str, diff: str,
                    heldout: list[dict], timeout_s: int, tmpbase: str) -> float:
+    if _candidate_verification_failures(diff):
+        return 0.0
     if _runner_client.runner_url():
         return _run_heldout_remote(source, base, diff, heldout, timeout_s)
     return _run_heldout_local(sandbox, heldout, timeout_s, tmpbase)
@@ -733,6 +756,8 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                 failing: list[str] = []
                 if _is_empty_diff(diff):
                     outcome = "empty_diff"
+                elif _candidate_verification_failures(diff):
+                    outcome = "verification_inconclusive"
                 elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
                     # Local execution: the task source is an ephemeral local
                     # repo that a remote runner cannot read (same reason suite
@@ -743,7 +768,7 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                     if score >= 1.0:
                         outcome = "passed"
                     else:
-                        outcome = "heldout_failed"
+                        outcome = _failed_run_outcome(failures)
                         failing = _failing_test_names(
                             failures, task["heldout"])
                 else:
@@ -861,7 +886,13 @@ def _call_pipeline_attempt(goal: str, base: str,
     return rsv, out, int(actual), missing
 
 
-SCORE_OUTCOMES = ("passed", "empty_diff", "apply_failed", "heldout_failed")
+def _failed_run_outcome(failures: list[dict]) -> str:
+    if any(f.get("verification") == "INCONCLUSIVE" for f in failures):
+        return "verification_inconclusive"
+    return "heldout_failed"
+
+
+SCORE_OUTCOMES = ("passed", "empty_diff", "apply_failed", "heldout_failed", "verification_inconclusive")
 
 _SCORE_BASE_KEYS = ("task_id", "score", "scaffold", "hygiene")
 
@@ -1005,9 +1036,10 @@ def _run_heldout_local_detail(sandbox: str, heldout: list[dict],
         raise SealedEvalError(f"sealed run failed: {type(e).__name__}")
     if not isinstance(result, dict) or result.get("timed_out"):
         raise SealedTimeout("sealed held-out run timed out")
-    n = result.get("n", 0)
-    passed = result.get("pass", 0)
-    if n < len(heldout) or passed != n:
+    if not _heldout_result_passes(result, len(heldout)):
+        if not _heldout_result_is_consistent(result, len(heldout)):
+            return 0.0, [{"test": "held-out", "message": "verification inconclusive",
+                          "verification": "INCONCLUSIVE"}]
         failures = _parse_failure_xml(xml)
         if not failures:
             failures = [{"test": "held-out", "message": "assertion failed"}]
@@ -1174,6 +1206,10 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
             last_dest = None
             goal = _critic_empty_feedback(task["goal"])
             continue
+        if _candidate_verification_failures(diff):
+            last_outcome, last_dest = "verification_inconclusive", None
+            goal = task["goal"] + "\nPrevious candidate could not be independently verified."
+            continue
         if not _apply_candidate(dest, diff,
                                 recount=harness != "api-sealed-eval/1"):
             last_outcome = "apply_failed"
@@ -1186,6 +1222,10 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
                 dest, critic_suite, timeout_s, tmpbase)
         else:
             c_score, c_failures = 1.0, []
+        if _failed_run_outcome(c_failures) == "verification_inconclusive":
+            last_outcome, last_dest = "verification_inconclusive", None
+            goal = task["goal"] + "\nPrevious candidate could not be independently verified."
+            continue
         if c_score >= 1.0:
             h_score, h_failures = _run_heldout_local_detail(
                 dest, task["heldout"], timeout_s, tmpbase)
@@ -1193,7 +1233,7 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
                 best, final_outcome, final_failing = 1.0, "passed", []
             else:
                 best = 0.0
-                final_outcome = "heldout_failed"
+                final_outcome = _failed_run_outcome(h_failures)
                 final_failing = _failing_test_names(
                     h_failures, task["heldout"])
             last_outcome = final_outcome
@@ -1213,7 +1253,7 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
             if h_score >= 1.0:
                 final_outcome, final_failing = "passed", []
             else:
-                final_outcome = "heldout_failed"
+                final_outcome = _failed_run_outcome(h_failures)
                 final_failing = _failing_test_names(
                     h_failures, task["heldout"])
         else:
@@ -1333,6 +1373,9 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                         if _is_empty_diff(diff):
                             outcome: str = "empty_diff"
                             failing: list[str] = []
+                        elif _candidate_verification_failures(diff):
+                            outcome, failing = "verification_inconclusive", []
+                            failures = _candidate_verification_failures(diff)
                         elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
                             # Always local, like the baseline: the task source is an ephemeral local repo that the remote
                             # runner cannot read (production returned RunnerBadRequest for every pipeline task).
@@ -1341,7 +1384,7 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                             if score >= 1.0:
                                 outcome, failing = "passed", []
                             else:
-                                outcome = "heldout_failed"
+                                outcome = _failed_run_outcome(failures)
                                 failing = _failing_test_names(
                                     failures, task["heldout"])
                         else:

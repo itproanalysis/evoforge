@@ -85,6 +85,13 @@ export async function middleware(req: NextRequest) {
     return intlResponse;
   }
   
+  // The default-locale login has a concrete route. Rewriting it to
+  // /ko/login makes as-needed locale canonicalization redirect back to
+  // /login in the production server. Let that public entry render once.
+  if (p === "/login" || p === "/login/") {
+    return NextResponse.next();
+  }
+
   // Skip auth for login pages
   if (
     p === "/login" ||

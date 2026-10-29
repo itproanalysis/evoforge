@@ -496,6 +496,9 @@
     "stats-verified": "검증됨",
     "stats-rate": "비율",
     "stats-interval": "95% 구간",
-    "stats-cost-per-verified": "검증된 라운드당 비용"
+    "stats-cost-per-verified": "검증된 라운드당 비용",
+    "load-failed": "기록을 불러오지 못했습니다.",
+    "refresh-failed": "갱신에 실패해 마지막으로 확인한 결과를 표시합니다.",
+    "retry": "다시 불러오기"
   }
 }

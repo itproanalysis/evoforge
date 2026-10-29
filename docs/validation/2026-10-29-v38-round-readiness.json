@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "source_commit": "9d08bd9e898a59c44d98400f44fdee839055e61b",
+  "branch": "codex/sealed-scoring-r8",
+  "integrated_release_commit": "e426e569e9c8497d19994e2f9fb1db45a5bec7a7",
+  "source_blob_sha256": {
+    "services/api/evoforge/runner.py": "d85c7b875d4747bfeefbe08b819e8c94c2feca51082ccac72fddea99b2ec1be7",
+    "services/api/evoforge/sealed_eval.py": "1e7cb29fdbe579f135b01c7d47c93df570dc9a52bcf98572d97529cbfbe1ef3c",
+    "services/api/evoforge/arena.py": "ee014db8ed3a59e85e26668b70d5a023f864de28d940ea185b8852c32f618a09",
+    "services/api/evoforge/evolution_rounds.py": "369994b64a86aa3df7f2333f7715facdbff4f4831557da0af0bfcb9d06b662ac",
+    "apps/web/lib/arenaStatus.ts": "354bb0861d6f314c073db5efe44291b8ba061da92e62d5aa7f58f7d0ba308ea0",
+    "apps/web/lib/api.ts": "5a3d6f6a82fa49dfa66deb011489e97f548d293b14cb426b4ab7fbeedae41aef",
+    "apps/web/app/[locale]/arena/page.tsx": "615fe72ff6b8296220882cc4ac8fc03f16d1338ad6d29116b19eafabc66d140d",
+    "services/api/tests/test_round_readiness_codex.py": "c817721b5a2c0adf6775b495f24bcf917521e2b69842a91c2161e8c7b7c590f8",
+    "services/api/tests/test_muse_t51.py": "c3f56cd6446177491e687584d23cd453036435720f963f32036a2704727e0cc7",
+    "services/api/tests/test_arena_status_http_codex.py": "270a84f7c26099b44cf53fc840d8f9a5d46b6ac87a87f3c4ed813695d41980c1"
+  },
+  "local_log_sha256": {
+    "validation-round-readiness.log": "6510cfd202e3eddc04e8182203b5aa5ba8512d8527ce876483e4e934f8680099",
+    "validation-rounds-existing-http.log": "da6de56d5e93b38cf9c862047dd6d94a68ec2b42e16240337c6796f956c0255a",
+    "validation-arena-status-http-final.log": "42fbbec8cd115cc718cacccf356f2b25acc0f6fc7d63896ef5a06930fdd36dce",
+    "validation-web-npm-ci.log": "fcda6e2031e529a982b28f0109e9ea747632dfed88b4d0d25293fcc9bd4c114f",
+    "validation-web-tsc.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "validation-web-arena-status.log": "53ffbbeee17ed90ef1f2af6e49eb88ddda0bf130ed3b189b99cd2a505d59adbf",
+    "validation-web-build.log": "ca0dccb50a2043906dfc95d1e05799cc91e95918ce6f8d57acfd5964896884a3"
+  },
+  "checks": {
+    "focused": "90 passed, 2 deselected",
+    "T50_T51_critic_http": "9 passed",
+    "T51_builder": "4 passed; initial combined run had one UI fixture failure, corrected in final HTTP-to-UI check",
+    "HTTP_to_UI_final": "1 passed",
+    "npm_ci": 0,
+    "tsc": 0,
+    "arena_presentation": 0,
+    "next_build": 0
+  },
+  "limits": [
+    "No live model execution or provider invoice verification",
+    "No deployment or public launch",
+    "Browser integration UNVERIFIED: environment setup rejected by approval policy; default startup redirects to login repeatedly",
+    "Full API and PostgreSQL release gates not run on this integrated branch",
+    "Screenshot capture and full four-part immutable snapshot manifest remain incomplete"
+  ]
+}

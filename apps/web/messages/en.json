@@ -496,6 +496,9 @@
     "stats-verified": "Verified",
     "stats-rate": "Rate",
     "stats-interval": "95% interval",
-    "stats-cost-per-verified": "Cost per verified round"
+    "stats-cost-per-verified": "Cost per verified round",
+    "load-failed": "Could not load the recorded run.",
+    "refresh-failed": "Refresh failed. Showing the last confirmed result for this run.",
+    "retry": "Retry"
   }
 }

@@ -9,6 +9,7 @@ import {
   type ArenaDoc,
 } from "../../../lib/api";
 import { Button, Card } from "../../../components/ui";
+import { laneView, arenaVerdict, arenaCost, costLabel } from "../../../lib/arenaStatus";
 
 const BENCHMARK_TASKS: Record<"v2" | "v1", { id: string; goal: string }[]> = {
   v2: [
@@ -36,7 +37,7 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
       </span>
     );
   }
-  if (status === "succeeded" || status === "finished") {
+  if (status === "succeeded") {
     if (passed !== undefined && n !== undefined && n > 0 && passed >= n) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/60 text-emerald-300 border border-emerald-500/40">
@@ -44,15 +45,16 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
         </span>
       );
     }
-    return (
+    if (passed !== undefined && n !== undefined && n > 0 && passed >= 0 && passed < n) return (
       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-950/60 text-rose-300 border border-rose-500/40">
         FAILED ({passed ?? 0}/{n ?? 0})
       </span>
     );
+    return <span className="text-xs text-text-secondary">결과 미확인</span>;
   }
   return (
     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-      {status.toUpperCase()}
+      {status === "failed" ? "실행 실패" : status === "pending" ? "대기 중" : status === "inconclusive" ? "검증 불확실" : status.toUpperCase()}
     </span>
   );
 }
@@ -62,7 +64,9 @@ export default function ArenaPage() {
   const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2">("v2");
   const [selectedTaskId, setSelectedTaskId] = useState<string>("SV2-AO-01");
   const [customTaskId, setCustomTaskId] = useState<string>("");
-  const [running, setRunning] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [pollError, setPollError] = useState(false);
   const [activeArena, setActiveArena] = useState<ArenaDoc | null>(null);
   const [recentArenas, setRecentArenas] = useState<ArenaDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -70,6 +74,8 @@ export default function ArenaPage() {
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
   const activeTaskId = customTaskId.trim() || selectedTaskId;
+  const trackedId = pendingId ?? (activeArena?.status === "running" ? activeArena.arena_id : null);
+  const running = starting || !!trackedId;
 
   // Load recent arenas
   const refreshRecent = async () => {
@@ -77,9 +83,6 @@ export default function ArenaPage() {
       const res = await listArenas();
       if (res && Array.isArray(res.arenas)) {
         setRecentArenas(res.arenas);
-        if (!activeArena && res.arenas.length > 0) {
-          setActiveArena(res.arenas[0]);
-        }
       }
     } catch (e) {
       console.warn("Failed to list arenas", e);
@@ -90,83 +93,69 @@ export default function ArenaPage() {
     refreshRecent();
   }, []);
 
-  // Poll active arena if running
+  // Poll the returned server ID. A failed lookup pauses polling so the user
+  // can retry the same job without accidentally starting another paid job.
   useEffect(() => {
-    if (!activeArena || activeArena.status !== "running") {
-      if (pollRef.current) clearInterval(pollRef.current);
-      setRunning(false);
-      return;
-    }
-
-    setRunning(true);
-    pollRef.current = setInterval(async () => {
+    if (!trackedId || pollError) return;
+    let active = true;
+    let inFlight = false;
+    const poll = async () => {
+      if (inFlight) return;
+      inFlight = true;
       try {
-        const doc = await getArena(activeArena.arena_id);
+        const doc = await getArena(trackedId);
+        if (!active) return;
+        if (doc.arena_id !== trackedId) throw new Error("arena id mismatch");
         setActiveArena(doc);
-        if (doc.status !== "running") {
-          setRunning(false);
-          refreshRecent();
-          if (pollRef.current) clearInterval(pollRef.current);
+        setPendingId(null);
+        setError(null);
+        if (doc.status !== "running") void refreshRecent();
+      } catch {
+        if (active) {
+          setPollError(true);
+          setError("실행 상태를 불러오지 못했습니다. 같은 작업의 상태를 다시 확인해 주세요.");
         }
-      } catch (err) {
-        console.warn("Arena poll error", err);
+      } finally {
+        inFlight = false;
       }
-    }, 1500);
-
+    };
+    void poll();
+    pollRef.current = setInterval(() => void poll(), 1500);
     return () => {
+      active = false;
       if (pollRef.current) clearInterval(pollRef.current);
     };
-  }, [activeArena?.arena_id, activeArena?.status]);
+  }, [trackedId, pollError]);
 
   const handleStartMatch = async () => {
-    if (!activeTaskId) return;
+    if (!activeTaskId || running) return;
     setError(null);
-    setRunning(true);
+    setPollError(false);
+    setStarting(true);
+    setActiveArena(null);
     try {
       const res = await postArena(activeTaskId, suiteVersion);
-      if (res && res.arena_id) {
-        const seeded: ArenaDoc = {
-          arena_id: res.arena_id,
-          status: "running",
-          suite_version: suiteVersion,
-          task_id: activeTaskId,
-          model: "muse-spark-1.3",
-          goal: BENCHMARK_TASKS[suiteVersion]?.find((t) => t.id === activeTaskId)?.goal || activeTaskId,
-          created_at: Date.now() / 1000,
-          lanes: {
-            single: {
-              status: "running",
-              attempts: 0,
-              heldout: { passed: 0, n: 0 },
-              outcome: "heldout_failed",
-              cost_cents: 0,
-              elapsed_ms: 0,
-              diff: "",
-              events: [{ seq: 1, ts: Date.now() / 1000, role: "system", message: "Single AI lane initialized" }],
-            },
-            evoforge: {
-              status: "running",
-              attempts: 0,
-              heldout: { passed: 0, n: 0 },
-              outcome: "heldout_failed",
-              cost_cents: 0,
-              elapsed_ms: 0,
-              diff: "",
-              events: [{ seq: 1, ts: Date.now() / 1000, role: "system", message: "EvoForge Pipeline lane initialized" }],
-            },
-          },
-          verdict: { winner: "tie", reason: "Arena match in progress..." },
-        };
-        setActiveArena(seeded);
-      }
-    } catch (e: any) {
-      setError(e.message || "Failed to start arena match");
-      setRunning(false);
+      if (!res?.arena_id) throw new Error("missing arena id");
+      setPendingId(res.arena_id);
+    } catch (cause) {
+      const status = cause instanceof Error ? /^(\d{3})\b/.exec(cause.message)?.[1] : undefined;
+      const reason = status === "402" ? "예산 부족으로 요청이 거부됐습니다."
+        : status ? `서버가 요청을 처리하지 못했습니다 (HTTP ${status}).`
+          : "서버 응답을 확인할 수 없습니다.";
+      setError(`${reason} 다시 시도하기 전에 서버 작업 이력을 확인해 주세요.`);
+      void refreshRecent();
+    } finally {
+      setStarting(false);
     }
   };
 
   const singleLane = activeArena?.lanes?.single;
   const evoLane = activeArena?.lanes?.evoforge;
+  const evoView = laneView(evoLane);
+  const singleView = laneView(singleLane);
+  const verdict = arenaVerdict(activeArena);
+  const verificationInconclusive = activeArena?.verdict?.winner === "inconclusive"
+    || evoView.outcome === "verification_inconclusive" || singleView.outcome === "verification_inconclusive";
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
@@ -233,10 +222,14 @@ export default function ArenaPage() {
       </div>
 
       {error && (
-        <div className="bg-red-950/50 border border-red-500/40 text-red-300 text-xs px-4 py-2.5 rounded-lg">
+        <div role="alert" className="bg-red-950/50 border border-red-500/40 text-red-300 text-xs px-4 py-2.5 rounded-lg">
           {error}
+          {pollError && trackedId && <button type="button" onClick={() => { setPollError(false); setError(null); }} className="ml-3 underline">상태 다시 확인</button>}
         </div>
       )}
+      {starting && <p className="text-sm text-text-secondary">실행 요청 중…</p>}
+      {pendingId && !activeArena && <p className="text-sm text-text-secondary">작업 {pendingId} 상태 확인 중…</p>}
+      {activeArena?.status === "failed" && <p role="alert" className="text-sm text-red-300">실행 실패: {activeArena.error || "서버가 실패 사유를 제공하지 않았습니다."} 입력을 확인한 뒤 다시 실행할 수 있습니다.</p>}
 
       {/* Task Goal Display */}
       {activeArena && (
@@ -270,22 +263,22 @@ export default function ArenaPage() {
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-text-primary">
-                {evoLane?.heldout.passed ?? 0}/{evoLane?.heldout.n ?? 0}
+                {evoView.score ?? (evoView.outcome === "verification_inconclusive" ? "검증 불확실" : evoView.status === "failed" ? "실행 실패" : "결과 대기")}
               </span>
-              <span className="text-xs text-emerald-300 font-medium">hidden tests passed</span>
+              {evoView.score && <span className="text-xs text-emerald-300 font-medium">봉인 테스트 통과</span>}
             </div>
             <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-emerald-500/20 pt-2">
-              <span>{t("cost")}: <strong className="text-text-primary">{evoLane?.cost_cents ?? 0}¢</strong></span>
-              <span>{t("attempts")}: <strong className="text-text-primary">{evoLane?.attempts ?? 0}</strong></span>
-              <span>Outcome: <strong className="text-text-primary font-mono">{evoLane?.outcome ?? "—"}</strong></span>
+              <span>{costLabel(evoView.costState)}: <strong className="text-text-primary">{evoView.cost === null ? "—" : `${evoView.cost}¢`}</strong></span>
+              <span>{t("attempts")}: <strong className="text-text-primary">{evoView.attempts ?? "—"}</strong></span>
+              <span>결과: <strong className="text-text-primary font-mono">{evoView.outcome ?? "미확인"}</strong></span>
             </div>
           </Card>
 
           {/* Verdict Banner (Center) */}
           <Card className={`p-4 border flex flex-col justify-center items-center text-center ${
-            activeArena.verdict?.winner === "evoforge"
+            verdict?.winner === "evoforge"
               ? "bg-emerald-950/40 border-emerald-500/50"
-              : activeArena.verdict?.winner === "single"
+              : verdict?.winner === "single"
               ? "bg-blue-950/40 border-blue-500/50"
               : "bg-background-tertiary border-border"
           }`}>
@@ -297,23 +290,25 @@ export default function ArenaPage() {
                 <span className="animate-spin text-base">⚙️</span>
                 <span>{t("running-match")}</span>
               </div>
+            ) : !verdict ? (
+              <div className="text-text-secondary text-sm">{verificationInconclusive ? "검증 불확실 · 비교 보류" : activeArena.status === "failed" ? "비교 실패 · 결과 미확인" : "결과 미확인"}</div>
             ) : (
               <div>
                 <span className={`text-base font-extrabold ${
-                  activeArena.verdict?.winner === "evoforge"
+                  verdict.winner === "evoforge"
                     ? "text-emerald-400"
-                    : activeArena.verdict?.winner === "single"
+                    : verdict.winner === "single"
                     ? "text-blue-400"
                     : "text-text-secondary"
                 }`}>
-                  {activeArena.verdict?.winner === "evoforge"
+                  {verdict.winner === "evoforge"
                     ? "🏆 " + t("winner-evoforge")
-                    : activeArena.verdict?.winner === "single"
+                    : verdict.winner === "single"
                     ? "🤖 " + t("winner-single")
                     : "🤝 " + t("winner-tie")}
                 </span>
                 <p className="text-xs text-text-tertiary mt-1 max-w-sm">
-                  {activeArena.verdict?.reason}
+                  {verdict.reason}
                 </p>
               </div>
             )}
@@ -326,14 +321,14 @@ export default function ArenaPage() {
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-text-primary">
-                {singleLane?.heldout.passed ?? 0}/{singleLane?.heldout.n ?? 0}
+                {singleView.score ?? (singleView.outcome === "verification_inconclusive" ? "검증 불확실" : singleView.status === "failed" ? "실행 실패" : "결과 대기")}
               </span>
-              <span className="text-xs text-blue-300 font-medium">hidden tests passed</span>
+              {singleView.score && <span className="text-xs text-blue-300 font-medium">봉인 테스트 통과</span>}
             </div>
             <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-blue-500/20 pt-2">
-              <span>{t("cost")}: <strong className="text-text-primary">{singleLane?.cost_cents ?? 0}¢</strong></span>
-              <span>{t("attempts")}: <strong className="text-text-primary">{singleLane?.attempts ?? 0}</strong></span>
-              <span>Outcome: <strong className="text-text-primary font-mono">{singleLane?.outcome ?? "—"}</strong></span>
+              <span>{costLabel(singleView.costState)}: <strong className="text-text-primary">{singleView.cost === null ? "—" : `${singleView.cost}¢`}</strong></span>
+              <span>{t("attempts")}: <strong className="text-text-primary">{singleView.attempts ?? "—"}</strong></span>
+              <span>결과: <strong className="text-text-primary font-mono">{singleView.outcome ?? "미확인"}</strong></span>
             </div>
           </Card>
         </div>
@@ -352,11 +347,12 @@ export default function ArenaPage() {
                 <span className="text-xs text-text-tertiary">{t("evoforge-sub")}</span>
               </div>
               <StatusPill
-                status={evoLane?.status || "pending"}
-                passed={evoLane?.heldout.passed}
-                n={evoLane?.heldout.n}
+                status={evoView.outcome === "verification_inconclusive" ? "inconclusive" : evoView.status}
+                passed={evoView.score ? evoLane?.heldout.passed : undefined}
+                n={evoView.score ? evoLane?.heldout.n : undefined}
               />
             </div>
+            {evoView.status === "failed" && <p role="alert" className="text-sm text-red-300">실패: {evoView.error || "사유 미제공"}</p>}
 
             {/* Diff Viewer */}
             <Card className="bg-background-secondary border border-border p-3 space-y-2">
@@ -403,11 +399,12 @@ export default function ArenaPage() {
                 <span className="text-xs text-text-tertiary">{t("single-sub")}</span>
               </div>
               <StatusPill
-                status={singleLane?.status || "pending"}
-                passed={singleLane?.heldout.passed}
-                n={singleLane?.heldout.n}
+                status={singleView.outcome === "verification_inconclusive" ? "inconclusive" : singleView.status}
+                passed={singleView.score ? singleLane?.heldout.passed : undefined}
+                n={singleView.score ? singleLane?.heldout.n : undefined}
               />
             </div>
+            {singleView.status === "failed" && <p role="alert" className="text-sm text-red-300">실패: {singleView.error || "사유 미제공"}</p>}
 
             {/* Diff Viewer */}
             <Card className="bg-background-secondary border border-border p-3 space-y-2">
@@ -455,10 +452,15 @@ export default function ArenaPage() {
           <p className="text-xs text-text-tertiary">{t("empty-matches")}</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {recentArenas.map((ar) => (
+            {recentArenas.map((ar) => {
+              const result = arenaVerdict(ar);
+              const evoResult = laneView(ar.lanes?.evoforge);
+              const singleResult = laneView(ar.lanes?.single);
+              const cost = arenaCost(ar);
+              return (
               <div
                 key={ar.arena_id}
-                onClick={() => setActiveArena(ar)}
+                onClick={() => { if (!running) { setActiveArena(ar); setPollError(false); setError(null); } }}
                 className={`p-3 rounded-lg cursor-pointer transition border hover:border-emerald-500/60 ${
                   activeArena?.arena_id === ar.arena_id
                     ? "border-emerald-500 bg-emerald-950/20"
@@ -468,25 +470,25 @@ export default function ArenaPage() {
                 <div className="flex items-center justify-between text-xs font-mono text-text-tertiary">
                   <span>{ar.arena_id}</span>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    ar.verdict?.winner === "evoforge" ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30" :
-                    ar.verdict?.winner === "single" ? "bg-blue-950 text-blue-300 border border-blue-500/30" :
+                    result?.winner === "evoforge" ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30" :
+                    result?.winner === "single" ? "bg-blue-950 text-blue-300 border border-blue-500/30" :
                     "bg-slate-800 text-slate-300"
                   }`}>
-                    {ar.verdict?.winner || ar.status}
+                    {result?.winner ?? (ar.status === "running" ? "진행 중" : ar.verdict?.winner === "inconclusive" || evoResult.outcome === "verification_inconclusive" || singleResult.outcome === "verification_inconclusive" ? "검증 불확실 · 비교 보류" : ar.status === "failed" ? "실패" : "결과 미확인")}
                   </span>
                 </div>
                 <p className="text-xs font-medium text-text-primary mt-1.5 line-clamp-2">
                   [{ar.task_id}] {ar.goal}
                 </p>
                 <div className="flex items-center justify-between text-[11px] text-text-secondary mt-2 pt-2 border-t border-border/50">
-                  <span>Evo: {ar.lanes?.evoforge?.heldout?.passed ?? 0}/{ar.lanes?.evoforge?.heldout?.n ?? 0}</span>
-                  <span>Single: {ar.lanes?.single?.heldout?.passed ?? 0}/{ar.lanes?.single?.heldout?.n ?? 0}</span>
+                  <span>Evo: {evoResult.score ?? (evoResult.outcome === "verification_inconclusive" ? "검증 불확실" : "결과 대기")}</span>
+                  <span>Single: {singleResult.score ?? (singleResult.outcome === "verification_inconclusive" ? "검증 불확실" : "결과 대기")}</span>
                   <span className="font-semibold text-emerald-400">
-                    {(ar.lanes?.evoforge?.cost_cents ?? 0) + (ar.lanes?.single?.cost_cents ?? 0)}¢
+                    {cost === null ? "비용 미확인" : `서버 합계 ${cost}¢ · 출처 개별 확인`}
                   </span>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </div>

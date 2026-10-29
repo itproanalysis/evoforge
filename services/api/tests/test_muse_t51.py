@@ -100,7 +100,9 @@ def test_empty_diff_round_is_failed_with_preview(monkeypatch):
         assert HEX64.match(snap["source_sha"])
         assert snap["heldout"] == {"passed": 0, "n": 3}
         assert snap["round_tests"] == {"passed": 0, "n": 3}
-        assert isinstance(snap["preview_html"], str) and snap["preview_html"]
+        # SNAP-05: a failed checkpoint must not display the prior round as its output.
+        assert snap["preview_html"] == ""
+        assert snap["preview_error"]
         assert HEX64.match(snap["preview_sha"])
         assert isinstance(snap["diff"], str) and isinstance(snap["attempts"], int)
         assert isinstance(snap["cost_cents"], int) and isinstance(snap["elapsed_ms"], int)

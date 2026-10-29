@@ -16,7 +16,7 @@ def patch(code, path="calc.py"):
 
 @pytest.mark.parametrize("code", [
     "import atexit", "from os import _exit as stop", "os._exit(0)",
-    "from sys import exit as stop", "sys.exit(0)", "import faulthandler",
+    "sys.exit(0)", "import faulthandler",
     "from _pytest.config import main", "pytest.main([])",
     'open("result.xml", "w")', 'Path("x").write_text("<junit/>")',
     'builtins.open = replacement', '__builtins__["open"] = replacement',

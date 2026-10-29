@@ -431,6 +431,17 @@ def _preview_snapshot(files: dict) -> dict:
 # Scoring + diff application
 # ---------------------------------------------------------------------------
 
+def _preview_ready(preview: dict) -> bool:
+    html = preview.get("preview_html")
+    return (not preview.get("preview_error") and isinstance(html, str) and bool(html.strip())
+            and preview.get("preview_sha") == "sha256:" + hashlib.sha256(html.encode("utf-8")).hexdigest())
+
+
+def _failed_preview() -> dict:
+    return {"preview_html": "", "preview_error": "round failed; no candidate preview",
+            "preview_sha": "sha256:" + hashlib.sha256(b"").hexdigest()}
+
+
 def _safe_path(path: str) -> bool:
     import ntpath
 
@@ -450,6 +461,8 @@ def _apply_diff_to_files(files: dict, diff: str, recount: bool) -> tuple[dict | 
     if diff is None or (isinstance(diff, str) and not diff.strip()):
         return None, False
     if not isinstance(diff, str):
+        return None, False
+    if _sealed._candidate_verification_failures(diff):
         return None, False
     try:
         from evoforge import patch as _patch
@@ -509,17 +522,12 @@ def _score_files_counted(files: dict, heldout: list[dict],
             raise _sealed.SealedEvalError(f"sealed run failed: {type(e).__name__}")
         if not isinstance(result, dict) or result.get("timed_out"):
             raise _sealed.SealedTimeout("sealed held-out run timed out")
-        try:
-            n = int(result.get("n", 0) or 0)
-        except (TypeError, ValueError):
-            n = 0
-        try:
-            passed = int(result.get("pass", 0) or 0)
-        except (TypeError, ValueError):
-            passed = 0
-        passed = max(0, min(passed, n)) if n else 0
+        if not _sealed._heldout_result_is_consistent(result, len(heldout)):
+            return 0, len(heldout), [{"test": "held-out", "message": "verification inconclusive",
+                                      "verification": "INCONCLUSIVE"}]
+        n, passed = result["n"], result["pass"]
         failures: list[dict] = []
-        if n < len(heldout) or passed != n:
+        if passed != n:
             failures = _sealed._parse_failure_xml(xml)
             if not failures:
                 failures = [{"test": "held-out", "message": "assertion failed"}]
@@ -573,12 +581,16 @@ def _score_and_preview(files: dict, cumulative: list[dict],
     ok_cum, res_cum = out.get("cum", (False, RuntimeError("scoring did not run")))
     if ok_cum:
         c_passed, c_n, c_fail = res_cum
+        if _sealed._failed_run_outcome(c_fail) == "verification_inconclusive":
+            sandbox_error = "execution verification inconclusive"
     else:
         sandbox_error = _short_error(res_cum) if isinstance(res_cum, BaseException) else str(res_cum)[:300]
         c_passed, c_n, c_fail = 0, len(cumulative), []
     ok_rnd, res_rnd = out.get("rnd", (False, RuntimeError("scoring did not run")))
     if ok_rnd:
         r_passed, r_n, _rf = res_rnd
+        if _sealed._failed_run_outcome(_rf) == "verification_inconclusive":
+            sandbox_error = "execution verification inconclusive"
     else:
         if sandbox_error is None:
             sandbox_error = _short_error(res_rnd) if isinstance(res_rnd, BaseException) else str(res_rnd)[:300]
@@ -714,6 +726,9 @@ def _run_single_round(app_round: dict, cumulative: list[dict],
             _emit(events, "gate", f"single: FAILED ({sandbox_error[:80]})")
         else:
             _emit(events, "gate", "single: FAILED (no applicable change this round)")
+    elif not _preview_ready(preview):
+        status, verified = "UNVERIFIED", False
+        _emit(events, "gate", "preview missing, failed or digest inconsistent; snapshot UNVERIFIED")
     elif c_n > 0 and c_passed == c_n:
         status = "READY"
         verified = True
@@ -725,6 +740,7 @@ def _run_single_round(app_round: dict, cumulative: list[dict],
     # A FAILED round keeps the lane's previous files
     if status == "FAILED":
         new_files = dict(lane_files)
+        preview = _failed_preview()
     snap: dict = {"status": status, "verified": bool(verified),
                   "source_sha": _files_sha(new_files),
                   "heldout": {"passed": int(c_passed), "n": int(c_n)},
@@ -954,6 +970,9 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
         _emit(events, "gate", "evoforge: FAILED (no applicable change this round)")
         if error is not None and sandbox_error is not None:
             _emit(events, "gate", f"evoforge: FAILED ({str(error)[:80]})")
+    elif not _preview_ready(preview):
+        status, verified = "UNVERIFIED", False
+        _emit(events, "gate", "preview missing, failed or digest inconsistent; snapshot UNVERIFIED")
     elif c_n > 0 and c_passed == c_n:
         status = "READY"
         verified = True
@@ -964,6 +983,7 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
         _emit(events, "gate", f"evoforge: UNVERIFIED ({c_passed}/{c_n})")
     if status == "FAILED":
         new_files = dict(lane_files)
+        preview = _failed_preview()
     snap = {"status": status, "verified": bool(verified),
             "source_sha": _files_sha(new_files),
             "heldout": {"passed": int(c_passed), "n": int(c_n)},

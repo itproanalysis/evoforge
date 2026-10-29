@@ -221,7 +221,9 @@ def test_component_wiring():
 def test_page_and_api_and_nav():
     page = PAGE.read_text(encoding="utf-8")
     assert "listEvolutionRuns" in page and "getEvolutionRun" in page
-    assert "RoundReplay" in page and "5000" in page and "running" in page
+    loader = (WEB / "lib" / "replaySelection.ts").read_text(encoding="utf-8")
+    assert "RoundReplay" in page and "watchReplaySelection" in page
+    assert "5000" in loader and 'status === "running"' in loader
     api = API.read_text(encoding="utf-8")
     assert "listEvolutionRuns" in api and "getEvolutionRun" in api
     assert "/v1/evolution/runs" in api

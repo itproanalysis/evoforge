@@ -276,6 +276,7 @@ def _lane_skeleton(status: str, n: int) -> dict:
     return {"status": status, "attempts": 0,
             "heldout": {"passed": 0, "n": int(n)},
             "outcome": "heldout_failed", "cost_cents": 0,
+            "usage_missing": None, "cost_status": "pending",
             "elapsed_ms": 0, "diff": "", "events": [],
             "preview_source": "none"}
 
@@ -593,17 +594,12 @@ def _score_heldout_counted(sandbox: str, heldout: list[dict],
         raise _sealed.SealedEvalError(f"sealed run failed: {type(e).__name__}")
     if not isinstance(result, dict) or result.get("timed_out"):
         raise _sealed.SealedTimeout("sealed held-out run timed out")
-    try:
-        n = int(result.get("n", 0) or 0)
-    except (TypeError, ValueError):
-        n = 0
-    try:
-        passed = int(result.get("pass", 0) or 0)
-    except (TypeError, ValueError):
-        passed = 0
-    passed = max(0, min(passed, n)) if n else 0
+    if not _sealed._heldout_result_is_consistent(result, len(heldout)):
+        return 0, len(heldout), [{"test": "held-out", "message": "verification inconclusive",
+                                  "verification": "INCONCLUSIVE"}]
+    n, passed = result["n"], result["pass"]
     failures: list[dict] = []
-    if n < len(heldout) or passed != n:
+    if passed != n:
         failures = _sealed._parse_failure_xml(xml)
         if not failures:
             failures = [{"test": "held-out", "message": "assertion failed"}]
@@ -616,6 +612,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
     events: list[dict] = []
     n_total = len(task["heldout"])
     cost = 0
+    usage_missing = False
     attempts = 0
     diff = ""
     applied = False
@@ -648,6 +645,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
         if out is not None:
             attempts = 1
             cost = int(actual)
+            usage_missing = bool(_missing)
             cand = out.get("diff") if isinstance(out, dict) else ""
             diff = cand if isinstance(cand, str) else ""
             _emit(events, "builder",
@@ -658,6 +656,10 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
                 passed, n = 0, n_total
                 _emit(events, "runner",
                       "single: empty diff, held-out not run")
+            elif _sealed._candidate_verification_failures(diff):
+                outcome = "verification_inconclusive"
+                passed, n = 0, n_total
+                _emit(events, "runner", "single: candidate requires independent execution verification")
             elif _sealed._apply_candidate(dest, diff, recount=False):
                 applied = True
                 _emit(events, "runner",
@@ -668,7 +670,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
                 if n_total > 0 and passed == n and n >= n_total:
                     outcome = "passed"
                 else:
-                    outcome = "heldout_failed"
+                    outcome = _sealed._failed_run_outcome(failures)
                 failing = _sealed._failing_test_names(failures, task["heldout"])
                 detail = f"single: held-out {passed}/{n} passed"
                 if failing:
@@ -690,6 +692,9 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
     lane = {"status": status, "attempts": attempts,
             "heldout": {"passed": int(passed), "n": int(n)},
             "outcome": outcome, "cost_cents": int(cost),
+            "usage_missing": usage_missing,
+            "cost_status": ("incomplete" if status != "succeeded" else
+                            "estimated" if usage_missing else "usage_reported"),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
     if base_tree_sha is not None:
@@ -727,6 +732,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
     max_attempts = max(1, min(int(max_attempts),
                               _sealed.PIPELINE_MAX_ATTEMPTS))
     cost = 0
+    usage_missing = False
     attempts = 0
     diff = ""
     applied = False
@@ -763,6 +769,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                 break
             attempts += 1
             cost += int(actual)
+            usage_missing = usage_missing or bool(_missing)
             score = 0.0
             cand = out.get("diff") if isinstance(out, dict) else ""
             diff = cand if isinstance(cand, str) else ""
@@ -775,6 +782,11 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                              "message": "assertion failed"}]
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} empty diff")
+            elif _sealed._candidate_verification_failures(diff):
+                outcome, failing = "verification_inconclusive", []
+                passed, n = 0, n_total
+                failures = _sealed._candidate_verification_failures(diff)
+                _emit(events, "runner", "evoforge: candidate requires independent execution verification")
             elif _sealed._apply_candidate(dest, diff, recount=True):
                 applied = True
                 _emit(events, "runner",
@@ -790,7 +802,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                           f"evoforge: attempt {attempts} held-out "
                           f"{passed}/{n} passed")
                     break
-                outcome = "heldout_failed"
+                outcome = _sealed._failed_run_outcome(failures)
                 failing = _sealed._failing_test_names(failures,
                                                       task["heldout"])
                 detail = (f"evoforge: attempt {attempts} held-out "
@@ -823,6 +835,9 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
     lane = {"status": status, "attempts": attempts,
             "heldout": {"passed": int(passed), "n": int(n)},
             "outcome": outcome, "cost_cents": int(cost),
+            "usage_missing": usage_missing,
+            "cost_status": ("incomplete" if status != "succeeded" else
+                            "estimated" if usage_missing else "usage_reported"),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
     if base_tree_sha is not None:
@@ -849,6 +864,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
     max_attempts = max(1, min(int(max_attempts),
                               _sealed.PIPELINE_MAX_ATTEMPTS))
     cost = 0
+    usage_missing = False
     attempts = 0
     diff = ""
     applied = False
@@ -876,6 +892,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
             _emit(events, "gate", "evoforge: empty_diff after 0 attempt(s)")
             raise _DoneCriticLane()
         cost += int(cactual)
+        usage_missing = bool(_cmissing)
         critic_suite = _sealed._critic_suite_from_output(cout)
         total = len(critic_suite)
         _emit(events, "critic", f"Critic wrote {total} tests")
@@ -901,6 +918,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                 break
             attempts += 1
             cost += int(actual)
+            usage_missing = usage_missing or bool(_missing)
             cand = out.get("diff") if isinstance(out, dict) else ""
             diff = cand if isinstance(cand, str) else ""
             if _sealed._is_empty_diff(diff):
@@ -913,6 +931,13 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} empty diff")
                 goal = _sealed._critic_empty_feedback(task["goal"])
+                continue
+            if _sealed._candidate_verification_failures(diff):
+                applied = False
+                passed, n = 0, n_total
+                failing, last_dest, last_diff = [], None, diff
+                last_outcome = outcome = "verification_inconclusive"
+                goal = task["goal"] + "\nPrevious candidate could not be independently verified."
                 continue
             if not _sealed._apply_candidate(dest, diff, recount=True):
                 applied = False
@@ -935,6 +960,13 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
             _emit(events, "runner",
                   f"evoforge: attempt {attempts} critic "
                   f"{c_passed}/{total} passed")
+            if _sealed._failed_run_outcome(c_failures) == "verification_inconclusive":
+                passed, n = 0, n_total
+                failing, last_dest, last_diff = [], None, diff
+                applied = False
+                last_outcome = outcome = "verification_inconclusive"
+                goal = task["goal"] + "\nPrevious candidate could not be independently verified."
+                continue
             if not critic_suite or (c_n >= total and c_passed == c_n):
                 h_passed, h_n, h_failures = _score_heldout_counted(
                     dest, task["heldout"], timeout_s, tmpbase)
@@ -946,7 +978,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                     outcome = "passed"
                     failing = []
                 else:
-                    outcome = "heldout_failed"
+                    outcome = _sealed._failed_run_outcome(h_failures)
                     failing = _sealed._failing_test_names(
                         h_failures, task["heldout"])
                 last_outcome = outcome
@@ -980,7 +1012,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                     outcome = "passed"
                     failing = []
                 else:
-                    outcome = "heldout_failed"
+                    outcome = _sealed._failed_run_outcome(h_failures)
                     failing = _sealed._failing_test_names(
                         h_failures, task["heldout"])
             else:
@@ -1002,6 +1034,9 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
     lane = {"status": status, "attempts": attempts,
             "heldout": {"passed": int(passed), "n": int(n)},
             "outcome": outcome, "cost_cents": int(cost),
+            "usage_missing": usage_missing,
+            "cost_status": ("incomplete" if status != "succeeded" else
+                            "estimated" if usage_missing else "usage_reported"),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
     if base_tree_sha is not None:
@@ -1112,9 +1147,12 @@ def run_arena(suite_version: str, task_id: str, model: str,
             sp, ep = int(sp), int(ep)
         except (TypeError, ValueError):
             sp, ep = 0, 0
-        verdict = _verdict(sp, ep)
         failed = [lane for lane in (single, evo)
                   if lane.get("status") != "succeeded"]
+        inconclusive = any(lane.get("outcome") == "verification_inconclusive"
+                           for lane in (single, evo))
+        verdict = ({"winner": "inconclusive", "reason": "comparison requires verified lane results"}
+                   if failed or inconclusive else _verdict(sp, ep))
         if failed:
             status = "failed"
             error = next((lane.get("error") for lane in failed
@@ -1135,7 +1173,7 @@ def run_arena(suite_version: str, task_id: str, model: str,
         single["error"] = error
         evo["error"] = error
         status = "failed"
-        verdict = _verdict(0, 0)
+        verdict = {"winner": "inconclusive", "reason": "arena execution failed"}
         if manifest is None:
             try:
                 prev = get_arena(aid)

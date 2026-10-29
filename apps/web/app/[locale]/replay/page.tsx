@@ -5,90 +5,72 @@ import { useTranslations } from "next-intl";
 import {
   getEvolutionRun,
   listEvolutionRuns,
-  type EvolutionRun,
   type EvolutionRunSummary,
 } from "../../../lib/api";
 import { RoundReplay } from "../../../components/RoundReplay";
+import { watchReplaySelection, type ReplaySelection } from "../../../lib/replaySelection";
 import { AgentPanel } from "../../../components/AgentPanel";
 import { CommandBar } from "../../../components/CommandBar";
 import { EvolutionStats } from "../../../components/EvolutionStats";
 
 export default function ReplayPage() {
   const t = useTranslations("replay");
+  const tCommon = useTranslations("common");
   const [runs, setRuns] = useState<EvolutionRunSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selected, setSelected] = useState<EvolutionRun | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const refreshRuns = async () => {
-    try {
-      const res = await listEvolutionRuns();
-      const list = Array.isArray(res.runs) ? res.runs : [];
-      setRuns(list);
-      return list;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "failed to list runs");
-      return [];
-    }
-  };
+  const [selection, setSelection] = useState<ReplaySelection | null>(null);
+  const [listLoading, setListLoading] = useState(true);
+  const [listError, setListError] = useState(false);
+  const [listAttempt, setListAttempt] = useState(0);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  // Hide the prior run immediately, even before the selection effect runs.
+  const current = selection?.runId === selectedId ? selection : null;
+  const selected = current?.status === "ready" ? current.run : null;
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const list = await refreshRuns();
-      if (cancelled) return;
-      if (list.length > 0) setSelectedId(list[0].run_id);
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    if (!selectedId) return;
-    let cancelled = false;
+    setListLoading(true);
+    setListError(false);
     (async () => {
       try {
-        const doc = await getEvolutionRun(selectedId);
-        if (!cancelled) setSelected(doc);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "failed to load run");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedId]);
-
-  useEffect(() => {
-    if (!selected || selected.status !== "running") return;
-    const id = setInterval(async () => {
-      try {
-        const doc = await getEvolutionRun(selected.run_id);
-        setSelected(doc);
+        const res = await listEvolutionRuns();
+        if (cancelled) return;
+        const list = Array.isArray(res.runs) ? res.runs : [];
+        setRuns(list);
+        setSelectedId((id) => list.some((run) => run.run_id === id) ? id : list[0]?.run_id ?? null);
       } catch {
-        // keep the last snapshot while the run is still going
+        if (!cancelled) setListError(true);
+      } finally {
+        if (!cancelled) setListLoading(false);
       }
-    }, 5000);
-    return () => clearInterval(id);
-  }, [selected?.run_id, selected?.status]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [listAttempt]);
 
-  const handleStarted = async (runId: string) => {
-    const list = await refreshRuns();
-    if (list.some((r) => r.run_id === runId)) {
-      setSelectedId(runId);
-    } else {
-      setSelectedId(runId);
+  useEffect(() => {
+    if (!selectedId) {
+      setSelection(null);
+      return;
     }
+    return watchReplaySelection(selectedId, getEvolutionRun, setSelection);
+  }, [selectedId, loadAttempt]);
+
+  // A run started from the command bar: reload the list (it will include the new run) and select it.
+  const handleStarted = (runId: string) => {
+    setSelectedId(runId);
+    setListAttempt((n) => n + 1);
   };
 
   return (
-    <div style={{ paddingBottom: 110 }}>
+    <div>
       <h1>{t("title")}</h1>
-      {error && <p style={{ color: "#f87171" }}>{error}</p>}
       <EvolutionStats />
-      {runs.length === 0 ? (
+      {listError && <p role="alert" style={{ color: "#f87171" }}>
+        {t("load-failed")} <button type="button" onClick={() => setListAttempt((n) => n + 1)}>{t("retry")}</button>
+      </p>}
+      {listLoading ? <p role="status">{tCommon("loading")}</p> : !listError && runs.length === 0 ? (
         <p style={{ color: "#8b93a7" }}>{t("empty")}</p>
       ) : (
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 12 }}>
@@ -109,14 +91,20 @@ export default function ReplayPage() {
             ))}
           </div>
           <div style={{ flex: "3 1 420px" }}>
+            {current?.status === "error" && <p role="alert" style={{ color: "#f87171" }}>
+              {t("load-failed")} <button type="button" onClick={() => setLoadAttempt((n) => n + 1)}>{t("retry")}</button>
+            </p>}
+            {current?.status === "ready" && current.refreshError !== undefined && <p role="alert" style={{ color: "#fbbf24" }}>
+              {t("refresh-failed")} <button type="button" onClick={() => setLoadAttempt((n) => n + 1)}>{t("retry")}</button>
+            </p>}
             {selected ? (
               <>
                 <RoundReplay key={selected.run_id} run={selected} />
                 <AgentPanel run={selected} />
               </>
-            ) : (
-              <p style={{ color: "#8b93a7" }}>{t("empty")}</p>
-            )}
+            ) : selectedId && current?.status !== "error" ? (
+              <p role="status" style={{ color: "#8b93a7" }}>{tCommon("loading")}</p>
+            ) : null}
           </div>
         </div>
       )}
