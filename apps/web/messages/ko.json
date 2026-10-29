@@ -19,7 +19,8 @@
     "performance": "성과 분석",
     "autopilot": "오토파일럿",
     "leaderboard": "리더보드",
-    "arena": "아레나"
+    "arena": "아레나",
+    "replay": "리플레이"
   },
   "mission-control": {
     "heading": "미션 컨트롤",
@@ -450,5 +451,23 @@
     "passed": "통과",
     "running": "실행 중",
     "succeeded": "완료"
+  },
+  "replay": {
+    "title": "라운드 리플레이",
+    "first": "처음",
+    "latest": "최근",
+    "play": "재생",
+    "pause": "일시정지",
+    "recorded-run": "기록된 실행",
+    "pending": "대기 중",
+    "failed": "실패",
+    "unverified": "미검증",
+    "ready": "준비됨",
+    "evoforge": "EvoForge",
+    "single": "단일 AI",
+    "empty": "기록된 실행이 아직 없습니다.",
+    "cost": "비용",
+    "score": "점수",
+    "totals": "합계"
   }
 }
