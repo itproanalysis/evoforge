@@ -1651,6 +1651,64 @@ def arena_chain(arena_id: str):
     return {"rounds": rounds}
 
 
+def _proof_arena_key(arena_id: str) -> str:
+    return f"proofcert_arena_{arena_id}"
+
+
+def _mint_arena_proof(arena_id: str) -> dict:
+    """Return the stored arena proof certificate (stable since T70).
+
+    The first call mints and stores exactly one certificate body; later
+    calls return the stored one (never re-signed). The HTTP "verify"
+    envelope is added on top on every read. Certificates are also stored
+    under the shared proof certificate key namespace so they are served
+    by GET /v1/proof/cert/{certificate_id}.
+    """
+    doc = arena_mod.get_arena(arena_id)
+    if doc is None:
+        raise HTTPException(404, "unknown arena")
+    if doc.get("status") not in ("succeeded", "failed"):
+        raise HTTPException(409, "arena is not finished")
+    ev_key = _proof_arena_key(arena_id)
+    if ev_key in _evidence:
+        try:
+            cached = _stored_cert_body(_evidence[ev_key])
+        except KeyError:
+            cached = None
+        if cached is not None:
+            return {**cached, "verify": proof_mod.verify(cached)}
+    cert = proof_mod.mint_arena(doc)
+    cert_key = _proof_cert_key(cert.get("certificate_id", ""))
+    try:
+        _evidence[ev_key] = {"id": ev_key, "arena_id": arena_id,
+                             "certificate": cert}
+    except KernelRejected:
+        try:
+            winner = _stored_cert_body(_evidence[ev_key])
+        except KeyError:
+            winner = None
+        if winner is not None:
+            return {**winner, "verify": proof_mod.verify(winner)}
+        return {**cert, "verify": proof_mod.verify(cert)}
+    try:
+        _evidence[cert_key] = {"id": cert_key, "arena_id": arena_id,
+                               "certificate": cert}
+    except KernelRejected:
+        pass
+    try:
+        winner = _stored_cert_body(_evidence[ev_key])
+    except KeyError:
+        winner = None
+    final = winner if winner is not None else cert
+    return {**final, "verify": proof_mod.verify(final)}
+
+
+@app.get("/v1/arena/{arena_id}/proof")
+def arena_proof(arena_id: str):
+    """Signed arena result certificate: digests, never code."""
+    return _mint_arena_proof(arena_id)
+
+
 @app.get("/v1/performance")
 def performance():
     """Measured-only performance summary; missing data is not_measured."""

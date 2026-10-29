@@ -1,0 +1,20 @@
+{
+  "id": "T70_arena_certificates",
+  "planned_by": "Claude (Critic): verifiable published comparisons",
+  "goal": "T70 — signed Arena results (so a published comparison, e.g. in the demo video, can be checked offline). Reuse\nservices/api/evoforge/proof.py (Ed25519 with EVO_PROOF_SIGNING_KEY; same canonical signing and proof.verify).\n- GET /v1/arena/{id}/proof: unknown -> 404; not finished (status not succeeded/failed) -> 409. The first call mints\n  and stores ONE certificate; later calls return the stored one (same certificate_id and signature), with the usual\n  \"verify\" envelope ({...cert, \"verify\": proof.verify(cert)}). It is also served by GET /v1/proof/cert/{certificate_id}\n  (store it under the same certificate key namespace main.py uses for evidence certificates).\n- Certificate body (signed fields): certificate_id, kind \"arena\", arena_id, issued_at, mode (\"sealed\" or \"prompt\"),\n  round_index and root_id when present, verdict (the winner string: evoforge|single|tie|unscorable), model,\n  manifest: the arena's manifest hash/count/allowance fields (task_spec_hash, heldout_hash, base_tree_sha,\n  prompt_hash, acceptance_hash, acceptance_count, comparison_mode, cost_basis, lanes allowances — whichever exist),\n  lanes: {single|evoforge: {status, outcome, heldout {passed, n}, cost_cents, attempts, diff_sha256 (sha256 hex of the\n  lane's final diff, \"\" when none), preview_sha256 (sha256 hex of preview_html, \"\" when none)}}. Never include code,\n  diffs, preview HTML, held-out or judge tests. Unsigned (no key) -> the honest unsigned form proof.mint uses.\n  Add a proof.mint_arena(arena_doc) helper next to mint().\n- Proxy: allow GET /v1/arena/<id>/proof (proxyPolicy.ts + proxyPolicy.cases.json).\nTests: services/api/tests/test_muse_t70.py.",
+  "edit": [
+    "services/api/evoforge/proof.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t70.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t33_stable_certificates.py",
+    "services/api/evoforge/arena.py",
+    "services/api/tests/test_critic_t48_arena_manifest.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t70.py services/api/tests/test_sealed_t70_arena_certificates.py services/api/tests/test_critic_t33_stable_certificates.py services/api/tests/test_critic_t27_signed_proofs_and_evolution_budget.py services/api/tests/test_critic_t32_pr_carries_signed_proof.py services/api/tests/test_critic_t48_arena_manifest.py -q -p no:cacheprovider"
+  ]
+}
