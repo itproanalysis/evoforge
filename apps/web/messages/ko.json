@@ -468,6 +468,24 @@
     "empty": "기록된 실행이 아직 없습니다.",
     "cost": "비용",
     "score": "점수",
-    "totals": "합계"
+    "totals": "합계",
+    "start": "진화 시작",
+    "cost-warning": "실행을 시작하면 모델을 호출하고 비용이 발생합니다.",
+    "state-received": "접수됨",
+    "state-queued": "대기 중",
+    "state-running": "실행 중",
+    "state-applied": "적용됨",
+    "state-rejected": "거부됨",
+    "state-failed": "실패함",
+    "agents": "AI 에이전트",
+    "idle": "대기",
+    "active": "활성",
+    "done": "완료",
+    "app-label": "앱",
+    "feedback-label": "피드백",
+    "feedback-critic": "Critic",
+    "feedback-heldout": "Held-out",
+    "command-label": "명령",
+    "operator-only": "실시간 실행은 운영자만 시작할 수 있습니다. 여기서는 기록된 실행을 보여줍니다."
   }
 }
