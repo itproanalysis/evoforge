@@ -46,7 +46,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
   };
 
   return (
-    <div className="studio-composer fixed">
+    <div className="studio-composer fixed bottom-4">
       <div className="studio-composer-inner flex items-end gap-3 flex-wrap">
         <label className="flex-1 min-w-52 text-xs flex flex-col gap-1">
           <textarea
