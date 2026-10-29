@@ -718,3 +718,72 @@ export function getArena(arena_id: string) {
 export function listArenas() {
   return req<{ arenas: ArenaDoc[] }>("/v1/arena");
 }
+
+// --- R1-R5 round replay (recorded evolution runs) ---
+
+export type EvolutionSnapStatus = "READY" | "UNVERIFIED" | "FAILED" | "PENDING";
+
+export interface EvolutionSnap {
+  status: EvolutionSnapStatus;
+  verified?: boolean;
+  heldout?: { passed: number; n: number } | null;
+  cost_cents?: number | null;
+  elapsed_ms?: number | null;
+  source_sha?: string | null;
+  preview_html?: string | null;
+  preview_error?: string | null;
+  diff?: string | null;
+  events?: unknown[] | null;
+  [key: string]: unknown;
+}
+
+export interface EvolutionRound {
+  index: number;
+  name?: string;
+  goal?: string;
+  sides: { evoforge: EvolutionSnap; single: EvolutionSnap };
+}
+
+export interface EvolutionRunManifest {
+  app_id?: string;
+  rounds?: number;
+  cost_basis?: string;
+  runner_cost?: string;
+  disclosure?: string;
+  lanes?: unknown;
+  [key: string]: unknown;
+}
+
+export interface EvolutionRunLaneTotals {
+  cost_cents?: number | null;
+  elapsed_ms?: number | null;
+  verified_rounds?: number | null;
+  [key: string]: unknown;
+}
+
+export interface EvolutionRun {
+  run_id: string;
+  app_id?: string;
+  title?: string;
+  status?: string;
+  manifest?: EvolutionRunManifest;
+  rounds?: EvolutionRound[];
+  totals?: { evoforge?: EvolutionRunLaneTotals; single?: EvolutionRunLaneTotals };
+  [key: string]: unknown;
+}
+
+export interface EvolutionRunSummary {
+  run_id: string;
+  app_id?: string;
+  title?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+export function listEvolutionRuns() {
+  return req<{ runs: EvolutionRunSummary[] }>("/v1/evolution/runs");
+}
+
+export function getEvolutionRun(id: string) {
+  return req<EvolutionRun>(`/v1/evolution/runs/${encodeURIComponent(id)}`);
+}

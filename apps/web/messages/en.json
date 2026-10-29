@@ -19,7 +19,8 @@
     "performance": "Performance",
     "autopilot": "Autopilot",
     "leaderboard": "Leaderboard",
-    "arena": "Arena"
+    "arena": "Arena",
+    "replay": "Replay"
   },
   "mission-control": {
     "heading": "Mission Control",
@@ -450,5 +451,23 @@
     "passed": "PASS",
     "running": "RUNNING",
     "succeeded": "FINISHED"
+  },
+  "replay": {
+    "title": "Round Replay",
+    "first": "First",
+    "latest": "Latest",
+    "play": "Play",
+    "pause": "Pause",
+    "recorded-run": "Recorded run",
+    "pending": "Pending",
+    "failed": "Failed",
+    "unverified": "Unverified",
+    "ready": "Ready",
+    "evoforge": "EvoForge",
+    "single": "Single AI",
+    "empty": "No recorded runs yet.",
+    "cost": "Cost",
+    "score": "Score",
+    "totals": "Totals"
   }
 }

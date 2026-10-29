@@ -1,0 +1,24 @@
+{
+  "id": "T52_round_replay_ui",
+  "planned_by": "Claude (Critic): v3.8 §3",
+  "goal": "T52 — R1-R5 Replay page (v3.8 §3 signature UX; SNAP-02..05). Data comes from the T51 API (being built in\nparallel): GET /v1/evolution/runs -> {runs: [...]}, GET /v1/evolution/runs/{id} -> {run_id, app_id, title, status,\nmanifest {app_id, rounds, cost_basis, runner_cost, disclosure, lanes}, rounds: [{index, name, goal, sides: {evoforge:\nSNAP, single: SNAP}}], totals: {evoforge|single: {cost_cents, elapsed_ms, verified_rounds}}} where SNAP = {status:\nREADY|UNVERIFIED|FAILED|PENDING, verified, heldout {passed, n}, cost_cents, elapsed_ms, source_sha, preview_html?,\npreview_error?, diff?, events?}. Build the web side only (no API changes):\n\n1. apps/web/lib/roundReplay.ts — pure functions, no React, no fetch:\n   - roundView(run, index) -> null if that round is absent, else {index, name, sides: {evoforge: V, single: V}} with\n     V = {status, verified (true only for READY), score \"passed/n\" or \"—\", cost \"N¢\" or \"—\", previewHtml (that side's own\n     preview_html for that round, or null when PENDING/absent; never another round's or the other side's)}.\n   - latestCommonRound(run) -> highest round index where neither side is PENDING (0 if none).\n   - firstLatest(run) -> [1, latestCommonRound(run)].\n   - nextRound(i, run) -> i+1 if that round exists, else null (auto replay stops, no wraparound).\n   - totalsView(run) -> {evoforge|single: {cost \"N¢\", verified \"k/R\" with R = manifest.rounds, elapsed}}.\n2. apps/web/components/RoundReplay.tsx — client component taking {run}: R1..R5 scrubber (buttons, current highlighted,\n   each showing both sides' status dot), First and Latest buttons, Play/Pause auto replay (setInterval stepping with\n   nextRound; it only changes the selected round, it never fetches), two columns EvoForge | Single AI each with status\n   badge (READY/UNVERIFIED/FAILED/PENDING with distinct colours), cumulative score, cost, SandboxedPreview of that side's\n   previewHtml (fallback text when null), a totals strip and the manifest disclosure; a \"Recorded run\" label.\n   No fetch( in this file. Mobile (<768px): stack the two columns.\n3. apps/web/app/[locale]/replay/page.tsx — lists recent runs (listEvolutionRuns) and shows the selected one\n   (getEvolutionRun) with RoundReplay; empty state when there are no runs; poll every 5 s only while the run status is\n   \"running\".\n4. apps/web/lib/api.ts — add the types and listEvolutionRuns() / getEvolutionRun(id) using API_BASE + /v1/evolution/runs.\n5. Nav: add a Replay link (`${prefix}/replay`) in apps/web/app/[locale]/layout.tsx next to Arena.\n6. i18n: \"replay\" namespace in apps/web/messages/en.json and ko.json with at least: title, first, latest, play, pause,\n   recorded-run, pending, failed, unverified, ready, evoforge, single, empty, cost, score, totals.\nKeep tsc green. Tests: services/api/tests/test_muse_t52.py (may read the web files / run node like the sealed test).",
+  "edit": [
+    "apps/web/lib/roundReplay.ts",
+    "apps/web/components/RoundReplay.tsx",
+    "apps/web/app/[locale]/replay/page.tsx",
+    "apps/web/lib/api.ts",
+    "apps/web/app/[locale]/layout.tsx",
+    "apps/web/messages/en.json",
+    "apps/web/messages/ko.json",
+    "services/api/tests/test_muse_t52.py"
+  ],
+  "context": [
+    "docs/V38_EVOLUTION_ARENA_PLAN.md",
+    "apps/web/components/SandboxedPreview.tsx",
+    "apps/web/app/[locale]/arena/page.tsx"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t52.py services/api/tests/test_sealed_t52_round_replay_ui.py -q -p no:cacheprovider",
+    "node apps/web/node_modules/typescript/bin/tsc --noEmit --incremental false -p apps/web"
+  ]
+}

@@ -67,6 +67,12 @@ export default async function LocaleLayout({
                 <span>⚔️</span> {t('arena')}
               </a>
               <a
+                href={`${prefix}/replay`}
+                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
+              >
+                {t('replay')}
+              </a>
+              <a
                 href={`${prefix}/lab`}
                 className="text-text-tertiary no-underline text-sm hover:text-text-primary"
               >
