@@ -29,7 +29,8 @@
     "spec": "명세",
     "prompt": "무엇을 만들까요?",
     "followup": "어떻게 바꿀까요?",
-    "readonly": "실행 권한 필요"
+    "readonly": "실행 권한 필요",
+    "readonly-short": "보기 전용"
   },
   "studio": {
     "title": "작업실",

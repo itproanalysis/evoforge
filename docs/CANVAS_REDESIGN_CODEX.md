@@ -19,11 +19,11 @@ loaded. Preview source, cost provenance, base output, unconfirmed and failed
 states keep the existing conservative mappers. Auth, backend, model defaults,
 operator gating, spend confirmation and reservation/receipt paths are unchanged.
 
-Default/empty Korean desktop SSR text: **409 -> 75 non-whitespace characters,
-81.7% reduction** against source `333d88d9`. Includes placeholders; excludes
+Default/empty Korean desktop SSR text: **409 -> 79 non-whitespace characters,
+80.7% reduction** against source `333d88d9`. Includes placeholders; excludes
 hidden/mobile-only/assistive labels, closed disclosures and dialogs, and generated
 artifact text. The script and HTML hashes make this repeatable. This is not a
-claim that every page, generated output or browser viewport has 81.7% less text.
+claim that every page, generated output or browser viewport has 80.7% less text.
 
 `check-canvas-density.py` requires the saved before HTML in .local/design-review.
 `check-studio-render.mjs` checks actual English/Korean components, pending and
@@ -37,3 +37,6 @@ model execution; operator controls are off. Browser control is disabled, so
 screenshots, real input, mobile layout and hydration remain UNVERIFIED. Source,
 logs and final validation results are recorded in the follow-up manifest.
 Not deployed; release captain integrates through the existing clean gates.
+
+The compact read-only cue remains visible when operator controls are off; this
+adds four Korean characters while keeping the requested 80 percent reduction.

@@ -70,6 +70,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
             {prompt.length}/2000
           </span>
         </label>
+        {!operator && <span className="canvas-readonly" title={t('operator-only')}>{tc('readonly-short')}</span>}
         {!followUp && (
           <details className="studio-composer-settings" onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
           <summary aria-label={ts('settings')} title={ts('settings')}><StudioIcon name="settings" width="17" height="17"/><span className="sr-only">{ts('settings')}</span></summary>

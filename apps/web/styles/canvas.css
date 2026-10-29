@@ -68,6 +68,7 @@
 .canvas-workspace .studio-composer .studio-submit { width: 31px; height: 31px; min-width: 31px; display: grid; place-items: center; padding: 0; border-radius: 9px; background: #30303a; color: #fff; }
 .canvas-workspace .studio-submit:disabled { background: #ededf2; color: #b7b7c2; }
 .canvas-send-arrow { transform: rotate(-90deg); }
+.canvas-readonly { color: #aaaab5; font-size: 9px; white-space: nowrap; }
 .canvas-workspace .studio-composer-settings { display: block; position: relative; align-self: center; }
 .canvas-workspace .studio-composer-settings > summary { display: grid; place-items: center; width: 28px; height: 28px; color: #a2a2af; list-style: none; border-radius: 6px; }
 .canvas-workspace .studio-composer-settings > summary::-webkit-details-marker { display: none; }

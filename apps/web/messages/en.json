@@ -29,7 +29,8 @@
     "spec": "Spec",
     "prompt": "What shall we build?",
     "followup": "What should change?",
-    "readonly": "Run access required"
+    "readonly": "Run access required",
+    "readonly-short": "Read only"
   },
   "studio": {
     "title": "Workspace",
