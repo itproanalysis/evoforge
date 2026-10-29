@@ -1478,11 +1478,12 @@ class ArenaRequest(BaseModel):
     suite_version: Literal["v1", "v2", "v3", "v4"] = "v2"
     task_id: str
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
+    feedback: Literal["heldout", "critic"] = "heldout"
 
 
-def _arena_budget_or_402() -> None:
+def _arena_budget_or_402(feedback: str = "heldout") -> None:
     try:
-        arena_mod.check_budget()
+        arena_mod.check_budget(feedback)
     except performance_mod.BudgetExceeded as e:
         raise HTTPException(402, str(e))
     except ledger.Overdraft:
@@ -1507,14 +1508,15 @@ def arena_create(req: ArenaRequest):
         raise HTTPException(404, f"unknown task: {tid!r}")
     except sealed_eval_mod.SealedEvalError as e:
         raise HTTPException(502, _rs_arena.redact(str(e) or "sealed arena failed"))
-    _arena_budget_or_402()
+    _arena_budget_or_402(req.feedback)
     box: dict = {}
     ready = threading.Event()
 
-    def _runner(sv=req.suite_version, t=tid, m=req.model):
+    def _runner(sv=req.suite_version, t=tid, m=req.model, fb=req.feedback):
         if not ready.wait(timeout=60):
             raise RuntimeError("arena start sync failed")
-        return arena_mod.run_arena(sv, t, m, arena_id=box["arena_id"])
+        return arena_mod.run_arena(sv, t, m, arena_id=box["arena_id"],
+                                   feedback=fb)
 
     try:
         job = eval_jobs_mod.create_job(kind="ARENA",
@@ -1524,7 +1526,7 @@ def arena_create(req: ArenaRequest):
         raise HTTPException(409, f"another eval job is active: {e.job_id}")
     box["arena_id"] = job["job_id"]
     arena_mod.seed_running(job["job_id"], req.suite_version, tid,
-                           req.model, task)
+                           req.model, task, feedback=req.feedback)
     ready.set()
     return {"arena_id": job["job_id"], "status": "running"}
 

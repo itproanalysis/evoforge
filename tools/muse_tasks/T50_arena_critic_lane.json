@@ -1,0 +1,19 @@
+{
+  "id": "T50_arena_critic_lane",
+  "planned_by": "Claude (Critic): v3.6 COMP-02b",
+  "goal": "T50 — Arena EvoForge lane with Critic feedback (v3.6 §2.2 fair comparison; builds on T47 + T48). Today the\nEvoForge lane retries with the names of failing held-out tests (an oracle signal). Add a mode where it retries using\nonly the independent Critic's own tests, exactly like run_pipeline(feedback=\"critic\") from T47.\n\n- POST /v1/arena accepts feedback: \"heldout\" | \"critic\" (default \"heldout\"; anything else -> 422). Budget guard counts\n  one extra Critic call for the EvoForge lane in critic mode.\n- In critic mode the EvoForge lane: one spec-first Critic call (sealed_eval._call_critic_suite with\n  sealed_eval._critic_goal_for_task) before the first attempt, then attempts whose retry goal comes ONLY from Critic\n  failures (sealed_eval._critic_feedback / _critic_empty_feedback / _critic_apply_failed_feedback); the sealed held-out\n  suite scores the judged attempt (the first one passing all Critic tests, else the last) and never enters feedback.\n  Reuse T47 helpers; do not duplicate their logic. The Critic call's cost is part of the lane's cost_cents. Emit lane\n  events with role \"critic\" (Critic wrote N tests; attempt k: Critic m/N passed).\n- Manifest (T48): lanes.evoforge.feedback = \"critic\" in critic mode (\"heldout_failing_test_names\" otherwise), and the\n  disclosure sentence matches the mode (critic mode: the EvoForge lane gets no held-out signal; it adds a Critic call;\n  Runner compute not included). Store feedback on the arena document.\n- Single lane, scoring, verdict, previews (T49) unchanged.\nTests: services/api/tests/test_muse_t50.py.",
+  "edit": [
+    "services/api/evoforge/arena.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t50.py"
+  ],
+  "context": [
+    "docs/V36_EXECUTION_PLAN.md",
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/tests/test_critic_t47_critic_feedback_pipeline.py",
+    "services/api/tests/test_critic_t48_arena_manifest.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
