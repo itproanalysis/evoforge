@@ -1121,8 +1121,33 @@ def _call_critic_suite(critic_goal: str) -> tuple[str, object, int, bool]:
     return rsv, out, int(actual), missing
 
 
-def _critic_suite_from_output(out) -> list[dict]:
-    """Critic sealed_tests entries carrying top-level def test_* code."""
+def _imports_outside(code: str, allowed_modules) -> bool:
+    """True when the code does not parse or imports anything but stdlib, pytest and the target modules."""
+    import ast
+    import sys as _sys
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return True
+    ok = set(_sys.stdlib_module_names) | {"pytest"} | set(allowed_modules)
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [a.name for a in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            names = [node.module]
+        if any(n.split(".")[0] not in ok for n in names):
+            return True
+    return False
+
+
+def _critic_suite_from_output(out, allowed_modules=None) -> list[dict]:
+    """Critic sealed_tests entries carrying top-level def test_* code.
+
+    With allowed_modules (the target files' module stems), entries that do not parse or import a third-party package
+    are dropped: the sandbox has only the standard library and pytest, so such a file fails at collection and makes
+    every attempt look like a Critic failure (seen in production as "critic 0/N" on every retry).
+    """
     sealed = out.get("sealed_tests") if isinstance(out, dict) else None
     if not isinstance(sealed, list):
         return []
@@ -1132,6 +1157,8 @@ def _critic_suite_from_output(out) -> list[dict]:
         if not isinstance(code, str) or "def test_" not in code:
             continue
         if not re.search(r"(?m)^[ \t]*def\s+test_[A-Za-z0-9_]+\s*\(", code):
+            continue
+        if allowed_modules is not None and _imports_outside(code, allowed_modules):
             continue
         suite.append({"code": code})
     return suite
@@ -1331,7 +1358,8 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                         usage_missing = True
                     if isinstance(cout, dict) and not cout.get("stub"):
                         provider_stub = False
-                    critic_suite = _critic_suite_from_output(cout)
+                    critic_suite = _critic_suite_from_output(
+                        cout, [os.path.splitext(os.path.basename(p))[0] for p in task["files"]])
                 best = 0.0
                 final_outcome = "empty_diff"
                 final_failing: list[str] = []

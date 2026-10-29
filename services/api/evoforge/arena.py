@@ -893,7 +893,8 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
             raise _DoneCriticLane()
         cost += int(cactual)
         usage_missing = bool(_cmissing)
-        critic_suite = _sealed._critic_suite_from_output(cout)
+        critic_suite = _sealed._critic_suite_from_output(
+            cout, [os.path.splitext(os.path.basename(p))[0] for p in task["files"]])
         total = len(critic_suite)
         _emit(events, "critic", f"Critic wrote {total} tests")
         goal = task["goal"]

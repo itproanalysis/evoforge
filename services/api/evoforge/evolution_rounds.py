@@ -1026,7 +1026,8 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
             _crsv, _cout, _cactual, _cmiss = _sealed._call_critic_suite(
                 _sealed._critic_goal_for_task({"goal": goal}, file_context))
             cost += int(_cactual)
-            critic_new = _sealed._critic_suite_from_output(_cout)
+            critic_new = _sealed._critic_suite_from_output(
+                _cout, [os.path.splitext(os.path.basename(p))[0] for p in lane_files])
             _emit(events, "critic",
                   f"evoforge: Critic returned {len(critic_new)} tests")
         except Exception as e:
@@ -1100,6 +1101,11 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
                             nxt, critic_suite, timeout_s,
                             f"evo-critic-r{app_round.get('index')}")
                         n_c = len(critic_suite)
+                        if _sealed._failed_run_outcome(cfail or []) == "verification_inconclusive":
+                            # An unscorable Critic suite says nothing about the candidate: judge it, do not retry.
+                            _emit(events, "critic",
+                                  "Critic suite could not be scored (verification inconclusive); judging this attempt")
+                            break
                     except Exception as e:
                         _emit(events, "runner",
                               f"evoforge: critic scoring failed ({type(e).__name__})")

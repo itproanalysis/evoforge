@@ -13,6 +13,8 @@ CRITIC_SYSTEM = (
     "transcript, or self-assessment. Phase A: write acceptance tests from the SPEC only. "
     "Phase B: review the diff and CI results against your sealed tests. Sealed tests are the held-out "
     "suite: at least 3 pytest tests, each labelled kind compositional, negative or boundary (all three present). "
+    "Tests may import only the Python standard library, pytest and the target modules (by file stem): the verifier "
+    "has no other packages and no network. "
     'Output JSON: {"sealed_tests": [{"code": "...", "kind": "compositional|negative|boundary"}], '
     '"review": {"result": "PASS|FAIL", "findings": [...]}}'
 )
