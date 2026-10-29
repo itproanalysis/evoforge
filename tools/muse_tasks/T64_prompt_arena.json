@@ -1,0 +1,21 @@
+{
+  "id": "T64_prompt_arena",
+  "planned_by": "Claude (Critic): owner request — user prompt comparison",
+  "goal": "T64 — prompt Arena: compare what the USER asks for (owner: the real Arena has a prompt input at the bottom; the\ncomparison is on the user's requested result, not a preset task). API only (UI follows in T65).\nAdd services/api/evoforge/arena_prompt.py + routes in services/api/main.py, reusing arena.py lanes:\n- POST /v1/arena/prompt {prompt: str 1..2000 chars (strip; empty or longer -> 422), feedback: \"critic\"|\"heldout\" =\n  \"critic\", single_apply: \"strict\"|\"tolerant\" = \"tolerant\" (equal tools by default for user prompts)} -> 202\n  {arena_id, status: \"running\"}. Budget guard before any provider call covers the judge Critic call + both lanes\n  (-> 402). Runs as one background job like /v1/arena; GET /v1/arena/{id} and GET /v1/arena return it too.\n- Template (both lanes start here): files {\"app.py\": TEMPLATE} with\n  TEMPLATE = \"def render():\n    return '<main></main>'\n\n\ndef preview():\n    return render()\n\".\n- Step 1, BEFORE any lane runs: an independent judge Critic call (sealed_eval._call_critic_suite) with a goal built\n  from the prompt only: write pytest acceptance tests for app.render(), which returns one well-formed XHTML element for\n  this request; tests import app and parse app.render() with xml.etree.ElementTree; standard library + pytest only.\n  Keep entries from sealed_eval._critic_suite_from_output; run each on the TEMPLATE and DROP tests that already pass\n  there. The rest is the acceptance suite: fixed, hashed (acceptance_hash = \"sha256:\" + sha256 of json of the codes),\n  never sent to any lane and never returned.\n- Step 2: build the task {id: \"prompt\", goal: <prompt + the same implementation instruction (render()/preview() in\n  app.py, one well-formed XHTML element)>, files: template, heldout: acceptance suite} and run both lanes with the\n  existing arena machinery (single: one Builder call, apply per single_apply; evoforge: per feedback, its OWN internal\n  Critic call, never the judge's tests), scored on the acceptance suite, with T49 previews.\n- If fewer than 3 acceptance tests remain: still run both lanes and return previews, but verdict {winner:\n  \"unscorable\", reason}; never pick a winner.\n- Document: mode \"prompt\", prompt (as given), manifest {comparison_mode: \"user_prompt_same_template\", prompt_hash,\n  acceptance_hash, acceptance_count, acceptance_dropped, judge: one sentence (independent Critic, written from the prompt\n  before either lane ran, hidden from both lanes), lanes: {single: {harness, apply, max_attempts: 1, feedback: \"none\"},\n  evoforge: {harness, apply: \"tolerant\", max_attempts, feedback}}, cost_basis, runner_cost, disclosure}. Lanes as in\n  /v1/arena (heldout = acceptance scores). The judge call's cost is reported separately (judge_cost_cents), not\n  added to either lane.\n- Proxy: allow POST /v1/arena/prompt (proxyPolicy.ts + cases).\nTests: services/api/tests/test_muse_t64.py.",
+  "edit": [
+    "services/api/evoforge/arena_prompt.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t64.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/arena.py",
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/tests/test_critic_t49_arena_preview.py",
+    "services/api/tests/test_critic_t50_arena_critic_lane.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t64.py services/api/tests/test_sealed_t64_prompt_arena.py services/api/tests/test_critic_t48_arena_manifest.py services/api/tests/test_critic_t49_arena_preview.py services/api/tests/test_critic_t50_arena_critic_lane.py services/api/tests/test_sealed_t44_arena.py services/api/tests/test_arena_status_http_codex.py services/api/tests/test_arena_verification_codex.py -q -p no:cacheprovider"
+  ]
+}
