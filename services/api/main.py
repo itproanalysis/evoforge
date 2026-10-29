@@ -1768,7 +1768,8 @@ def evidence(eid: str):
 def _mission_chain(mission_id):
     """Each record links only the stages known when it was written (a run record predates its PR), so a viewer of
     one record saw PR/Outcome empty although the PR was open. This merges the stages over all of the mission's
-    evidence: per stage the first recorded event, None when no record of the mission has it."""
+    evidence: per stage the latest recorded event (the attempt that led on, e.g. to the PR), None when no record of the
+    mission has it."""
     if not isinstance(mission_id, str):
         return None
     mission = missions_store.get(mission_id)
@@ -1782,7 +1783,7 @@ def _mission_chain(mission_id):
             if stage not in merged:
                 order.append(stage)
                 merged[stage] = None
-            if merged[stage] is None and entry.get("event_id") is not None:
+            if entry.get("event_id") is not None:  # evidence_ids are in recording order
                 merged[stage] = entry["event_id"]
     return [{"stage": st, "event_id": merged[st]} for st in order]
 
