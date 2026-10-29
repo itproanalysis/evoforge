@@ -1030,6 +1030,15 @@
     ]
   },
   {
+    "expected": "/v1/arena/arena_abc123/proof",
+    "path_segments": [
+      "v1",
+      "arena",
+      "arena_abc123",
+      "proof"
+    ]
+  },
+  {
     "expected": null,
     "path_segments": [
       "v1",

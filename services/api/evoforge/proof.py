@@ -21,6 +21,7 @@ of the wider world beyond the digests carried inside.
 from __future__ import annotations
 
 import base64
+import copy
 import hashlib
 import json
 import os
@@ -103,6 +104,152 @@ def mint(evidence_id: str, public_evidence: dict, chain: list[dict]) -> dict:
     priv = _load_private_key()
     if priv is None:
         # Honest unsigned certificate: never a digest pretending to be a signature.
+        body["algorithm"] = None
+        body["signed"] = False
+        body["public_key"] = None
+        body["signature"] = None
+        return body
+    try:
+        from cryptography.hazmat.primitives import serialization
+
+        pub_raw = priv.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+        sig = priv.sign(_canonical({k: v for k, v in body.items()
+                                   if k not in _SIGNED_EXCLUDE}))
+        body["algorithm"] = "Ed25519"
+        body["signed"] = True
+        body["public_key"] = base64.b64encode(pub_raw).decode("ascii")
+        body["signature"] = base64.b64encode(sig).decode("ascii")
+        return body
+    except Exception:
+        body["algorithm"] = None
+        body["signed"] = False
+        body["public_key"] = None
+        body["signature"] = None
+        return body
+
+
+_ARENA_MANIFEST_KEYS = (
+    "task_spec_hash",
+    "heldout_hash",
+    "base_tree_sha",
+    "prompt_hash",
+    "acceptance_hash",
+    "acceptance_count",
+    "acceptance_inherited",
+    "acceptance_new",
+    "acceptance_dropped",
+    "heldout_count",
+    "comparison_mode",
+    "cost_basis",
+    "runner_cost",
+    "suite_version",
+    "task_id",
+    "disclosure",
+    "judge",
+    "lanes",
+)
+
+
+def _lane_arena_summary(lane) -> dict:
+    if not isinstance(lane, dict):
+        lane = {}
+    held = lane.get("heldout") if isinstance(lane.get("heldout"), dict) else {}
+    try:
+        passed = int(held.get("passed", 0))
+    except (TypeError, ValueError):
+        passed = 0
+    try:
+        n = int(held.get("n", 0))
+    except (TypeError, ValueError):
+        n = 0
+    diff = lane.get("diff")
+    if isinstance(diff, str) and diff:
+        diff_sha256 = hashlib.sha256(diff.encode("utf-8")).hexdigest()
+    else:
+        diff_sha256 = ""
+    preview = lane.get("preview_html")
+    if isinstance(preview, str) and preview:
+        preview_sha256 = hashlib.sha256(preview.encode("utf-8")).hexdigest()
+    else:
+        preview_sha256 = ""
+    try:
+        cost_cents = int(lane.get("cost_cents", 0))
+    except (TypeError, ValueError):
+        cost_cents = 0
+    try:
+        attempts = int(lane.get("attempts", 0))
+    except (TypeError, ValueError):
+        attempts = 0
+    status = lane.get("status", "")
+    outcome = lane.get("outcome", "")
+    return {
+        "status": status if isinstance(status, str) else "",
+        "outcome": outcome if isinstance(outcome, str) else "",
+        "heldout": {"passed": passed, "n": n},
+        "cost_cents": cost_cents,
+        "attempts": attempts,
+        "diff_sha256": diff_sha256,
+        "preview_sha256": preview_sha256,
+    }
+
+
+def mint_arena(arena_doc: dict) -> dict:
+    """Mint a certificate over a finished arena document (digests, never code)."""
+    if not isinstance(arena_doc, dict):
+        arena_doc = {}
+    arena_id = arena_doc.get("arena_id", "")
+    if not isinstance(arena_id, str):
+        arena_id = ""
+    mode = arena_doc.get("mode")
+    mode = "prompt" if mode == "prompt" else "sealed"
+    verdict_obj = arena_doc.get("verdict")
+    if isinstance(verdict_obj, dict):
+        winner = verdict_obj.get("winner", "")
+    elif isinstance(verdict_obj, str):
+        winner = verdict_obj
+    else:
+        winner = ""
+    if not isinstance(winner, str):
+        winner = ""
+    model = arena_doc.get("model", "")
+    if not isinstance(model, str):
+        model = ""
+    manifest_src = arena_doc.get("manifest")
+    if not isinstance(manifest_src, dict):
+        manifest_src = {}
+    manifest = {}
+    for key in _ARENA_MANIFEST_KEYS:
+        if key in manifest_src:
+            try:
+                manifest[key] = copy.deepcopy(manifest_src[key])
+            except Exception:
+                manifest[key] = manifest_src[key]
+    lanes_src = arena_doc.get("lanes")
+    if not isinstance(lanes_src, dict):
+        lanes_src = {}
+    lanes = {
+        "single": _lane_arena_summary(lanes_src.get("single")),
+        "evoforge": _lane_arena_summary(lanes_src.get("evoforge")),
+    }
+    body: dict = {
+        "certificate_id": f"cert_{uuid.uuid4().hex[:12]}",
+        "kind": "arena",
+        "arena_id": arena_id,
+        "issued_at": time.time(),
+        "mode": mode,
+        "verdict": winner,
+        "model": model,
+        "manifest": manifest,
+        "lanes": lanes,
+    }
+    if isinstance(arena_doc.get("root_id"), str) and arena_doc.get("root_id"):
+        body["root_id"] = arena_doc["root_id"]
+    round_index = arena_doc.get("round_index")
+    if isinstance(round_index, int) and not isinstance(round_index, bool):
+        body["round_index"] = round_index
+    priv = _load_private_key()
+    if priv is None:
         body["algorithm"] = None
         body["signed"] = False
         body["public_key"] = None

@@ -125,7 +125,7 @@ export function resolveApiPath(segments: string[]): string | null {
     segments.length === 4 &&
     segments[0] === "v1" &&
     segments[1] === "arena" &&
-    (segments[3] === "followup" || segments[3] === "chain")
+    (segments[3] === "followup" || segments[3] === "chain" || segments[3] === "proof")
   ) {
     return apiPath;
   }
