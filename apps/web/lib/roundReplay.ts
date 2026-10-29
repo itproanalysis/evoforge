@@ -426,3 +426,122 @@ export function statsView(stats: EvolutionStats | null | undefined): StatsView |
     single: statsSideView(bySide?.single),
   };
 }
+
+export interface PresentationSideFrame {
+  status: EvolutionSnapStatus;
+  score: string;
+  previewHtml: string | null;
+}
+
+export interface PresentationRoundFrame {
+  kind: "round";
+  index: number;
+  name: string;
+  evoforge: PresentationSideFrame;
+  single: PresentationSideFrame;
+  cost: Record<ReplaySideKey, string>;
+}
+
+export interface PresentationSummaryFrame {
+  kind: "summary";
+  first: number;
+  latest: number;
+  verified: Record<ReplaySideKey, string>;
+  label: string;
+}
+
+export type PresentationFrame = PresentationRoundFrame | PresentationSummaryFrame;
+
+function presentationSnap(
+  rounds: unknown,
+  roundIndex: number,
+  side: ReplaySideKey,
+): EvolutionSnap | null {
+  if (!Array.isArray(rounds)) return null;
+  for (const r of rounds) {
+    if (r && typeof r === "object" && (r as { index?: unknown }).index === roundIndex) {
+      const sides = (r as { sides?: unknown }).sides;
+      if (sides && typeof sides === "object") {
+        const snap = (sides as Record<string, unknown>)[side];
+        return snap && typeof snap === "object" ? (snap as EvolutionSnap) : null;
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
+function presentationSide(snap: EvolutionSnap | null): PresentationSideFrame {
+  const status = snapStatus(snap);
+  let score = "—";
+  const heldout = (snap as { heldout?: unknown } | null)?.heldout;
+  if (heldout && typeof heldout === "object") {
+    const passed = (heldout as { passed?: unknown }).passed;
+    const n = (heldout as { n?: unknown }).n;
+    if (typeof passed === "number" && Number.isFinite(passed) && typeof n === "number" && Number.isFinite(n)) {
+      score = `${passed}/${n}`;
+    }
+  }
+  const rawHtml = (snap as { preview_html?: unknown } | null)?.preview_html;
+  const previewHtml = typeof rawHtml === "string" ? rawHtml : null;
+  return { status, score, previewHtml };
+}
+
+function presentationCost(snap: EvolutionSnap | null): number {
+  const cents = (snap as { cost_cents?: unknown } | null)?.cost_cents;
+  return typeof cents === "number" && Number.isFinite(cents) ? cents : 0;
+}
+
+/** Recorded-run presentation frames: round frames in index order, then a summary frame. */
+export function presentationFrames(run: EvolutionRun | null | undefined): PresentationFrame[] {
+  if (run === null || run === undefined || typeof run !== "object") return [];
+  const rawRounds = (run as { rounds?: unknown }).rounds;
+  if (!Array.isArray(rawRounds) || rawRounds.length === 0) return [];
+  const ordered: { index: number; name: string }[] = [];
+  for (const r of rawRounds) {
+    if (!r || typeof r !== "object") continue;
+    const idx = (r as { index?: unknown }).index;
+    if (typeof idx !== "number" || !Number.isFinite(idx)) continue;
+    const nm = (r as { name?: unknown }).name;
+    ordered.push({ index: idx, name: typeof nm === "string" && nm ? nm : `R${idx}` });
+  }
+  ordered.sort((a, b) => a.index - b.index);
+  if (ordered.length === 0) return [];
+  const roundFrames: PresentationRoundFrame[] = [];
+  let cumEvoforge = 0;
+  let cumSingle = 0;
+  for (const o of ordered) {
+    const evoSnap = presentationSnap(rawRounds, o.index, "evoforge");
+    const singleSnap = presentationSnap(rawRounds, o.index, "single");
+    if (!evoSnap || !singleSnap) break;
+    if (snapStatus(evoSnap) === "PENDING" || snapStatus(singleSnap) === "PENDING") break;
+    cumEvoforge += presentationCost(evoSnap);
+    cumSingle += presentationCost(singleSnap);
+    roundFrames.push({
+      kind: "round",
+      index: o.index,
+      name: o.name,
+      evoforge: presentationSide(evoSnap),
+      single: presentationSide(singleSnap),
+      cost: { evoforge: `${cumEvoforge}¢`, single: `${cumSingle}¢` },
+    });
+  }
+  if (roundFrames.length === 0) return [];
+  const f = roundFrames.length;
+  let evoReady = 0;
+  let singleReady = 0;
+  for (const frame of roundFrames) {
+    if (frame.evoforge.status === "READY") evoReady += 1;
+    if (frame.single.status === "READY") singleReady += 1;
+  }
+  const runId = (run as { run_id?: unknown }).run_id;
+  const label = `Recorded run ${typeof runId === "string" ? runId : String(runId ?? "")}`;
+  const summary: PresentationSummaryFrame = {
+    kind: "summary",
+    first: roundFrames[0].index,
+    latest: roundFrames[roundFrames.length - 1].index,
+    verified: { evoforge: `${evoReady}/${f}`, single: `${singleReady}/${f}` },
+    label,
+  };
+  return [...roundFrames, summary];
+}

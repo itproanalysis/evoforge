@@ -517,6 +517,13 @@
     "stats-cost-per-verified": "Cost per verified round",
     "load-failed": "Could not load the recorded run.",
     "refresh-failed": "Refresh failed. Showing the last confirmed result for this run.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "present": "Present",
+    "next": "Next",
+    "previous": "Previous",
+    "exit": "Exit",
+    "summary": "Summary",
+    "verified": "Verified",
+    "comparison-mode": "Comparison mode"
   }
 }

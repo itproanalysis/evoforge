@@ -1,0 +1,23 @@
+{
+  "id": "T61_presentation_mode",
+  "planned_by": "Claude (Critic): v3.8 VIDEO-01",
+  "goal": "T61 — presentation mode for the demo video (v3.8 §4.4 / VIDEO-01: record the real stored snapshots, 16:9, no\nstaging). Web only.\n1. apps/web/lib/roundReplay.ts: presentationFrames(run) -> [] for null/no rounds, else, walking rounds in index order and\n   stopping at the first round where either side is PENDING (or missing): one {kind: \"round\", index, name, evoforge: P,\n   single: P, cost: {evoforge, single}} per round, with P = {status, score \"passed/n\" (or \"—\"), previewHtml (that side's\n   preview_html or null)} and cost = cumulative cost_cents up to and including that round, formatted \"N¢\"; then one\n   final {kind: \"summary\", first (first frame index), latest (last frame index), verified: {evoforge: \"k/F\", single:\n   \"k/F\"} (READY rounds among the F round frames), label: \"Recorded run \" + run_id}. Return [] when there is no round\n   frame.\n2. apps/web/components/PresentationView.tsx: full-screen 16:9 stage (aspect-ratio 16 / 9 or Tailwind aspect-video)\n   showing one frame at a time: header with round name and both sides' status, score and cumulative cost; EvoForge left\n   and single AI right as large SandboxedPreview; the summary frame shows R{first} and R{latest} previews of both sides\n   and the verified counts; a persistent \"Recorded run <id>\" label and the manifest comparison mode. Auto-advance every\n   4 s with pause / next / previous / exit (Esc) controls. No fetch( in this file.\n3. apps/web/app/[locale]/replay/page.tsx: a \"Present\" button on the selected run and support for ?present=1&run=<id>\n   that renders PresentationView for that run (the page still loads the run with its existing GET loader).\n4. i18n \"replay\" (en + ko) for the new labels.\nKeep tsc green. Tests: services/api/tests/test_muse_t61.py.",
+  "edit": [
+    "apps/web/lib/roundReplay.ts",
+    "apps/web/components/PresentationView.tsx",
+    "apps/web/app/[locale]/replay/page.tsx",
+    "apps/web/messages/en.json",
+    "apps/web/messages/ko.json",
+    "services/api/tests/test_muse_t61.py"
+  ],
+  "context": [
+    "apps/web/components/RoundReplay.tsx",
+    "apps/web/components/SandboxedPreview.tsx",
+    "services/api/tests/test_critic_t52_round_replay_ui.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t61.py services/api/tests/test_sealed_t61_presentation_mode.py services/api/tests/test_critic_t52_round_replay_ui.py services/api/tests/test_critic_t54_live_panel_command_bar.py services/api/tests/test_critic_t56_stats_panel.py services/api/tests/test_replay_selection_http_codex.py -q -p no:cacheprovider",
+    "node apps/web/scripts/check-replay-selection.mjs",
+    "node apps/web/node_modules/typescript/bin/tsc --noEmit --incremental false -p apps/web"
+  ]
+}
