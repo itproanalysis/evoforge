@@ -736,7 +736,8 @@ def _run_single_round(app_round: dict, cumulative: list[dict],
 
 
 def _run_evoforge_round(app_round: dict, cumulative: list[dict],
-                        lane_files: dict, feedback: str, timeout_s: int) -> tuple[dict, dict]:
+                        lane_files: dict, feedback: str, timeout_s: int,
+                        critic_history: list[dict] | None = None) -> tuple[dict, dict]:
     t0 = time.perf_counter()
     events: list[dict] = []
     goal = app_round.get("goal", "")
@@ -748,20 +749,27 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
     applied_any = False
     error = None
     file_context = [{"path": p, "content": lane_files[p]} for p in sorted(lane_files)]
-    critic_suite: list[dict] = []
+    critic_new: list[dict] = []
     if feedback == "critic":
         _emit(events, "critic", "evoforge: spec-first Critic call")
         try:
             _crsv, _cout, _cactual, _cmiss = _sealed._call_critic_suite(
                 _sealed._critic_goal_for_task({"goal": goal}, file_context))
             cost += int(_cactual)
-            critic_suite = _sealed._critic_suite_from_output(_cout)
+            critic_new = _sealed._critic_suite_from_output(_cout)
             _emit(events, "critic",
-                  f"evoforge: Critic returned {len(critic_suite)} tests")
+                  f"evoforge: Critic returned {len(critic_new)} tests")
         except Exception as e:
             error = _short_error(e)
             _emit(events, "critic", f"evoforge: Critic call failed ({type(e).__name__})")
-            critic_suite = []
+            critic_new = []
+    prior: list[dict] = list(critic_history) if isinstance(critic_history, list) else []
+    critic_suite: list[dict] = list(prior) + list(critic_new)
+    if feedback == "critic":
+        _emit(events, "critic",
+              f"Critic suite: {len(critic_suite)} tests ({len(critic_new)} new)")
+        if isinstance(critic_history, list):
+            critic_history.extend(list(critic_new))
     goal_attempt = goal
     try:
         for _attempt in range(max_attempts):
@@ -891,6 +899,7 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
             "source_sha": _files_sha(new_files),
             "heldout": {"passed": int(c_passed), "n": int(c_n)},
             "round_tests": {"passed": int(r_passed), "n": int(r_n)},
+            "critic_tests": int(len(critic_suite)) if feedback == "critic" else 0,
             "diff": final_diff if isinstance(final_diff, str) else "",
             "attempts": int(attempts), "cost_cents": int(cost),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
@@ -988,6 +997,7 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
 
     def _lane_worker(lane: str) -> None:
         files = dict(base_files)
+        critic_history: list[dict] = []
         for r in rounds_all:
             try:
                 idx = int(r.get("index", 0))
@@ -995,7 +1005,8 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                 if lane == "single":
                     files, snap = _run_single_round(r, cumulative, files, timeout_s)
                 else:
-                    files, snap = _run_evoforge_round(r, cumulative, files, feedback, timeout_s)
+                    files, snap = _run_evoforge_round(r, cumulative, files, feedback, timeout_s,
+                                                      critic_history)
             except Exception as e:
                 try:
                     idx = int(r.get("index", 0))
@@ -1014,6 +1025,8 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                         "preview_error": _short_error(e),
                         "diff": "", "attempts": 0, "cost_cents": 0,
                         "elapsed_ms": 0, "events": [], "error": _short_error(e)}
+                if lane == "evoforge":
+                    snap["critic_tests"] = int(len(critic_history)) if feedback == "critic" else 0
             with lock:
                 state["snaps"][(lane, idx)] = snap
                 state["order"].append((lane, idx))
@@ -1054,6 +1067,7 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                       "source_sha": _files_sha(base_files),
                       "heldout": {"passed": 0, "n": len(_cumulative_heldout(rounds_all, idx))},
                       "round_tests": {"passed": 0, "n": len(r.get("heldout") or [])},
+                      "critic_tests": 0,
                       "preview_html": "",
                       "preview_sha": "sha256:" + hashlib.sha256(b"").hexdigest(),
                       "preview_error": "RuntimeError: lane did not finish",
