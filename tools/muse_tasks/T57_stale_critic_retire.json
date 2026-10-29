@@ -1,0 +1,16 @@
+{
+  "id": "T57_stale_critic_retire",
+  "planned_by": "Claude (Critic): production run job_b9fbd6da2e3f",
+  "goal": "T57 — retire stale Critic tests in evolution runs (fixes the cost blow-up seen in production run job_b9fbd6da2e3f:\nan R1 Critic test that the R2 redesign legitimately breaks failed on every attempt of R2-R5, so every round burnt all 3\nattempts although the held-out suite passed from attempt 1; EvoForge cost 204c vs 52c).\nIn services/api/evoforge/evolution_rounds.py (T51/T53 critic mode, EvoForge lane):\n- Track, per applied attempt, which accumulated Critic tests failed, split into earlier-round tests (from\n  critic_history) and this round's new Critic tests.\n- If two consecutive applied attempts fail exactly the same non-empty set of EARLIER-round Critic tests while ALL of this\n  round's new Critic tests pass on both, treat those earlier tests as stale: remove them from the lane's critic_history\n  for the rest of the run, stop retrying, and judge the latest attempt with the held-out suite as usual.\n- Snapshot field \"critic_retired\": number of tests retired in this round (0 otherwise); emit a role \"critic\" event\n  \"retired N stale Critic tests (contradicted by this round's requirements)\". critic_tests keeps meaning the suite size\n  used this round.\n- A real regression (an earlier test fails, then passes after a retry) must still be retried exactly as before (T53).\n- No held-out signal enters feedback; scoring, statuses, manifest, previews and the single lane are unchanged.\nTests: services/api/tests/test_muse_t57.py.",
+  "edit": [
+    "services/api/evoforge/evolution_rounds.py",
+    "services/api/tests/test_muse_t57.py"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t53_cumulative_critic.py",
+    "evals/rounds_v1/mission_board.json"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t57.py services/api/tests/test_sealed_t57_stale_critic_retire.py services/api/tests/test_critic_t53_cumulative_critic.py services/api/tests/test_critic_t51_evolution_rounds.py -q -p no:cacheprovider"
+  ]
+}
