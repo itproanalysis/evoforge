@@ -190,6 +190,223 @@ def _validate_collection(section: dict, supplied_count: int, name: str) -> None:
         raise RunnerClientError(f"malformed runner reply ({name}: incomplete or unsuccessful collection)")
 
 
+def _validate_failures(section: dict) -> list[dict]:
+    raw = section.get("failures", [])
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise RunnerClientError("malformed runner reply (heldout.failures)")
+    out: list[dict] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise RunnerClientError("malformed runner reply (heldout.failures entry)")
+        test = entry.get("test", "")
+        message = entry.get("message", "")
+        if not isinstance(test, str) or not isinstance(message, str):
+            raise RunnerClientError("malformed runner reply (heldout.failures entry)")
+        out.append({"test": test[:200], "message": message[:300]})
+    return out
+
+
+def _validate_preview(section: object) -> dict | None:
+    if section is None:
+        return None
+    if not isinstance(section, dict):
+        raise RunnerClientError("malformed runner reply (preview)")
+    html = section.get("html")
+    error = section.get("error")
+    if html is not None and not isinstance(html, str):
+        raise RunnerClientError("malformed runner reply (preview.html)")
+    if error is not None and not isinstance(error, str):
+        raise RunnerClientError("malformed runner reply (preview.error)")
+    return {"html": html, "error": error}
+
+
+def _make_files_repo(files: dict) -> tuple[str, str]:
+    """Throw-away git repo holding exactly ``files`` (server-created, trusted)."""
+    if not isinstance(files, dict):
+        raise RunnerBadRequest("files must be an object")
+    tmpdir = tempfile.mkdtemp(prefix="evoforge-runfiles-")
+    try:
+        proc = subprocess.run(["git", "init", "-q"], cwd=tmpdir,
+                              capture_output=True, timeout=60)
+        if proc.returncode != 0:
+            raise RunnerClientError("bundle create failed: git init")
+        for path, content in files.items():
+            if not isinstance(path, str) or not path:
+                raise RunnerBadRequest(f"refused file path: {path!r}")
+            if not isinstance(content, str):
+                raise RunnerBadRequest(f"file content must be text: {path!r}")
+            # Server-created paths only; refuse anything escaping the repo.
+            norm = path.replace("\\", "/")
+            segs = [s for s in norm.split("/") if s not in ("", ".")]
+            if not segs or ".." in segs or segs[0] == ".git":
+                raise RunnerBadRequest(f"refused file path: {path!r}")
+            full = os.path.join(tmpdir, *segs)
+            parent = os.path.dirname(full)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(full, "w", encoding="utf-8", newline="") as fh:
+                fh.write(content)
+        env = dict(os.environ, GIT_AUTHOR_NAME="evoforge", GIT_AUTHOR_EMAIL="evoforge@local",
+                   GIT_COMMITTER_NAME="evoforge", GIT_COMMITTER_EMAIL="evoforge@local")
+        try:
+            proc = subprocess.run(["git", "add", "-A"], cwd=tmpdir, env=env,
+                                  capture_output=True, timeout=60)
+            if proc.returncode != 0:
+                raise RunnerClientError("bundle create failed: git add")
+            proc = subprocess.run(["git", "-c", "user.name=evoforge",
+                                   "-c", "user.email=evoforge@local",
+                                   "commit", "-qm", "run-files base", "--allow-empty"],
+                                  cwd=tmpdir, env=env, capture_output=True, timeout=60)
+            if proc.returncode != 0:
+                raise RunnerClientError("bundle create failed: git commit")
+        except (subprocess.TimeoutExpired, OSError) as e:
+            raise RunnerClientError(f"bundle create failed: {type(e).__name__}")
+        base = _head_sha(tmpdir)
+        if not re.fullmatch(r"[0-9a-f]{40}", base or ""):
+            raise RunnerClientError("bundle create failed: no base commit")
+        return tmpdir, base
+    except Exception:
+        _remove_tree(tmpdir)
+        raise
+
+
+def run_files(files: dict, sealed_tests, timeout_s: int = 120,
+              preview_module=None) -> dict:
+    """Execute candidate/model-written code on the Runner without local fallback.
+
+    Builds a throw-away repo holding exactly ``files``, bundles it like
+    :func:`run_via_runner`, POSTs ``/run`` with ``diff`` empty and
+    ``failures=True``, and validates the reply the same way.
+    """
+    url = runner_url()
+    if not url:
+        raise RunnerClientError("runner URL not configured")
+    if timeout_s is None:
+        timeout_s = 120
+    try:
+        timeout_s = int(timeout_s)
+    except (TypeError, ValueError):
+        raise RunnerBadRequest("timeout_s must be an int")
+    if not 1 <= timeout_s <= 600:
+        raise RunnerBadRequest("timeout_s out of range")
+    repo_dir = None
+    bundle_path = None
+    try:
+        repo_dir, effective_base = _make_files_repo(files or {})
+    except (RunnerBadRequest, RunnerClientError):
+        raise
+    except Exception as e:
+        raise RunnerClientError(f"bundle create failed: {e}")
+    try:
+        sealed_payload = []
+        for t in (sealed_tests or []):
+            if isinstance(t, dict):
+                sealed_payload.append({"code": t.get("code"),
+                                       "kind": t.get("kind", "") if isinstance(t.get("kind", ""), str) else ""})
+            else:
+                sealed_payload.append({"code": t, "kind": ""})
+        try:
+            bundle_path = _create_bundle(repo_dir, effective_base)
+        except RunnerBadRequest:
+            raise
+        except RunnerClientError:
+            raise
+        except Exception as e:
+            raise RunnerClientError(f"bundle create failed: {e}")
+        try:
+            with open(bundle_path, "rb") as fh:
+                bundle_bytes = fh.read()
+        except OSError as e:
+            raise RunnerClientError(f"bundle read failed: {e}")
+        payload = {
+            "bundle_b64": base64.b64encode(bundle_bytes).decode("ascii"),
+            "base_sha": effective_base,
+            "diff": "",
+            "visible": [],
+            "sealed": sealed_payload,
+            "timeout_s": timeout_s,
+            "failures": True,
+        }
+        if preview_module is not None and preview_module != "":
+            if not isinstance(preview_module, str):
+                raise RunnerBadRequest("preview_module must be a Python identifier")
+            payload["preview_module"] = preview_module
+        headers = _auth_headers()
+        try:
+            import httpx
+        except ImportError as e:
+            raise RunnerClientError(f"runner http client unavailable: {e}")
+        try:
+            resp = httpx.post(f"{url}/run", json=payload, headers=headers,
+                              timeout=timeout_s + 30)
+        except Exception:
+            raise RunnerClientError("runner unreachable: httpx")
+        if resp.status_code == 400:
+            raise RunnerBadRequest(resp.text[:500])
+        if resp.status_code == 409:
+            raise RunnerConflict(resp.text[:500])
+        if resp.status_code == 413:
+            raise RunnerTooLarge(resp.text[:500])
+        if resp.status_code != 200:
+            raise RunnerClientError(f"runner error {resp.status_code}")
+        try:
+            data = resp.json()
+        except Exception:
+            raise RunnerClientError("malformed runner reply (not JSON)")
+        if not isinstance(data, dict):
+            raise RunnerClientError("malformed runner reply")
+        base = data.get("base")
+        if not isinstance(base, str) or base != effective_base:
+            raise RunnerClientError("malformed runner reply (base mismatch)")
+        visible = data.get("visible")
+        if visible is not None:
+            visible = _validate_counts(visible, "visible")
+            _validate_collection(visible, 0, "visible")
+        heldout = _validate_counts(data.get("heldout"), "heldout")
+        _validate_collection(heldout, len(sealed_payload), "heldout")
+        kinds = data.get("heldout_kinds")
+        if not isinstance(kinds, list) or any(not isinstance(k, str) for k in kinds):
+            raise RunnerClientError("malformed runner reply (heldout_kinds)")
+        if kinds != [t.get("kind", "") for t in sealed_payload]:
+            raise RunnerClientError("malformed runner reply (heldout_kinds mismatch)")
+        if data.get('hygiene', []) != []:
+            raise RunnerClientError('runner sandbox hygiene failed')
+        failures = _validate_failures(data.get("heldout") or {})
+        heldout = dict(heldout)
+        heldout["failures"] = failures
+        result = {"base": base, "hygiene": [], "visible": visible or
+                  {"pass": 0, "n": 0, "timed_out": False, "exit_code": 0},
+                  "heldout": heldout, "heldout_kinds": list(kinds)}
+        from evoforge import runner_attestation
+        try:
+            expected_image = runner_attestation.configured_image()
+            if expected_image or 'attestation' in data:
+                result['attestation'] = data.get('attestation')
+                runner_attestation.verify(result, effective_base, '',
+                                          [], sealed_payload, expected_image)
+        except (ValueError, TypeError, KeyError, UnicodeError):
+            raise RunnerClientError('Runner provenance validation failed') from None
+        preview = None
+        if preview_module is not None and preview_module != "":
+            preview = _validate_preview(data.get("preview"))
+            if preview is None:
+                raise RunnerClientError("malformed runner reply (preview missing)")
+        elif data.get("preview") is not None:
+            preview = _validate_preview(data.get("preview"))
+        return {"heldout": heldout, "preview": preview,
+                "base": base, "heldout_kinds": list(kinds)}
+    finally:
+        if bundle_path:
+            try:
+                os.remove(bundle_path)
+            except OSError:
+                pass
+        if repo_dir:
+            _remove_tree(repo_dir)
+
+
 def run_via_runner(source_repo, base_sha, diff, visible_tests, sealed_tests,
                    timeout_s: int = 120) -> dict:
     """Execute via the remote Runner; returns the run dict for gate evaluation."""

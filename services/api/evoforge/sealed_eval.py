@@ -417,10 +417,52 @@ def _heldout_result_passes(result: dict, expected: int) -> bool:
             and result["pass"] == result["n"])
 
 
+def _sandbox_files_for_runner(sandbox: str) -> dict[str, str]:
+    """Read a sandbox tree for Runner execution (skip .git only)."""
+    out: dict[str, str] = {}
+    for root, dirs, files in os.walk(sandbox):
+        if ".git" in dirs:
+            dirs.remove(".git")
+        for fn in files:
+            full = os.path.join(root, fn)
+            try:
+                rel = os.path.relpath(full, sandbox)
+            except ValueError:
+                continue
+            if rel.split(os.sep)[0] == ".git":
+                continue
+            try:
+                with open(full, "r", encoding="utf-8", newline="") as fh:
+                    content = fh.read()
+            except (OSError, UnicodeDecodeError):
+                continue
+            out[rel.replace(os.sep, "/")] = content
+    return out
+
+
 def _run_heldout_local(sandbox: str, heldout: list[dict],
-                       timeout_s: int, tmpbase: str) -> float:
+                       timeout_s: int, tmpbase: str, force_local: bool = False) -> float:
     """Held-out run with the Runner sealed isolation; 1.0 iff all pass."""
     _check_size(heldout)
+    if not force_local and _runner_client.runner_url():
+        files = _sandbox_files_for_runner(sandbox)
+        entries = [{"code": e["code"], "kind": e.get("kind", "")}
+                   for e in heldout]
+        try:
+            res = _runner_client.run_files(files, entries, timeout_s)
+        except _runner_client.RunnerTooLarge:
+            raise SealedTooLarge("sealed run over size budget")
+        except (_runner_client.RunnerBadRequest,
+                _runner_client.RunnerConflict) as e:
+            raise SealedEvalError(f"sealed run refused: {type(e).__name__}")
+        except _runner_client.RunnerClientError as e:
+            raise SealedEvalError(f"sealed runner failed: {type(e).__name__}")
+        held = res.get("heldout", {})
+        if not isinstance(held, dict) or held.get("timed_out"):
+            raise SealedTimeout("sealed held-out run timed out")
+        if not _heldout_result_passes(held, len(heldout)):
+            return 0.0
+        return 1.0
     sealed = os.path.join(tmpbase, f"sealed-{secrets.token_hex(8)}")
     os.makedirs(sealed)
     for i, entry in enumerate(heldout, 1):
@@ -624,11 +666,15 @@ def check_task(task: dict, timeout_s: int | None = None) -> dict:
         # Validation always executes locally: the task source is an ephemeral
         # local repo that a remote runner cannot read. Remote execution is
         # only for real baselines via _score_heldout (server-owned repos).
-        without = _run_heldout_local(plain, heldout, timeout_s, tmpbase)
+        # Trusted Critic suite validation stays local even when a Runner is
+        # configured (T68); candidate scoring routes via run_files.
+        without = _run_heldout_local(plain, heldout, timeout_s, tmpbase,
+                                     force_local=True)
         fixed = os.path.join(tmpbase, "sandbox-fixed")
         _build_clean_sandbox(source, base, fixed, future)
         _apply_fix_to_sandbox(fixed, fix)
-        with_fix = _run_heldout_local(fixed, heldout, timeout_s, tmpbase)
+        with_fix = _run_heldout_local(fixed, heldout, timeout_s, tmpbase,
+                                      force_local=True)
     finally:
         _remove_tree(tmpbase)
     return {"fails_without_fix": without < 1.0,
@@ -1011,11 +1057,42 @@ def _parse_failure_xml(xml_path: str) -> list[dict]:
 
 
 def _run_heldout_local_detail(sandbox: str, heldout: list[dict],
-                              timeout_s: int, tmpbase: str) -> tuple[float, list[dict]]:
+                              timeout_s: int, tmpbase: str, force_local: bool = False) -> tuple[float, list[dict]]:
     """Held-out run returning (score, failures) with Runner sealed isolation."""
     import xml.etree.ElementTree as _ET  # noqa: F401
 
     _check_size(heldout)
+    if not force_local and _runner_client.runner_url():
+        files = _sandbox_files_for_runner(sandbox)
+        entries = [{"code": e["code"], "kind": e.get("kind", "")}
+                   for e in heldout]
+        try:
+            res = _runner_client.run_files(files, entries, timeout_s)
+        except _runner_client.RunnerTooLarge:
+            raise SealedTooLarge("sealed run over size budget")
+        except (_runner_client.RunnerBadRequest,
+                _runner_client.RunnerConflict) as e:
+            raise SealedEvalError(f"sealed run refused: {type(e).__name__}")
+        except _runner_client.RunnerClientError as e:
+            raise SealedEvalError(f"sealed runner failed: {type(e).__name__}")
+        held = res.get("heldout", {})
+        if not isinstance(held, dict) or held.get("timed_out"):
+            raise SealedTimeout("sealed held-out run timed out")
+        if not _heldout_result_passes(held, len(heldout)):
+            if not _heldout_result_is_consistent(held, len(heldout)):
+                return 0.0, [{"test": "held-out", "message": "verification inconclusive",
+                              "verification": "INCONCLUSIVE"}]
+            failures = held.get("failures") or []
+            clean: list[dict] = []
+            for f in failures:
+                if isinstance(f, dict) and isinstance(f.get("test"), str) \
+                        and isinstance(f.get("message"), str):
+                    clean.append({"test": f["test"][:200],
+                                  "message": f["message"][:300]})
+            if not clean:
+                clean = [{"test": "held-out", "message": "assertion failed"}]
+            return 0.0, clean
+        return 1.0, []
     sealed = os.path.join(tmpbase, f"sealed-{secrets.token_hex(8)}")
     os.makedirs(sealed)
     for i, entry in enumerate(heldout, 1):

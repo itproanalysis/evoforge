@@ -21,6 +21,7 @@ import time
 import uuid
 
 from evoforge import postgres_state as _postgres_state
+from evoforge import runner_client as _runner_client
 from evoforge import sealed_eval as _sealed
 
 KIND = "evolution_run"
@@ -553,6 +554,23 @@ def _write_preview_tree(root: str, files: dict) -> None:
 
 
 def _run_preview_code(files: dict, module: str) -> tuple[str | None, str | None]:
+    if _runner_client.runner_url():
+        try:
+            res = _runner_client.run_files(dict(files or {}), [],
+                                           PREVIEW_TIMEOUT_S,
+                                           preview_module=module)
+        except Exception as e:
+            return None, _short_error(e)
+        preview = res.get("preview") if isinstance(res, dict) else None
+        if not isinstance(preview, dict):
+            return None, "RuntimeError: preview missing from runner reply"
+        html = preview.get("html")
+        err = preview.get("error")
+        if err is not None and html is None:
+            return None, str(err)[:300]
+        if isinstance(html, str) and err is None:
+            return html, None
+        return None, str(err or "preview failed")[:300]
     tmpdir = tempfile.mkdtemp(prefix="evoforge-evolution-preview-")
     try:
         try:
@@ -682,6 +700,45 @@ def _score_files_counted(files: dict, heldout: list[dict],
     from evoforge import runner as _runner
 
     _sealed._check_size(heldout)
+    if _runner_client.runner_url():
+        entries = [{"code": e["code"], "kind": e.get("kind", "")}
+                   for e in heldout]
+        try:
+            res = _runner_client.run_files(dict(files or {}), entries,
+                                           timeout_s)
+        except (_sealed.SealedTooLarge, _sealed.SealedTimeout,
+                _sealed.SealedEvalError):
+            raise
+        except _runner_client.RunnerTooLarge:
+            raise _sealed.SealedTooLarge("sealed run over size budget")
+        except (_runner_client.RunnerBadRequest,
+                _runner_client.RunnerConflict) as e:
+            raise _sealed.SealedEvalError(
+                f"sealed run refused: {type(e).__name__}")
+        except _runner_client.RunnerClientError as e:
+            raise _sealed.SealedEvalError(
+                f"sealed runner failed: {type(e).__name__}")
+        except Exception as e:
+            raise _sealed.SealedEvalError(
+                f"sealed run failed: {type(e).__name__}")
+        held = res.get("heldout", {})
+        if not isinstance(held, dict) or held.get("timed_out"):
+            raise _sealed.SealedTimeout("sealed held-out run timed out")
+        if not _sealed._heldout_result_is_consistent(held, len(heldout)):
+            return 0, len(heldout), [{"test": "held-out", "message": "verification inconclusive",
+                                      "verification": "INCONCLUSIVE"}]
+        n, passed = held["n"], held["pass"]
+        failures: list[dict] = []
+        if passed != n:
+            raw = held.get("failures") or []
+            for f in raw:
+                if isinstance(f, dict) and isinstance(f.get("test"), str) \
+                        and isinstance(f.get("message"), str):
+                    failures.append({"test": f["test"][:200],
+                                     "message": f["message"][:300]})
+            if not failures:
+                failures = [{"test": "held-out", "message": "assertion failed"}]
+        return passed, n, failures
     tmpbase = tempfile.mkdtemp(prefix="evoforge-evolution-score-")
     try:
         safe = re.sub(r"[^A-Za-z0-9_]+", "_", lane_tag).strip("_") or "lane"
