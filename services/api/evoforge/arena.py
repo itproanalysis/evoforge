@@ -372,6 +372,62 @@ def _is_equal_tools(doc: dict) -> bool:
         return False
 
 
+def _wilson95_rounded(k: int, n: int) -> list | None:
+    """Wilson 95% interval for k successes in n trials, z = 1.96.
+
+    Bounds are rounded to 3 decimals; None when n is 0. Never raises.
+    """
+    try:
+        n = int(n)
+        k = int(k)
+    except Exception:
+        return None
+    if n <= 0:
+        return None
+    try:
+        import math as _math
+
+        z = 1.96
+        p = float(k) / float(n)
+        den = 1.0 + z * z / float(n)
+        centre = (p + z * z / (2.0 * float(n))) / den
+        half = z * _math.sqrt(p * (1.0 - p) / float(n)
+                              + z * z / (4.0 * float(n) * float(n))) / den
+        lo = max(0.0, centre - half)
+        hi = min(1.0, centre + half)
+        return [round(float(lo), 3), round(float(hi), 3)]
+    except Exception:
+        return None
+
+
+def _sign_test_p(evo_wins: int, single_wins: int) -> float | None:
+    """Exact two-sided binomial sign test over decisive matches.
+
+    Ties are excluded by the caller (only evo/single wins are passed).
+    p = min(1, 2 * P(X <= min)) with X ~ Bin(m, 0.5); None when m == 0.
+    Never raises.
+    """
+    try:
+        e = int(evo_wins)
+        s = int(single_wins)
+    except Exception:
+        return None
+    if e < 0 or s < 0:
+        return None
+    m = e + s
+    if m <= 0:
+        return None
+    try:
+        import math as _math
+
+        k = min(e, s)
+        total = sum(_math.comb(m, i) for i in range(k + 1))
+        p = 2.0 * total / (2.0 ** m)
+        return min(1.0, float(p))
+    except Exception:
+        return None
+
+
 def summary() -> dict:
     """Scoreboard over EVERY stored arena document, sealed and prompt alike.
 
@@ -415,6 +471,7 @@ def summary() -> dict:
     eq_heldout = {"single": {"passed": 0, "n": 0},
                   "evoforge": {"passed": 0, "n": 0}}
     eq_cost_cents = {"single": 0, "evoforge": 0, "judge": 0}
+    eq_solved = {"single": 0, "evoforge": 0}
     for doc in cands.values():
         if not isinstance(doc, dict):
             continue
@@ -460,17 +517,38 @@ def summary() -> dict:
                             held.get("passed"))
                         eq_heldout[side]["n"] += _summary_int(
                             held.get("n"))
+                        try:
+                            _p = _summary_int(held.get("passed"))
+                            _n = _summary_int(held.get("n"))
+                        except Exception:
+                            _p, _n = 0, 0
+                        if _n > 0 and _p == _n:
+                            eq_solved[side] += 1
                     eq_cost_cents[side] += _summary_int(
                         lane.get("cost_cents"))
                 eq_cost_cents["judge"] += _summary_int(
                     doc.get("judge_cost_cents"))
+    eq_decisive = {"evoforge": int(eq_wins.get("evoforge", 0)),
+                   "single": int(eq_wins.get("single", 0))}
+    eq_wilson = {"single": _wilson95_rounded(eq_solved["single"], eq_scored),
+                 "evoforge": _wilson95_rounded(eq_solved["evoforge"],
+                                               eq_scored)}
+    eq_p = _sign_test_p(eq_decisive["evoforge"], eq_decisive["single"])
+    eq_stats = {"tasks": int(eq_scored),
+                "solved": {"single": int(eq_solved["single"]),
+                           "evoforge": int(eq_solved["evoforge"])},
+                "wilson95": eq_wilson,
+                "decisive": eq_decisive,
+                "sign_test_p": eq_p,
+                "significant": bool(eq_p is not None and eq_p < 0.05)}
     return {"total": total, "running": running, "failed": failed,
             "scored": scored, "unscorable": unscorable,
             "inconclusive": inconclusive, "wins": wins,
             "heldout": heldout, "cost_cents": cost_cents,
             "equal_tools": {"scored": eq_scored, "wins": eq_wins,
                             "heldout": eq_heldout,
-                            "cost_cents": eq_cost_cents},
+                            "cost_cents": eq_cost_cents,
+                            "stats": eq_stats},
             "basis": SUMMARY_BASIS}
 
 

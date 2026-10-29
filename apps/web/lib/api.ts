@@ -799,6 +799,15 @@ export function listArenas() {
   return req<{ arenas: ArenaDoc[] }>("/v1/arena");
 }
 
+export interface ArenaEqualToolsStats {
+  tasks: number;
+  solved: { single: number; evoforge: number };
+  wilson95: { single: [number, number] | null; evoforge: [number, number] | null };
+  decisive: { evoforge: number; single: number };
+  sign_test_p: number | null;
+  significant: boolean;
+}
+
 export interface ArenaSummary {
   total: number;
   running: number;
@@ -814,6 +823,7 @@ export interface ArenaSummary {
     wins: { evoforge: number; single: number; tie: number };
     heldout: { single: { passed: number; n: number }; evoforge: { passed: number; n: number } };
     cost_cents: { single: number; evoforge: number; judge: number };
+    stats?: ArenaEqualToolsStats | null;
   };
   basis: string;
 }

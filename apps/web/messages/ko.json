@@ -523,7 +523,9 @@
     "summary-cost-single": "단일 AI 비용",
     "summary-cost-judge": "심사 비용",
     "summary-unscorable": "점수 낼 테스트 부족",
-    "summary-inconclusive": "추가 확인 필요"
+    "summary-inconclusive": "추가 확인 필요",
+    "summary-significant": "통계적으로 유의미함 (p = {p})",
+    "summary-not-significant": "아직 통계적으로 유의미하지 않음 (p = {p}); 더 많은 대결이 필요함"
   },
   "replay": {
     "title": "라운드 리플레이",

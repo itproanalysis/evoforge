@@ -523,7 +523,9 @@
     "summary-cost-single": "Single cost",
     "summary-cost-judge": "Judge cost",
     "summary-unscorable": "Too few tests to score",
-    "summary-inconclusive": "Needs another check"
+    "summary-inconclusive": "Needs another check",
+    "summary-significant": "Statistically significant (p = {p})",
+    "summary-not-significant": "Not statistically significant yet (p = {p}); more matches needed"
   },
   "replay": {
     "title": "Round Replay",

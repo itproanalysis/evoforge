@@ -369,6 +369,33 @@ export default function ArenaPage() {
             <span>{t("summary-cost-single")}: <strong className="text-text-primary">{summary.equal_tools?.cost_cents?.single ?? 0}¢</strong></span>
             <span>{t("summary-cost-judge")}: <strong className="text-text-primary">{summary.equal_tools?.cost_cents?.judge ?? 0}¢</strong></span>
           </div>
+          {(() => {
+            const stats = summary.equal_tools?.stats;
+            if (!stats) return null;
+            const p = stats.sign_test_p;
+            const pText = typeof p === "number" && Number.isFinite(p) ? String(p) : "—";
+            const fmtIv = (iv: [number, number] | null | undefined) =>
+              Array.isArray(iv) ? `[${iv[0]}, ${iv[1]}]` : "—";
+            const tasks = stats.tasks ?? summary.equal_tools?.scored ?? 0;
+            const solvedE = stats.solved?.evoforge ?? 0;
+            const solvedS = stats.solved?.single ?? 0;
+            const ivE = fmtIv(stats.wilson95?.evoforge);
+            const ivS = fmtIv(stats.wilson95?.single);
+            const significant = typeof p === "number" && Number.isFinite(p) ? p < 0.05 : !!stats.significant;
+            return (
+              <>
+                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words max-w-full">
+                  <span>Solved EvoForge {solvedE}/{tasks} {ivE}</span>
+                  <span>Solved Single {solvedS}/{tasks} {ivS}</span>
+                </div>
+                <p className="mt-1 text-xs text-text-secondary break-words max-w-full">
+                  {significant
+                    ? t("summary-significant", { p: pText })
+                    : t("summary-not-significant", { p: pText })}
+                </p>
+              </>
+            );
+          })()}
           <div className="mt-2 text-xs font-semibold text-text-primary break-words">
             {t("summary-all-matches")}
           </div>
