@@ -1,0 +1,19 @@
+{
+  "id": "T76_judge_reference",
+  "planned_by": "Claude (Critic): production prompt-Arena 0-0 ties from a wrong judge suite",
+  "goal": "T76 — prompt Arena: check the judge's hidden tests against a judge reference build. Production 2026-10-30\n(password meter): both lanes scored 0/5, later 0/3, while a fresh judge suite for the same prompt passed 3/3 on BOTH\nproduction candidates (locally and through the Runner path) — the production judge suite was wrong and nothing checked\nit, so the \"tie 0-0\" measured the judge, not the lanes. API only; first round only (follow-ups unchanged in T76).\n1. evoforge/arena_prompt.py: REFERENCE_MARKER = \"Judge reference build\". After the judge suite is filtered on the\n   template (kept), make ONE Builder call through sealed_eval._call_builder_task (reserve -> call -> settle) with goal\n   REFERENCE_MARKER + \"\n\n\" + the lanes' task goal (including the acceptance interface), file context = the template.\n   Apply its diff to the template (tolerant, like the lanes' previews) and run each kept test on that reference\n   (Runner when EVO_RUNNER_URL is set, local sandbox otherwise — same mechanics as _filter_on_template). Keep only the\n   tests that pass on the reference. Its cost is added to judge_cost_cents.\n2. Manifest: \"reference_checked\": true and \"acceptance_reference_dropped\": <count>; acceptance_count/hash/interface\n   describe the scored (kept) suite. Fewer than 3 left -> verdict \"unscorable\" whose reason mentions the judge\n   reference; never a tie or a win.\n3. The reference code, its diff and the dropped tests never reach a lane, a lane goal, the response or the proof\n   certificate (store nothing of it, or only privately with the other hidden data).\n4. Update YOUR earlier tests that assumed no reference build (services/api/tests/test_muse_t64.py, test_muse_t75.py):\n   their Builder stubs must answer a goal containing REFERENCE_MARKER with a correct page for the judge codes they\n   define, without changing what those tests check. Tests: services/api/tests/test_muse_t76.py.",
+  "edit": [
+    "services/api/evoforge/arena_prompt.py",
+    "services/api/tests/test_muse_t76.py",
+    "services/api/tests/test_muse_t64.py",
+    "services/api/tests/test_muse_t75.py"
+  ],
+  "context": [
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/evoforge/arena.py",
+    "services/api/evoforge/runner_client.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t76.py services/api/tests/test_sealed_t76_judge_reference.py services/api/tests/test_arena_status_http_codex.py services/api/tests/test_arena_verification_codex.py services/api/tests/test_critic_sealed_v5.py services/api/tests/test_critic_t48_arena_manifest.py services/api/tests/test_critic_t49_arena_preview.py services/api/tests/test_critic_t50_arena_critic_lane.py services/api/tests/test_critic_t64_prompt_arena.py services/api/tests/test_critic_t65_prompt_bar.py services/api/tests/test_critic_t66_prompt_followup.py services/api/tests/test_critic_t68_candidate_code_in_runner.py services/api/tests/test_critic_t70_arena_certificates.py services/api/tests/test_muse_t44.py services/api/tests/test_muse_t48.py services/api/tests/test_muse_t49.py services/api/tests/test_muse_t50.py services/api/tests/test_muse_t59.py services/api/tests/test_muse_t64.py services/api/tests/test_muse_t65.py services/api/tests/test_muse_t66.py services/api/tests/test_muse_t67.py services/api/tests/test_muse_t70.py services/api/tests/test_muse_t73.py services/api/tests/test_muse_t75.py services/api/tests/test_sealed_t44_arena.py services/api/tests/test_sealed_t70_arena_certificates.py services/api/tests/test_sealed_t73_acceptance_interface.py services/api/tests/test_sealed_t75_live_arena_progress.py -q -p no:cacheprovider"
+  ]
+}
