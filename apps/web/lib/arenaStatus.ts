@@ -109,6 +109,69 @@ export function canFollowUp(doc: ArenaDoc | null | undefined): boolean {
   return rec.mode === "prompt" && doc.status === "succeeded";
 }
 
+export type ArenaAgentRole = "builder" | "critic" | "runner" | "gate";
+
+export type ArenaAgentState = "active" | "done" | "idle";
+
+export interface ArenaAgentRow {
+  role: ArenaAgentRole;
+  state: ArenaAgentState;
+  message: string | null;
+}
+
+const ARENA_AGENT_ROLES: ArenaAgentRole[] = ["builder", "critic", "runner", "gate"];
+
+/** Live-agent view for one arena side: one row per role from recorded lane events. */
+export function arenaAgentPanel(
+  doc: ArenaDoc | null | undefined,
+  side: "evoforge" | "single",
+): ArenaAgentRow[] {
+  const idle = (): ArenaAgentRow[] =>
+    ARENA_AGENT_ROLES.map((role) => ({ role, state: "idle" as const, message: null }));
+  if (doc == null || typeof doc !== "object") return idle();
+  const rec = doc as unknown as Record<string, unknown>;
+  const lanes = (rec.lanes ?? {}) as Record<string, unknown>;
+  const lane = (lanes[side] ?? null) as Record<string, unknown> | null;
+  const raw = lane != null && Array.isArray((lane as { events?: unknown }).events)
+    ? ((lane as { events?: unknown }).events as unknown[])
+    : [];
+  type Ev = { seq: number; role: string; message: unknown; order: number };
+  const events: Ev[] = [];
+  raw.forEach((e, order) => {
+    if (e == null || typeof e !== "object") return;
+    const r = e as Record<string, unknown>;
+    if (typeof r.seq !== "number" || !Number.isFinite(r.seq)) return;
+    if (typeof r.role !== "string" || r.role.length === 0) return;
+    events.push({ seq: r.seq, role: r.role, message: r.message, order });
+  });
+  const laneStatus = lane != null && typeof lane.status === "string"
+    ? (lane.status as string)
+    : "pending";
+  const arenaRunning = rec.status === "running";
+  const laneFinished = laneStatus === "succeeded" || laneStatus === "failed";
+  let newest: Ev | null = null;
+  for (const e of events) {
+    if (newest === null || e.seq > newest.seq || (e.seq === newest.seq && e.order > newest.order)) {
+      newest = e;
+    }
+  }
+  const textOf = (v: unknown): string | null =>
+    typeof v === "string" ? v : v === null || v === undefined ? null : String(v);
+  return ARENA_AGENT_ROLES.map((role) => {
+    let best: Ev | null = null;
+    for (const e of events) {
+      if (e.role !== role) continue;
+      if (best === null || e.seq > best.seq || (e.seq === best.seq && e.order > best.order)) {
+        best = e;
+      }
+    }
+    if (best === null) return { role, state: "idle" as const, message: null };
+    const isNewest = newest !== null && best.order === newest.order;
+    const active = arenaRunning && !laneFinished && isNewest;
+    return { role, state: active ? ("active" as const) : ("done" as const), message: textOf(best.message) };
+  });
+}
+
 export interface PromptChainRow {
   round: number;
   arenaId: string;

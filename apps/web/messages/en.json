@@ -158,6 +158,22 @@
     "gate-integrity-w10-hint": "Stability Hint (W10): Weak assertions detected (< 0.8 threshold). Exact == comparisons and pytest.raises required.",
     "storage-label": "Storage Backend"
   },
+  "workspace": {
+    "heading": "Home workspace",
+    "ai-status-heading": "AI status",
+    "implementation-heading": "Implementation",
+    "prompt-heading": "Prompt",
+    "verdict-label": "Verdict",
+    "scores-label": "Scores",
+    "view-arena": "Full view in Arena →",
+    "view-replay": "Open in Replay →",
+    "empty": "No arena matches yet. Type a prompt below and watch both sides build live.",
+    "evoforge": "EvoForge",
+    "single": "Single AI",
+    "mission-control-toggle": "Mission Control (metrics, missions, evidence)",
+    "running": "Running…",
+    "no-prompt": "No prompt yet"
+  },
   "lab": {
     "heading": "Improvement Lab",
     "description": "candidate diff → sealed tests → review → PR. INCONCLUSIVE blocks merge.",
