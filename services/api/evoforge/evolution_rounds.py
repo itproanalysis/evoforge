@@ -771,6 +771,16 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
             critic_new = []
     prior: list[dict] = list(critic_history) if isinstance(critic_history, list) else []
     critic_suite: list[dict] = list(prior) + list(critic_new)
+    critic_retired = 0
+    try:
+        _prior_names = set(_sealed._heldout_test_names(prior))
+    except Exception:
+        _prior_names = set()
+    try:
+        _new_names = set(_sealed._heldout_test_names(critic_new))
+    except Exception:
+        _new_names = set()
+    _prev_earlier_failed: set | None = None
     if feedback == "critic":
         _emit(events, "critic",
               f"Critic suite: {len(critic_suite)} tests ({len(critic_new)} new)")
@@ -839,6 +849,59 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
                         break
                     _emit(events, "runner",
                           f"evoforge: attempt {attempts} critic {cp}/{_cn} failed")
+                    _stale_hit = False
+                    if critic_new:
+                        try:
+                            _failing = set(_sealed._failing_test_names(
+                                cfail or [], critic_suite))
+                        except Exception:
+                            _failing = set()
+                        _new_failed = _failing & _new_names
+                        _earlier_failed = _failing & _prior_names
+                        if (_new_failed == set() and _earlier_failed
+                                and _failing == _earlier_failed):
+                            if (_prev_earlier_failed is not None
+                                    and _earlier_failed == _prev_earlier_failed):
+                                _stale = set(_earlier_failed)
+                                critic_retired = len(_stale)
+                                if isinstance(critic_history, list):
+                                    def _entry_test_names(entry) -> set:
+                                        try:
+                                            code = entry.get("code", "") if isinstance(
+                                                entry, dict) else ""
+                                        except Exception:
+                                            return set()
+                                        if not isinstance(code, str):
+                                            return set()
+                                        return set(re.findall(
+                                            r"(?m)^[ \t]*def\s+(test_[A-Za-z0-9_]+)\s*\(",
+                                            code))
+                                    # Retire only the stale functions: other tests in the same Critic file stay in
+                                    # the suite (pytest collects test_* only, so a renamed def is not run).
+                                    _kept = []
+                                    for e in critic_history:
+                                        names = _entry_test_names(e)
+                                        if not (names & _stale):
+                                            _kept.append(e)
+                                            continue
+                                        if not (names - _stale):
+                                            continue
+                                        code = e.get("code", "")
+                                        for name in names & _stale:
+                                            code = re.sub(rf"(?m)^([ \t]*def\s+){name}\s*\(",
+                                                          rf"\g<1>_retired_{name}(", code)
+                                        _kept.append({**e, "code": code})
+                                    critic_history[:] = _kept
+                                _emit(events, "critic",
+                                      f"retired {critic_retired} stale Critic tests "
+                                      "(contradicted by this round's requirements)")
+                                _stale_hit = True
+                            else:
+                                _prev_earlier_failed = set(_earlier_failed)
+                        else:
+                            _prev_earlier_failed = None
+                    if _stale_hit:
+                        break
                     goal_attempt = _sealed._critic_feedback(
                         goal, cfail or [{"test": "critic", "message": "assertion failed"}],
                         n_c, 0)
@@ -906,6 +969,7 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
             "heldout": {"passed": int(c_passed), "n": int(c_n)},
             "round_tests": {"passed": int(r_passed), "n": int(r_n)},
             "critic_tests": int(len(critic_suite)) if feedback == "critic" else 0,
+            "critic_retired": int(critic_retired) if feedback == "critic" else 0,
             "diff": final_diff if isinstance(final_diff, str) else "",
             "attempts": int(attempts), "cost_cents": int(cost),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
@@ -1033,6 +1097,7 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                         "elapsed_ms": 0, "events": [], "error": _short_error(e)}
                 if lane == "evoforge":
                     snap["critic_tests"] = int(len(critic_history)) if feedback == "critic" else 0
+                    snap["critic_retired"] = 0
             with lock:
                 state["snaps"][(lane, idx)] = snap
                 state["order"].append((lane, idx))
@@ -1074,6 +1139,7 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                       "heldout": {"passed": 0, "n": len(_cumulative_heldout(rounds_all, idx))},
                       "round_tests": {"passed": 0, "n": len(r.get("heldout") or [])},
                       "critic_tests": 0,
+                      "critic_retired": 0,
                       "preview_html": "",
                       "preview_sha": "sha256:" + hashlib.sha256(b"").hexdigest(),
                       "preview_error": "RuntimeError: lane did not finish",
