@@ -902,6 +902,13 @@ def _pipeline_usage_from_output(out: dict):
     return _perf.usage_from_output(out)
 
 
+def _critic_output_cost(out) -> int | None:
+    """Cost a Critic output at its own model's prices (never Builder prices)."""
+    from evoforge import performance as _perf
+
+    return _perf.output_cost_cents(out)
+
+
 def _call_pipeline_attempt(goal: str, base: str,
                            file_context: list[dict]) -> tuple[str, object, int, bool]:
     """One reserve -> Builder -> settle attempt with usage-derived cost.
@@ -1190,8 +1197,7 @@ def _call_critic_suite(critic_goal: str) -> tuple[str, object, int, bool]:
             pass
         raise SealedEvalError(
             f"provider outcome unknown ({type(e).__name__}); reservation held")
-    usage = _pipeline_usage_from_output(out) if isinstance(out, dict) else None
-    actual = _pipeline_usage_cost(usage)
+    actual = _critic_output_cost(out) if isinstance(out, dict) else None
     missing = actual is None
     if missing:
         actual = PIPELINE_PER_ATTEMPT_MAX_CENTS

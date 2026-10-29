@@ -685,6 +685,12 @@ def _review_core(*, goal_contract: str, diff: str, ci: str,
             try:
                 response = _call_provider(rsv, send)
                 metadata = broker_meta.call_metadata(response, os.getenv("MODEL_CRITIC", "muse-spark-1.3"), phase)
+                try:
+                    from evoforge.critic import critic_endpoint as _critic_endpoint
+
+                    metadata["provider"] = _critic_endpoint()["provider"]
+                except Exception:
+                    pass
                 if hasattr(response, "model_dump"):
                     response_document = response.model_dump(mode="json")
                 return response

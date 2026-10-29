@@ -42,6 +42,10 @@ echo "== runner: no secrets, no roles, private, one job per instance"
 echo "== api: private; only the web SA may invoke; Meta key + GitHub token from Secret Manager"
 # CPU always allocated: eval jobs (T24) run after the response returns.
 # max-instances 1 until the request path is on Cloud SQL (in-memory evidence/ledger must stay on one instance).
+# T72 second Critic provider (owner-added at submission; unset = Critic shares the Builder's Meta endpoint):
+# CRITIC_API_BASE + CRITIC_API_KEY select a second Meta open-weight model endpoint (e.g. Fireworks/Baseten),
+# and CRITIC_PRICE_INPUT_PER_MTOK + CRITIC_PRICE_OUTPUT_PER_MTOK (USD per million tokens, from that
+# provider's price page) must both be set or Critic calls are refused before anything is sent or billed.
 "$GCLOUD" run deploy evoforge-api --project "$PROJECT" --region "$REGION" --image "${REG}/api:${TAG}" \
   --service-account "$(SA api)" --no-allow-unauthenticated --port 8080 \
   --cpu 1 --memory 1Gi --min-instances 1 --max-instances 1 --timeout 900 --no-cpu-throttling \

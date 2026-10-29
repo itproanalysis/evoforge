@@ -76,13 +76,24 @@ def tokens_from_usage(usage) -> tuple[int, int, int, int] | None:
     return (prompt, completion, reasoning, cached)
 
 
-def usage_cost_cents(usage) -> int | None:
-    """Usage-derived cost in integer cents (rounded up); None when missing."""
+def usage_cost_cents(usage, model=None) -> int | None:
+    """Usage-derived cost in integer cents (rounded up); None when missing.
+
+    A call on the second Critic provider (CRITIC_API_BASE + CRITIC_API_KEY
+    set) whose model is the Critic model (MODEL_CRITIC) is priced at the
+    Critic provider's CRITIC_PRICE_* prices, with cache-read tokens at the
+    input price; every other call keeps today's EVO_PRICE_* prices.
+    """
     tokens = tokens_from_usage(usage)
     if tokens is None:
         return None
     prompt, completion, reasoning, cached = tokens
-    price_in, price_out, price_cache = prices()
+    critic_pair = _critic_price_pair(model)
+    if critic_pair is not None:
+        price_in, price_out = critic_pair
+        price_cache = price_in
+    else:
+        price_in, price_out, price_cache = prices()
     # OpenAI-compatible usage: prompt_tokens already includes cached tokens, so the uncached part is billed
     # at the input price and the cached part at the cache-read price (never both at full price).
     uncached = max(prompt - cached, 0)
@@ -90,6 +101,42 @@ def usage_cost_cents(usage) -> int | None:
            + (completion + reasoning) * price_out
            + cached * price_cache) / 1_000_000.0
     return int(math.ceil(usd * 100.0))
+
+
+def critic_prices() -> tuple[float, float] | None:
+    """Critic-provider prices (USD per million tokens: input, output).
+
+    From CRITIC_PRICE_INPUT_PER_MTOK + CRITIC_PRICE_OUTPUT_PER_MTOK, set by
+    the owner from the provider's price page; None unless both are set to
+    numbers. Prices are never guessed here.
+    """
+    try:
+        raw_in = os.getenv("CRITIC_PRICE_INPUT_PER_MTOK")
+        raw_out = os.getenv("CRITIC_PRICE_OUTPUT_PER_MTOK")
+        if raw_in is None or raw_out is None:
+            return None
+        raw_in, raw_out = raw_in.strip(), raw_out.strip()
+        if not raw_in or not raw_out:
+            return None
+        return (float(raw_in), float(raw_out))
+    except (TypeError, ValueError, AttributeError):
+        return None
+
+
+def _critic_price_pair(model) -> tuple[float, float] | None:
+    """Critic-provider (input, output) prices for this model, else None.
+
+    Applies only when the second Critic provider is configured
+    (CRITIC_API_BASE + CRITIC_API_KEY) and the call's model is the Critic
+    model (MODEL_CRITIC) with both CRITIC_PRICE_* set.
+    """
+    if not isinstance(model, str) or not model:
+        return None
+    if model != os.getenv("MODEL_CRITIC", "muse-spark-1.3"):
+        return None
+    if not (os.getenv("CRITIC_API_BASE") and os.getenv("CRITIC_API_KEY")):
+        return None
+    return critic_prices()
 
 
 def usage_from_output(out: dict):
@@ -105,6 +152,17 @@ def usage_from_output(out: dict):
                     and call["usage"]:
                 return call["usage"]
     return None
+
+
+def output_cost_cents(out) -> int | None:
+    """Cost a model output dict at its own model's prices (Critic-aware).
+
+    Critic outputs (model == MODEL_CRITIC on the second provider) are
+    priced at the Critic provider's prices, never at Builder prices.
+    """
+    if not isinstance(out, dict):
+        return None
+    return usage_cost_cents(usage_from_output(out), model=out.get("model"))
 
 
 def eval_max_cents() -> int:
