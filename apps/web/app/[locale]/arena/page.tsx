@@ -353,7 +353,26 @@ export default function ArenaPage() {
           <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
             {t("summary-heading")}
           </span>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
+          <div className="mt-2 text-xs font-semibold text-text-primary break-words">
+            {t("summary-equal-tools")}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+            <span>{t("summary-evoforge-wins")}: <strong className="text-text-primary">{summary.equal_tools?.wins?.evoforge ?? 0}</strong></span>
+            <span>{t("summary-single-wins")}: <strong className="text-text-primary">{summary.equal_tools?.wins?.single ?? 0}</strong></span>
+            <span>{t("summary-ties")}: <strong className="text-text-primary">{summary.equal_tools?.wins?.tie ?? 0}</strong></span>
+            <span>{t("summary-scored")}: <strong className="text-text-primary">{summary.equal_tools?.scored ?? 0}</strong></span>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+            <span>{t("summary-heldout-evoforge")}: <strong className="text-text-primary">{summary.equal_tools?.heldout?.evoforge?.passed ?? 0}/{summary.equal_tools?.heldout?.evoforge?.n ?? 0}</strong></span>
+            <span>{t("summary-heldout-single")}: <strong className="text-text-primary">{summary.equal_tools?.heldout?.single?.passed ?? 0}/{summary.equal_tools?.heldout?.single?.n ?? 0}</strong></span>
+            <span>{t("summary-cost-evoforge")}: <strong className="text-text-primary">{summary.equal_tools?.cost_cents?.evoforge ?? 0}¢</strong></span>
+            <span>{t("summary-cost-single")}: <strong className="text-text-primary">{summary.equal_tools?.cost_cents?.single ?? 0}¢</strong></span>
+            <span>{t("summary-cost-judge")}: <strong className="text-text-primary">{summary.equal_tools?.cost_cents?.judge ?? 0}¢</strong></span>
+          </div>
+          <div className="mt-2 text-xs font-semibold text-text-primary break-words">
+            {t("summary-all-matches")}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
             <span>{t("summary-evoforge-wins")}: <strong className="text-text-primary">{summary.wins?.evoforge ?? 0}</strong></span>
             <span>{t("summary-single-wins")}: <strong className="text-text-primary">{summary.wins?.single ?? 0}</strong></span>
             <span>{t("summary-ties")}: <strong className="text-text-primary">{summary.wins?.tie ?? 0}</strong></span>

@@ -436,7 +436,59 @@ export default function MissionControl() {
             </p>
           ) : (
             <>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+              <div className="mt-2 text-xs font-semibold text-text-primary break-words">
+                {tArena("summary-equal-tools")}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-evoforge-wins")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.wins?.evoforge ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-single-wins")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.wins?.single ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-ties")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.wins?.tie ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-scored")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.scored ?? 0}</strong>
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-heldout-evoforge")}:{" "}
+                  <strong className="text-text-primary">
+                    {arenaSummary.equal_tools?.heldout?.evoforge?.passed ?? 0}/{arenaSummary.equal_tools?.heldout?.evoforge?.n ?? 0}
+                  </strong>
+                </span>
+                <span>
+                  {tArena("summary-heldout-single")}:{" "}
+                  <strong className="text-text-primary">
+                    {arenaSummary.equal_tools?.heldout?.single?.passed ?? 0}/{arenaSummary.equal_tools?.heldout?.single?.n ?? 0}
+                  </strong>
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-cost-evoforge")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.cost_cents?.evoforge ?? 0}¢</strong>
+                </span>
+                <span>
+                  {tArena("summary-cost-single")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.cost_cents?.single ?? 0}¢</strong>
+                </span>
+                <span>
+                  {tArena("summary-cost-judge")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.cost_cents?.judge ?? 0}¢</strong>
+                </span>
+              </div>
+              <div className="mt-2 text-xs font-semibold text-text-primary break-words">
+                {tArena("summary-all-matches")}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
                 <span>
                   {tArena("summary-evoforge-wins")}:{" "}
                   <strong className="text-text-primary">{arenaSummary.wins?.evoforge ?? 0}</strong>

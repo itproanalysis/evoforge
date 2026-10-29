@@ -508,6 +508,8 @@
     "prompt-judge-cost": "독립 심사 비용: {cost}",
     "prompt-equal-tools": "동등한 도구: 양쪽 레인 모두 tolerant recounting으로 diff를 적용합니다.",
     "summary-heading": "아레나 스코어보드",
+    "summary-equal-tools": "동등 도구 (공정 비교)",
+    "summary-all-matches": "전체 대결",
     "summary-evoforge-wins": "EvoForge 승리",
     "summary-single-wins": "단일 AI 승리",
     "summary-ties": "무승부",

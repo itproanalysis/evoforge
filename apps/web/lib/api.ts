@@ -809,6 +809,12 @@ export interface ArenaSummary {
   wins: { evoforge: number; single: number; tie: number };
   heldout: { single: { passed: number; n: number }; evoforge: { passed: number; n: number } };
   cost_cents: { single: number; evoforge: number; judge: number };
+  equal_tools?: {
+    scored: number;
+    wins: { evoforge: number; single: number; tie: number };
+    heldout: { single: { passed: number; n: number }; evoforge: { passed: number; n: number } };
+    cost_cents: { single: number; evoforge: number; judge: number };
+  };
   basis: string;
 }
 

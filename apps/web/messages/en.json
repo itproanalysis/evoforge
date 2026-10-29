@@ -508,6 +508,8 @@
     "prompt-judge-cost": "Independent judge cost: {cost}",
     "prompt-equal-tools": "Equal tools: both lanes apply diffs with tolerant recounting.",
     "summary-heading": "Arena scoreboard",
+    "summary-equal-tools": "Equal tools (fair comparison)",
+    "summary-all-matches": "All matches",
     "summary-evoforge-wins": "EvoForge wins",
     "summary-single-wins": "Single wins",
     "summary-ties": "Ties",
