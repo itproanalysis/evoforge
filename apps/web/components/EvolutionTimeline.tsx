@@ -20,8 +20,8 @@ export interface EvolutionTimelineProps {
 const FALLBACK: Record<string, string> = {
   "timeline.not-comparable": "Not comparable \u2014 different suite or model",
   "timeline.empty": "No measurements yet. Run a baseline or pipeline measurement to start the timeline.",
-  "timeline.legend-x-single": "X_SINGLE",
-  "timeline.legend-pipeline": "PIPELINE",
+  "timeline.legend-x-single": "Single AI baseline",
+  "timeline.legend-pipeline": "EvoForge pipeline",
   "timeline.families-heading": "Per-family results",
   "timeline.harness": "harness {version}",
   "timeline.verdict-improved": "Improvement confirmed ({delta})",

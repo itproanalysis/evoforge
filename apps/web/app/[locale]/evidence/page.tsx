@@ -163,7 +163,7 @@ export default function EvidencePage() {
           for (const eid of [o.evidence_id, o.pr_evidence_id, o.run_evidence_id]) {
             if (eid && !seen.has(eid)) {
               seen.add(eid);
-              items.push({ eid, label: `WVI ${o.mission_id}` });
+              items.push({ eid, label: `verified improvement ${o.mission_id}` });
             }
           }
         }

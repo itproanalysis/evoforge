@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   API_BASE,
   type ArenaDoc,
@@ -76,6 +76,7 @@ export default function MissionControl() {
   const tErrors = useTranslations("errors");
   const tCommon = useTranslations("common");
   const tWorkspace = useTranslations("workspace");
+  const locale = useLocale();
 
   const [goal, setGoal] = useState("");
   const [repoRef, setRepoRef] = useState("HEAD");
@@ -309,7 +310,7 @@ export default function MissionControl() {
       localStorage.setItem("evoforge.run_evidence_id", m.run_evidence_id || "");
     } catch {}
     if (typeof window !== "undefined") {
-      window.location.href = "/lab";
+      window.location.href = locale === "ko" ? "/ko/lab" : "/lab";
     }
   };
 
@@ -394,6 +395,17 @@ export default function MissionControl() {
 
   return (
     <main className="pb-40">
+      {/* Plain-language intro above the workspace: what happens when you type. */}
+      <section aria-label={tWorkspace("intro")} className="mt-2">
+        <p className="text-sm text-text-primary mt-0 mb-2">
+          {tWorkspace("intro")}
+        </p>
+        <ol className="text-sm text-text-secondary mt-0 mb-0 pl-5">
+          <li>{tWorkspace("intro-step-1")}</li>
+          <li>{tWorkspace("intro-step-2")}</li>
+          <li>{tWorkspace("intro-step-3")}</li>
+        </ol>
+      </section>
       {/* Home workspace: AI status left (~1/3), implementation right (~2/3).
           Mobile (<768px): grid stacks AI status above the implementation;
           the PromptBar stays fixed at the bottom. */}
@@ -655,7 +667,7 @@ export default function MissionControl() {
         </div>
         <div className="text-sm mt-2 flex flex-wrap gap-4">
           <div>
-            <span className="text-text-secondary">X_SINGLE: </span>
+            <span className="text-text-secondary">single AI baseline: </span>
             {initialLoading ? (
               <span className="text-text-secondary">{tCommon("loading")}</span>
             ) : perf?.baseline?.status === "measured" ? (
@@ -670,7 +682,7 @@ export default function MissionControl() {
             {perf?.baseline?.status === "measured" && <span className="text-text-secondary"> · {t(`provenance.${viewProvenance(perf.baseline)}` as any)}</span>}
           </div>
           <div>
-            <span className="text-text-secondary">PIPELINE: </span>
+            <span className="text-text-secondary">EvoForge pipeline: </span>
             {initialLoading ? (
               <span className="text-text-secondary">{tCommon("loading")}</span>
             ) : perf?.pipeline?.status === "measured" ? (

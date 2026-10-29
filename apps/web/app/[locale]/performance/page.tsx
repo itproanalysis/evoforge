@@ -115,7 +115,7 @@ function MeasureCard({
 export default function PerformancePage() {
   const t = useTranslations("performance");
   const locale = useLocale();
-  const prefix = locale === "ko" ? "" : `/${locale}`;
+  const prefix = locale === "en" ? "" : `/${locale}`;
   const evidenceHref = (id: string) => `${prefix}/evidence?id=${encodeURIComponent(id)}`;
 
   const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
@@ -436,8 +436,8 @@ export default function PerformancePage() {
                   ) : null}
                 </div>
                 <div className="text-text-secondary mt-1">
-                  X_SINGLE: {v.base ? `${v.base.passed}/${v.base.n}` : "not_measured"} ·{" "}
-                  PIPELINE: {v.pipe ? `${v.pipe.passed}/${v.pipe.n}` : "not_measured"}
+                  single AI baseline: {v.base ? `${v.base.passed}/${v.base.n}` : "not_measured"} ·{" "}
+                  EvoForge pipeline: {v.pipe ? `${v.pipe.passed}/${v.pipe.n}` : "not_measured"}
                 </div>
               </div>
             ))}

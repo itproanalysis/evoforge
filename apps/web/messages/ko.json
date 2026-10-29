@@ -52,12 +52,12 @@
     "inspect-mission": "상세 보기",
     "inspecting": "선택됨",
     "selected-mission-heading": "실시간 미션 상세 상태 (GET /v1/missions/{id})",
-    "record-outcome-heading": "병합 검증 결과 기록 · WVI (POST /v1/outcomes)",
+    "record-outcome-heading": "병합 검증 결과 기록 · 검증된 개선 (POST /v1/outcomes)",
     "merged-sha-placeholder": "병합된 커밋 SHA (예: d9f579eb...)",
     "pr-url-placeholder": "PR URL (선택)",
-    "record-outcome-button": "WVI 검증 결과 기록",
+    "record-outcome-button": "검증된 개선 결과 기록",
     "recording-outcome": "기록 중…",
-    "outcomes-heading": "검증된 개선 결과 · WVI (GET /v1/outcomes)",
+    "outcomes-heading": "검증된 개선 결과 (GET /v1/outcomes)",
     "outcomes-empty": "아직 병합·검증된 결과(Outcome)가 없습니다.",
     "performance-heading": "실시간 성능 및 운영 요약 (GET /v1/performance)",
     "performance-link": "성과 분석 상세 보기 →",
@@ -82,10 +82,10 @@
       "badge-worse": "악화",
       "rule": "95% 신뢰구간이 겹치지 않을 때만 개선으로 판정",
       "link": "성과 분석 상세 보기 →",
-      "empty": "아직 비교할 측정이 없습니다. 하네스 두 버전의 X_SINGLE 측정이 필요합니다.",
+      "empty": "아직 비교할 측정이 없습니다. 하네스 두 버전의 단일 AI 기준 측정이 필요합니다.",
       "from-label": "이전 하네스",
       "to-label": "최신 하네스",
-      "pipeline-label": "PIPELINE",
+      "pipeline-label": "EvoForge 파이프라인",
       "interval-label": "95% 신뢰구간"
     },
     "participants-heading": "참여자 현황",
@@ -126,11 +126,11 @@
     "history-empty": "기록된 성능 측정이 없습니다.",
     "metrics": {
       "active-missions": "활성 미션",
-      "validated-wvi": "검증된 개선 (WVI)",
+      "validated-wvi": "검증된 개선",
       "blocked-merges": "차단된 병합",
       "spent": "모델 API 사용액(공급사 사용량 기준)",
       "prs-awaiting": "PR 열림 · 병합 검증 대기",
-      "wvi-rule": "WVI는 PR이 병합되고 결과가 VALIDATED로 기록된 뒤에만 집계합니다. PR을 연 것만으로는 집계하지 않습니다. 사용액은 공급사가 보고한 토큰 기준 모델 API 비용이며 Runner 컴퓨팅 비용은 포함하지 않습니다.",
+      "wvi-rule": "검증된 개선은 PR이 병합되고 결과가 VALIDATED로 기록된 뒤에만 집계합니다. PR을 연 것만으로는 집계하지 않습니다. 사용액은 공급사가 보고한 토큰 기준 모델 API 비용이며 Runner 컴퓨팅 비용은 포함하지 않습니다.",
       "reserved": "예약 금액",
       "unknown-holds": "알 수 없는 보류",
       "missions-prefix": "미션: "
@@ -151,11 +151,11 @@
       "unknown-reservations": "unknown_reservations"
     },
     "presets-heading": "실제 검증 사례 기반 목표 (Case-Based Contracts)",
-    "preset-wvi-btn": "WVI 검증 성공사례 (PR #6)",
+    "preset-wvi-btn": "검증된 개선 사례 (PR #6)",
     "preset-contract-btn": "입력·예외 계약 명시형 (EVAL_V1)",
     "preset-boundary-btn": "분할 임계치 보장형 (PM-01)",
     "gate-diagnostics-heading": "게이트 무결성 진단 (Gate Diagnostics)",
-    "gate-integrity-w10-hint": "안정성 안내 (W10): 단언문 강도 비율이 미달하여 PR이 보류되었습니다. == 값 비교 및 pytest.raises 단언이 필요합니다.",
+    "gate-integrity-w10-hint": "안정성 안내 (테스트 강도 검사): 단언문 강도 비율이 미달하여 PR이 보류되었습니다. == 값 비교 및 pytest.raises 단언이 필요합니다.",
     "storage-label": "스토리지 백엔드"
   },
   "workspace": {
@@ -172,7 +172,11 @@
     "single": "단일 AI",
     "mission-control-toggle": "미션 컨트롤 (지표, 미션, 증거)",
     "running": "실행 중…",
-    "no-prompt": "프롬프트 없음"
+    "no-prompt": "프롬프트 없음",
+    "intro": "만들고 싶은 것을 입력하면, 같은 Meta 모델이 두 번 만듭니다 — 한 번은 single AI 호출로, 한 번은 EvoForge 파이프라인으로, 여기서 Critic이 test를 작성하고 Builder가 그 test를 통과할 때까지 다시 시도합니다. 숨겨진 acceptance test가 어느 결과가 더 좋은지 판정하고, 양쪽의 비용을 함께 보여줍니다.",
+    "intro-step-1": "만들고 싶은 것을 입력합니다.",
+    "intro-step-2": "같은 모델이 두 번 만듭니다: single AI 호출 한 번, Critic이 test를 쓰고 Builder가 재시도하는 EvoForge로 한 번.",
+    "intro-step-3": "숨겨진 acceptance test가 더 좋은 결과를 고르고 양쪽 비용을 보여줍니다."
   },
   "lab": {
     "heading": "개선 랩",
@@ -198,7 +202,7 @@
     "merge-blocked": "병합 (차단됨)",
     "merge-blocked-description": "INCONCLUSIVE/FAIL 게이트가 있어 Merge가 비활성화됩니다. 예외 승인이 필요합니다.",
     "sealed-tests-heading": "봉인 테스트 ({count})",
-    "sealed-suites-heading": "Sealed v0 + X_SINGLE (읽기 전용)",
+    "sealed-suites-heading": "Sealed v0 + 단일 AI 기준 (읽기 전용)",
     "sealed-suites-description": "서버 측정 기준 카탈로그. 카탈로그는 GET으로만 로드; 봉인된 작업 코드는 서버를 벗어나지 않습니다.",
     "run-info": "visible {visPass}/{visN}{visTimeout} · held-out {heldPass}/{heldN}{heldTimeout} · base {base}",
     "review-verdict": "검토 결과: {verdict}",
@@ -213,7 +217,7 @@
     "suite-kinds": "종류: {kinds}",
     "evidence-label": "증거",
     "review-evidence-label": "검토 증거",
-    "integrity-hint": "안정성 안내 (W10): GH_INTEGRITY 게이트는 동어반복(assert True)이나 빈 try/except를 제외한 엄격한 == 비교 및 pytest.raises를 요구합니다."
+    "integrity-hint": "안정성 안내 (무결성 게이트): 무결성 게이트는 동어반복(assert True)이나 빈 try/except를 제외한 엄격한 == 비교 및 pytest.raises를 요구합니다."
   },
   "evidence": {
     "heading": "증거 타임라인",
@@ -277,8 +281,8 @@
     "auto-on": "자동 갱신 켜짐 (5초)",
     "auto-off": "자동 갱신 꺼짐",
     "refresh": "새로고침",
-    "baseline-title": "X_SINGLE 기준 통과율",
-    "pipeline-title": "PIPELINE 통과율",
+    "baseline-title": "단일 AI 기준 통과율",
+    "pipeline-title": "EvoForge 파이프라인 통과율",
     "verdict-title": "개선 여부 (Wilson 95% 구간 비교)",
     "not-measured": "측정 전 · not_measured",
     "not-measured-short": "측정 전 (not_measured)",
@@ -301,8 +305,8 @@
     },
     "delta": "변화량",
     "run-heading": "측정 실행",
-    "run-baseline": "X_SINGLE 기준 측정",
-    "run-pipeline": "Pipeline 개선 측정",
+    "run-baseline": "단일 AI 기준 측정",
+    "run-pipeline": "EvoForge 파이프라인 개선 측정",
     "measuring": "측정 중…",
     "budget-baseline": "예산 거부(402): 기준 측정 차단 — {detail}",
     "budget-pipeline": "예산 거부(402): Pipeline 측정 차단 — {detail}",
@@ -318,17 +322,17 @@
     "how-suite": "스위트: {suite}",
     "how-families": "분야: {families}",
     "how-n-model": "n: {n} · 모델: {model}",
-    "how-attempts": "시도 횟수: X_SINGLE은 작업당 1회, PIPELINE은 작업당 최대 3회",
+    "how-attempts": "시도 횟수: 단일 AI 기준은 작업당 1회, EvoForge 파이프라인은 작업당 최대 3회",
     "how-attempts-latest": "최근 측정 시도 {count}회",
-    "how-wilson": "Wilson 95% 구간으로 비교: PIPELINE 하한이 기준 상한을 넘을 때만 개선됨으로 판정",
+    "how-wilson": "Wilson 95% 구간으로 비교: EvoForge 파이프라인 하한이 기준 상한을 넘을 때만 개선됨으로 판정",
     "how-budget": "예산 상한: 서버 설정 EVO_EVAL_MAX_CENTS를 초과하면 402로 거부",
     "how-storage": "저장소: {storage}",
     "timeline": {
       "heading": "진화 타임라인",
       "empty": "아직 측정이 없습니다. 기준 또는 파이프라인 측정을 실행하면 타임라인이 시작됩니다.",
       "not-comparable": "비교 불가 (not comparable) — 스위트 또는 모델이 달라 비교할 수 없음",
-      "legend-x-single": "X_SINGLE",
-      "legend-pipeline": "PIPELINE",
+      "legend-x-single": "단일 AI 기준",
+      "legend-pipeline": "EvoForge 파이프라인",
       "harness": "하네스 {version}",
       "families-heading": "분야별 결과",
       "verdict-improved": "개선 확인 ({delta})",
@@ -380,9 +384,9 @@
     "proof-link": "증명서 보기 →",
     "run-active": "백그라운드 실행 중 — 3초마다 실시간 조회 중…",
     "run-error": "백그라운드 실행 오류",
-    "case-w10-alert": "사례 W10 경고: GH_INTEGRITY 통과를 위해 'assert True'를 배제하고 명시적 '==' 값 비교 또는 pytest.raises를 사용해야 합니다.",
+    "case-w10-alert": "테스트 강도 안내: 무결성 게이트 통과를 위해 'assert True'를 배제하고 명시적 '==' 값 비교 또는 pytest.raises를 사용해야 합니다.",
     "failure-reasons": {
-      "weak_oracle": "약한 오라클 (단언문 강도 < 0.8) · 사례 W10",
+      "weak_oracle": "약한 테스트 (단언문 강도 < 0.8)",
       "contract_gap": "계약 규격 미충족 · 사례 EVAL_V1",
       "heldout_failed": "비공개 테스트 불합격",
       "visible_failed": "공개 테스트 불합격",
@@ -431,7 +435,7 @@
   "layout": {
     "title": "EvoForge — 미션 컨트롤",
     "description": "검증된 코드 개선 서비스: 생성 → 게이트 → 리뷰 → PR → 증거.",
-    "footer": "빌더: Muse Spark 1.3 (Meta Model API 사용) · 게이트: GH_INTEGRITY (oracle_ast + 임시 D-054) · 비용은 GET /v1/ledger에서 센트 단위의 provider_billed 실제 값; UNKNOWN 보류는 별도로 나열"
+    "footer": "빌더: Muse Spark 1.3 (Meta Model API 사용) · 게이트: 무결성 게이트 (oracle_ast + 임시 테스트 강도 검사) · 비용은 GET /v1/ledger에서 센트 단위의 provider_billed 실제 값; UNKNOWN 보류는 별도로 나열"
   },
   "errors": {
     "budget-exhausted": "예산 소진: 미션 단계가 402로 거부됨",

@@ -6,7 +6,7 @@ const COOKIE_NAME = "__Host-evoforge-session";
 // Create next-intl middleware
 const intlMiddleware = createIntlMiddleware({
   locales: ['en', 'ko'],
-  defaultLocale: 'ko',
+  defaultLocale: 'en',
   localeDetection: false,
   localePrefix: 'as-needed',
 });
@@ -86,7 +86,7 @@ export async function middleware(req: NextRequest) {
   }
   
   // The default-locale login has a concrete route. Rewriting it to
-  // /ko/login makes as-needed locale canonicalization redirect back to
+  // /en/login makes as-needed locale canonicalization redirect back to
   // /login in the production server. Let that public entry render once.
   if (p === "/login" || p === "/login/") {
     return NextResponse.next();

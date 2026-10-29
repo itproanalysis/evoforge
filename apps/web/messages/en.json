@@ -52,12 +52,12 @@
     "inspect-mission": "Inspect",
     "inspecting": "Selected",
     "selected-mission-heading": "Live Mission Inspector (GET /v1/missions/{id})",
-    "record-outcome-heading": "Record Validated Outcome · WVI (POST /v1/outcomes)",
+    "record-outcome-heading": "Record verified improvement (POST /v1/outcomes)",
     "merged-sha-placeholder": "Merged commit SHA (e.g. d9f579eb...)",
     "pr-url-placeholder": "PR URL (optional)",
-    "record-outcome-button": "Record WVI Outcome",
+    "record-outcome-button": "Record verified improvement",
     "recording-outcome": "Recording…",
-    "outcomes-heading": "Validated Outcomes · WVI (GET /v1/outcomes)",
+    "outcomes-heading": "Verified improvements (GET /v1/outcomes)",
     "outcomes-empty": "No validated outcomes recorded yet.",
     "performance-heading": "Performance & Production Summary (GET /v1/performance)",
     "performance-link": "Performance →",
@@ -82,10 +82,10 @@
       "badge-worse": "Worse",
       "rule": "Improved only when the 95% confidence intervals do not overlap",
       "link": "Performance details →",
-      "empty": "No comparable measurements yet. X_SINGLE measurements on two harness versions are needed.",
+      "empty": "No comparable measurements yet. Single AI baseline measurements on two harness versions are needed.",
       "from-label": "Previous harness",
       "to-label": "Latest harness",
-      "pipeline-label": "PIPELINE",
+      "pipeline-label": "EvoForge pipeline",
       "interval-label": "95% interval"
     },
     "participants-heading": "Participants",
@@ -126,11 +126,11 @@
     "history-empty": "No performance measurements have been recorded.",
     "metrics": {
       "active-missions": "Active missions",
-      "validated-wvi": "Validated (WVI)",
+      "validated-wvi": "Verified improvements",
       "blocked-merges": "Blocked merges",
       "spent": "Model API spend (provider usage)",
       "prs-awaiting": "PRs opened · awaiting merge validation",
-      "wvi-rule": "WVI counts a PR only after it is merged and its outcome is recorded as VALIDATED. Opening a PR does not count. Spend is model API usage from provider-reported tokens; Runner compute is not included.",
+      "wvi-rule": "A verified improvement counts a PR only after it is merged and its outcome is recorded as VALIDATED. Opening a PR does not count. Spend is model API usage from provider-reported tokens; Runner compute is not included.",
       "reserved": "Reserved",
       "unknown-holds": "Unknown holds",
       "missions-prefix": "Missions: "
@@ -151,11 +151,11 @@
       "unknown-reservations": "unknown_reservations"
     },
     "presets-heading": "Case-Based Contract Presets",
-    "preset-wvi-btn": "Verified WVI Fix (PR #6)",
+    "preset-wvi-btn": "Verified improvement example (PR #6)",
     "preset-contract-btn": "Input & Exception Contract (EVAL_V1)",
     "preset-boundary-btn": "Partition Boundary Guarantee (PM-01)",
     "gate-diagnostics-heading": "Gate Integrity Diagnostics",
-    "gate-integrity-w10-hint": "Stability Hint (W10): Weak assertions detected (< 0.8 threshold). Exact == comparisons and pytest.raises required.",
+    "gate-integrity-w10-hint": "Stability hint (test-strength check): Weak assertions detected (< 0.8 threshold). Exact == comparisons and pytest.raises required.",
     "storage-label": "Storage Backend"
   },
   "workspace": {
@@ -172,7 +172,11 @@
     "single": "Single AI",
     "mission-control-toggle": "Mission Control (metrics, missions, evidence)",
     "running": "Running…",
-    "no-prompt": "No prompt yet"
+    "no-prompt": "No prompt yet",
+    "intro": "Type what you want built: the same Meta model builds it twice — once as a single AI call, once as the EvoForge pipeline, where a Critic writes tests and the Builder retries against them. Hidden acceptance tests decide which result is better, and the cost of each side is shown.",
+    "intro-step-1": "You type what you want built.",
+    "intro-step-2": "The same model builds it twice: once as a single AI call, once as EvoForge, where a Critic writes tests and the Builder retries against them.",
+    "intro-step-3": "Hidden acceptance tests pick the better result, with each side's cost shown."
   },
   "lab": {
     "heading": "Improvement Lab",
@@ -198,7 +202,7 @@
     "merge-blocked": "Merge (blocked)",
     "merge-blocked-description": "INCONCLUSIVE/FAIL gates prevent merge. Exception approval required.",
     "sealed-tests-heading": "Sealed tests ({count})",
-    "sealed-suites-heading": "Sealed v0 + X_SINGLE (read-only)",
+    "sealed-suites-heading": "Sealed v0 + single AI baseline (read-only)",
     "sealed-suites-description": "Server-measured baseline catalogue. Catalogue loads over GET only; sealed task code never leaves the server.",
     "run-info": "visible {visPass}/{visN}{visTimeout} · held-out {heldPass}/{heldN}{heldTimeout} · base {base}",
     "review-verdict": "review verdict: {verdict}",
@@ -213,7 +217,7 @@
     "suite-kinds": "kinds: {kinds}",
     "evidence-label": "evidence",
     "review-evidence-label": "review evidence",
-    "integrity-hint": "Stability Hint (W10): GH_INTEGRITY requires strict == value asserts and pytest.raises, rejecting tautologies (assert True)."
+    "integrity-hint": "Stability hint (integrity gate): the integrity gate requires strict == value asserts and pytest.raises, rejecting tautologies (assert True)."
   },
   "evidence": {
     "heading": "Evidence Timeline",
@@ -277,8 +281,8 @@
     "auto-on": "Auto-refresh ON (5s)",
     "auto-off": "Auto-refresh OFF",
     "refresh": "Refresh",
-    "baseline-title": "X_SINGLE baseline pass rate",
-    "pipeline-title": "PIPELINE pass rate",
+    "baseline-title": "Single AI baseline pass rate",
+    "pipeline-title": "EvoForge pipeline pass rate",
     "verdict-title": "Improvement (Wilson 95% interval comparison)",
     "not-measured": "Not measured · not_measured",
     "not-measured-short": "Not measured (not_measured)",
@@ -301,8 +305,8 @@
     },
     "delta": "Change",
     "run-heading": "Run measurement",
-    "run-baseline": "Measure X_SINGLE baseline",
-    "run-pipeline": "Measure Pipeline improvement",
+    "run-baseline": "Measure single AI baseline",
+    "run-pipeline": "Measure EvoForge pipeline improvement",
     "measuring": "Measuring…",
     "budget-baseline": "Budget refused (402): baseline measurement blocked — {detail}",
     "budget-pipeline": "Budget refused (402): pipeline measurement blocked — {detail}",
@@ -318,17 +322,17 @@
     "how-suite": "Suite: {suite}",
     "how-families": "Families: {families}",
     "how-n-model": "n: {n} · model: {model}",
-    "how-attempts": "Attempts: X_SINGLE once per task, PIPELINE up to 3 per task",
+    "how-attempts": "Attempts: single AI baseline once per task, EvoForge pipeline up to 3 per task",
     "how-attempts-latest": "latest measurement used {count} attempts",
-    "how-wilson": "Compared by Wilson 95% interval: improved only when the PIPELINE lower bound exceeds the baseline upper bound",
+    "how-wilson": "Compared by Wilson 95% interval: improved only when the EvoForge pipeline lower bound exceeds the baseline upper bound",
     "how-budget": "Budget cap: requests above the server setting EVO_EVAL_MAX_CENTS are refused with 402",
     "how-storage": "Storage: {storage}",
     "timeline": {
       "heading": "Evolution timeline",
       "empty": "No measurements yet. Run a baseline or pipeline measurement to start the timeline.",
       "not-comparable": "Not comparable — different suite or model",
-      "legend-x-single": "X_SINGLE",
-      "legend-pipeline": "PIPELINE",
+      "legend-x-single": "Single AI baseline",
+      "legend-pipeline": "EvoForge pipeline",
       "harness": "harness {version}",
       "families-heading": "Per-family results",
       "verdict-improved": "Improvement confirmed ({delta})",
@@ -380,9 +384,9 @@
     "proof-link": "Proof certificate →",
     "run-active": "Background run active — polling live every 3 s…",
     "run-error": "Background run error",
-    "case-w10-alert": "Case W10 Alert: GH_INTEGRITY requires explicit '==' value asserts or pytest.raises. Avoid 'assert True'.",
+    "case-w10-alert": "Test-strength alert: the integrity gate requires explicit '==' value asserts or pytest.raises. Avoid 'assert True'.",
     "failure-reasons": {
-      "weak_oracle": "Weak Oracle (strength < 0.8) · Case W10",
+      "weak_oracle": "Weak test check (strength < 0.8)",
       "contract_gap": "Contract Gap · Case EVAL_V1",
       "heldout_failed": "Held-out Failed",
       "visible_failed": "Visible Failed",
@@ -431,7 +435,7 @@
   "layout": {
     "title": "EvoForge — Mission Control",
     "description": "Verified code improvement service: generate → gate → review → PR → evidence.",
-    "footer": "Builder: Muse Spark 1.3 via Meta Model API · Gates: GH_INTEGRITY (oracle_ast + provisional D-054) · costs are provider_billed actuals in cents from GET /v1/ledger; UNKNOWN holds listed separately"
+    "footer": "Builder: Muse Spark 1.3 via Meta Model API · Gates: integrity gate (oracle_ast + provisional test-strength check) · costs are provider_billed actuals in cents from GET /v1/ledger; UNKNOWN holds listed separately"
   },
   "errors": {
     "budget-exhausted": "Budget exhausted: mission step refused with 402",
