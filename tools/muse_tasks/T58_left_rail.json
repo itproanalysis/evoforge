@@ -1,0 +1,20 @@
+{
+  "id": "T58_left_rail",
+  "planned_by": "Claude (Critic): v3.8 §2.1",
+  "goal": "T58 — left feature rail (v3.8 §2.1; owner's layout: feature tabs at the far left, main content to the right).\nWeb only.\n1. apps/web/components/FeatureRail.tsx (client component): a <nav aria-label=...> rail on the far left with an ITEMS\n   array whose path strings are exactly, in this order: \"/\" (Mission Control, key mission-control), \"/arena\" (arena),\n   \"/replay\" (replay), \"/evidence\" (evidence), \"/performance\" (performance), \"/lab\" (improvement-lab). Links are\n   `${prefix}${path}` for the current locale prefix (as layout.tsx does today). The current page (usePathname) gets\n   aria-current=\"page\" and a highlighted style.\n   Below them, a \"More\" disclosure (<details> or a button with aria-expanded) with \"/evolution\" (autopilot),\n   \"/leaderboard\" (leaderboard), \"/verify\" — listed AFTER \"/lab\" in the file. Do not link pages that do not exist.\n2. Responsive: on md+ the rail is a fixed-width column (icons + labels; may collapse to icons); below md it is hidden\n   (class \"hidden md:flex\" or similar) and a compact top bar with a menu button opens it as a drawer. Content must not\n   be squeezed by the rail on mobile.\n3. apps/web/app/[locale]/layout.tsx: replace the current horizontal nav links with <FeatureRail/> and lay out\n   rail | main. Keep the language switcher and everything else the layout renders today.\n4. i18n navigation namespace (en + ko): add \"more\" (and \"verify\" if you label it); reuse existing keys otherwise.\nKeep tsc green and do not change page contents. Tests: services/api/tests/test_muse_t58.py.",
+  "edit": [
+    "apps/web/components/FeatureRail.tsx",
+    "apps/web/app/[locale]/layout.tsx",
+    "apps/web/messages/en.json",
+    "apps/web/messages/ko.json",
+    "services/api/tests/test_muse_t58.py"
+  ],
+  "context": [
+    "docs/V38_EVOLUTION_ARENA_PLAN.md",
+    "apps/web/components/LanguageSwitcher.tsx"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t58.py services/api/tests/test_sealed_t58_left_rail.py services/api/tests/test_critic_t52_round_replay_ui.py -q -p no:cacheprovider",
+    "node apps/web/node_modules/typescript/bin/tsc --noEmit --incremental false -p apps/web"
+  ]
+}
