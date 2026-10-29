@@ -55,7 +55,7 @@ export function Button({
   className = '',
   ...props
 }: ButtonProps) {
-  const baseClasses = 'inline-flex items-center justify-center font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-background-primary disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseClasses = 'studio-button inline-flex items-center justify-center font-medium rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-blue focus-visible:ring-offset-2 focus-visible:ring-offset-background-primary disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variantClasses = {
     primary: 'bg-accent-blue hover:bg-blue-700 text-white',

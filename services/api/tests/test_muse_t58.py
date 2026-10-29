@@ -45,7 +45,7 @@ def test_rail_nav_accessibility_and_active():
     assert "'use client'" in src or '"use client"' in src
     assert "usePathname" in src
     assert "<nav" in src and "aria-label=" in src
-    assert "aria-current" in src and '"page"' in src
+    assert "aria-current" in src and re.search(r"['\"]page['\"]", src)
     assert "${prefix}${path}" in src
     assert ("<details" in src) or ("aria-expanded" in src)
 
@@ -54,7 +54,7 @@ def test_rail_responsive_and_drawer():
     src = _read(RAIL)
     assert re.search(r"hidden\s+md:flex", src), "desktop rail must hide below md"
     assert "md:hidden" in src, "mobile bar/drawer must hide on md+"
-    assert "<button" in src
+    assert "<button" in src or ("<details" in src and "<summary" in src)
     assert "fixed" in src
 
 

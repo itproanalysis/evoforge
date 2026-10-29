@@ -127,6 +127,10 @@ def test_home_workspace_wiring():
     status = (WEB / "lib" / "arenaStatus.ts").read_text(encoding="utf-8")
     assert "export function arenaAgentPanel" in status
     page = (WEB / "app" / "[locale]" / "page.tsx").read_text(encoding="utf-8")
+    canvas = (WEB / "components" / "CanvasWorkspace.tsx").read_text(encoding="utf-8")
+    rail = (WEB / "components" / "FeatureRail.tsx").read_text(encoding="utf-8")
+    assert "<CanvasWorkspace" in page and "management={management}" in page
+    wiring = page + canvas + rail
     for token in (
         "arenaAgentPanel",
         "previewView",
@@ -137,11 +141,12 @@ def test_home_workspace_wiring():
         "setInterval",
         "/arena",
         "/replay",
-        "state-dot-",
+        "row.state",
+        "aria-controls",
         "active",
         "onStarted",
     ):
-        assert token in page, token
+        assert token in wiring, token
     # Collapsible Mission Control below the workspace; behaviour preserved.
     assert "<details" in page or "aria-expanded" in page
     for token in (
@@ -154,9 +159,10 @@ def test_home_workspace_wiring():
         "postMission",
     ):
         assert token in page, token
-    # Responsive stacking for narrow screens.
-    assert "768" in page
-    assert "md:grid-cols-3" in page or "md:flex-row" in page
+    # The rebuilt canvas stacks output frames through its shared stylesheet.
+    css = (WEB / "styles" / "canvas.css").read_text(encoding="utf-8")
+    assert "max-width: 767px" in css
+    assert "grid-template-columns: minmax(0, 1fr)" in css
 
 
 def test_home_workspace_i18n():

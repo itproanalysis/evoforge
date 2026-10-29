@@ -8,12 +8,12 @@ import type { Locale } from '../lib/i18n';
 
 /**
  * Language switcher component for changing the interface language.
- * 
+ *
  * @example
  * ```tsx
  * <LanguageSwitcher />
  * ```
- * 
+ *
  * Accessibility:
  * - Keyboard navigable with Tab, Enter, and Arrow keys
  * - Includes aria-label for screen readers
@@ -24,29 +24,29 @@ export function LanguageSwitcher() {
   const router = useRouter();
   const pathname = usePathname();
   const [isPending, startTransition] = useTransition();
-  
+
   const handleLanguageChange = (newLocale: Locale) => {
     if (newLocale === locale) return;
-    
+
     // Persist language preference
     setStoredLanguage(newLocale);
-    
+
     // Navigate to the new locale
     startTransition(() => {
       // Remove current locale from pathname if present
       const pathnameWithoutLocale = pathname.replace(/^\/(en|ko)(?=\/|$)/, '') || '/';
-      
+
       // Navigate to new locale path
       const newPath = newLocale === 'en'
-        ? pathnameWithoutLocale 
+        ? pathnameWithoutLocale
         : `/${newLocale}${pathnameWithoutLocale}`;
-      
+
       router.replace(newPath);
     });
   };
-  
+
   return (
-    <div className="flex items-center gap-2" aria-label="Select language">
+    <div className="studio-language" aria-label="Select language">
       <button
         onClick={() => handleLanguageChange('en')}
         className={`px-2 py-1 text-sm rounded transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue ${
@@ -59,7 +59,7 @@ export function LanguageSwitcher() {
       >
         English
       </button>
-      <span className="text-text-secondary">|</span>
+
       <button
         onClick={() => handleLanguageChange('ko')}
         className={`px-2 py-1 text-sm rounded transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue ${

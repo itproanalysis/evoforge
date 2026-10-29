@@ -36,12 +36,11 @@ import { getErrorMessageKey } from "../../lib/apiErrors";
 import { comparisonProvenance, provenance, viewProvenance } from "../../lib/performanceProvenance";
 import {
   arenaAgentPanel,
-  arenaVerdict,
   canFollowUp,
-  laneView,
   previewView,
-  promptArenaView,
 } from "../../lib/arenaStatus";
+import { StudioOverview } from "../../components/StudioOverview";
+import { CanvasWorkspace } from "../../components/CanvasWorkspace";
 import { PromptBar } from "../../components/PromptBar";
 import { SandboxedPreview } from "../../components/SandboxedPreview";
 
@@ -78,6 +77,7 @@ export default function MissionControl() {
   const tErrors = useTranslations("errors");
   const tCommon = useTranslations("common");
   const tWorkspace = useTranslations("workspace");
+  const tStudio = useTranslations("studio");
   const tArena = useTranslations("arena");
   const locale = useLocale();
 
@@ -104,6 +104,7 @@ export default function MissionControl() {
   const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
   const [participants, setParticipants] = useState<Awaited<ReturnType<typeof getParticipants>> | null>(null);
   const [workspaceArena, setWorkspaceArena] = useState<ArenaDoc | null>(null);
+  const [workspaceArenas, setWorkspaceArenas] = useState<ArenaDoc[]>([]);
   const [arenaSummary, setArenaSummary] = useState<ArenaSummary | null>(null);
   const [arenaPendingId, setArenaPendingId] = useState<string | null>(null);
   const [arenaPollError, setArenaPollError] = useState(false);
@@ -217,6 +218,11 @@ export default function MissionControl() {
       .then((res) => {
         if (cancelled) return;
         const list = res && Array.isArray(res.arenas) ? res.arenas : [];
+        setWorkspaceArenas(current => {
+          const byId = new Map(list.map(run => [run.arena_id, run]));
+          for (const run of current) byId.set(run.arena_id, run);
+          return [...byId.values()].sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+        });
         setWorkspaceArena((cur) => cur ?? pickWorkspaceArena(list));
       })
       .catch(() => {});
@@ -255,6 +261,7 @@ export default function MissionControl() {
         if (!active) return;
         if (doc.arena_id !== wsTrackedId) throw new Error("arena id mismatch");
         setWorkspaceArena(doc);
+        setWorkspaceArenas(current => [doc, ...current.filter(run => run.arena_id !== doc.arena_id)]);
         setArenaPendingId(null);
       } catch {
         if (active) setArenaPollError(true);
@@ -397,24 +404,16 @@ export default function MissionControl() {
   const active = mission && !TERMINAL.includes(mission.state);
   const currentStepIdx = mission ? PIPELINE_STEPS.indexOf(mission.state) : -1;
 
-  const evoWsLane = workspaceArena?.lanes?.evoforge;
-  const singleWsLane = workspaceArena?.lanes?.single;
-  const evoWsView = laneView(evoWsLane);
-  const singleWsView = laneView(singleWsLane);
-  const evoWsPreview = previewView(evoWsLane);
-  const singleWsPreview = previewView(singleWsLane);
-  const wsVerdict = arenaVerdict(workspaceArena);
-  const wsPromptView = promptArenaView(workspaceArena);
-  const wsPrompt =
-    wsPromptView?.prompt || workspaceArena?.prompt || workspaceArena?.goal || "";
   const wsFollowUp = canFollowUp(workspaceArena) ? workspaceArena : null;
   const wsRunning =
     arenaPendingId !== null || workspaceArena?.status === "running";
+  const displayedArena = arenaPendingId !== null && workspaceArena?.arena_id !== arenaPendingId
+    ? null : workspaceArena;
 
-  return (
-    <main className="pb-40">
-      {/* Plain-language intro above the workspace: what happens when you type. */}
-      <section aria-label={tWorkspace("intro")} className="mt-2">
+  const management = <>
+      <div className="studio-tools flex flex-col md:flex-row">
+      <section aria-label={tWorkspace("intro")} className="studio-intro">
+        <details><summary>{tStudio('guide')}</summary>
         <p className="text-sm text-text-primary mt-0 mb-2">
           {tWorkspace("intro")}
         </p>
@@ -423,9 +422,12 @@ export default function MissionControl() {
           <li>{tWorkspace("intro-step-2")}</li>
           <li>{tWorkspace("intro-step-3")}</li>
         </ol>
+        </details>
       </section>
       {/* Home scoreboard: measured Arena results from getArenaSummary(). */}
-      <section aria-label={tWorkspace("scoreboard-heading")} className="mt-2">
+      <section aria-label={tWorkspace("scoreboard-heading")}>
+        <details className="studio-scoreboard">
+          <summary>{tWorkspace("scoreboard-heading")}</summary>
         <Card className="bg-background-secondary border border-border p-3">
           <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
             {tWorkspace("scoreboard-heading")}
@@ -576,192 +578,10 @@ export default function MissionControl() {
             </a>
           </div>
         </Card>
+        </details>
       </section>
-      {/* Home workspace: AI status left (~1/3), implementation right (~2/3).
-          Mobile (<768px): grid stacks AI status above the implementation;
-          the PromptBar stays fixed at the bottom. */}
-      <section aria-label={tWorkspace("heading")} className="mt-2">
-        <h1 className="my-1 text-2xl font-bold">{tWorkspace("heading")}</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-          <div className="md:col-span-1 space-y-3">
-            <h2 className="text-base font-semibold m-0">
-              {tWorkspace("ai-status-heading")}
-            </h2>
-            {!workspaceArena ? (
-              <p className="text-sm text-text-secondary">
-                {arenaPendingId
-                  ? `${tWorkspace("running")} ${arenaPendingId}`
-                  : tWorkspace("empty")}
-              </p>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
-                  {WS_SIDES.map((side) => {
-                    const rows = arenaAgentPanel(workspaceArena, side);
-                    const label =
-                      side === "evoforge"
-                        ? tWorkspace("evoforge")
-                        : tWorkspace("single");
-                    return (
-                      <div
-                        key={side}
-                        className="p-3 rounded-lg border border-border bg-background-secondary"
-                        data-side={side}
-                      >
-                        <strong className="text-sm">{label}</strong>
-                        <ul className="mt-2 space-y-1.5">
-                          {rows.map((row) => (
-                            <li
-                              key={row.role}
-                              className="flex items-start gap-2 text-xs"
-                            >
-                              <span
-                                className={`state-dot state-dot-${row.state}`}
-                                title={row.state}
-                                style={{
-                                  background:
-                                    row.state === "active"
-                                      ? "#34d399"
-                                      : row.state === "done"
-                                      ? "#94a3b8"
-                                      : "#64748b",
-                                  width: 8,
-                                  height: 8,
-                                  borderRadius: 9999,
-                                  display: "inline-block",
-                                  marginTop: 3,
-                                  flexShrink: 0,
-                                }}
-                              />
-                              <span className="font-mono font-semibold w-14 flex-shrink-0">
-                                {row.role}
-                              </span>
-                              <span className="text-text-secondary">
-                                {row.state}
-                              </span>
-                              <span className="text-text-primary break-words min-w-0 flex-1">
-                                {row.message ?? "—"}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    );
-                  })}
-                </div>
-                <Card className="bg-background-secondary border border-border p-3">
-                  <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
-                    {tWorkspace("prompt-heading")}
-                  </span>
-                  <p className="text-sm font-medium text-text-primary mt-1 whitespace-pre-wrap">
-                    {wsPrompt || tWorkspace("no-prompt")}
-                  </p>
-                  <p className="mt-2 text-xs text-text-secondary">
-                    {tWorkspace("verdict-label")}:{" "}
-                    {wsVerdict
-                      ? `${wsVerdict.winner} — ${wsVerdict.reason}`
-                      : workspaceArena.status === "running"
-                      ? tWorkspace("running")
-                      : workspaceArena.verdict?.winner ?? "—"}
-                  </p>
-                </Card>
-              </>
-            )}
-          </div>
-          <div className="md:col-span-2 space-y-3">
-            <h2 className="text-base font-semibold m-0">
-              {tWorkspace("implementation-heading")}
-            </h2>
-            {!workspaceArena ? (
-              <p className="text-sm text-text-secondary">
-                {tWorkspace("empty")}
-              </p>
-            ) : (
-              <>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  {(
-                    [
-                      {
-                        side: "evoforge" as const,
-                        label: tWorkspace("evoforge"),
-                        view: evoWsView,
-                        preview: evoWsPreview,
-                      },
-                      {
-                        side: "single" as const,
-                        label: tWorkspace("single"),
-                        view: singleWsView,
-                        preview: singleWsPreview,
-                      },
-                    ]
-                  ).map((lane) => (
-                    <Card
-                      key={lane.side}
-                      className="bg-background-secondary border border-border p-3 space-y-2"
-                    >
-                      <div className="flex items-center justify-between text-xs">
-                        <strong>{lane.label}</strong>
-                        <span className="font-mono text-text-secondary">
-                          {tWorkspace("scores-label")}:{" "}
-                          {lane.view.score ?? "—"}
-                        </span>
-                      </div>
-                      {lane.preview.html ? (
-                        <SandboxedPreview
-                          html={lane.preview.html}
-                          title={`workspace-${workspaceArena.arena_id}-${lane.side}`}
-                        />
-                      ) : (
-                        <p className="text-xs text-text-tertiary">
-                          {lane.preview.source === "pending"
-                            ? tWorkspace("running")
-                            : tWorkspace("no-prompt")}
-                        </p>
-                      )}
-                    </Card>
-                  ))}
-                </div>
-                <div className="flex items-center gap-4 text-xs">
-                  <a
-                    href={`${locale === "en" ? "" : `/${locale}`}/arena`}
-                    className="text-accent-cyan hover:underline"
-                  >
-                    {tWorkspace("view-arena")}
-                  </a>
-                  <a
-                    href={`${locale === "en" ? "" : `/${locale}`}/replay`}
-                    className="text-accent-cyan hover:underline"
-                  >
-                    {tWorkspace("view-replay")}
-                  </a>
-                </div>
-              </>
-            )}
-            {arenaPollError && wsTrackedId && (
-              <p role="alert" className="text-xs text-accent-amber">
-                {tWorkspace("running")}{" "}
-                <button
-                  type="button"
-                  onClick={() => setArenaPollError(false)}
-                  className="underline bg-transparent border-0 cursor-pointer p-0 text-xs"
-                >
-                  {t("refresh-now")}
-                </button>
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-
-      <PromptBar
-        disabled={wsRunning}
-        followUpArena={wsFollowUp}
-        onStarted={(id) => {
-          setArenaPendingId(id);
-          setArenaPollError(false);
-        }}
-      />
-
+      </div>
+    <div className="canvas-management">
       <details className="mt-8" data-testid="mission-control-details">
         <summary className="cursor-pointer text-sm font-semibold text-text-primary">
           {tWorkspace("mission-control-toggle")}
@@ -1336,6 +1156,29 @@ export default function MissionControl() {
       </Card>
         </div>
       </details>
-    </main>
+    </div>
+  </>;
+  return (
+    <CanvasWorkspace
+      label={tWorkspace("heading")}
+      doc={displayedArena}
+      runs={workspaceArenas}
+      busy={wsRunning}
+      loading={initialLoading}
+      pollError={arenaPollError}
+      onRetry={() => setArenaPollError(false)}
+      onSelect={(id) => {
+        if (wsRunning) return;
+        const selected = workspaceArenas.find(run => run.arena_id === id);
+        if (selected) { setWorkspaceArena(selected); setArenaPendingId(null); setArenaPollError(false); }
+      }}
+      previews={{ evoforge: previewView(displayedArena?.lanes?.evoforge), single: previewView(displayedArena?.lanes?.single) }}
+      agents={{ evoforge: arenaAgentPanel(displayedArena, 'evoforge'), single: arenaAgentPanel(displayedArena, 'single') }}
+      participants={participants}
+      history={perf?.history ?? null}
+      renderPreview={(html, title) => <SandboxedPreview html={html} title={title}/>}
+      overview={<StudioOverview running={wsRunning} runId={displayedArena?.arena_id} measured={arenaSummary?.equal_tools?.scored ?? null} verified={dashboard?.validated_improvements ?? null} participants={participants?.status === 'available' ? participants.participants.length : null} participantsMore={participants?.has_more} heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null}/>}
+      management={management}
+      composer={<PromptBar disabled={wsRunning} followUpArena={wsFollowUp} onStarted={(id) => { setArenaPendingId(id); setArenaPollError(false); }}/>} />
   );
 }

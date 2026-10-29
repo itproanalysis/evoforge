@@ -3,7 +3,10 @@ import { getMessages, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { FeatureRail } from '../../components/FeatureRail';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
+import { StudioBreadcrumb } from '../../components/StudioBreadcrumb';
+import { StudioIcon } from '../../components/StudioIcon';
 import '../../styles/globals.css';
+import '../../styles/canvas.css';
 
 const locales = ['en', 'ko'];
 
@@ -35,42 +38,27 @@ export default async function LocaleLayout({
   }
 
   const messages = await getMessages();
-  const tCommon = await getTranslations('common');
+  const ts = await getTranslations('studio');
   const tLayout = await getTranslations('layout');
-
-  const raw = (process.env.NEXT_PUBLIC_API_BASE ?? '').trim();
-  const apiBase = raw === '' ? '/api/evoforge (same-origin)' : raw;
   const prefix = locale === 'en' ? '' : `/${locale}`;
 
   return (
     <html lang={locale}>
       <body className="m-0 font-sans bg-background-primary text-text-primary">
         <NextIntlClientProvider messages={messages}>
-          <header className="flex items-center gap-5 px-6 py-3 bg-background-tertiary border-b border-border sticky top-0 z-10 flex-wrap">
-            <a
-              href={prefix || '/'}
-              className="text-text-tertiary no-underline font-extrabold text-xl hover:text-text-primary"
-            >
-              {tCommon('app-name')}
-            </a>
-            <div className="ml-auto flex items-center gap-4">
-              <LanguageSwitcher />
-              <span className="hidden md:inline text-xs text-text-tertiary">
-                {tCommon('api-label')}: {apiBase}
-              </span>
-            </div>
-          </header>
-          {/* Mobile: the rail's menu bar sits above the content (a row here left the content ~205px of 375). */}
-          <div className="flex flex-col md:flex-row">
-            {/* Primary feature navigation (including /replay) renders here via <FeatureRail/>. */}
+          <a href="#workspace-content" className="studio-skip">{ts('skip')}</a>
+          <div className="studio-shell">
             <FeatureRail />
-            <div className="flex-1 min-w-0">
-              <div className="max-w-[1080px] mx-auto px-4 md:px-6 py-6">
-                {children}
-              </div>
-              <footer className="px-6 py-4 text-xs text-text-secondary">
-                {tLayout('footer')}
-              </footer>
+            <div className="studio-column flex-1">
+              <header className="studio-topbar">
+                <StudioBreadcrumb />
+                <div className="flex items-center gap-5">
+                  <a href={`${prefix}/replay`} className="studio-action-link hidden lg:inline-flex">{ts('replay')}<StudioIcon name="arrow" width="14" height="14"/></a>
+                  <LanguageSwitcher />
+                </div>
+              </header>
+              <div id="workspace-content" className="studio-content">{children}</div>
+              <footer className="studio-footer"><span>EvoForge</span><p>{tLayout('footer')}</p></footer>
             </div>
           </div>
         </NextIntlClientProvider>

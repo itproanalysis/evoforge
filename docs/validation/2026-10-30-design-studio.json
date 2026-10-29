@@ -1,0 +1,49 @@
+{
+  "source_commit": "a889c89395a844b4d28058c75caf906e4f1b5d42",
+  "base_release": "44e5ec9e5b47fc1b9dc81f4b6937670f75b8492f",
+  "validation": [
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\studio-render.log",
+      "sha256": "663155855a323d5e00e4d91904d57274c18477c85d12a95e4778162d72bdafa8",
+      "result": "49 actual-component SSR assertions passed"
+    },
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\arena-presentation.log",
+      "sha256": "ac9f801f7a1ed879b9cb361804492491269bbd5abafdef1df4851d26240aeff2",
+      "result": "Arena presentation checks passed"
+    },
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\studio-typescript.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "result": "TypeScript exit 0, incremental disabled"
+    },
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\studio-build.log",
+      "sha256": "aa6e31d37f9d33dace94f3050a1bd6b3562eab0e22da56c47c716104d81adf82",
+      "result": "Next production build exit 0"
+    },
+    {
+      "path": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\studio-web-regression.log",
+      "sha256": "ca8e92210dea961fc50021c67a398fa382d6229439ed163d127eb23821ccc813",
+      "result": "44 passed, 3 deprecation warnings"
+    }
+  ],
+  "build_wrapper_diagnostic": "After npm returned exit 0, printing the Unicode build log through cp949 failed. The build itself succeeded and its UTF-8 raw log is preserved.",
+  "browser_validation": "UNVERIFIED: local browser control is disabled in Work settings; no screenshots or responsive/hydration/browser-interaction proof.",
+  "preview": {
+    "url": "http://127.0.0.1:47839",
+    "type": "static SSR empty-state design review",
+    "http_status": 200,
+    "model_calls": 0,
+    "live_metrics": false
+  },
+  "deployment": "NOT DEPLOYED: release-captain integration required",
+  "organization": {
+    "relocated_clean_worktrees": 98,
+    "root_registered_worktrees_before": 125,
+    "root_registered_worktrees_after": 27,
+    "deleted_data": false,
+    "move_refusals_preserved": 5,
+    "manifest_path": "C:/Projects/EvoForge/organization/relocation-manifest.json"
+  }
+}

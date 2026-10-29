@@ -42,7 +42,7 @@ export interface CardProps {
 export function Card({ children, header, footer, className = '' }: CardProps) {
   return (
     <div
-      className={`bg-background-secondary border border-border rounded-card p-3.5 ${className}`}
+      className={`studio-card bg-background-secondary border border-border rounded-card p-3.5 ${className}`}
     >
       {header && (
         <div className="mb-3">
