@@ -1,0 +1,20 @@
+{
+  "id": "T66_prompt_followup",
+  "planned_by": "Claude (Critic): owner — evolve the user's result round by round",
+  "goal": "T66 — prompt Arena follow-ups (owner: type at the bottom and watch the result evolve round after round). Builds on\nT64 (services/api/evoforge/arena_prompt.py). API only.\n- POST /v1/arena/{id}/followup {prompt: 1..2000 chars (else 422), feedback?, single_apply? (default: the parent's)} ->\n  202 {arena_id}. Unknown id -> 404; parent not a finished prompt arena -> 409. Budget guard as in T64 (-> 402).\n- Each finished prompt arena must keep, server-side only: each lane's final files (the template or parent files plus\n  that lane's final applied candidate; unchanged files when nothing applied) and its full acceptance suite. Store them\n  in a private record (evidence store kind \"arena_private\", keyed by arena id) that GET endpoints never return.\n- The follow-up round: each lane starts from ITS OWN final files of the parent (single from single's, evoforge from\n  evoforge's) and gets the task goal = the follow-up prompt plus the same implementation instruction (mention the\n  earlier requests as context, but the follow-up prompt text must appear verbatim). The judge Critic is called with a\n  goal built from the prompts only (earlier requests as context + the new request; never file contents) to write\n  tests for the NEW request; keep entries via sealed_eval._critic_suite_from_output(out, [\"app\"]); drop new tests that\n  pass on BOTH lanes' starting files. The round's acceptance suite = the parent's full suite + the kept new tests.\n  Both lanes are scored on it (same machinery as T64, previews included). Fewer than 3 tests -> unscorable.\n- Document: like T64 plus parent_id, root_id, round_index (root = 1, follow-up = parent + 1); manifest adds\n  acceptance_inherited, acceptance_new, acceptance_dropped (new tests dropped), acceptance_count (inherited + new).\n  Judge names and code never appear in any response or lane goal (scrub as T64 does).\n- GET /v1/arena/{id}/chain -> {rounds: [docs from the root to the newest round of that chain, in round order]} for\n  any member id of the chain (404 unknown). Root arenas get root_id = own id, round_index 1, parent_id null.\n- Proxy: allow POST /v1/arena/<id>/followup and GET /v1/arena/<id>/chain (proxyPolicy.ts + cases).\nTests: services/api/tests/test_muse_t66.py.",
+  "edit": [
+    "services/api/evoforge/arena_prompt.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t66.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/arena.py",
+    "services/api/tests/test_critic_t64_prompt_arena.py",
+    "services/api/evoforge/sealed_eval.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t66.py services/api/tests/test_sealed_t66_prompt_followup.py services/api/tests/test_critic_t64_prompt_arena.py services/api/tests/test_muse_t64.py services/api/tests/test_critic_t48_arena_manifest.py services/api/tests/test_arena_status_http_codex.py services/api/tests/test_arena_verification_codex.py -q -p no:cacheprovider"
+  ]
+}
