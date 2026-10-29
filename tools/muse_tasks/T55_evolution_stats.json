@@ -1,0 +1,19 @@
+{
+  "id": "T55_evolution_stats",
+  "planned_by": "Claude (Critic): v3.8 §9",
+  "goal": "T55 — evolution statistics across runs (v3.8 §9 KPI; v3.6 rule \"no 10x claim without a matched experiment\").\nIn services/api/evoforge/evolution_rounds.py + services/api/main.py add GET /v1/evolution/stats?feedback=critic|heldout\n(optional; other values -> 422) returning:\n{runs, by_side: {evoforge: S, single: S}, comparison: \"evoforge_better\" | \"single_better\" | \"not_significant\", method}\nwith S = {rounds, verified, wilson95: [lo, hi], cost_cents, cost_per_verified_cents}.\n- Count only runs whose status is \"succeeded\" or \"failed\" (a running run counts not at all), over ALL stored evolution\n  runs (not just the 20 newest), filtered by run feedback when the query parameter is given.\n- rounds = number of rounds with a non-PENDING snapshot on that side; verified = rounds whose snapshot status is \"READY\";\n  cost_cents = sum of those snapshots' cost_cents; cost_per_verified_cents = round(cost_cents / verified) or null when\n  verified == 0; wilson95 via the same Wilson 95% helper the evals use (z = 1.96; [0, 0] when rounds == 0).\n- comparison: \"evoforge_better\" only when evoforge.lo > single.hi, \"single_better\" only when single.lo > evoforge.hi,\n  else \"not_significant\". method: one sentence saying rounds are counted as independent trials (an approximation).\n- Read-only: never calls a model. Proxy: allow GET /v1/evolution/stats in apps/web/lib/proxyPolicy.ts and its cases.\nTests: services/api/tests/test_muse_t55.py.",
+  "edit": [
+    "services/api/evoforge/evolution_rounds.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t55.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "services/api/evoforge/performance.py",
+    "services/api/tests/test_critic_t51_evolution_rounds.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t55.py services/api/tests/test_sealed_t55_evolution_stats.py services/api/tests/test_critic_t51_evolution_rounds.py -q -p no:cacheprovider"
+  ]
+}
