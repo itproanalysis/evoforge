@@ -1,0 +1,22 @@
+{
+  "id": "T51_evolution_rounds",
+  "planned_by": "Claude (Critic): v3.8 P0-A/P0-B",
+  "goal": "T51 — Evolution Rounds engine (v3.8 P0-A + P0-B: one app visibly evolves R1->R5, EvoForge vs single AI).\nRead docs/NORTH_STAR.md, docs/V36_EXECUTION_PLAN.md and evals/rounds_v1/mission_board.json (app file board.py, base R0\ncode, 5 rounds each with goal + 3 held-out tests; \"reference\" fields are Critic validation data and must NEVER be sent\nto a model or returned by the API).\n\nBuild services/api/evoforge/evolution_rounds.py + routes in services/api/main.py:\n- GET /v1/evolution/apps -> {apps: [{app_id, title, rounds: [{index, name}]}]} (no goals' tests, no references).\n- POST /v1/evolution/runs {app_id, feedback: \"critic\"|\"heldout\" = \"critic\", rounds: int 1..5 = 5} -> 202 {run_id,\n  status: \"running\"}; unknown app 404; bad values 422; budget guard for both lanes over all rounds before any provider\n  call (single: 1 Builder call/round; evoforge: PIPELINE_MAX_ATTEMPTS calls + 1 Critic call in critic mode) -> 402.\n  Runs as ONE background job (eval_jobs, one job at a time).\n- Two lanes run concurrently, each from the same base files, each round sequentially on its OWN current files:\n  * Builder input = the round goal + the lane's current files (file_context). single: one call, strict apply\n    (recount=False). evoforge: T47-style attempts (critic mode: one spec-first Critic call per round via\n    sealed_eval._call_critic_suite/_critic_goal_for_task, retries see only Critic failures; heldout mode: failing\n    held-out names of the CURRENT cumulative tests), recount apply.\n  * If the round's final candidate applied, the lane's files become that candidate (even if tests fail); else they stay.\n  * Score = the cumulative held-out tests of rounds 1..n run on the lane's files (local sandbox, same isolation as\n    sealed evals). Never feed held-out code to a model.\n  * Snapshot per (round, lane), stored once and never rewritten: {status: \"READY\" (all cumulative tests pass; verified\n    true) | \"UNVERIFIED\" (code changed this round, some cumulative tests fail) | \"FAILED\" (no applicable change this round,\n    or provider/sandbox error), verified, source_sha (\"sha256:\" + sha256 of json.dumps(files, sort_keys=True)),\n    heldout {passed, n} cumulative, round_tests {passed, n} (this round's 3), preview_html (preview() of the lane's files\n    after the round, run like T49 arena previews: isolated subprocess, scrubbed env, 10 s, 64 KB) or preview_error,\n    preview_sha, diff, attempts, cost_cents (provider usage incl. Critic), elapsed_ms, events [{seq, ts, role, message}]}.\n    A FAILED round's snapshot keeps the lane's previous files: never copy another lane's or another round's result.\n- Run document (evidence store kind \"evolution_run\", survives redeploys): {run_id, app_id, title, status, feedback,\n  created_at, finished_at, manifest {app_id, rounds, base_sha, goals_hash, heldout_hash, lanes {single: {model,\n  harness: \"api-sealed-eval/1\", max_attempts: 1, feedback: \"none\"}, evoforge: {model, harness: \"api-sealed-eval/2\",\n  max_attempts, feedback}}, cost_basis: \"model_api_usage\", runner_cost: \"not_measured\", disclosure}, rounds: [{index,\n  name, goal, sides: {single: snapshot, evoforge: snapshot}}], totals {single|evoforge: {cost_cents, elapsed_ms,\n  verified_rounds}}}. A running document lists finished rounds so far (status \"running\"; unfinished sides \"PENDING\").\n- GET /v1/evolution/runs/{id} (404 unknown) and GET /v1/evolution/runs -> {runs: [...]} newest first (<= 20). GET is\n  read-only replay: it never calls a model.\n- Proxy: allow GET /v1/evolution/apps, POST+GET /v1/evolution/runs, GET /v1/evolution/runs/<id> in\n  apps/web/lib/proxyPolicy.ts + proxyPolicy.cases.json.\nTests: services/api/tests/test_muse_t51.py.",
+  "edit": [
+    "services/api/evoforge/evolution_rounds.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t51.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json"
+  ],
+  "context": [
+    "evals/rounds_v1/mission_board.json",
+    "services/api/evoforge/arena.py",
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/evoforge/eval_jobs.py",
+    "services/api/tests/test_critic_t49_arena_preview.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}
