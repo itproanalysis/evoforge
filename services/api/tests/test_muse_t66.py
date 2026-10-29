@@ -92,6 +92,11 @@ class _Stubs:
                 [dict(f) for f in (file_context or [])])
             cur = next((f["content"] for f in (file_context or [])
                         if f["path"] == "app.py"), arena_prompt.TEMPLATE)
+        if arena_prompt.REFERENCE_MARKER in (goal or ""):
+            target = HELLO_GOODBYE
+            return {"diff": _diff(cur, target), "tests": [], "rationale": "x",
+                    "stub": False, "model": "muse-spark-1.3",
+                    "provider_calls": [], "usage": dict(USAGE)}
         target = HELLO_GOODBYE if "goodbye" in cur else HELLO
         if "goodbye" in goal.lower() and "goodbye" not in cur:
             target = HELLO_GOODBYE

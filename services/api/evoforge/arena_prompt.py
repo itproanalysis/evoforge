@@ -1061,13 +1061,26 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
         _arena._live_init(arena_id)
         kept_new, dropped = _filter_on_starting_files(
             critic_suite, s_start, e_start, timeout_s)
-        full_suite = list(parent_suite) + list(kept_new)
+        pre_suite = list(parent_suite) + list(kept_new)
+        lane_goal = _goal_with_interface(goal, pre_suite)
+        try:
+            ref_cost, ref_diff = _build_judge_reference(lane_goal)
+        except Exception:
+            ref_cost, ref_diff = 0, ""
+        ref_files = _final_files({"app.py": TEMPLATE}, ref_diff, True)
+        scored_new, ref_dropped = _filter_on_reference(kept_new, ref_files,
+                                                       timeout_s)
+        judge_cost += int(ref_cost)
+        full_suite = list(parent_suite) + list(scored_new)
         try:
             _sealed._check_size(full_suite)
         except Exception:
             pass
         manifest = _manifest_with_acceptance(
-            manifest, full_suite, dropped, len(parent_suite), len(kept_new))
+            manifest, full_suite, dropped, len(parent_suite),
+            len(scored_new))
+        manifest["reference_checked"] = True
+        manifest["acceptance_reference_dropped"] = int(ref_dropped)
         goal = _goal_with_interface(goal, full_suite)
         single_task = {"id": "prompt", "goal": goal,
                        "files": dict(s_start), "heldout": list(full_suite)}
