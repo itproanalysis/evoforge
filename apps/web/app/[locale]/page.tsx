@@ -400,7 +400,7 @@ export default function MissionControl() {
         <p className="text-sm text-text-primary mt-0 mb-2">
           {tWorkspace("intro")}
         </p>
-        <ol className="text-sm text-text-secondary mt-0 mb-0 pl-5">
+        <ol className="list-decimal text-sm text-text-secondary mt-0 mb-0 pl-5">
           <li>{tWorkspace("intro-step-1")}</li>
           <li>{tWorkspace("intro-step-2")}</li>
           <li>{tWorkspace("intro-step-3")}</li>
@@ -468,7 +468,7 @@ export default function MissionControl() {
                               <span className="text-text-secondary">
                                 {row.state}
                               </span>
-                              <span className="text-text-primary break-words">
+                              <span className="text-text-primary break-words min-w-0 flex-1">
                                 {row.message ?? "—"}
                               </span>
                             </li>

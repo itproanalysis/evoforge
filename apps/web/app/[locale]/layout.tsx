@@ -55,16 +55,17 @@ export default async function LocaleLayout({
             </a>
             <div className="ml-auto flex items-center gap-4">
               <LanguageSwitcher />
-              <span className="text-xs text-text-secondary">
+              <span className="hidden md:inline text-xs text-text-tertiary">
                 {tCommon('api-label')}: {apiBase}
               </span>
             </div>
           </header>
-          <div className="flex">
+          {/* Mobile: the rail's menu bar sits above the content (a row here left the content ~205px of 375). */}
+          <div className="flex flex-col md:flex-row">
             {/* Primary feature navigation (including /replay) renders here via <FeatureRail/>. */}
             <FeatureRail />
             <div className="flex-1 min-w-0">
-              <div className="max-w-[1080px] mx-auto px-6 py-6">
+              <div className="max-w-[1080px] mx-auto px-4 md:px-6 py-6">
                 {children}
               </div>
               <footer className="px-6 py-4 text-xs text-text-secondary">
