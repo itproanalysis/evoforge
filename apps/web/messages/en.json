@@ -19,7 +19,8 @@
     "performance": "Performance",
     "autopilot": "Autopilot",
     "leaderboard": "Leaderboard",
-    "arena": "Arena"
+    "arena": "Arena",
+    "replay": "Replay"
   },
   "mission-control": {
     "heading": "Mission Control",
@@ -125,7 +126,9 @@
       "active-missions": "Active missions",
       "validated-wvi": "Validated (WVI)",
       "blocked-merges": "Blocked merges",
-      "spent": "Spent",
+      "spent": "Model API spend (provider usage)",
+      "prs-awaiting": "PRs opened · awaiting merge validation",
+      "wvi-rule": "WVI counts a PR only after it is merged and its outcome is recorded as VALIDATED. Opening a PR does not count. Spend is model API usage from provider-reported tokens; Runner compute is not included.",
       "reserved": "Reserved",
       "unknown-holds": "Unknown holds",
       "missions-prefix": "Missions: "
@@ -448,5 +451,23 @@
     "passed": "PASS",
     "running": "RUNNING",
     "succeeded": "FINISHED"
+  },
+  "replay": {
+    "title": "Round Replay",
+    "first": "First",
+    "latest": "Latest",
+    "play": "Play",
+    "pause": "Pause",
+    "recorded-run": "Recorded run",
+    "pending": "Pending",
+    "failed": "Failed",
+    "unverified": "Unverified",
+    "ready": "Ready",
+    "evoforge": "EvoForge",
+    "single": "Single AI",
+    "empty": "No recorded runs yet.",
+    "cost": "Cost",
+    "score": "Score",
+    "totals": "Totals"
   }
 }

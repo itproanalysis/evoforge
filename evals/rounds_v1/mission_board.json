@@ -1,0 +1,125 @@
+{
+  "app_id": "mission_board",
+  "title": "Mission Board",
+  "suite": "rounds_v1",
+  "file": "board.py",
+  "base": "def render(tasks):\n    return '<section class=\"board\"></section>'\n\n\ndef preview():\n    return render([])\n",
+  "rule": "render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape text and attributes once escaping is required). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+  "rounds": [
+    {
+      "index": 1,
+      "name": "Initial Build",
+      "goal": "Round 1 — Initial Build. In board.py, render(tasks) takes dicts {id, title, status} and returns <section class=\"board\"><h1>Mission Board</h1><ul>...</ul></section> with one <li class=\"task\" data-status=\"STATUS\">TITLE</li> per task in input order. Add a module-level SAMPLE list of example tasks. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape text and attributes once escaping is required). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "def render(tasks):\n    items = \"\".join(f'<li class=\"task\" data-status=\"{t[\"status\"]}\">{t[\"title\"]}</li>' for t in tasks)\n    return f'<section class=\"board\"><h1>Mission Board</h1><ul>{items}</ul></section>'\n\n\nSAMPLE = [\n    {\"id\": 1, \"title\": \"Plan the release\", \"status\": \"done\", \"owner\": \"Muse Spark\", \"priority\": 2},\n    {\"id\": 2, \"title\": \"Arena manifest\", \"status\": \"done\", \"owner\": \"Muse Spark\"},\n    {\"id\": 3, \"title\": \"Visual suite\", \"status\": \"doing\", \"owner\": \"Claude\", \"priority\": 1},\n    {\"id\": 4, \"title\": \"Runner isolation\", \"status\": \"doing\", \"owner\": \"Codex\"},\n    {\"id\": 5, \"title\": \"Workspace shell\", \"status\": \"todo\", \"owner\": \"agy\"},\n    {\"id\": 6, \"title\": \"Session tenancy\", \"status\": \"todo\", \"owner\": \"Codex\", \"priority\": 3},\n    {\"id\": 7, \"title\": \"Replay page\", \"status\": \"todo\"},\n]\ndef preview():\n    return render(SAMPLE)\n",
+      "heldout": [
+        {
+          "id": "R1-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r1_compositional():\n    e = ET.fromstring(board.render([{'id': 1, 'title': 'Plan', 'status': 'todo'}, {'id': 2, 'title': 'Build', 'status': 'todo'}]))\n    assert e.tag == 'section' and e.find('h1').text == 'Mission Board'\n    assert [t.text for t in [t for t in e.iter('li') if t.get('class') == 'task']] == ['Plan', 'Build']\n"
+        },
+        {
+          "id": "R1-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r1_negative():\n    e = ET.fromstring(board.render([]))\n    assert e.find('h1').text == 'Mission Board' and [t for t in e.iter('li') if t.get('class') == 'task'] == []\n    assert e.find('.//ul') is not None\n"
+        },
+        {
+          "id": "R1-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r1_boundary():\n    e = ET.fromstring(board.render([{'id': 1, 'title': 'A', 'status': 'todo'}]))\n    assert [t for t in e.iter('li') if t.get('class') == 'task'][0].get('data-status') == 'todo'\n    assert len([t for t in ET.fromstring(board.preview()).iter('li') if t.get('class') == 'task']) >= 3\n"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "name": "Feature Growth",
+      "goal": "Round 2 — Feature Growth. Group tasks into three <div class=\"column\" data-status=\"KEY\"> columns, always in the order todo, doing, done, each holding <h2>LABEL (COUNT)</h2> (labels Todo, Doing, Done) and a <ul> of its tasks in input order. Before the columns add <p class=\"summary\">D of N done</p>. A task whose status is not todo, doing or done raises ValueError. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape text and attributes once escaping is required). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "COLUMNS = ((\"todo\", \"Todo\"), (\"doing\", \"Doing\"), (\"done\", \"Done\"))\n\n\ndef render(tasks):\n    known = {key for key, _ in COLUMNS}\n    for t in tasks:\n        if t[\"status\"] not in known:\n            raise ValueError(f\"unknown status: {t['status']!r}\")\n    done = sum(1 for t in tasks if t[\"status\"] == \"done\")\n    cols = []\n    for key, label in COLUMNS:\n        mine = [t for t in tasks if t[\"status\"] == key]\n        items = \"\".join(f'<li class=\"task\" data-status=\"{key}\">{t[\"title\"]}</li>' for t in mine)\n        cols.append(f'<div class=\"column\" data-status=\"{key}\"><h2>{label} ({len(mine)})</h2><ul>{items}</ul></div>')\n    return (f'<section class=\"board\"><h1>Mission Board</h1><p class=\"summary\">{done} of {len(tasks)} done</p>'\n            + \"\".join(cols) + \"</section>\")\n\n\nSAMPLE = [\n    {\"id\": 1, \"title\": \"Plan the release\", \"status\": \"done\", \"owner\": \"Muse Spark\", \"priority\": 2},\n    {\"id\": 2, \"title\": \"Arena manifest\", \"status\": \"done\", \"owner\": \"Muse Spark\"},\n    {\"id\": 3, \"title\": \"Visual suite\", \"status\": \"doing\", \"owner\": \"Claude\", \"priority\": 1},\n    {\"id\": 4, \"title\": \"Runner isolation\", \"status\": \"doing\", \"owner\": \"Codex\"},\n    {\"id\": 5, \"title\": \"Workspace shell\", \"status\": \"todo\", \"owner\": \"agy\"},\n    {\"id\": 6, \"title\": \"Session tenancy\", \"status\": \"todo\", \"owner\": \"Codex\", \"priority\": 3},\n    {\"id\": 7, \"title\": \"Replay page\", \"status\": \"todo\"},\n]\ndef preview():\n    return render(SAMPLE)\n",
+      "heldout": [
+        {
+          "id": "R2-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r2_compositional():\n    e = ET.fromstring(board.render([{'id': 1, 'title': 'A', 'status': 'todo'}, {'id': 2, 'title': 'B', 'status': 'done'}, {'id': 3, 'title': 'C', 'status': 'doing'}, {'id': 4, 'title': 'D', 'status': 'todo'}]))\n    cols = [d for d in e.findall('div') if d.get('class') == 'column']\n    assert [c.get('data-status') for c in cols] == ['todo', 'doing', 'done']\n    assert [c.find('h2').text for c in cols] == ['Todo (2)', 'Doing (1)', 'Done (1)']\n    assert [li.text for li in cols[0].iter('li')] == ['A', 'D'] and e.find('p').text == '1 of 4 done'\n"
+        },
+        {
+          "id": "R2-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r2_negative():\n    with pytest.raises(ValueError):\n        board.render([{'id': 1, 'title': 'X', 'status': 'blocked'}])\n"
+        },
+        {
+          "id": "R2-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r2_boundary():\n    e = ET.fromstring(board.render([]))\n    cols = [d for d in e.findall('div') if d.get('class') == 'column']\n    assert [c.find('h2').text for c in cols] == ['Todo (0)', 'Doing (0)', 'Done (0)']\n    assert e.find('p').text == '0 of 0 done'\n"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "name": "UX Refinement",
+      "goal": "Round 3 — UX Refinement. The section gets aria-label=\"Mission board\". Each column gets aria-label=\"LABEL column, N tasks\" (\"1 task\" when N is 1). Each task <li> gets aria-label=\"TITLE, STATUS, owned by OWNER\" (or \"TITLE, STATUS, unassigned\" when the task has no owner) and, after the title text, <span class=\"owner\" title=\"Owner: OWNER\">INITIALS</span> where INITIALS are the upper-cased first letters of the first two words of the owner, or \"?\" with title \"Owner: unassigned\" when there is no owner. Tasks may carry an optional owner. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape text and attributes once escaping is required). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "COLUMNS = ((\"todo\", \"Todo\"), (\"doing\", \"Doing\"), (\"done\", \"Done\"))\n\n\ndef _initials(name):\n    if not name:\n        return \"?\"\n    return \"\".join(part[0] for part in name.split()[:2]).upper()\n\n\ndef _item(t):\n    owner = t.get(\"owner\")\n    who = f\"owned by {owner}\" if owner else \"unassigned\"\n    return (f'<li class=\"task\" data-status=\"{t[\"status\"]}\" aria-label=\"{t[\"title\"]}, {t[\"status\"]}, {who}\">'\n            f'{t[\"title\"]}<span class=\"owner\" title=\"Owner: {owner or \"unassigned\"}\">{_initials(owner)}</span></li>')\n\n\ndef render(tasks):\n    known = {key for key, _ in COLUMNS}\n    for t in tasks:\n        if t[\"status\"] not in known:\n            raise ValueError(f\"unknown status: {t['status']!r}\")\n    done = sum(1 for t in tasks if t[\"status\"] == \"done\")\n    cols = []\n    for key, label in COLUMNS:\n        mine = [t for t in tasks if t[\"status\"] == key]\n        noun = \"task\" if len(mine) == 1 else \"tasks\"\n        cols.append(f'<div class=\"column\" data-status=\"{key}\" aria-label=\"{label} column, {len(mine)} {noun}\">'\n                    f'<h2>{label} ({len(mine)})</h2><ul>{\"\".join(_item(t) for t in mine)}</ul></div>')\n    return (f'<section class=\"board\" aria-label=\"Mission board\"><h1>Mission Board</h1>'\n            f'<p class=\"summary\">{done} of {len(tasks)} done</p>' + \"\".join(cols) + \"</section>\")\n\n\nSAMPLE = [\n    {\"id\": 1, \"title\": \"Plan the release\", \"status\": \"done\", \"owner\": \"Muse Spark\", \"priority\": 2},\n    {\"id\": 2, \"title\": \"Arena manifest\", \"status\": \"done\", \"owner\": \"Muse Spark\"},\n    {\"id\": 3, \"title\": \"Visual suite\", \"status\": \"doing\", \"owner\": \"Claude\", \"priority\": 1},\n    {\"id\": 4, \"title\": \"Runner isolation\", \"status\": \"doing\", \"owner\": \"Codex\"},\n    {\"id\": 5, \"title\": \"Workspace shell\", \"status\": \"todo\", \"owner\": \"agy\"},\n    {\"id\": 6, \"title\": \"Session tenancy\", \"status\": \"todo\", \"owner\": \"Codex\", \"priority\": 3},\n    {\"id\": 7, \"title\": \"Replay page\", \"status\": \"todo\"},\n]\ndef preview():\n    return render(SAMPLE)\n",
+      "heldout": [
+        {
+          "id": "R3-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r3_compositional():\n    e = ET.fromstring(board.render([{'id': 1, 'title': 'Ship', 'status': 'doing', 'owner': 'ada lovelace'}]))\n    li = [t for t in e.iter('li') if t.get('class') == 'task'][0]\n    assert li.text == 'Ship' and li.get('aria-label') == 'Ship, doing, owned by ada lovelace'\n    span = li.find('span')\n    assert span.text == 'AL' and span.get('title') == 'Owner: ada lovelace' and e.get('aria-label') == 'Mission board'\n"
+        },
+        {
+          "id": "R3-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r3_negative():\n    e = ET.fromstring(board.render([{'id': 1, 'title': 'X', 'status': 'todo'}]))\n    li = [t for t in e.iter('li') if t.get('class') == 'task'][0]\n    assert li.find('span').text == '?' and li.find('span').get('title') == 'Owner: unassigned'\n    assert li.get('aria-label') == 'X, todo, unassigned'\n"
+        },
+        {
+          "id": "R3-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r3_boundary():\n    e = ET.fromstring(board.render([{'id': 1, 'title': 'A', 'status': 'todo', 'owner': 'muse'}]))\n    assert [c.get('aria-label') for c in [d for d in e.findall('div') if d.get('class') == 'column']] == ['Todo column, 1 task', 'Doing column, 0 tasks', 'Done column, 0 tasks']\n    assert [t for t in e.iter('li') if t.get('class') == 'task'][0].find('span').text == 'M'\n"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "name": "Optimization",
+      "goal": "Round 4 — Robustness. HTML-escape every title and owner (text and attributes) so task data can never inject markup. A repeated task id is shown once (the first); counts and the summary use the de-duplicated tasks. Within a column, order tasks by optional integer priority, highest first, keeping input order for ties. Show at most 5 tasks per column and then <li class=\"more\">+K more</li>; the heading and aria-label counts still cover all tasks. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape text and attributes once escaping is required). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "import html\n\nCOLUMNS = ((\"todo\", \"Todo\"), (\"doing\", \"Doing\"), (\"done\", \"Done\"))\nVISIBLE = 5\n\n\ndef _e(text):\n    return html.escape(str(text), quote=True)\n\n\ndef _initials(name):\n    if not name:\n        return \"?\"\n    return \"\".join(part[0] for part in name.split()[:2]).upper()\n\n\ndef _item(t):\n    owner = t.get(\"owner\")\n    who = f\"owned by {owner}\" if owner else \"unassigned\"\n    return (f'<li class=\"task\" data-status=\"{t[\"status\"]}\" aria-label=\"{_e(t[\"title\"])}, {t[\"status\"]}, {_e(who)}\">'\n            f'{_e(t[\"title\"])}<span class=\"owner\" title=\"Owner: {_e(owner or \"unassigned\")}\">'\n            f'{_e(_initials(owner))}</span></li>')\n\n\ndef _unique(tasks):\n    seen, out = set(), []\n    for t in tasks:\n        if t[\"id\"] in seen:\n            continue\n        seen.add(t[\"id\"])\n        out.append(t)\n    return out\n\n\ndef render(tasks):\n    tasks = _unique(tasks)\n    known = {key for key, _ in COLUMNS}\n    for t in tasks:\n        if t[\"status\"] not in known:\n            raise ValueError(f\"unknown status: {t['status']!r}\")\n    done = sum(1 for t in tasks if t[\"status\"] == \"done\")\n    cols = []\n    for key, label in COLUMNS:\n        mine = sorted((t for t in tasks if t[\"status\"] == key), key=lambda t: -t.get(\"priority\", 0))\n        noun = \"task\" if len(mine) == 1 else \"tasks\"\n        items = \"\".join(_item(t) for t in mine[:VISIBLE])\n        if len(mine) > VISIBLE:\n            items += f'<li class=\"more\">+{len(mine) - VISIBLE} more</li>'\n        cols.append(f'<div class=\"column\" data-status=\"{key}\" aria-label=\"{label} column, {len(mine)} {noun}\">'\n                    f\"<h2>{label} ({len(mine)})</h2><ul>{items}</ul></div>\")\n    return (f'<section class=\"board\" aria-label=\"Mission board\"><h1>Mission Board</h1>'\n            f'<p class=\"summary\">{done} of {len(tasks)} done</p>' + \"\".join(cols) + \"</section>\")\n\n\nSAMPLE = [\n    {\"id\": 1, \"title\": \"Plan the release\", \"status\": \"done\", \"owner\": \"Muse Spark\", \"priority\": 2},\n    {\"id\": 2, \"title\": \"Arena manifest\", \"status\": \"done\", \"owner\": \"Muse Spark\"},\n    {\"id\": 3, \"title\": \"Visual suite\", \"status\": \"doing\", \"owner\": \"Claude\", \"priority\": 1},\n    {\"id\": 4, \"title\": \"Runner isolation\", \"status\": \"doing\", \"owner\": \"Codex\"},\n    {\"id\": 5, \"title\": \"Workspace shell\", \"status\": \"todo\", \"owner\": \"agy\"},\n    {\"id\": 6, \"title\": \"Session tenancy\", \"status\": \"todo\", \"owner\": \"Codex\", \"priority\": 3},\n    {\"id\": 7, \"title\": \"Replay page\", \"status\": \"todo\"},\n]\ndef preview():\n    return render(SAMPLE)\n",
+      "heldout": [
+        {
+          "id": "R4-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r4_compositional():\n    out = board.render([{'id': 1, 'title': '<b>x</b> & y', 'status': 'todo', 'owner': '<i>'}])\n    assert '<b>' not in out and '<i>' not in out\n    e = ET.fromstring(out)\n    li = [t for t in e.iter('li') if t.get('class') == 'task'][0]\n    assert li.text == '<b>x</b> & y' and li.find('span').get('title') == 'Owner: <i>'\n"
+        },
+        {
+          "id": "R4-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r4_negative():\n    e = ET.fromstring(board.render([{'id': 1, 'title': 'A', 'status': 'todo'}, {'id': 1, 'title': 'A2', 'status': 'done'}]))\n    assert [t.text for t in [t for t in e.iter('li') if t.get('class') == 'task']] == ['A'] and e.find('p').text == '0 of 1 done'\n"
+        },
+        {
+          "id": "R4-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r4_boundary():\n    tasks = [{'id': i, 'title': f't{i}', 'status': 'todo', 'priority': 1 if i in (5, 6) else 0} for i in range(7)]\n    e = ET.fromstring(board.render(tasks))\n    col = [d for d in e.findall('div') if d.get('class') == 'column'][0]\n    assert [li.text for li in col.iter('li') if li.get('class') == 'task'] == ['t5', 't6', 't0', 't1', 't2']\n    assert [li.text for li in col.iter('li') if li.get('class') == 'more'] == ['+2 more'] and col.find('h2').text == 'Todo (7)'\n"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "name": "Verified Release",
+      "goal": "Round 5 — Verified Release. render(tasks, now=None): after the summary add <div class=\"progress\" role=\"progressbar\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-valuenow=\"P\"><div class=\"bar\" style=\"width: P%\"></div></div> where P = round(100 * done / N), 0 for no tasks; end the section with <footer>N tasks · P% done</footer> (\"1 task\"), prefixed by \"Updated HH:MM UTC · \" when now (epoch seconds) is given. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape text and attributes once escaping is required). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "import html\nimport time\n\nCOLUMNS = ((\"todo\", \"Todo\"), (\"doing\", \"Doing\"), (\"done\", \"Done\"))\nVISIBLE = 5\n\n\ndef _e(text):\n    return html.escape(str(text), quote=True)\n\n\ndef _initials(name):\n    if not name:\n        return \"?\"\n    return \"\".join(part[0] for part in name.split()[:2]).upper()\n\n\ndef _item(t):\n    owner = t.get(\"owner\")\n    who = f\"owned by {owner}\" if owner else \"unassigned\"\n    return (f'<li class=\"task\" data-status=\"{t[\"status\"]}\" aria-label=\"{_e(t[\"title\"])}, {t[\"status\"]}, {_e(who)}\">'\n            f'{_e(t[\"title\"])}<span class=\"owner\" title=\"Owner: {_e(owner or \"unassigned\")}\">'\n            f'{_e(_initials(owner))}</span></li>')\n\n\ndef _unique(tasks):\n    seen, out = set(), []\n    for t in tasks:\n        if t[\"id\"] in seen:\n            continue\n        seen.add(t[\"id\"])\n        out.append(t)\n    return out\n\n\ndef render(tasks, now=None):\n    tasks = _unique(tasks)\n    known = {key for key, _ in COLUMNS}\n    for t in tasks:\n        if t[\"status\"] not in known:\n            raise ValueError(f\"unknown status: {t['status']!r}\")\n    done = sum(1 for t in tasks if t[\"status\"] == \"done\")\n    cols = []\n    for key, label in COLUMNS:\n        mine = sorted((t for t in tasks if t[\"status\"] == key), key=lambda t: -t.get(\"priority\", 0))\n        noun = \"task\" if len(mine) == 1 else \"tasks\"\n        items = \"\".join(_item(t) for t in mine[:VISIBLE])\n        if len(mine) > VISIBLE:\n            items += f'<li class=\"more\">+{len(mine) - VISIBLE} more</li>'\n        cols.append(f'<div class=\"column\" data-status=\"{key}\" aria-label=\"{label} column, {len(mine)} {noun}\">'\n                    f\"<h2>{label} ({len(mine)})</h2><ul>{items}</ul></div>\")\n    pct = round(100 * done / len(tasks)) if tasks else 0\n    bar = (f'<div class=\"progress\" role=\"progressbar\" aria-valuemin=\"0\" aria-valuemax=\"100\" aria-valuenow=\"{pct}\">'\n           f'<div class=\"bar\" style=\"width: {pct}%\"></div></div>')\n    noun = \"task\" if len(tasks) == 1 else \"tasks\"\n    foot = f\"{len(tasks)} {noun} · {pct}% done\"\n    if now is not None:\n        foot = time.strftime(\"Updated %H:%M UTC\", time.gmtime(now)) + \" · \" + foot\n    return (f'<section class=\"board\" aria-label=\"Mission board\"><h1>Mission Board</h1>'\n            f'<p class=\"summary\">{done} of {len(tasks)} done</p>' + bar + \"\".join(cols)\n            + f\"<footer>{foot}</footer></section>\")\n\n\nSAMPLE = [\n    {\"id\": 1, \"title\": \"Plan the release\", \"status\": \"done\", \"owner\": \"Muse Spark\", \"priority\": 2},\n    {\"id\": 2, \"title\": \"Arena manifest\", \"status\": \"done\", \"owner\": \"Muse Spark\"},\n    {\"id\": 3, \"title\": \"Visual suite\", \"status\": \"doing\", \"owner\": \"Claude\", \"priority\": 1},\n    {\"id\": 4, \"title\": \"Runner isolation\", \"status\": \"doing\", \"owner\": \"Codex\"},\n    {\"id\": 5, \"title\": \"Workspace shell\", \"status\": \"todo\", \"owner\": \"agy\"},\n    {\"id\": 6, \"title\": \"Session tenancy\", \"status\": \"todo\", \"owner\": \"Codex\", \"priority\": 3},\n    {\"id\": 7, \"title\": \"Replay page\", \"status\": \"todo\"},\n]\ndef preview():\n    return render(SAMPLE, now=1793232000)\n",
+      "heldout": [
+        {
+          "id": "R5-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r5_compositional():\n    e = ET.fromstring(board.render([{'id': 1, 'title': 'A', 'status': 'done'}, {'id': 2, 'title': 'B', 'status': 'todo'}, {'id': 3, 'title': 'C', 'status': 'done'}], now=13 * 3600 + 5 * 60))\n    bar = [d for d in e.findall('div') if d.get('class') == 'progress'][0]\n    assert bar.get('role') == 'progressbar' and bar.get('aria-valuenow') == '67' and bar.find('div').get('style') == 'width: 67%'\n    assert e.find('footer').text == 'Updated 13:05 UTC · 3 tasks · 67% done'\n"
+        },
+        {
+          "id": "R5-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r5_negative():\n    e = ET.fromstring(board.render([]))\n    assert e.find('footer').text == '0 tasks · 0% done'\n    assert [d for d in e.findall('div') if d.get('class') == 'progress'][0].get('aria-valuenow') == '0'\n"
+        },
+        {
+          "id": "R5-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport board\n\n\ndef test_r5_boundary():\n    assert ET.fromstring(board.render([{'id': 1, 'title': 'A', 'status': 'done'}])).find('footer').text == '1 task · 100% done'\n    assert ET.fromstring(board.render([{'id': 1, 'title': 'A', 'status': 'done'}], now=0)).find('footer').text == 'Updated 00:00 UTC · 1 task · 100% done'\n"
+        }
+      ]
+    }
+  ]
+}

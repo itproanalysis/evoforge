@@ -1,0 +1,56 @@
+{
+  "family": "algorithmic_optimization",
+  "suite_version": "v4",
+  "tasks": [
+    {
+      "id": "SV4-AO-01",
+      "goal": "In barchart.py, render(values, height=100, bar_width=20, gap=4) returns an SVG <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"W\" height=\"HEIGHT\"> with one <rect> per value in order: rect height h = round(v / max(values) * height) (0 when every value is 0), x = i * (bar_width + gap), y = height - h, width = bar_width; W = n * (bar_width + gap) - gap, or 0 for no values. A negative value raises ValueError. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "barchart.py": "def render(values, height=100, bar_width=20, gap=4):\n    rects = \"\".join(\n        f'<rect x=\"{i * bar_width}\" y=\"0\" width=\"{bar_width}\" height=\"{v}\"/>'\n        for i, v in enumerate(values))\n    width = len(values) * bar_width\n    return f'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\">{rects}</svg>'\n\n\ndef preview():\n    return render([3, 7, 2, 9, 5])\n"
+      },
+      "reference_fix": "--- a/barchart.py\n+++ b/barchart.py\n@@ -1,9 +1,14 @@\n def render(values, height=100, bar_width=20, gap=4):\n-    rects = \"\".join(\n-        f'<rect x=\"{i * bar_width}\" y=\"0\" width=\"{bar_width}\" height=\"{v}\"/>'\n-        for i, v in enumerate(values))\n-    width = len(values) * bar_width\n-    return f'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\">{rects}</svg>'\n+    if any(v < 0 for v in values):\n+        raise ValueError(\"values must be non-negative\")\n+    top = max(values, default=0)\n+    rects = []\n+    for i, v in enumerate(values):\n+        h = round(v / top * height) if top else 0\n+        rects.append(f'<rect x=\"{i * (bar_width + gap)}\" y=\"{height - h}\" width=\"{bar_width}\" height=\"{h}\"/>')\n+    width = len(values) * (bar_width + gap) - gap if values else 0\n+    return (f'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\">'\n+            + \"\".join(rects) + \"</svg>\")\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-AO-01-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport barchart\n\n\ndef test_sv4ao01_compositional():\n    svg = ET.fromstring(barchart.render([1, 2, 4]))\n    rects = svg.findall('{http://www.w3.org/2000/svg}rect')\n    assert [r.get('height') for r in rects] == ['25', '50', '100']\n    assert [r.get('y') for r in rects] == ['75', '50', '0'] and [r.get('x') for r in rects] == ['0', '24', '48']\n    assert svg.get('width') == '68'\n"
+        },
+        {
+          "id": "SV4-AO-01-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport barchart\n\n\ndef test_sv4ao01_negative():\n    with pytest.raises(ValueError):\n        barchart.render([3, -1])\n"
+        },
+        {
+          "id": "SV4-AO-01-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport barchart\n\n\ndef test_sv4ao01_boundary():\n    zero = ET.fromstring(barchart.render([0, 0]))\n    assert [r.get('height') for r in zero.findall('{http://www.w3.org/2000/svg}rect')] == ['0', '0']\n    empty = ET.fromstring(barchart.render([]))\n    assert empty.findall('{http://www.w3.org/2000/svg}rect') == [] and empty.get('width') == '0'\n"
+        }
+      ]
+    },
+    {
+      "id": "SV4-AO-02",
+      "goal": "In sparkline.py, render(points, width=100, height=20) returns <svg xmlns=\"http://www.w3.org/2000/svg\" width=\"WIDTH\" height=\"HEIGHT\"> holding one <polyline fill=\"none\" points=\"...\"/> whose points are \"x,y\" pairs joined by single spaces, each number formatted with one decimal (f\"{x:.1f},{y:.1f}\"): x is spread evenly from 0 to width (a single point has x = 0), y = height - (p - min) / (max - min) * height, and a flat series (max == min) sits at y = height / 2. No points means no polyline. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "sparkline.py": "def render(points, width=100, height=20):\n    pts = \" \".join(f\"{i},{p}\" for i, p in enumerate(points))\n    return (f'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\">'\n            f'<polyline fill=\"none\" points=\"{pts}\"/></svg>')\n\n\ndef preview():\n    return render([4, 6, 5, 9, 7, 12, 10])\n"
+      },
+      "reference_fix": "--- a/sparkline.py\n+++ b/sparkline.py\n@@ -1,7 +1,15 @@\n def render(points, width=100, height=20):\n-    pts = \" \".join(f\"{i},{p}\" for i, p in enumerate(points))\n-    return (f'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\">'\n-            f'<polyline fill=\"none\" points=\"{pts}\"/></svg>')\n+    head = f'<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"{width}\" height=\"{height}\">'\n+    if not points:\n+        return head + \"</svg>\"\n+    lo, hi = min(points), max(points)\n+    n = len(points)\n+    pairs = []\n+    for i, p in enumerate(points):\n+        x = i * width / (n - 1) if n > 1 else 0\n+        y = height / 2 if hi == lo else height - (p - lo) / (hi - lo) * height\n+        pairs.append(f\"{x:.1f},{y:.1f}\")\n+    return head + f'<polyline fill=\"none\" points=\"{\" \".join(pairs)}\"/></svg>'\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-AO-02-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport sparkline\n\n\ndef test_sv4ao02_compositional():\n    line = ET.fromstring(sparkline.render([0, 5, 10])).find('{http://www.w3.org/2000/svg}polyline')\n    assert line.get('points') == '0.0,20.0 50.0,10.0 100.0,0.0' and line.get('fill') == 'none'\n"
+        },
+        {
+          "id": "SV4-AO-02-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport sparkline\n\n\ndef test_sv4ao02_negative():\n    assert ET.fromstring(sparkline.render([])).findall('{http://www.w3.org/2000/svg}polyline') == []\n"
+        },
+        {
+          "id": "SV4-AO-02-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport sparkline\n\n\ndef test_sv4ao02_boundary():\n    flat = ET.fromstring(sparkline.render([3, 3])).find('{http://www.w3.org/2000/svg}polyline')\n    assert flat.get('points') == '0.0,10.0 100.0,10.0'\n    assert ET.fromstring(sparkline.render([7])).find('{http://www.w3.org/2000/svg}polyline').get('points') == '0.0,10.0'\n"
+        }
+      ]
+    }
+  ]
+}

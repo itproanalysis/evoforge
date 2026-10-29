@@ -1,0 +1,56 @@
+{
+  "family": "security_sensitive",
+  "suite_version": "v4",
+  "tasks": [
+    {
+      "id": "SV4-SEC-01",
+      "goal": "In comment.py, render(author, text) returns <article class=\"comment\"><h3>AUTHOR</h3><p>TEXT</p></article>. Both values are HTML-escaped (html.escape with quote=True) so user input can never inject markup; after escaping, each newline in text becomes <br/>. An empty author shows Anonymous. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "comment.py": "def render(author, text):\n    return f'<article class=\"comment\"><h3>{author}</h3><p>{text}</p></article>'\n\n\ndef preview():\n    return \"<div>\" + render(\"ann\", \"Looks good!\") + render(\"\", \"first line\\nsecond line\") + \"</div>\"\n"
+      },
+      "reference_fix": "--- a/comment.py\n+++ b/comment.py\n@@ -1,5 +1,10 @@\n+import html\n+\n+\n def render(author, text):\n-    return f'<article class=\"comment\"><h3>{author}</h3><p>{text}</p></article>'\n+    who = html.escape(author or \"Anonymous\", quote=True)\n+    body = html.escape(text, quote=True).replace(\"\\n\", \"<br/>\")\n+    return f'<article class=\"comment\"><h3>{who}</h3><p>{body}</p></article>'\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-SEC-01-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport comment\n\n\ndef test_sv4sec01_compositional():\n    out = comment.render('ann', '<script>alert(1)</script>')\n    assert '<script>' not in out\n    e = ET.fromstring(out)\n    assert e.find('p').text == '<script>alert(1)</script>' and e.find('h3').text == 'ann'\n"
+        },
+        {
+          "id": "SV4-SEC-01-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport comment\n\n\ndef test_sv4sec01_negative():\n    assert ET.fromstring(comment.render('', 'hi')).find('h3').text == 'Anonymous'\n    assert '<img' not in comment.render('<img src=x onerror=alert(1)>', 'x')\n"
+        },
+        {
+          "id": "SV4-SEC-01-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport comment\n\n\ndef test_sv4sec01_boundary():\n    e = ET.fromstring(comment.render('a & b', 'line1\\nline2'))\n    p = e.find('p')\n    assert e.find('h3').text == 'a & b' and p.text == 'line1'\n    assert len(p.findall('br')) == 1 and p.find('br').tail == 'line2'\n"
+        }
+      ]
+    },
+    {
+      "id": "SV4-SEC-02",
+      "goal": "In link.py, render(href, label) returns <a href=\"HREF\" rel=\"noopener noreferrer\">LABEL</a> with href and label HTML-escaped. After stripping whitespace, an href with a scheme other than http, https or mailto (case-insensitive, e.g. javascript:, data:, vbscript:) is replaced by \"#\" and the link gets data-blocked=\"true\"; hrefs without a scheme (relative paths) are kept. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring; escape &, <, > and quotes in text and attributes). preview() returns a sample built with render.",
+      "files": {
+        "link.py": "def render(href, label):\n    return f'<a href=\"{href}\">{label}</a>'\n\n\ndef preview():\n    return \"<div>\" + render(\"https://example.com/docs?a=1&b=2\", \"Docs\") + render(\"javascript:alert(1)\", \"bad\") + \"</div>\"\n"
+      },
+      "reference_fix": "--- a/link.py\n+++ b/link.py\n@@ -1,5 +1,18 @@\n+import html\n+import re\n+\n+SAFE = {\"http\", \"https\", \"mailto\"}\n+\n+\n def render(href, label):\n-    return f'<a href=\"{href}\">{label}</a>'\n+    target = href.strip()\n+    m = re.match(r\"^([A-Za-z][A-Za-z0-9+.-]*):\", target)\n+    blocked = bool(m) and m.group(1).lower() not in SAFE\n+    if blocked:\n+        target = \"#\"\n+    extra = ' data-blocked=\"true\"' if blocked else \"\"\n+    return (f'<a href=\"{html.escape(target, quote=True)}\" rel=\"noopener noreferrer\"{extra}>'\n+            f'{html.escape(label, quote=True)}</a>')\n \n \n def preview():\n",
+      "heldout": [
+        {
+          "id": "SV4-SEC-02-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport link\n\n\ndef test_sv4sec02_compositional():\n    e = ET.fromstring(link.render('https://x.dev/a?b=1&c=2', 'Docs'))\n    assert e.get('href') == 'https://x.dev/a?b=1&c=2' and e.get('rel') == 'noopener noreferrer'\n    assert e.text == 'Docs' and e.get('data-blocked') is None\n"
+        },
+        {
+          "id": "SV4-SEC-02-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport link\n\n\ndef test_sv4sec02_negative():\n    e = ET.fromstring(link.render(' JavaScript:alert(1)', 'x'))\n    assert e.get('href') == '#' and e.get('data-blocked') == 'true'\n    assert ET.fromstring(link.render('data:text/html,hi', 'y')).get('href') == '#'\n"
+        },
+        {
+          "id": "SV4-SEC-02-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport link\n\n\ndef test_sv4sec02_boundary():\n    rel = ET.fromstring(link.render('/local', '<b>'))\n    assert rel.get('href') == '/local' and rel.text == '<b>' and rel.get('data-blocked') is None\n    assert ET.fromstring(link.render('MAILTO:a@b.c', 'm')).get('href') == 'MAILTO:a@b.c'\n"
+        }
+      ]
+    }
+  ]
+}

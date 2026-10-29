@@ -1027,5 +1027,81 @@
       "arena",
       ".."
     ]
+  },
+  {
+    "expected": "/v1/stream",
+    "path_segments": [
+      "v1",
+      "stream"
+    ]
+  },
+  {
+    "expected": "/v1/mcp",
+    "path_segments": [
+      "v1",
+      "mcp"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/apps",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "apps"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/runs",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "runs"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/runs/run_abc123",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "runs",
+      "run_abc123"
+    ]
+  },
+  {
+    "expected": "/v1/evolution/runs/aB0._~-x",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "runs",
+      "aB0._~-x"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evolution",
+      "runs",
+      "abc",
+      "extra"
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evolution",
+      "runs",
+      ".."
+    ]
+  },
+  {
+    "expected": null,
+    "path_segments": [
+      "v1",
+      "evolution",
+      "runs",
+      "a:b"
+    ]
   }
 ]

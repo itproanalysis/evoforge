@@ -151,6 +151,32 @@ export default function MissionControl() {
     return () => clearInterval(id);
   }, [mission?.mission_id, mission?.state, autoPoll]);
 
+  useEffect(() => {
+    if (!autoPoll) return;
+    if (typeof EventSource === "undefined") return;
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`${API_BASE}/v1/stream?wait=25`);
+    } catch {
+      return;
+    }
+    // Live updates: refresh on every streamed event. The polling loop above
+    // stays as the fallback when the stream errors.
+    es.onmessage = () => {
+      void refreshState(selectedIdRef.current);
+    };
+    es.onerror = () => {
+      try {
+        es?.close();
+      } catch {}
+    };
+    return () => {
+      try {
+        es?.close();
+      } catch {}
+    };
+  }, [autoPoll]);
+
   const fmtCents = (n: number | null | undefined) =>
     typeof n === "number" ? `${n}¢` : "—";
 
@@ -164,6 +190,10 @@ export default function MissionControl() {
         {
           k: t("metrics.validated-wvi"),
           v: String(dashboard.validated_improvements ?? 0),
+        },
+        {
+          k: t("metrics.prs-awaiting"),
+          v: String(dashboard.prs_awaiting_validation ?? 0),
         },
         { k: t("metrics.blocked-merges"), v: String(dashboard.blocked_merges) },
         { k: t("metrics.spent"), v: fmtCents(dashboard.spent_cents) },
@@ -330,6 +360,9 @@ export default function MissionControl() {
           ))
         )}
       </section>
+      {dashboard && (
+        <p className="text-xs text-text-secondary mt-2">{t("metrics.wvi-rule")}</p>
+      )}
 
       <Card className="mt-4">
         <div className="flex items-center justify-between flex-wrap gap-2">

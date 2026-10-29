@@ -1,0 +1,21 @@
+{
+  "id": "T49_arena_preview",
+  "planned_by": "Claude (Critic): North Star A4, v3.6 UX-02",
+  "goal": "T49 — Arena on sealed v3/v4 + a sandboxed preview per lane (North Star A4, v3.6 UX-02). On a visual task you must\nSEE both results side by side. Sealed v4 (evals/sealed_v4) holds 12 visual tasks: each task module has render(...)\nreturning XHTML/SVG and preview() returning a sample page built with render.\n\nAPI (services/api/evoforge/arena.py, services/api/main.py):\n- Arena accepts suite_version v1|v2|v3|v4 (arena.SUITE_VERSIONS and the ArenaRequest Literal); unknown task -> 404.\n- After a lane is scored, compute its preview when the task has one (a task file defining \"def preview(\"; use the first\n  such file in sorted path order; module name = file stem):\n  * preview_source \"candidate\": the lane's final candidate applied cleanly -> run preview() on that code;\n  * preview_source \"base\": the lane's diff was empty or did not apply -> run preview() on the untouched task files;\n  * preview_source \"none\": the task has no preview, or the preview run failed (then set preview_error).\n  Lane fields: preview_source, preview_html (string, only when the run succeeded), preview_error (short string).\n- Run preview() in a fresh subprocess, never in the API process: python -I with cwd = a sandbox copy of the files,\n  sys.path set to that directory, an environment with NO server variables (only what Python needs to start, e.g.\n  PATH/SYSTEMROOT; never MODEL_API_KEY, GITHUB_TOKEN, EVO_*, DB_URL...), a hard timeout PREVIEW_TIMEOUT_S = 10\n  (kill on expiry -> preview_error contains \"timeout\"), stdout capped at PREVIEW_MAX_BYTES = 65536 (larger ->\n  preview_source \"none\", preview_error contains \"too large\", no preview_html). preview() must return str.\n- Previews never hold held-out code or the reference fix (they are produced by candidate/base code only).\nWeb: add apps/web/components/SandboxedPreview.tsx — props {html: string, title: string}; renders\n<iframe sandbox=\"\" srcDoc={html} title={title} referrerPolicy=\"no-referrer\" /> (empty sandbox: no scripts, no same-origin,\nno forms, no top navigation), a fixed height and responsive width, and a fallback text when html is empty. Do not use\ndangerouslySetInnerHTML. Do not edit the Arena page in this task.\nTests: services/api/tests/test_muse_t49.py.",
+  "edit": [
+    "services/api/evoforge/arena.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t49.py",
+    "apps/web/components/SandboxedPreview.tsx"
+  ],
+  "context": [
+    "docs/NORTH_STAR.md",
+    "docs/V36_EXECUTION_PLAN.md",
+    "services/api/evoforge/sealed_eval.py",
+    "evals/sealed_v4/sealed_algorithmic_optimization.json",
+    "services/api/tests/test_sealed_t44_arena.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

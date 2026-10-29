@@ -127,12 +127,16 @@ async function handle(req: NextRequest, params: { path?: string[] }) {
   const base = apiBase();
   const isAdvance =
     segs.length === 4 && segs[0] === "v1" && segs[1] === "commands" && segs[3] === "advance";
-  // Query strings are forwarded only where an endpoint needs one: mission advance, and the sealed-suite
-  // catalogue version (allowlisted values only).
+  const isStream = apiPath === "/v1/stream";
+  // Query strings are forwarded only where an endpoint needs one: mission advance, the SSE
+  // live-update stream (after/limit/wait), and the sealed-suite catalogue version
+  // (allowlisted values only).
   const suiteVersion = req.nextUrl.searchParams.get("suite_version");
-  const qs = isAdvance
+  const qs = isStream
     ? (req.nextUrl.search ?? "")
-    : req.method === "GET" && apiPath === "/v1/eval/suites" && (suiteVersion === "v0" || suiteVersion === "v1" || suiteVersion === "v2")
+    : isAdvance
+    ? (req.nextUrl.search ?? "")
+    : req.method === "GET" && apiPath === "/v1/eval/suites" && (suiteVersion === "v0" || suiteVersion === "v1" || suiteVersion === "v2" || suiteVersion === "v3" || suiteVersion === "v4")
       ? `?suite_version=${suiteVersion}`
       : "";
   const target = `${base}${apiPath}${qs}`;
@@ -144,6 +148,11 @@ async function handle(req: NextRequest, params: { path?: string[] }) {
   const accept = req.headers.get("accept");
   if (accept) headers["accept"] = accept;
   if (idToken) headers["authorization"] = `Bearer ${idToken}`;
+  // EventSource reconnects carry Last-Event-ID; forward it so the SSE resume works.
+  if (isStream) {
+    const lastEventId = req.headers.get("last-event-id");
+    if (lastEventId) headers["last-event-id"] = lastEventId;
+  }
 
   let body: ArrayBuffer | undefined;
   if (req.method !== "GET" && req.method !== "HEAD") {
@@ -165,6 +174,18 @@ async function handle(req: NextRequest, params: { path?: string[] }) {
     return NextResponse.json({ error: "upstream unavailable" }, { status: 502 });
   }
 
+  if (isStream) {
+    // SSE live updates: stream the upstream body through with no buffering.
+    const outCt = upstream.headers.get("content-type") ?? "text/event-stream";
+    const streamHeaders = new Headers();
+    streamHeaders.set("content-type", outCt.includes("text/event-stream") ? outCt : "text/event-stream");
+    streamHeaders.set("cache-control", "no-cache");
+    streamHeaders.set("connection", "keep-alive");
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: streamHeaders,
+    });
+  }
   const buf = Buffer.from(await upstream.arrayBuffer());
   const outCt = upstream.headers.get("content-type") ?? "application/json";
   return new NextResponse(buf, {

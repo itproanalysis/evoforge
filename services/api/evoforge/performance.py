@@ -163,6 +163,7 @@ def make_record(*, kind: str, suite_version: str = "v0",
                 evidence: str | None = None,
                 attempts_total: int | None = None,
                 usage_missing: bool = False,
+                feedback_source: str = "heldout",
                 wilson95: list | tuple | None = None,
                 created_at: float | None = None,
                 **extra) -> dict:
@@ -187,12 +188,15 @@ def make_record(*, kind: str, suite_version: str = "v0",
         lo, hi = _qg.wilson(passed, n)
     else:
         lo, hi = float(wilson95[0]), float(wilson95[1])
+    if feedback_source not in ("heldout", "critic"):
+        raise ValueError(f"unknown feedback_source: {feedback_source!r}")
     record: dict = {
         "measurement_id": f"m_{uuid.uuid4().hex[:12]}",
         "kind": kind,
         "suite_version": suite_version,
         "model": model,
         "harness_version": harness_version,
+        "feedback_source": feedback_source,
         "n": n,
         "passed": passed,
         "pass_rate": (passed / n) if n else 0.0,

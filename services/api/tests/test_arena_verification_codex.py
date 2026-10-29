@@ -43,7 +43,7 @@ def test_no_winner_is_declared_against_an_unconfirmed_lane(monkeypatch, lane_nam
     else:
         lanes[lane_name]["outcome"] = unconfirmed
     monkeypatch.setattr(arena, "find_task", lambda *a: {"goal": "x", "heldout": [{"code": "x"}]})
-    monkeypatch.setattr(arena, "_run_lanes", lambda *a: (lanes["single"], lanes["evoforge"]))
+    monkeypatch.setattr(arena, "_run_lanes", lambda *a, **kw: (lanes["single"], lanes["evoforge"]))
     monkeypatch.setattr(arena, "_STORE", {})
     result = arena.run_arena("v2", "task", arena.BASELINE_MODEL)
     assert result["verdict"]["winner"] == "inconclusive"
@@ -125,7 +125,7 @@ def test_actual_http_job_keeps_inconclusive_verdict_and_cost_basis(monkeypatch):
                    "usage_missing": True, "cost_status": "estimated",
                    "attempts": 1, "elapsed_ms": 1, "diff": "", "events": []}
                   for _ in range(2))
-    monkeypatch.setattr(arena, "_run_lanes", lambda *a: lanes)
+    monkeypatch.setattr(arena, "_run_lanes", lambda *a, **kw: lanes)
     monkeypatch.setattr(arena, "_STORE", {})
     monkeypatch.setattr(broker_meta, "call_builder", lambda *a, **kw: pytest.fail("no model calls in HTTP contract test"))
     monkeypatch.setenv("EVO_EVAL_MAX_CENTS", "100000")

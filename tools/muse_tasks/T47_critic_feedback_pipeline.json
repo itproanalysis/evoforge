@@ -1,0 +1,18 @@
+{
+  "id": "T47_critic_feedback_pipeline",
+  "planned_by": "Claude (Critic): pipeline retries must not use held-out feedback",
+  "goal": "T47 — a pipeline whose retry feedback comes only from the independent Critic's own tests.\n\nToday services/api/evoforge/sealed_eval.py::run_pipeline feeds failing HELD-OUT test names and assertion lines back to\nthe Builder (_pipeline_feedback). Assertion lines can reveal expected values, so the pipeline score is an upper bound,\nnot what the product does. In the product the Critic writes spec-first tests and the held-out suite is only the judge.\n\nAdd a `feedback` option to run_pipeline / POST /v1/eval/pipeline / POST /v1/eval/jobs (PIPELINE) / the arena lane:\nLiteral \"heldout\" (default, current behaviour) | \"critic\".\nWith \"critic\", per task:\n1. Before the first attempt call broker_meta.call_critic(goal, \"\", \"\") with the task goal and file contents only (never\n   held-out code or names); take its sealed_tests (top-level def test_* code) as the Critic suite. Settle the Critic\n   call's usage like Builder calls (reserve before, usage-derived settle).\n2. After each Builder attempt that applies, run the Critic suite on the candidate in the sandbox (same isolation as the\n   held-out run, separate directory); if any Critic test fails, the next attempt's feedback lists only the failing Critic\n   test names and their assertion lines. If the diff is empty or does not apply, say so.\n3. The task's score is decided ONLY by the sealed held-out suite run on the final passing-Critic attempt (or the last\n   attempt); held-out results never enter feedback.\n4. Every measurement and eval result records \"feedback_source\": \"heldout\" or \"critic\" (make_record + /v1/performance\n   view + the pipeline response), so numbers from the two modes are never mixed silently.\nInvalid feedback value -> 422. Tests: services/api/tests/test_muse_t47.py. Do not weaken any existing test.",
+  "edit": [
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/evoforge/performance.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t47.py"
+  ],
+  "context": [
+    "services/api/evoforge/critic.py",
+    "services/api/evoforge/broker_meta.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider"
+  ]
+}

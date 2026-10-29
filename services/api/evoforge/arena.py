@@ -19,9 +19,13 @@ code or the reference fix.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
+import re
 import secrets
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -30,10 +34,20 @@ import uuid
 from evoforge import postgres_state as _postgres_state
 from evoforge import sealed_eval as _sealed
 
+DISCLOSURE = ("The EvoForge lane may retry using the names of failing held-out "
+              "tests, an upper-bound oracle signal the single lane does not get, "
+              "and reported costs cover only model API usage, not Runner compute.")
+
+DISCLOSURE_CRITIC = ("The EvoForge lane gets no held-out signal; it retries using only "
+                     "the independent Critic's own tests and adds one Critic call, "
+                     "and reported costs cover only model API usage, not Runner compute.")
+
 KIND = "arena"
-SUITE_VERSIONS = ("v1", "v2")
+SUITE_VERSIONS = ("v1", "v2", "v3", "v4")
 BASELINE_MODEL = "muse-spark-1.3"
 LIST_LIMIT = 20
+PREVIEW_TIMEOUT_S = 10
+PREVIEW_MAX_BYTES = 65536
 
 _STORE = None
 _FALLBACK = None
@@ -229,17 +243,19 @@ def find_task(suite_version: str, task_id: str) -> dict:
     raise UnknownTask(f"unknown task: {task_id!r}")
 
 
-def budget_worst_cents() -> int:
+def budget_worst_cents(feedback: str = "heldout") -> int:
     """Worst-case provider cost for both lanes together, in integer cents."""
-    return ((1 + _sealed.PIPELINE_MAX_ATTEMPTS)
+    extra = 1 if feedback == "critic" else 0
+    return ((1 + _sealed.PIPELINE_MAX_ATTEMPTS + extra)
             * _sealed.BASELINE_COST_CENTS)
 
 
-def check_budget() -> int:
+def check_budget(feedback: str = "heldout") -> int:
     """Refuse with BudgetExceeded before any provider call is made."""
     from evoforge import performance as _perf
 
-    return _perf.check_budget(1, 1 + _sealed.PIPELINE_MAX_ATTEMPTS,
+    extra = 1 if feedback == "critic" else 0
+    return _perf.check_budget(1, 1 + _sealed.PIPELINE_MAX_ATTEMPTS + extra,
                               _sealed.BASELINE_COST_CENTS)
 
 
@@ -261,19 +277,275 @@ def _lane_skeleton(status: str, n: int) -> dict:
             "heldout": {"passed": 0, "n": int(n)},
             "outcome": "heldout_failed", "cost_cents": 0,
             "usage_missing": None, "cost_status": "pending",
-            "elapsed_ms": 0, "diff": "", "events": []}
+            "elapsed_ms": 0, "diff": "", "events": [],
+            "preview_source": "none"}
+
+
+_PREVIEW_ENV_KEEP = ("PATH", "SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "OS",
+                     "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME",
+                     "USERPROFILE", "LANG")
+
+_PREVIEW_BOOT = (
+    "import sys; sys.path.insert(0, sys.argv[1]); "
+    "import importlib; "
+    "mod = importlib.import_module(sys.argv[2]); "
+    "out = mod.preview(); "
+    "import sys as _s; "
+    "(_s.exit('preview must return str') "
+    "if not isinstance(out, str) else _s.stdout.write(out))"
+)
+
+
+def _find_preview_module(files: dict) -> tuple[str | None, str | None]:
+    """First task file (sorted path order) defining ``def preview(``.
+
+    Returns (path, module_name) with module_name = file stem, or
+    (None, None) when the task has no preview.
+    """
+    if not isinstance(files, dict):
+        return None, None
+    for path in sorted(files):
+        content = files.get(path)
+        if isinstance(content, str) and "def preview(" in content:
+            stem = os.path.splitext(os.path.basename(path))[0]
+            return path, stem
+    return None, None
+
+
+def _preview_env() -> dict:
+    env = {k: os.environ[k] for k in _PREVIEW_ENV_KEEP if k in os.environ}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["PYTHONNOUSERSITE"] = "1"
+    return env
+
+
+def _write_preview_tree(root: str, files: dict) -> None:
+    real_root = os.path.normcase(os.path.realpath(root))
+    for path, content in files.items():
+        if not isinstance(path, str) or not path:
+            raise ValueError(f"bad preview path: {path!r}")
+        target = os.path.normcase(
+            os.path.realpath(os.path.join(root, path)))
+        try:
+            common = os.path.commonpath([real_root, target])
+        except ValueError:
+            raise ValueError(f"bad preview path: {path!r}")
+        if common != real_root:
+            raise ValueError(f"bad preview path: {path!r}")
+        if not isinstance(content, str):
+            raise ValueError(f"bad preview content: {path!r}")
+        full = os.path.join(root, path)
+        parent = os.path.dirname(full)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(full, "w", encoding="utf-8", newline="") as fh:
+            fh.write(content)
+
+
+def _run_preview_code(files: dict, module: str) -> tuple[str | None, str | None]:
+    """Run ``preview()`` in a fresh subprocess; never in the API process.
+
+    Returns (html, None) on success or (None, short_error) on failure.
+    Only candidate/base file contents are used — never held-out code or
+    the reference fix.
+    """
+    tmpdir = tempfile.mkdtemp(prefix="evoforge-arena-preview-")
+    try:
+        try:
+            _write_preview_tree(tmpdir, files)
+        except Exception as e:
+            return None, _short_error(e)
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", module or ""):
+            return None, "ValueError: bad preview module"
+        cmd = [sys.executable, "-I", "-c", _PREVIEW_BOOT, tmpdir, module]
+        try:
+            proc = subprocess.run(cmd, cwd=tmpdir, env=_preview_env(),
+                                  capture_output=True, timeout=PREVIEW_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            return None, f"TimeoutExpired: preview timeout after {PREVIEW_TIMEOUT_S}s"
+        except OSError as e:
+            return None, _short_error(e)
+        except Exception as e:
+            return None, _short_error(e)
+        out = proc.stdout if isinstance(proc.stdout, bytes) else b""
+        if len(out) > PREVIEW_MAX_BYTES:
+            return None, (f"ValueError: preview output too large "
+                           f"({len(out)} bytes)")
+        if proc.returncode != 0:
+            try:
+                err = (proc.stderr or b"").decode("utf-8", errors="replace")
+            except Exception:
+                err = ""
+            tail = " ".join(err.strip().split())[-280:] or "preview failed"
+            return None, f"RuntimeError: {tail}"[:300]
+        try:
+            return out.decode("utf-8"), None
+        except Exception as e:
+            return None, _short_error(e)
+    finally:
+        _sealed._remove_tree(tmpdir)
+
+
+def _preview_files_for_lane(task_files: dict, diff: str, applied: bool,
+                            recount: bool) -> dict:
+    """File set for the preview run: candidate code when it applied cleanly."""
+    if applied and isinstance(diff, str) and diff.strip():
+        try:
+            from evoforge import patch as _patch
+
+            base = dict(task_files)
+            changed = _patch.apply_unified_diff(base, diff, recount=recount)
+            out: dict = {}
+            for p, text in base.items():
+                out[p] = changed.get(p, text) if p in changed else text
+            for p, text in changed.items():
+                if text is None:
+                    out.pop(p, None)
+                else:
+                    out[p] = text
+            return out
+        except Exception:
+            pass
+    return dict(task_files)
+
+
+def _compute_lane_preview(task: dict, diff: str, applied: bool,
+                          recount: bool) -> dict:
+    """Preview fields for one lane (never raises, never leaks held-out code)."""
+    try:
+        files = task.get("files") if isinstance(task, dict) else None
+        if not isinstance(files, dict) or not files:
+            return {"preview_source": "none"}
+        _path, module = _find_preview_module(files)
+        if module is None:
+            return {"preview_source": "none"}
+        provisional = "candidate" if (applied and isinstance(diff, str)
+                                      and diff.strip()) else "base"
+        snap = _preview_files_for_lane(files, diff, applied, recount)
+        html, err = _run_preview_code(snap, module)
+        if err is not None or html is None:
+            out: dict = {"preview_source": "none"}
+            if err is not None:
+                out["preview_error"] = str(err)[:300]
+            return out
+        return {"preview_source": provisional, "preview_html": html}
+    except Exception as e:
+        return {"preview_source": "none",
+                "preview_error": _short_error(e)}
+
+
+def _attach_preview(lane: dict, task: dict, recount: bool) -> dict:
+    """Ensure preview fields exist on a lane dict (never raises)."""
+    try:
+        if isinstance(lane, dict) and "preview_source" not in lane:
+            diff = lane.get("diff", "")
+            if not isinstance(diff, str):
+                diff = ""
+            applied = (isinstance(diff, str) and bool(diff.strip())
+                       and lane.get("outcome") not in (
+                           "empty_diff", "apply_failed"))
+            lane.update(_compute_lane_preview(task, diff, applied, recount))
+    except Exception:
+        try:
+            lane.setdefault("preview_source", "none")
+        except Exception:
+            pass
+    return lane
+
+
+def _task_spec_hash(task: dict) -> str:
+    payload = {"goal": task.get("goal", ""),
+               "files": task.get("files", {})}
+    raw = json.dumps(payload, sort_keys=True,
+                     separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _heldout_hash(task: dict) -> str:
+    items = [{"id": h.get("id", ""), "code": h.get("code", "")}
+             for h in (task.get("heldout") or [])]
+    raw = json.dumps(items, sort_keys=True,
+                     separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _compute_base_tree_sha(task_id: str, files: dict) -> str:
+    """40-hex git tree id of the task base commit (deterministic in files)."""
+    tmp = tempfile.mkdtemp(prefix="evoforge-arena-manifest-")
+    try:
+        source, base, _future = _sealed._make_task_source_repo(
+            tmp, task_id, dict(files or {}))
+        proc = _sealed._git(source, "rev-parse", f"{base}^{{tree}}")
+        sha = (proc.stdout or "").strip() if proc.returncode == 0 else ""
+        if not re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+            raise _sealed.SealedEvalError("could not resolve base tree")
+        return sha
+    finally:
+        _sealed._remove_tree(tmp)
+
+
+def _lane_tree_sha(source: str, base: str) -> str | None:
+    try:
+        proc = _sealed._git(source, "rev-parse", f"{base}^{{tree}}")
+        sha = (proc.stdout or "").strip() if proc.returncode == 0 else ""
+        if re.fullmatch(r"[0-9a-f]{40}", sha or ""):
+            return sha
+    except Exception:
+        pass
+    return None
+
+
+def build_manifest(suite_version: str, task_id: str,
+                   model: str, task: dict,
+                   feedback: str = "heldout") -> dict:
+    """Fairness manifest: same task + same held-out tests for both lanes."""
+    if feedback not in ("heldout", "critic"):
+        raise ValueError(f"unknown feedback: {feedback!r}")
+    files = task.get("files", {}) if isinstance(task, dict) else {}
+    heldout = task.get("heldout", []) if isinstance(task, dict) else []
+    tid = task.get("id", task_id) if isinstance(task, dict) else task_id
+    critic = feedback == "critic"
+    return {
+        "comparison_mode": "same_task_same_tests_concurrent",
+        "suite_version": suite_version,
+        "task_id": task_id,
+        "task_spec_hash": _task_spec_hash(task),
+        "heldout_hash": _heldout_hash(task),
+        "heldout_count": len(heldout),
+        "base_tree_sha": _compute_base_tree_sha(
+            tid if isinstance(tid, str) else task_id, files),
+        "lanes": {
+            "single": {"model": model, "harness": "api-sealed-eval/1",
+                       "max_attempts": 1, "critic": False,
+                       "feedback": "none"},
+            "evoforge": {"model": model, "harness": "api-sealed-eval/2",
+                         "max_attempts": _sealed.PIPELINE_MAX_ATTEMPTS,
+                         "feedback": ("critic" if critic
+                                      else "heldout_failing_test_names")},
+        },
+        "cost_basis": "model_api_usage",
+        "runner_cost": "not_measured",
+        "disclosure": DISCLOSURE_CRITIC if critic else DISCLOSURE,
+    }
 
 
 def seed_running(arena_id: str, suite_version: str, task_id: str,
-                 model: str, task: dict) -> dict:
+                 model: str, task: dict,
+                 feedback: str = "heldout") -> dict:
     """Seed the ``running`` document synchronously at POST time."""
+    if feedback not in ("heldout", "critic"):
+        raise ValueError(f"unknown feedback: {feedback!r}")
     n = len(task.get("heldout") or []) if isinstance(task, dict) else 0
     goal = task.get("goal", "") if isinstance(task, dict) else ""
     now = time.time()
+    manifest = build_manifest(suite_version, task_id, model, task,
+                              feedback=feedback)
     doc = {"arena_id": arena_id, "status": "running",
            "suite_version": suite_version, "task_id": task_id,
            "model": model, "goal": goal if isinstance(goal, str) else "",
+           "feedback": feedback,
            "created_at": now, "started_at": now, "finished_at": None,
+           "manifest": manifest,
            "lanes": {"single": _lane_skeleton("running", n),
                      "evoforge": _lane_skeleton("running", n)},
            "verdict": {"winner": "tie", "reason": "arena running"},
@@ -343,15 +615,18 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
     usage_missing = False
     attempts = 0
     diff = ""
+    applied = False
     outcome = "heldout_failed"
     passed, n = 0, n_total
     failing: list[str] = []
     error = None
     status = "succeeded"
     tmpbase = tempfile.mkdtemp(prefix="evoforge-arena-single-")
+    base_tree_sha = None
     try:
         source, base, future = _sealed._make_task_source_repo(
             tmpbase, task["id"], task["files"])
+        base_tree_sha = _lane_tree_sha(source, base)
         dest = os.path.join(tmpbase, "sandbox-single")
         _sealed._build_clean_sandbox(source, base, dest, future)
         file_context = [{"path": p, "content": task["files"][p]}
@@ -377,6 +652,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
                   f"single: Builder returned a {len(diff)}-char diff")
             if _sealed._is_empty_diff(diff):
                 outcome = "empty_diff"
+                applied = False
                 passed, n = 0, n_total
                 _emit(events, "runner",
                       "single: empty diff, held-out not run")
@@ -385,6 +661,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
                 passed, n = 0, n_total
                 _emit(events, "runner", "single: candidate requires independent execution verification")
             elif _sealed._apply_candidate(dest, diff, recount=False):
+                applied = True
                 _emit(events, "runner",
                       "single: diff applied (strict hunk counts), "
                       "scoring held-out")
@@ -401,6 +678,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
                 _emit(events, "runner", detail)
             else:
                 outcome = "apply_failed"
+                applied = False
                 passed, n = 0, n_total
                 _emit(events, "runner",
                       "single: diff did not apply under strict hunk counts")
@@ -419,16 +697,33 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
                             "estimated" if usage_missing else "usage_reported"),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
+    if base_tree_sha is not None:
+        lane["base_tree_sha"] = base_tree_sha
     if failing:
         lane["failing_tests"] = list(failing)
     if error is not None:
         lane["error"] = error
+    try:
+        lane.update(_compute_lane_preview(task, diff, applied, False))
+    except Exception:
+        lane.setdefault("preview_source", "none")
     return lane
 
 
 def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
-                       max_attempts: int | None = None) -> dict:
-    """Lane ``evoforge``: pipeline attempts with failing-test-name feedback."""
+                       max_attempts: int | None = None,
+                       feedback: str = "heldout") -> dict:
+    """Lane ``evoforge``: pipeline attempts with failing-test-name feedback.
+
+    With ``feedback="critic"`` the retry signal comes only from the
+    independent Critic's own spec-first tests (T47 helpers); the sealed
+    held-out suite only judges the first attempt passing all Critic tests
+    (else the last applied attempt) and never enters feedback.
+    """
+    if feedback == "critic":
+        return _run_evoforge_lane_critic(task, model, timeout_s, max_attempts)
+    if feedback != "heldout":
+        raise ValueError(f"unknown feedback: {feedback!r}")
     t0 = time.perf_counter()
     events: list[dict] = []
     n_total = len(task["heldout"])
@@ -440,15 +735,18 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
     usage_missing = False
     attempts = 0
     diff = ""
+    applied = False
     outcome = "empty_diff"
     passed, n = 0, n_total
     failing: list[str] = []
     error = None
     status = "succeeded"
     tmpbase = tempfile.mkdtemp(prefix="evoforge-arena-evo-")
+    base_tree_sha = None
     try:
         source, base, future = _sealed._make_task_source_repo(
             tmpbase, task["id"], task["files"])
+        base_tree_sha = _lane_tree_sha(source, base)
         file_context = [{"path": p, "content": task["files"][p]}
                         for p in sorted(task["files"])]
         goal = task["goal"]
@@ -477,6 +775,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
             diff = cand if isinstance(cand, str) else ""
             if _sealed._is_empty_diff(diff):
                 outcome = "empty_diff"
+                applied = False
                 passed, n = 0, n_total
                 failing = []
                 failures = [{"test": "held-out",
@@ -489,6 +788,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                 failures = _sealed._candidate_verification_failures(diff)
                 _emit(events, "runner", "evoforge: candidate requires independent execution verification")
             elif _sealed._apply_candidate(dest, diff, recount=True):
+                applied = True
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} diff applied, "
                       "scoring held-out")
@@ -512,6 +812,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                 _emit(events, "runner", detail)
             else:
                 outcome = "apply_failed"
+                applied = False
                 passed, n = 0, n_total
                 failing = []
                 failures = [{"test": "held-out",
@@ -539,15 +840,225 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                             "estimated" if usage_missing else "usage_reported"),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
+    if base_tree_sha is not None:
+        lane["base_tree_sha"] = base_tree_sha
     if failing:
         lane["failing_tests"] = list(failing)
     if error is not None:
         lane["error"] = error
+    try:
+        lane.update(_compute_lane_preview(task, diff, applied, True))
+    except Exception:
+        lane.setdefault("preview_source", "none")
     return lane
 
 
+def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
+                              max_attempts: int | None = None) -> dict:
+    """Lane ``evoforge`` in critic mode (T47 ``feedback="critic"`` semantics)."""
+    t0 = time.perf_counter()
+    events: list[dict] = []
+    n_total = len(task["heldout"])
+    if max_attempts is None:
+        max_attempts = _sealed.PIPELINE_MAX_ATTEMPTS
+    max_attempts = max(1, min(int(max_attempts),
+                              _sealed.PIPELINE_MAX_ATTEMPTS))
+    cost = 0
+    usage_missing = False
+    attempts = 0
+    diff = ""
+    applied = False
+    outcome = "empty_diff"
+    passed, n = 0, n_total
+    failing: list[str] = []
+    error = None
+    status = "succeeded"
+    tmpbase = tempfile.mkdtemp(prefix="evoforge-arena-evo-critic-")
+    base_tree_sha = None
+    try:
+        source, base, future = _sealed._make_task_source_repo(
+            tmpbase, task["id"], task["files"])
+        base_tree_sha = _lane_tree_sha(source, base)
+        file_context = [{"path": p, "content": task["files"][p]}
+                        for p in sorted(task["files"])]
+        try:
+            _rsv, cout, cactual, _cmissing = _sealed._call_critic_suite(
+                _sealed._critic_goal_for_task(task, file_context))
+        except Exception as e:
+            error = _short_error(e)
+            status = "failed"
+            _emit(events, "critic",
+                  f"evoforge: Critic call failed ({type(e).__name__})")
+            _emit(events, "gate", "evoforge: empty_diff after 0 attempt(s)")
+            raise _DoneCriticLane()
+        cost += int(cactual)
+        usage_missing = bool(_cmissing)
+        critic_suite = _sealed._critic_suite_from_output(cout)
+        total = len(critic_suite)
+        _emit(events, "critic", f"Critic wrote {total} tests")
+        goal = task["goal"]
+        judged = False
+        last_dest: str | None = None
+        last_diff = ""
+        last_outcome = "empty_diff"
+        for _attempt in range(max_attempts):
+            dest = os.path.join(
+                tmpbase, f"sandbox-evo-critic-{secrets.token_hex(4)}")
+            _sealed._build_clean_sandbox(source, base, dest, future)
+            _emit(events, "builder",
+                  f"evoforge: Builder attempt {attempts + 1}/{max_attempts}")
+            try:
+                _rsv, out, actual, _missing = _sealed._call_pipeline_attempt(
+                    goal, base, file_context)
+            except Exception as e:
+                error = _short_error(e)
+                status = "failed"
+                _emit(events, "builder",
+                      f"evoforge: Builder call failed ({type(e).__name__})")
+                break
+            attempts += 1
+            cost += int(actual)
+            usage_missing = usage_missing or bool(_missing)
+            cand = out.get("diff") if isinstance(out, dict) else ""
+            diff = cand if isinstance(cand, str) else ""
+            if _sealed._is_empty_diff(diff):
+                applied = False
+                passed, n = 0, n_total
+                failing = []
+                last_outcome = "empty_diff"
+                outcome = "empty_diff"
+                last_diff = diff
+                _emit(events, "runner",
+                      f"evoforge: attempt {attempts} empty diff")
+                goal = _sealed._critic_empty_feedback(task["goal"])
+                continue
+            if _sealed._candidate_verification_failures(diff):
+                applied = False
+                passed, n = 0, n_total
+                failing, last_dest, last_diff = [], None, diff
+                last_outcome = outcome = "verification_inconclusive"
+                goal = task["goal"] + "\nPrevious candidate could not be independently verified."
+                continue
+            if not _sealed._apply_candidate(dest, diff, recount=True):
+                applied = False
+                passed, n = 0, n_total
+                failing = []
+                last_outcome = "apply_failed"
+                outcome = "apply_failed"
+                last_diff = diff
+                _emit(events, "runner",
+                      f"evoforge: attempt {attempts} diff did not apply")
+                goal = _sealed._critic_apply_failed_feedback(task["goal"])
+                continue
+            if critic_suite:
+                c_passed, c_n, c_failures = _score_heldout_counted(
+                    dest, critic_suite, timeout_s, tmpbase)
+            else:
+                c_passed, c_n, c_failures = 0, 0, []
+            _emit(events, "critic",
+                  f"attempt {attempts}: Critic {c_passed}/{total} passed")
+            _emit(events, "runner",
+                  f"evoforge: attempt {attempts} critic "
+                  f"{c_passed}/{total} passed")
+            if _sealed._failed_run_outcome(c_failures) == "verification_inconclusive":
+                passed, n = 0, n_total
+                failing, last_dest, last_diff = [], None, diff
+                applied = False
+                last_outcome = outcome = "verification_inconclusive"
+                goal = task["goal"] + "\nPrevious candidate could not be independently verified."
+                continue
+            if not critic_suite or (c_n >= total and c_passed == c_n):
+                h_passed, h_n, h_failures = _score_heldout_counted(
+                    dest, task["heldout"], timeout_s, tmpbase)
+                passed, n = h_passed, h_n
+                applied = True
+                last_dest = dest
+                last_diff = diff
+                if n_total > 0 and h_passed == h_n and h_n >= n_total:
+                    outcome = "passed"
+                    failing = []
+                else:
+                    outcome = _sealed._failed_run_outcome(h_failures)
+                    failing = _sealed._failing_test_names(
+                        h_failures, task["heldout"])
+                last_outcome = outcome
+                detail = (f"evoforge: attempt {attempts} held-out "
+                          f"{passed}/{n} passed")
+                if failing:
+                    detail += f" (failing: {', '.join(failing[:5])})"
+                _emit(events, "runner", detail)
+                judged = True
+                break
+            last_dest = dest
+            last_diff = diff
+            last_outcome = "heldout_failed"
+            outcome = "heldout_failed"
+            applied = False
+            passed, n = 0, n_total
+            failing = []
+            goal = _sealed._critic_feedback(
+                task["goal"],
+                c_failures or [{"test": "critic",
+                                "message": "assertion failed"}],
+                total, int(c_passed))
+        if not judged:
+            if last_dest is not None:
+                h_passed, h_n, h_failures = _score_heldout_counted(
+                    last_dest, task["heldout"], timeout_s, tmpbase)
+                passed, n = h_passed, h_n
+                diff = last_diff
+                applied = True
+                if n_total > 0 and h_passed == h_n and h_n >= n_total:
+                    outcome = "passed"
+                    failing = []
+                else:
+                    outcome = _sealed._failed_run_outcome(h_failures)
+                    failing = _sealed._failing_test_names(
+                        h_failures, task["heldout"])
+            else:
+                outcome = last_outcome
+                diff = last_diff
+                applied = False
+                passed, n = 0, n_total
+                failing = []
+        _emit(events, "gate",
+              f"evoforge: {outcome} after {attempts} attempt(s)")
+    except _DoneCriticLane:
+        pass
+    except Exception as e:
+        error = _short_error(e)
+        status = "failed"
+        _emit(events, "gate", f"evoforge: lane failed ({type(e).__name__})")
+    finally:
+        _sealed._remove_tree(tmpbase)
+    lane = {"status": status, "attempts": attempts,
+            "heldout": {"passed": int(passed), "n": int(n)},
+            "outcome": outcome, "cost_cents": int(cost),
+            "usage_missing": usage_missing,
+            "cost_status": ("incomplete" if status != "succeeded" else
+                            "estimated" if usage_missing else "usage_reported"),
+            "elapsed_ms": int((time.perf_counter() - t0) * 1000),
+            "diff": diff, "events": events}
+    if base_tree_sha is not None:
+        lane["base_tree_sha"] = base_tree_sha
+    if failing:
+        lane["failing_tests"] = list(failing)
+    if error is not None:
+        lane["error"] = error
+    try:
+        lane.update(_compute_lane_preview(task, diff, applied, True))
+    except Exception:
+        lane.setdefault("preview_source", "none")
+    return lane
+
+
+class _DoneCriticLane(Exception):
+    """Internal control flow: Critic call failed, lane already recorded."""
+
+
 def _run_lanes(task: dict, model: str,
-               timeout_s: int) -> tuple[dict, dict]:
+               timeout_s: int,
+               feedback: str = "heldout") -> tuple[dict, dict]:
     """Run both lanes concurrently in two threads."""
     out: dict[str, object] = {}
 
@@ -563,7 +1074,8 @@ def _run_lanes(task: dict, model: str,
         daemon=True)
     evo_t = threading.Thread(
         target=_target,
-        args=("evoforge", lambda: _run_evoforge_lane(task, model, timeout_s)),
+        args=("evoforge", lambda: _run_evoforge_lane(
+            task, model, timeout_s, feedback=feedback)),
         daemon=True)
     single_t.start()
     evo_t.start()
@@ -579,11 +1091,16 @@ def _run_lanes(task: dict, model: str,
         lane = _lane_skeleton("failed", len(task["heldout"]))
         lane["error"] = _short_error(evo)
         evo = lane
+    if isinstance(single, dict) and "preview_source" not in single:
+        _attach_preview(single, task, False)
+    if isinstance(evo, dict) and "preview_source" not in evo:
+        _attach_preview(evo, task, True)
     return single, evo
 
 
 def run_arena(suite_version: str, task_id: str, model: str,
-              timeout_s: int | None = None, arena_id: str = "") -> dict:
+              timeout_s: int | None = None, arena_id: str = "",
+              feedback: str = "heldout") -> dict:
     """Background worker body: run both lanes, store and return the arena.
 
     Never raises: provider or sandbox trouble is recorded as a failed
@@ -592,8 +1109,11 @@ def run_arena(suite_version: str, task_id: str, model: str,
     started = time.time()
     if timeout_s is None:
         timeout_s = _sealed.PYTEST_TIMEOUT_S
+    if feedback not in ("heldout", "critic"):
+        feedback = "heldout"
     aid = arena_id or f"arena_{uuid.uuid4().hex[:12]}"
     goal = ""
+    manifest = None
     try:
         if model != BASELINE_MODEL:
             raise ValueError(f"unknown model: {model!r}")
@@ -601,9 +1121,26 @@ def run_arena(suite_version: str, task_id: str, model: str,
             raise ValueError(f"unknown suite_version: {suite_version!r}")
         task = find_task(suite_version, task_id)
         _sealed._check_size(task["heldout"])
+        try:
+            prev = get_arena(aid)
+            if isinstance(prev, dict) and isinstance(
+                    prev.get("manifest"), dict):
+                manifest = copy.deepcopy(prev["manifest"])
+                prev_fb = prev.get("feedback")
+                if isinstance(prev_fb, str) and prev_fb in (
+                        "heldout", "critic"):
+                    feedback = prev_fb
+        except Exception:
+            manifest = None
+        if manifest is None:
+            manifest = build_manifest(suite_version, task_id, model, task,
+                                      feedback=feedback)
         maybe_goal = task.get("goal", "")
         goal = maybe_goal if isinstance(maybe_goal, str) else ""
-        single, evo = _run_lanes(task, model, timeout_s)
+        single, evo = _run_lanes(task, model, timeout_s, feedback=feedback)
+        for _lane, _recount in ((single, False), (evo, True)):
+            if isinstance(_lane, dict) and "preview_source" not in _lane:
+                _attach_preview(_lane, task, _recount)
         sp = single.get("heldout", {}).get("passed", 0)
         ep = evo.get("heldout", {}).get("passed", 0)
         try:
@@ -637,12 +1174,30 @@ def run_arena(suite_version: str, task_id: str, model: str,
         evo["error"] = error
         status = "failed"
         verdict = {"winner": "inconclusive", "reason": "arena execution failed"}
+        if manifest is None:
+            try:
+                prev = get_arena(aid)
+                if isinstance(prev, dict) and isinstance(
+                        prev.get("manifest"), dict):
+                    manifest = copy.deepcopy(prev["manifest"])
+            except Exception:
+                manifest = None
+            if manifest is None:
+                try:
+                    _t = find_task(suite_version, task_id)
+                    manifest = build_manifest(
+                        suite_version, task_id, model, _t,
+                        feedback=feedback)
+                except Exception:
+                    manifest = None
     doc = {"arena_id": aid, "status": status,
            "suite_version": suite_version, "task_id": task_id,
-           "model": model, "goal": goal,
+           "model": model, "goal": goal, "feedback": feedback,
            "created_at": started, "started_at": started,
            "finished_at": time.time(),
            "lanes": {"single": single, "evoforge": evo},
            "verdict": verdict, "error": error}
+    if manifest is not None:
+        doc["manifest"] = manifest
     _save(doc)
     return copy.deepcopy(doc)

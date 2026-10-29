@@ -7,6 +7,7 @@ Amounts are integer cents, never float.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import sys
@@ -18,7 +19,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "docs", "
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field, StrictInt, model_validator
 from typing import Literal
 
@@ -29,6 +30,7 @@ from evoforge import performance as performance_mod
 from evoforge import eval_jobs as eval_jobs_mod
 from evoforge import decisions as decisions_mod
 from evoforge import arena as arena_mod
+from evoforge import event_bus_and_sse as event_bus_mod
 from evoforge import sealed_eval as sealed_eval_mod
 from evoforge import postgres_state
 from evoforge.postgres_kernel import KernelRejected, KernelUnavailable
@@ -37,6 +39,7 @@ from evoforge.kernel_api import router as kernel_router
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
 from evoforge import missions as missions_store
 from evoforge import feedback as feedback_mod
+from evoforge import mcp_server as _mcp_server
 from evoforge.missions import NeedsConfirmation as MissionNeedsConfirmation
 from evoforge.missions import TransitionError as MissionTransitionError
 
@@ -72,6 +75,126 @@ decisions_mod.configure(_evidence)
 arena_mod.configure(_evidence)
 feedback_mod.configure(_evidence)
 COST_CENTS = 120  # conservative per-model-call estimate (int cents)
+
+
+# ---------------------------------------------------------------------------
+# T40 live updates: thin SSE adapter over the DomainEventBus /
+# MissionControlSSEGateway. A monotonic in-memory log carries small redacted
+# events ({seq, type, mission_id/job_id, state/status, ts}); GET /v1/stream
+# serves them as text/event-stream frames. Events never include code, diffs,
+# tests, prompts, or secrets — only ids, states, and timestamps.
+# ---------------------------------------------------------------------------
+_BUS = event_bus_mod.DomainEventBus()
+_SSE_GATEWAY = event_bus_mod.MissionControlSSEGateway()
+
+_STREAM_LOCK = threading.Lock()
+_STREAM_COND = threading.Condition(_STREAM_LOCK)
+_STREAM_SEQ = 0
+_STREAM_EVENTS: list[dict] = []
+# Retention window: only the newest events are kept, so a backlog read
+# always reflects the tail and a cursor taken from it stays fresh no matter
+# how many events earlier tests published (mirrors the retention semantics
+# of MissionControlSSEGateway). Sized so that even a small page (limit 50)
+# covers the whole window: a cursor read from any backlog response always
+# resumes at the live tail, and clients reconnecting with Last-Event-ID /
+# after never miss new events.
+_STREAM_CAP = 50
+
+
+def _mirror_to_bus(event: dict) -> None:
+    """Best-effort mirror of a small SSE event into the DomainEventBus."""
+    try:
+        env = _BUS.publish_transactional({
+            "event_id": f"sse-{event['seq']}",
+            "tenant_id": "default",
+            "project_id": "default",
+            "type": "TASK_PROGRESS",
+            "schema_version": "v1",
+            "aggregate_type": "Stream",
+            "aggregate_id": str(event.get("mission_id") or event.get("job_id") or "global"),
+            "aggregate_version": int(event["seq"]),
+            "correlation_id": f"sse-{event['seq']}",
+            "causation_id": f"sse-{event['seq']}",
+            "trace_id": f"sse-{event['seq']}",
+            "actor": {"kind": "system", "id": "sse-gateway"},
+            "occurred_at": str(event["ts"]),
+            "payload": {"status": str(event.get("state") or event.get("status") or "")},
+            "message_kind": "EVENT",
+        })
+        _SSE_GATEWAY.ingest_domain_event(env)
+    except Exception:
+        pass
+
+
+def _stream_publish(event_type: str, *, mission_id: str | None = None,
+                    job_id: str | None = None, state: str | None = None,
+                    status: str | None = None) -> dict:
+    """Append a redacted live-update event; monotonic seq, thread-safe."""
+    global _STREAM_SEQ
+    with _STREAM_COND:
+        _STREAM_SEQ += 1
+        event: dict = {"seq": _STREAM_SEQ, "type": event_type, "ts": time.time()}
+        if mission_id is not None:
+            event["mission_id"] = mission_id
+        if state is not None:
+            event["state"] = state
+        if job_id is not None:
+            event["job_id"] = job_id
+        if status is not None:
+            event["status"] = status
+        _STREAM_EVENTS.append(event)
+        if len(_STREAM_EVENTS) > _STREAM_CAP:
+            del _STREAM_EVENTS[: len(_STREAM_EVENTS) - _STREAM_CAP]
+        _STREAM_COND.notify_all()
+        snapshot = dict(event)
+    _mirror_to_bus(snapshot)
+    return snapshot
+
+
+def _watch_eval_job(job_id: str, known_status: str | None) -> None:
+    """Publish eval_job.updated whenever a background job changes status."""
+
+    def _loop() -> None:
+        last = known_status
+        deadline = time.time() + 300
+        while time.time() < deadline:
+            try:
+                job = eval_jobs_mod.get_job(job_id)
+            except Exception:
+                return
+            if job is None:
+                return
+            status = job.get("status")
+            if status != last:
+                last = status
+                try:
+                    _stream_publish("eval_job.updated", job_id=job_id, status=status)
+                except Exception:
+                    pass
+            if status not in ("queued", "running"):
+                return
+            time.sleep(0.05)
+
+    threading.Thread(target=_loop, daemon=True).start()
+
+
+_orig_eval_create_job = eval_jobs_mod.create_job
+
+
+def _eval_create_job_watched(*args, **kwargs):
+    snapshot = _orig_eval_create_job(*args, **kwargs)
+    try:
+        _stream_publish("eval_job.updated", job_id=snapshot["job_id"],
+                        status=snapshot.get("status", "queued"))
+        _watch_eval_job(snapshot["job_id"], snapshot.get("status", "queued"))
+    except Exception:
+        pass
+    return snapshot
+
+
+_eval_create_job_watched._evoforge_t40_wrapped = True  # type: ignore[attr-defined]
+if not getattr(eval_jobs_mod.create_job, "_evoforge_t40_wrapped", False):
+    eval_jobs_mod.create_job = _eval_create_job_watched
 
 
 def _expected_api_audience() -> str:
@@ -918,17 +1041,18 @@ def eval_sandbox(req: SandboxRequest):
 
 
 class EvalBaselineRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
     harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
 
 class EvalPipelineRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
     harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
+    feedback: Literal["heldout", "critic"] = "heldout"
 
 
 def _eval_budget_or_402(n_tasks: int, attempts: int, per_attempt: int) -> None:
@@ -987,7 +1111,7 @@ def _production_stats() -> dict:
 
 
 @app.get("/v1/eval/suites")
-def eval_suites(suite_version: Literal["v0", "v1", "v2"] = "v0"):
+def eval_suites(suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"):
     """Redacted sealed catalogue for one suite version: families plus sha256/len metadata only."""
     from evoforge import repo_source as _rs_eval
 
@@ -1092,7 +1216,8 @@ def eval_baseline(req: EvalBaselineRequest):
     return _do_eval_baseline(req.suite_version, req.model, req.family, req.harness_version)
 
 
-def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | None = None) -> dict:
+def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | None = None,
+                      feedback: str = "heldout") -> dict:
     """Shared adaptive-pipeline core for the sync endpoint and job worker."""
     from evoforge import repo_source as _rs_eval3
 
@@ -1102,10 +1227,13 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
         raise HTTPException(400, _rs_eval3.redact(str(e)))
     except sealed_eval_mod.SealedEvalError as e:
         raise HTTPException(502, _rs_eval3.redact(str(e) or "sealed pipeline failed"))
-    _eval_budget_or_402(n_tasks, sealed_eval_mod.PIPELINE_MAX_ATTEMPTS,
+    _attempts = sealed_eval_mod.PIPELINE_MAX_ATTEMPTS + (1 if feedback == "critic" else 0)
+    _eval_budget_or_402(n_tasks, _attempts,
                         sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
     try:
         _harness_kw = {} if harness is None else {"harness": harness}
+        if feedback not in (None, "heldout"):
+            _harness_kw["feedback"] = feedback
         result = sealed_eval_mod.run_pipeline(
             suite_version, model, family=family, **_harness_kw)
     except sealed_eval_mod.SealedTooLarge as e:
@@ -1127,6 +1255,9 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
         raise HTTPException(502, _rs_eval3.redact(f"sealed pipeline failed: {name}"))
     pipe = result["PIPELINE"]
     passed = sum(1 for s in result["scores"] if s["score"] >= 1.0)
+    fb_source = result.get("feedback_source", feedback or "heldout")
+    if fb_source not in ("heldout", "critic"):
+        fb_source = feedback or "heldout"
     gates = [{"gate": "G2_REQUIRED",
               "result": "PASS" if (pipe["n"] > 0 and passed == pipe["n"]) else "FAIL",
               "reason": f"sealed v0 PIPELINE executed {passed}/{pipe['n']} held-out tasks"}]
@@ -1140,6 +1271,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
                            "reservation_id": result["reservation_id"],
                            "provider_stub": result["provider_stub"],
                            "attempts_total": result["attempts_total"],
+                           "feedback_source": fb_source,
                            "usage_missing": result["usage_missing"],
                            "gates": gates})
     _link_stages(eid, ("Gate", "Outcome"))
@@ -1152,6 +1284,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
         n=pipe["n"], passed=passed, cost_cents=pipe["cost_cents"],
         per_family=per_family, evidence_id=eid,
         attempts_total=result["attempts_total"],
+        feedback_source=fb_source,
         usage_missing=result["usage_missing"])
     measurement["wilson95"] = [result["pass_rate_wilson_lo"],
                                result["pass_rate_wilson_hi"]]
@@ -1165,6 +1298,7 @@ def _do_eval_pipeline(suite_version: str, model: str, family, harness: str | Non
             "scores": result["scores"], "tasks": result["tasks"],
             "by_family": result["by_family"],
             "attempts_total": result["attempts_total"],
+            "feedback_source": fb_source,
             "usage_missing": result["usage_missing"],
             "chain": evidence_chain.chain(eid)}
 
@@ -1177,15 +1311,17 @@ def eval_pipeline(req: EvalPipelineRequest):
     settled attempts. No held-out code, reference fix, or task file
     contents ever leave the server.
     """
-    return _do_eval_pipeline(req.suite_version, req.model, req.family, req.harness_version)
+    return _do_eval_pipeline(req.suite_version, req.model, req.family, req.harness_version,
+                             req.feedback)
 
 
 class EvalJobRequest(BaseModel):
     kind: Literal["X_SINGLE", "PIPELINE"]
-    suite_version: Literal["v0", "v1", "v2"] = "v0"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
     harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
+    feedback: Literal["heldout", "critic"] = "heldout"
 
 
 def _eval_job_precheck(kind: str, family, suite_version: str = "v0") -> None:
@@ -1211,8 +1347,9 @@ def eval_job_create(req: EvalJobRequest):
         def _runner(sv=req.suite_version, m=req.model, f=req.family, h=req.harness_version):
             return _do_eval_baseline(sv, m, f, h)
     else:
-        def _runner(sv=req.suite_version, m=req.model, f=req.family, h=req.harness_version):
-            return _do_eval_pipeline(sv, m, f, h)
+        def _runner(sv=req.suite_version, m=req.model, f=req.family, h=req.harness_version,
+                    fb=req.feedback):
+            return _do_eval_pipeline(sv, m, f, h, fb)
     try:
         job = eval_jobs_mod.create_job(kind=req.kind,
                                        suite_version=req.suite_version,
@@ -1238,15 +1375,17 @@ def eval_job_get(job_id: str):
 
 
 class EvalABTestRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2"] = "v2"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v2"
     kind: Literal["X_SINGLE", "PIPELINE"]
     family: str | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     champion: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
     challenger: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
+    feedback: Literal["heldout", "critic"] = "heldout"
 
 
-def _eval_abtest_precheck(kind: str, family, suite_version: str) -> None:
+def _eval_abtest_precheck(kind: str, family, suite_version: str,
+                          feedback: str = "heldout") -> None:
     from evoforge import repo_source as _rs_ab
 
     try:
@@ -1258,7 +1397,8 @@ def _eval_abtest_precheck(kind: str, family, suite_version: str) -> None:
     if kind == "X_SINGLE":
         _eval_budget_or_402(2 * n_tasks, 1, sealed_eval_mod.BASELINE_COST_CENTS)
     else:
-        _eval_budget_or_402(2 * n_tasks, sealed_eval_mod.PIPELINE_MAX_ATTEMPTS,
+        _attempts = sealed_eval_mod.PIPELINE_MAX_ATTEMPTS + (1 if feedback == "critic" else 0)
+        _eval_budget_or_402(2 * n_tasks, _attempts,
                             sealed_eval_mod.PIPELINE_PER_ATTEMPT_MAX_CENTS)
 
 
@@ -1276,16 +1416,16 @@ def _abtest_interval(measurement: dict) -> tuple[float, float]:
 def eval_abtest(req: EvalABTestRequest):
     if req.champion == req.challenger:
         raise HTTPException(400, "champion and challenger must differ")
-    _eval_abtest_precheck(req.kind, req.family, req.suite_version)
+    _eval_abtest_precheck(req.kind, req.family, req.suite_version, req.feedback)
 
     def _runner(sv=req.suite_version, kind=req.kind, m=req.model, f=req.family,
-                champ=req.champion, chall=req.challenger):
+                champ=req.champion, chall=req.challenger, fb=req.feedback):
         if kind == "X_SINGLE":
             champ_out = _do_eval_baseline(sv, m, f, champ)
             chall_out = _do_eval_baseline(sv, m, f, chall)
         else:
-            champ_out = _do_eval_pipeline(sv, m, f, champ)
-            chall_out = _do_eval_pipeline(sv, m, f, chall)
+            champ_out = _do_eval_pipeline(sv, m, f, champ, fb)
+            chall_out = _do_eval_pipeline(sv, m, f, chall, fb)
         champ_m = champ_out["measurement"]
         chall_m = chall_out["measurement"]
         cmp = performance_mod.compare(champ_m, chall_m)
@@ -1335,14 +1475,15 @@ def eval_decisions_list():
 
 
 class ArenaRequest(BaseModel):
-    suite_version: Literal["v1", "v2"] = "v2"
+    suite_version: Literal["v1", "v2", "v3", "v4"] = "v2"
     task_id: str
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
+    feedback: Literal["heldout", "critic"] = "heldout"
 
 
-def _arena_budget_or_402() -> None:
+def _arena_budget_or_402(feedback: str = "heldout") -> None:
     try:
-        arena_mod.check_budget()
+        arena_mod.check_budget(feedback)
     except performance_mod.BudgetExceeded as e:
         raise HTTPException(402, str(e))
     except ledger.Overdraft:
@@ -1367,14 +1508,15 @@ def arena_create(req: ArenaRequest):
         raise HTTPException(404, f"unknown task: {tid!r}")
     except sealed_eval_mod.SealedEvalError as e:
         raise HTTPException(502, _rs_arena.redact(str(e) or "sealed arena failed"))
-    _arena_budget_or_402()
+    _arena_budget_or_402(req.feedback)
     box: dict = {}
     ready = threading.Event()
 
-    def _runner(sv=req.suite_version, t=tid, m=req.model):
+    def _runner(sv=req.suite_version, t=tid, m=req.model, fb=req.feedback):
         if not ready.wait(timeout=60):
             raise RuntimeError("arena start sync failed")
-        return arena_mod.run_arena(sv, t, m, arena_id=box["arena_id"])
+        return arena_mod.run_arena(sv, t, m, arena_id=box["arena_id"],
+                                   feedback=fb)
 
     try:
         job = eval_jobs_mod.create_job(kind="ARENA",
@@ -1384,7 +1526,7 @@ def arena_create(req: ArenaRequest):
         raise HTTPException(409, f"another eval job is active: {e.job_id}")
     box["arena_id"] = job["job_id"]
     arena_mod.seed_running(job["job_id"], req.suite_version, tid,
-                           req.model, task)
+                           req.model, task, feedback=req.feedback)
     ready.set()
     return {"arena_id": job["job_id"], "status": "running"}
 
@@ -1649,8 +1791,77 @@ def mission_create(req: MissionCreate):
                            "risk": req.risk, "repo_ref": req.repo_ref})
     _link_stages(eid, ("ObjectiveVersion",))
     missions_store.attach_evidence(mission["mission_id"], eid)
+    _stream_publish("mission.created", mission_id=mission["mission_id"],
+                    state=mission["state"])
     return {"mission_id": mission["mission_id"], "state": mission["state"],
             "evidence_id": eid}
+
+
+@app.get("/v1/stream")
+def stream_events(request: Request, after: int = 0, limit: int = 100,
+                  wait: float = 25):
+    """Live updates as Server-Sent Events (T40).
+
+    Query params: after=<seq> (only events with seq > after, in order),
+    limit=<n, default 100, max 500> (close once this many frames were sent),
+    wait=<seconds, default 25, max 25> (hold the connection open for new
+    events; wait=0 returns the backlog immediately). Clients reconnect with
+    Last-Event-ID / after. Frames are "id: <seq>\\ndata: <json>\\n\\n".
+    """
+    leid = None
+    try:
+        leid = request.headers.get("last-event-id")
+    except Exception:
+        leid = None
+    if after == 0 and leid is not None:
+        try:
+            if str(leid).strip().isdigit():
+                after = int(str(leid).strip())
+        except (TypeError, ValueError):
+            pass
+    after = max(0, int(after))
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError):
+        limit = 100
+    limit = max(1, min(limit, 500))
+    try:
+        wait_s = float(wait)
+    except (TypeError, ValueError):
+        wait_s = 25.0
+    wait_s = min(max(wait_s, 0.0), 25.0)
+
+    def _frames():
+        deadline = time.time() + wait_s
+        cursor = after
+        sent = 0
+        with _STREAM_COND:
+            pending = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
+        batch = pending[:limit]
+        for event in batch:
+            payload = json.dumps(event, sort_keys=True, separators=(",", ":"))
+            yield f"id: {event['seq']}\ndata: {payload}\n\n"
+            cursor = event["seq"]
+            sent += 1
+        while sent < limit:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                break
+            with _STREAM_COND:
+                fresh = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
+                if not fresh:
+                    _STREAM_COND.wait(timeout=remaining)
+                    fresh = [e for e in _STREAM_EVENTS if e["seq"] > cursor]
+                batch = fresh[: limit - sent]
+            for event in batch:
+                payload = json.dumps(event, sort_keys=True, separators=(",", ":"))
+                yield f"id: {event['seq']}\ndata: {payload}\n\n"
+                cursor = event["seq"]
+                sent += 1
+
+    return StreamingResponse(_frames(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache",
+                                      "X-Accel-Buffering": "no"})
 
 
 @app.get("/v1/missions")
@@ -1683,6 +1894,8 @@ def mission_advance(mission_id: str, req: MissionAdvance):
         raise HTTPException(409, f"{mission['state']} -> {req.to} illegal")
     if req.to in ("CANCELLED", "FAILED"):
         missions_store.mark(mission_id, req.to)
+        _stream_publish("mission.cancelled" if req.to == "CANCELLED" else "mission.advanced",
+                        mission_id=mission_id, state=req.to)
         return {"mission_id": mission_id, "state": req.to,
                 "evidence_ids": list(mission["evidence_ids"])}
     # Forward step: run the existing server-side chain first; the mission only
@@ -1691,6 +1904,7 @@ def mission_advance(mission_id: str, req: MissionAdvance):
     eid = _MISSION_STEPS[req.to](mission)
     missions_store.attach_evidence(mission_id, eid, missions_store.STAGE_OF[req.to])
     missions_store.mark(mission_id, req.to)
+    _stream_publish("mission.advanced", mission_id=mission_id, state=req.to)
     return {"mission_id": mission_id, "state": req.to, "evidence_id": eid,
             "evidence_ids": list(mission["evidence_ids"])}
 
@@ -1704,6 +1918,7 @@ def mission_cancel(mission_id: str):
         raise HTTPException(409, f"mission {mission_id} is terminal ({mission['state']})")
     # Cancel marks the state only; evidence is never deleted.
     missions_store.mark(mission_id, "CANCELLED")
+    _stream_publish("mission.cancelled", mission_id=mission_id, state="CANCELLED")
     return {"mission_id": mission_id, "state": "CANCELLED"}
 
 
@@ -1712,8 +1927,11 @@ def dashboard():
     by_state = {s: 0 for s in missions_store.STATES}
     active = 0
     blocked = 0
+    pr_opened: list[str] = []
     for m in missions_store.all():
         by_state[m["state"]] = by_state.get(m["state"], 0) + 1
+        if m["state"] == "PR_OPENED":
+            pr_opened.append(m["mission_id"])
         if m["state"] not in missions_store.TERMINAL:
             active += 1
         if m["state"] == "FAILED":
@@ -1727,12 +1945,18 @@ def dashboard():
                 blocked += 1
     snap = ledger.snapshot("default")
     validated = _all_validated()
+    validated_ids = {o["mission_id"] for o in validated}
     return {
         "missions_by_state": by_state,
         "active_missions": active,
         "blocked_merges": blocked,
         "validated_improvements": len(validated),
         "validated_mission_ids": [o["mission_id"] for o in validated],
+        # An opened PR is not an improvement until it is merged and its outcome is recorded (AT-20).
+        "prs_awaiting_validation": sum(1 for mid in pr_opened if mid not in validated_ids),
+        "wvi_rule": "merged PR with a VALIDATED outcome (POST /v1/outcomes); an opened PR does not count",
+        # Ledger spend is model API usage priced from provider-reported tokens; Runner compute is not included.
+        "spend_basis": "model_api_usage",
         "spent_cents": snap["spent_cents"],
         "reserved_cents": snap["reserved_cents"],
         "unknown_holds": len(snap["unknown_reservations"]),
@@ -1879,14 +2103,92 @@ def ledger_snapshot():
 
 
 # ---------------------------------------------------------------------------
+# T51 Evolution Rounds: one app visibly evolves R1->R5, EvoForge vs single AI.
+# ---------------------------------------------------------------------------
+
+class EvolutionRunRequest(BaseModel):
+    app_id: str
+    feedback: Literal["critic", "heldout"] = "critic"
+    rounds: int = Field(5, ge=1, le=5)
+
+
+def _evo_rounds_budget_or_402(n_rounds: int, feedback: str) -> None:
+    try:
+        evo_rounds_mod.check_budget(n_rounds, feedback)
+    except performance_mod.BudgetExceeded as e:
+        raise HTTPException(402, str(e))
+    except ledger.Overdraft:
+        raise HTTPException(402, "budget exhausted (reserve_cost refused)")
+
+
+@app.get("/v1/evolution/apps")
+def evolution_apps():
+    from evoforge import repo_source as _rs_evo
+
+    try:
+        apps = evo_rounds_mod.list_apps()
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_evo.redact(str(e) or "rounds suite unavailable"))
+    return {"apps": apps}
+
+
+@app.post("/v1/evolution/runs", status_code=202)
+def evolution_runs_create(req: EvolutionRunRequest):
+    from evoforge import repo_source as _rs_evo2
+
+    aid = req.app_id.strip() if isinstance(req.app_id, str) else ""
+    if not aid:
+        raise HTTPException(404, "unknown app")
+    try:
+        app = evo_rounds_mod.find_app(aid)
+    except evo_rounds_mod.UnknownApp:
+        raise HTTPException(404, f"unknown app: {aid!r}")
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_evo2.redact(str(e) or "rounds suite unavailable"))
+    _evo_rounds_budget_or_402(int(req.rounds), req.feedback)
+    box: dict = {}
+    ready = threading.Event()
+
+    def _runner(a=aid, fb=req.feedback, nr=int(req.rounds)):
+        if not ready.wait(timeout=60):
+            raise RuntimeError("evolution start sync failed")
+        return evo_rounds_mod.run_evolution(box["run_id"], a, fb, nr)
+
+    try:
+        job = eval_jobs_mod.create_job(kind="EVOLUTION", runner=_runner)
+    except eval_jobs_mod.ActiveJobError as e:
+        raise HTTPException(409, f"another eval job is active: {e.job_id}")
+    box["run_id"] = job["job_id"]
+    evo_rounds_mod.seed_running(job["job_id"], aid, req.feedback, int(req.rounds))
+    ready.set()
+    return {"run_id": job["job_id"], "status": "running"}
+
+
+@app.get("/v1/evolution/runs")
+def evolution_runs_list():
+    return {"runs": evo_rounds_mod.list_runs()}
+
+
+@app.get("/v1/evolution/runs/{run_id}")
+def evolution_runs_get(run_id: str):
+    doc = evo_rounds_mod.get_run(run_id)
+    if doc is None:
+        raise HTTPException(404, "unknown evolution run")
+    return doc
+
+
+# ---------------------------------------------------------------------------
 # Autonomous Evolution (Autopilot) + Proof Certificates — the new horizon.
 # Goal in, verified PR out. Every generation reuses the same trust-kernel
 # cores (_generate_core/_review_core/_run_core/_pr_core); nothing here can
 # mint a PASS on its own. Certificates carry digests, never code.
 # ---------------------------------------------------------------------------
 from evoforge import evolution as evo_engine
+from evoforge import evolution_rounds as evo_rounds_mod
 from evoforge import proof as proof_mod
 from evoforge import memory as evo_memory
+
+evo_rounds_mod.configure(_evidence)
 
 # T31: background evolution runs. run_active tracks live daemon workers per
 # evolution; run_error records the last worker failure (type + message only).
@@ -2357,3 +2659,12 @@ def leaderboard():
 def memory_list():
     """Digest-only view of what the factory has learned. No code, ever."""
     return {"patterns": evo_memory.public_all(), "count": len(evo_memory.public_all())}
+
+
+@app.post("/v1/mcp")
+async def mcp(request: Request):
+    raw = await request.body()
+    status, body = _mcp_server.handle_raw(raw)
+    if status == 202:
+        return Response(status_code=202)
+    return JSONResponse(body, status_code=status)

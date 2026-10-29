@@ -1,0 +1,21 @@
+{
+  "id": "T40_sse_stream",
+  "planned_by": "Claude (Critic): gap review R12-1/R27-1/R44-1 — event bus module never wired",
+  "goal": "T40 — live updates: wire the existing event bus into an SSE endpoint and use it in Mission Control.\n\nservices/api/evoforge/event_bus_and_sse.py has DomainEventBus and MissionControlSSEGateway (tested, never called from\nmain.py). Use them (or a thin adapter over them):\n1. main.py: publish a small event whenever a mission is created/advanced/cancelled and when an eval job changes status:\n   {seq (monotonic int), type (\"mission.created\"|\"mission.advanced\"|\"mission.cancelled\"|\"eval_job.updated\"),\n   mission_id / job_id, state/status, ts}. Never include code, diffs, tests, prompts or secrets.\n2. GET /v1/stream?after=<seq>&limit=<n, default 100, max 500>&wait=<seconds, default 25, max 25>: text/event-stream\n   frames \"id: <seq>\ndata: <json>\n\n\" for events with seq > after, in order; returns early once `limit` frames were\n   sent, otherwise keeps the connection open up to `wait` seconds for new events, then closes (clients reconnect with\n   Last-Event-ID / after). wait=0 returns immediately with the backlog.\n3. Web: apps/web/lib/proxyPolicy.ts (+ cases) allow GET /v1/stream; the proxy route streams upstream.body through with\n   content-type text/event-stream (no buffering) for that path; Mission Control (apps/web/app/[locale]/page.tsx) opens\n   an EventSource on /api/evoforge/v1/stream and refreshes on events, falling back to the existing polling when the\n   stream errors.\nTests: services/api/tests/test_muse_t40.py.",
+  "edit": [
+    "services/api/main.py",
+    "services/api/tests/test_muse_t40.py",
+    "apps/web/lib/proxyPolicy.ts",
+    "apps/web/lib/proxyPolicy.cases.json",
+    "apps/web/app/api/evoforge/[...path]/route.ts",
+    "apps/web/app/[locale]/page.tsx"
+  ],
+  "context": [
+    "services/api/evoforge/event_bus_and_sse.py",
+    "services/api/evoforge/eval_jobs.py"
+  ],
+  "check": [
+    "python -m pytest services/api -q -p no:cacheprovider",
+    "cd apps\\web && node node_modules\\typescript\\bin\\tsc --noEmit --incremental false -p ."
+  ]
+}
