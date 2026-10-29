@@ -241,20 +241,17 @@ export default function ArenaPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <span className="text-3xl">⚔️</span>
             <h1 className="text-2xl font-bold text-text-primary">{t("heading")}</h1>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-500/30">
-              North Star A1/A2
-            </span>
           </div>
           <p className="text-sm text-text-secondary mt-1">{t("description")}</p>
         </div>
 
         {/* Task Selection & Run Action */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-text-secondary font-medium">{t("suite-version")}:</label>
+          <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+            <label className="text-xs text-text-secondary font-medium shrink-0">{t("suite-version")}:</label>
             <select
               value={suiteVersion}
               onChange={(e) => {
@@ -262,7 +259,7 @@ export default function ArenaPage() {
                 setSuiteVersion(sv);
                 setSelectedTaskId(BENCHMARK_TASKS[sv]?.[0]?.id || "");
               }}
-              className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary"
+              className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary flex-1 min-w-0 sm:flex-none"
               disabled={running}
             >
               <option value="v4">Sealed v4 (12 tasks)</option>
@@ -272,12 +269,12 @@ export default function ArenaPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-text-secondary font-medium">{t("feedback-label")}:</label>
+          <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+            <label className="text-xs text-text-secondary font-medium shrink-0">{t("feedback-label")}:</label>
             <select
               value={feedback}
               onChange={(e) => setFeedback(e.target.value as "heldout" | "critic")}
-              className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary"
+              className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary flex-1 min-w-0 sm:flex-none"
               disabled={running}
               aria-label={t("feedback-label")}
             >
@@ -286,15 +283,15 @@ export default function ArenaPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-text-secondary font-medium">{t("select-task")}:</label>
+          <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+            <label className="text-xs text-text-secondary font-medium shrink-0">{t("select-task")}:</label>
             <select
               value={selectedTaskId}
               onChange={(e) => {
                 setSelectedTaskId(e.target.value);
                 setCustomTaskId("");
               }}
-              className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary max-w-xs"
+              className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary flex-1 min-w-0 sm:flex-none sm:max-w-xs"
               disabled={running}
             >
               {BENCHMARK_TASKS[suiteVersion]?.map((tk) => (

@@ -242,7 +242,7 @@ export default function Lab() {
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             placeholder={t("goal-placeholder")}
-            className="ml-2 w-[420px]"
+            className="sm:ml-2 w-full max-w-[420px]"
           />
         </label>
         <h3 className="text-lg font-semibold mt-4">{t("candidate-diff")}</h3>
@@ -273,7 +273,7 @@ export default function Lab() {
               value={repo}
               onChange={(e) => setRepo(e.target.value)}
               placeholder={t("repo-path-placeholder")}
-              className="ml-2 w-[280px]"
+              className="sm:ml-2 w-full max-w-[280px]"
             />
           </label>
           <label className="text-xs text-text-secondary">
@@ -281,7 +281,7 @@ export default function Lab() {
             <Input
               value={baseSha}
               onChange={(e) => setBaseSha(e.target.value)}
-              className="ml-2 w-[140px]"
+              className="sm:ml-2 w-full max-w-[140px]"
             />
           </label>
         </div>
