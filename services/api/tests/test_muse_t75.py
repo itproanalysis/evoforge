@@ -81,6 +81,7 @@ class _Stubs:
         self.builder_goals = []
         self.delay = delay
         self.diff = _hello_world_diff()
+        self.reference_diff = _hello_world_diff()
         self.judge_codes = list(judge_codes)
         self.judged = False
         monkeypatch.setattr(broker_meta, "call_builder", self.builder)
@@ -88,6 +89,11 @@ class _Stubs:
 
     def builder(self, goal, sha, file_context=None, **k):
         self.builder_goals.append(goal)
+        if arena_prompt.REFERENCE_MARKER in (goal or ""):
+            time.sleep(0)
+            return {"diff": self.reference_diff, "tests": [], "rationale": "x",
+                    "stub": False, "model": "muse-spark-1.3",
+                    "provider_calls": [], "usage": dict(USAGE)}
         time.sleep(self.delay)
         return {"diff": self.diff, "tests": [], "rationale": "x",
                 "stub": False, "model": "muse-spark-1.3",

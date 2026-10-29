@@ -45,6 +45,12 @@ JUDGE_SENTENCE = ("Independent Critic wrote acceptance tests from the prompt "
 BASELINE_MODEL = "muse-spark-1.3"
 COMPARISON_MODE = "user_prompt_same_template"
 
+REFERENCE_MARKER = "Judge reference build"
+
+
+def build_reference_goal(lane_goal: str) -> str:
+    return f"{REFERENCE_MARKER}\n\n{lane_goal}"
+
 
 def build_judge_goal(prompt: str) -> str:
     return f"{prompt}\n\n{JUDGE_INSTRUCTION}"
@@ -413,6 +419,90 @@ def _filter_on_template(suite: list[dict], timeout_s: int) -> tuple[list[dict], 
         _sealed._remove_tree(tmpbase)
 
 
+def _build_judge_reference(lane_goal: str) -> tuple[int, str]:
+    """ONE Builder call implementing the lanes' goal for judge checking.
+
+    Returns ``(cost_cents, diff)``; the diff is applied tolerantly by the
+    caller and each kept test must pass on the result to stay scored.
+    """
+    ref_goal = build_reference_goal(lane_goal)
+    file_context = [{"path": "app.py", "content": TEMPLATE}]
+    tmpbase = tempfile.mkdtemp(prefix="evoforge-prompt-refbuild-")
+    try:
+        _source, base, _future = _sealed._make_task_source_repo(
+            tmpbase, "prompt", {"app.py": TEMPLATE})
+        _rsv, out, actual, _missing = _sealed._call_builder_task(
+            ref_goal, base, file_context)
+    finally:
+        _sealed._remove_tree(tmpbase)
+    diff = out.get("diff") if isinstance(out, dict) else ""
+    if not isinstance(diff, str):
+        diff = ""
+    return int(actual), diff
+
+
+def _filter_on_reference(suite: list[dict], ref_files: dict,
+                         timeout_s: int) -> tuple[list[dict], int]:
+    """Keep entries that pass on the judge reference build.
+
+    Fail closed: a test that could not be run on the reference is dropped, so only verified tests are scored.
+    """
+    if not suite:
+        return [], 0
+    files = dict(ref_files or {})
+    if _runner_client.runner_url():
+        kept: list[dict] = []
+        dropped = 0
+        for entry in suite:
+            code = entry.get("code", "") if isinstance(entry, dict) else ""
+            if not isinstance(code, str) or not code.strip():
+                continue
+            try:
+                res = _runner_client.run_files(dict(files),
+                                               [{"code": code}], timeout_s)
+                held = res.get("heldout", {})
+                n = held.get("n", 0) if isinstance(held, dict) else 0
+                passed = held.get("pass", 0) if isinstance(held, dict) else 0
+            except Exception:
+                dropped += 1  # unverified on the reference -> not scored (fail closed)
+                continue
+            if n >= 1 and passed == n:
+                kept.append({"code": code})
+            else:
+                dropped += 1
+        return kept, dropped
+    tmpbase = tempfile.mkdtemp(prefix="evoforge-prompt-refcheck-")
+    try:
+        source, base, future = _sealed._make_task_source_repo(
+            tmpbase, "prompt-reference", files)
+        kept: list[dict] = []
+        dropped = 0
+        for entry in suite:
+            code = entry.get("code", "") if isinstance(entry, dict) else ""
+            if not isinstance(code, str) or not code.strip():
+                continue
+            dest = os.path.join(
+                tmpbase, f"sandbox-refcheck-{uuid.uuid4().hex[:6]}")
+            try:
+                _sealed._build_clean_sandbox(source, base, dest, future)
+            except Exception:
+                dropped += 1  # unverified on the reference -> not scored (fail closed)
+                continue
+            try:
+                passed, n, _fail = _arena._score_heldout_counted(
+                    dest, [{"code": code}], timeout_s, tmpbase)
+            except Exception:
+                dropped += 1  # unverified on the reference -> not scored (fail closed)
+                continue
+            if n >= 1 and passed == n:
+                kept.append({"code": code})
+            else:
+                dropped += 1
+        return kept, dropped
+    finally:
+        _sealed._remove_tree(tmpbase)
+
+
 def _passes_on_files(files: dict, code: str, timeout_s: int,
                      tmpbase: str, source: str, base: str,
                      future: list) -> bool | None:
@@ -715,18 +805,31 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
             _sealed._check_size(critic_suite)
         except Exception:
             pass
-        kept, dropped = _filter_on_template(critic_suite, timeout_s)
-        manifest = _manifest_with_acceptance(manifest, kept, dropped, 0,
-                                             len(kept))
-        goal = _goal_with_interface(goal, kept)
+        kept, template_dropped = _filter_on_template(critic_suite,
+                                                           timeout_s)
+        lane_goal = _goal_with_interface(goal, kept)
+        try:
+            ref_cost, ref_diff = _build_judge_reference(lane_goal)
+        except Exception:
+            ref_cost, ref_diff = 0, ""
+        ref_files = _final_files({"app.py": TEMPLATE}, ref_diff, True)
+        scored, ref_dropped = _filter_on_reference(kept, ref_files,
+                                                   timeout_s)
+        judge_cost += int(ref_cost)
+        manifest = _manifest_with_acceptance(manifest, scored,
+                                             template_dropped, 0,
+                                             len(scored))
+        manifest["reference_checked"] = True
+        manifest["acceptance_reference_dropped"] = int(ref_dropped)
+        goal = lane_goal
         task = {"id": "prompt", "goal": goal,
-                "files": {"app.py": TEMPLATE}, "heldout": list(kept)}
+                "files": {"app.py": TEMPLATE}, "heldout": list(scored)}
         _arena._live_init(arena_id)
         try:
             _names = _sealed._heldout_test_names(task["heldout"])
         except Exception:
             _names = []
-        judge_events = [_push_judge_event(arena_id, len(kept))]
+        judge_events = [_push_judge_event(arena_id, len(scored))]
         try:
             _sealed._check_size(task["heldout"])
         except Exception:
@@ -750,10 +853,11 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
             sp, ep = int(sp), int(ep)
         except (TypeError, ValueError):
             sp, ep = 0, 0
-        if len(kept) < 3:
+        if len(scored) < 3:
             verdict = {"winner": "unscorable",
-                       "reason": (f"unscorable: only {len(kept)} acceptance "
-                                  "tests remained after filtering")}
+                       "reason": (f"unscorable: only {len(scored)} acceptance "
+                                  "tests remained after checking against "
+                                  "the judge reference build")}
             status = "succeeded"
             error = None
         else:
@@ -803,8 +907,8 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
                                single_apply == "tolerant")
         e_files = _final_files(start, evo.get("diff", "")
                                if isinstance(evo, dict) else "", True)
-        _save_private(arena_id, s_files, e_files, list(kept)
-                      if "kept" in locals() else [])
+        _save_private(arena_id, s_files, e_files, list(scored)
+                      if "scored" in locals() else [])
     except Exception:
         pass
     return copy.deepcopy(doc)
