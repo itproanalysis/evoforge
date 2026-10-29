@@ -787,3 +787,38 @@ export function listEvolutionRuns() {
 export function getEvolutionRun(id: string) {
   return req<EvolutionRun>(`/v1/evolution/runs/${encodeURIComponent(id)}`);
 }
+
+export interface EvolutionAppSummary {
+  app_id: string;
+  title?: string;
+  [key: string]: unknown;
+}
+
+export function listEvolutionApps() {
+  return req<{ apps: EvolutionAppSummary[] }>("/v1/evolution/apps");
+}
+
+export interface StartEvolutionRunResult {
+  status: number;
+  body: unknown;
+}
+
+export async function startEvolutionRun(
+  app_id: string,
+  feedback: string,
+): Promise<StartEvolutionRunResult> {
+  // Returns {status, body} and never throws for 402/409/422: the caller maps
+  // the HTTP status to a commandState badge (RECEIVED != APPLIED).
+  const r = await fetch(`${API_BASE}/v1/evolution/runs`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ app_id, feedback }),
+  });
+  let body: unknown = null;
+  try {
+    body = await r.json();
+  } catch {
+    body = null;
+  }
+  return { status: r.status, body };
+}

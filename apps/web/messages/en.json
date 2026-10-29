@@ -468,6 +468,24 @@
     "empty": "No recorded runs yet.",
     "cost": "Cost",
     "score": "Score",
-    "totals": "Totals"
+    "totals": "Totals",
+    "start": "Start evolution",
+    "cost-warning": "Starting a run calls the model and spends money.",
+    "state-received": "Received",
+    "state-queued": "Queued",
+    "state-running": "Running",
+    "state-applied": "Applied",
+    "state-rejected": "Rejected",
+    "state-failed": "Failed",
+    "agents": "AI agents",
+    "idle": "Idle",
+    "active": "Active",
+    "done": "Done",
+    "app-label": "App",
+    "feedback-label": "Feedback",
+    "feedback-critic": "Critic",
+    "feedback-heldout": "Held-out",
+    "command-label": "Command",
+    "operator-only": "Live runs are started by the operator; recorded runs are shown here."
   }
 }

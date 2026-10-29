@@ -9,6 +9,8 @@ import {
   type EvolutionRunSummary,
 } from "../../../lib/api";
 import { RoundReplay } from "../../../components/RoundReplay";
+import { AgentPanel } from "../../../components/AgentPanel";
+import { CommandBar } from "../../../components/CommandBar";
 
 export default function ReplayPage() {
   const t = useTranslations("replay");
@@ -17,22 +19,29 @@ export default function ReplayPage() {
   const [selected, setSelected] = useState<EvolutionRun | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const refreshRuns = async () => {
+    try {
+      const res = await listEvolutionRuns();
+      const list = Array.isArray(res.runs) ? res.runs : [];
+      setRuns(list);
+      return list;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "failed to list runs");
+      return [];
+    }
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      try {
-        const res = await listEvolutionRuns();
-        if (cancelled) return;
-        const list = Array.isArray(res.runs) ? res.runs : [];
-        setRuns(list);
-        if (list.length > 0) setSelectedId(list[0].run_id);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "failed to list runs");
-      }
+      const list = await refreshRuns();
+      if (cancelled) return;
+      if (list.length > 0) setSelectedId(list[0].run_id);
     })();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -64,8 +73,17 @@ export default function ReplayPage() {
     return () => clearInterval(id);
   }, [selected?.run_id, selected?.status]);
 
+  const handleStarted = async (runId: string) => {
+    const list = await refreshRuns();
+    if (list.some((r) => r.run_id === runId)) {
+      setSelectedId(runId);
+    } else {
+      setSelectedId(runId);
+    }
+  };
+
   return (
-    <div>
+    <div style={{ paddingBottom: 110 }}>
       <h1>{t("title")}</h1>
       {error && <p style={{ color: "#f87171" }}>{error}</p>}
       {runs.length === 0 ? (
@@ -90,13 +108,17 @@ export default function ReplayPage() {
           </div>
           <div style={{ flex: "3 1 420px" }}>
             {selected ? (
-              <RoundReplay key={selected.run_id} run={selected} />
+              <>
+                <RoundReplay key={selected.run_id} run={selected} />
+                <AgentPanel run={selected} />
+              </>
             ) : (
               <p style={{ color: "#8b93a7" }}>{t("empty")}</p>
             )}
           </div>
         </div>
       )}
+      <CommandBar onStarted={handleStarted} />
     </div>
   );
 }

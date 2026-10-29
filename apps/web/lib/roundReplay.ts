@@ -232,3 +232,110 @@ export function totalsView(run: EvolutionRun | null | undefined): ReplayTotals {
   };
   return { evoforge: one("evoforge"), single: one("single") };
 }
+
+export type AgentRole = "builder" | "critic" | "runner" | "gate";
+
+export type AgentRowState = "active" | "done" | "idle";
+
+export interface AgentRow {
+  role: AgentRole;
+  state: AgentRowState;
+  message: string | null;
+}
+
+export type CommandStateName = "RECEIVED" | "QUEUED" | "RUNNING" | "APPLIED" | "REJECTED" | "FAILED";
+
+export interface CommandState {
+  state: CommandStateName;
+  reason: string | null;
+}
+
+const AGENT_ROLES: AgentRole[] = ["builder", "critic", "runner", "gate"];
+
+interface PanelEvent {
+  seq: number;
+  role: string;
+  message: string;
+  order: number;
+}
+
+function collectSideEvents(
+  run: EvolutionRun | null | undefined,
+  side: ReplaySideKey,
+): PanelEvent[] {
+  const out: PanelEvent[] = [];
+  const rounds = (run as { rounds?: unknown } | null | undefined)?.rounds;
+  if (!Array.isArray(rounds)) return out;
+  let order = 0;
+  for (const r of rounds) {
+    if (!r || typeof r !== "object") continue;
+    const sides = (r as { sides?: unknown }).sides;
+    if (!sides || typeof sides !== "object") continue;
+    const snap = (sides as Record<string, unknown>)[side];
+    if (!snap || typeof snap !== "object") continue;
+    const events = (snap as { events?: unknown }).events;
+    if (!Array.isArray(events)) continue;
+    for (const e of events) {
+      if (!e || typeof e !== "object") continue;
+      const seq = (e as { seq?: unknown }).seq;
+      if (typeof seq !== "number" || !Number.isFinite(seq)) continue;
+      const role = (e as { role?: unknown }).role;
+      if (typeof role !== "string" || !role) continue;
+      const raw = (e as { message?: unknown }).message;
+      const message = typeof raw === "string" ? raw : raw === null || raw === undefined ? "" : String(raw);
+      out.push({ seq, role, message, order });
+      order += 1;
+    }
+  }
+  return out;
+}
+
+/** Latest live-agent view for one side: one row per role, newest role live. */
+export function agentPanel(run: EvolutionRun | null | undefined, side: ReplaySideKey): AgentRow[] {
+  const all = collectSideEvents(run, side);
+  let newest: PanelEvent | null = null;
+  for (const e of all) {
+    if (
+      newest === null ||
+      e.seq > newest.seq ||
+      (e.seq === newest.seq && e.order > newest.order)
+    ) {
+      newest = e;
+    }
+  }
+  const live = (run as { status?: unknown } | null | undefined)?.status === "running";
+  return AGENT_ROLES.map((role) => {
+    let best: PanelEvent | null = null;
+    for (const e of all) {
+      if (e.role !== role) continue;
+      if (
+        best === null ||
+        e.seq > best.seq ||
+        (e.seq === best.seq && e.order > best.order)
+      ) {
+        best = e;
+      }
+    }
+    if (best === null) return { role, state: "idle" as AgentRowState, message: null };
+    const isNewest = newest !== null && best.order === newest.order;
+    return { role, state: live && isNewest ? "active" : "done", message: best.message };
+  });
+}
+
+/** RECEIVED is not APPLIED: map send status + polled run status to one badge. */
+export function commandState(
+  httpStatus: number | null,
+  runStatus: string | null,
+): CommandState {
+  if (httpStatus === null || httpStatus === undefined) {
+    return { state: "RECEIVED", reason: null };
+  }
+  if (httpStatus === 409) return { state: "REJECTED", reason: "busy" };
+  if (httpStatus === 402) return { state: "REJECTED", reason: "budget" };
+  if (httpStatus === 422) return { state: "REJECTED", reason: "invalid" };
+  if (httpStatus !== 202) return { state: "REJECTED", reason: "error" };
+  if (runStatus === "running") return { state: "RUNNING", reason: null };
+  if (runStatus === "succeeded") return { state: "APPLIED", reason: null };
+  if (runStatus === "failed") return { state: "FAILED", reason: null };
+  return { state: "QUEUED", reason: null };
+}
