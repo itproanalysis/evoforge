@@ -468,6 +468,9 @@
     "empty": "No recorded runs yet.",
     "cost": "Cost",
     "score": "Score",
-    "totals": "Totals"
+    "totals": "Totals",
+    "load-failed": "Could not load the recorded run.",
+    "refresh-failed": "Refresh failed. Showing the last confirmed result for this run.",
+    "retry": "Retry"
   }
 }
