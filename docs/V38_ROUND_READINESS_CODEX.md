@@ -35,10 +35,26 @@ including positive/negative round readiness, failed-round preview separation,
 actual pytest partial-failure handling and the Arena HTTP contract. Log:
 `.local/validation-round-readiness.log`.
 
-The existing T50/T51 HTTP scenarios are running in
-`.local/validation-rounds-existing-http.log`; final web/release gates are
-recorded separately. These fixtures use deterministic provider responses.
-They do not establish live model quality or a deployed R1–R5 experience.
+Existing T50/T51 HTTP scenarios: 9 passed in 305.14s, including five verified
+rounds, a failed round with recovery, immutable/read-only replay, and Critic
+feedback. Log: `.local/validation-rounds-existing-http.log`.
+
+T51 Builder checks: 4 passed after tightening the failed-preview assertion.
+The additional HTTP-to-TypeScript status contract initially exposed two old
+fixture assumptions (empty base files, then inherited pending cost status).
+Both fixtures were corrected for the real manifest/cost contract; the final
+HTTP-to-UI check passed. Log: `.local/validation-arena-status-http-final.log`.
+
+Clean npm ci, TypeScript, Arena presentation checks and production build passed
+in this integration worktree. Logs: `.local/validation-web-*.log`.
+Full API/PG release gates are still required. Deterministic provider fixtures
+do not establish live model quality or a deployed R1–R5 experience.
+
+Browser integration remains UNVERIFIED: custom local environment setup was
+rejected by automatic approval review (`blocked by policy`, no further reason
+supplied). Standard Next startup succeeded but its authenticated navigation
+repeated a login redirect. No authentication was bypassed, no credentials were
+requested, and no rendered screenshot or browser E2E completion is claimed.
 
 ## Still partial in the full v3.8 contract
 

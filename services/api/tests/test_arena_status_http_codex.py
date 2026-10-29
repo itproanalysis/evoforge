@@ -22,7 +22,7 @@ def test_arena_http_statuses_do_not_promote_placeholders(monkeypatch):
     monkeypatch.setattr(arena, "_STORE", {})
     monkeypatch.setattr(arena, "_is_pg", lambda: False)
     seeded = arena.seed_running("arena_contract", "v2", "fixture", "muse-spark-1.3",
-                                {"goal": "synthetic", "heldout": [{}]})
+                                {"goal": "synthetic", "files": {"app.py": "value = 1\n"}, "heldout": [{}]})
     with TestClient(main.app) as client:
         running = client.get("/v1/arena/arena_contract")
         assert running.status_code == 200
@@ -39,7 +39,7 @@ def test_arena_http_statuses_do_not_promote_placeholders(monkeypatch):
         succeeded["status"] = "succeeded"
         for lane in succeeded["lanes"].values():
             lane.update(status="succeeded", attempts=1, heldout={"passed": 1, "n": 1},
-                        outcome="passed", cost_cents=0)
+                        outcome="passed", cost_cents=0, cost_status="usage_reported", usage_missing=False)
         arena._save(succeeded)
         success_response = client.get("/v1/arena/arena_contract")
         assert success_response.status_code == 200
