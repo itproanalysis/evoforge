@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   getArena,
+  getPromptChain,
   listArenas,
   postArena,
   type ArenaDoc,
 } from "../../../lib/api";
 import { Button, Card } from "../../../components/ui";
-import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView, promptArenaView } from "../../../lib/arenaStatus";
+import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView, promptArenaView, canFollowUp, promptChainView } from "../../../lib/arenaStatus";
 import { SandboxedPreview } from "../../../components/SandboxedPreview";
 import { PromptBar } from "../../../components/PromptBar";
 
@@ -89,6 +90,8 @@ export default function ArenaPage() {
   const [activeArena, setActiveArena] = useState<ArenaDoc | null>(null);
   const [recentArenas, setRecentArenas] = useState<ArenaDoc[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [chainRounds, setChainRounds] = useState<ArenaDoc[] | null>(null);
+  const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -146,6 +149,48 @@ export default function ArenaPage() {
     };
   }, [trackedId, pollError]);
 
+  const isPromptArena = activeArena?.mode === "prompt";
+  const chainArenaId = isPromptArena ? activeArena?.arena_id ?? null : null;
+
+  // Load the prompt chain for a prompt arena and poll it while the newest
+  // round is still running.
+  useEffect(() => {
+    if (!chainArenaId) {
+      setSelectedRoundId(null);
+      return;
+    }
+    let cancelled = false;
+    let inFlight = false;
+    let timer: NodeJS.Timeout | null = null;
+    const load = async () => {
+      if (inFlight || cancelled) return;
+      inFlight = true;
+      try {
+        const res = await getPromptChain(chainArenaId);
+        if (cancelled) return;
+        if (res && Array.isArray(res.rounds)) {
+          setChainRounds(res.rounds);
+          const rows = promptChainView(res.rounds);
+          const newest = rows[rows.length - 1];
+          if (newest && !newest.running && timer) {
+            clearInterval(timer);
+            timer = null;
+          }
+        }
+      } catch {
+        // Keep the last confirmed chain while polling.
+      } finally {
+        inFlight = false;
+      }
+    };
+    void load();
+    timer = setInterval(() => void load(), 1500);
+    return () => {
+      cancelled = true;
+      if (timer) clearInterval(timer);
+    };
+  }, [chainArenaId]);
+
   const handleStartMatch = async () => {
     if (!activeTaskId || running) return;
     // Starting an arena spends model credits: operator-only, with a cost
@@ -184,6 +229,12 @@ export default function ArenaPage() {
   const operator = process.env.NEXT_PUBLIC_EVO_OPERATOR_CONTROLS === "1";
   const verificationInconclusive = activeArena?.verdict?.winner === "inconclusive"
     || evoView.outcome === "verification_inconclusive" || singleView.outcome === "verification_inconclusive";
+  const chainView = isPromptArena
+    ? promptChainView(chainRounds ?? (activeArena ? [activeArena] : []))
+    : [];
+  const selectedChainRow = chainView.find((r) => r.arenaId === selectedRoundId)
+    ?? chainView[chainView.length - 1] ?? null;
+  const followUpArena = canFollowUp(activeArena) ? activeArena : null;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 pb-40 space-y-6">
@@ -440,6 +491,72 @@ export default function ArenaPage() {
         </Card>
       )}
 
+      {/* Prompt-chain round timeline (above the lanes) */}
+      {activeArena && promptView && chainView.length > 0 && (
+        <Card className="bg-background-secondary border border-border p-4">
+          <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
+            {t("prompt-chain-title")}
+          </span>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {chainView.map((row) => {
+              const badge = row.running
+                ? t("prompt-chain-running")
+                : row.unscorable
+                  ? t("prompt-chain-unscorable")
+                  : row.winner
+                    ? t(`winner-${row.winner}` as "winner-evoforge")
+                    : t("prompt-chain-unscorable");
+              const selected = selectedChainRow?.arenaId === row.arenaId;
+              return (
+                <button
+                  key={row.arenaId || `r${row.round}`}
+                  type="button"
+                  onClick={() => setSelectedRoundId(row.arenaId)}
+                  aria-pressed={selected}
+                  className={`px-2.5 py-1.5 rounded text-xs border text-left ${selected ? "border-emerald-500 bg-emerald-950/20" : "border-border bg-background-tertiary/40"}`}
+                >
+                  <span className="font-bold font-mono">R{row.round}</span>
+                  <span className="block max-w-56 truncate text-text-secondary">{row.prompt}</span>
+                  <span className="block font-mono text-text-secondary">
+                    {t("prompt-chain-single")}: {row.single} · {t("prompt-chain-evoforge")}: {row.evoforge}
+                  </span>
+                  <span className="block text-text-tertiary">{badge}</span>
+                </button>
+              );
+            })}
+          </div>
+          {selectedChainRow && (
+            <div className="mt-3 space-y-2">
+              <p className="text-sm font-medium text-text-primary whitespace-pre-wrap">
+                {t("prompt-chain-round", { n: selectedChainRow.round })}: {selectedChainRow.prompt}
+              </p>
+              <p className="text-xs text-text-secondary font-mono">
+                {t("prompt-chain-single")}: {selectedChainRow.single} · {t("prompt-chain-evoforge")}: {selectedChainRow.evoforge}
+                {" · "}{t("prompt-chain-winner")}: {selectedChainRow.winner ?? (selectedChainRow.running ? t("prompt-chain-running") : t("prompt-chain-unscorable"))}
+              </p>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-xs text-text-tertiary font-mono">{t("evoforge-lane")}</span>
+                  {selectedChainRow.evoforgePreview ? (
+                    <SandboxedPreview html={selectedChainRow.evoforgePreview} title={`chain-${selectedChainRow.arenaId}-evoforge`} />
+                  ) : (
+                    <p className="text-xs text-text-tertiary">{t("preview-pending")}</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <span className="text-xs text-text-tertiary font-mono">{t("single-lane")}</span>
+                  {selectedChainRow.singlePreview ? (
+                    <SandboxedPreview html={selectedChainRow.singlePreview} title={`chain-${selectedChainRow.arenaId}-single`} />
+                  ) : (
+                    <p className="text-xs text-text-tertiary">{t("preview-pending")}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </Card>
+      )}
+
       {/* Split-Screen Lanes */}
       {activeArena && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -645,6 +762,7 @@ export default function ArenaPage() {
 
       <PromptBar
         disabled={running}
+        followUpArena={followUpArena}
         onStarted={(id) => {
           setPendingId(id);
           setActiveArena(null);

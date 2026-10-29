@@ -2,14 +2,16 @@
 
 import { useState } from "react";
 import { useTranslations } from "next-intl";
-import { postPromptArena } from "../lib/api";
+import { postPromptArena, postPromptFollowup, type ArenaDoc } from "../lib/api";
+import { canFollowUp } from "../lib/arenaStatus";
 
 type Props = {
   onStarted?: (arenaId: string) => void;
   disabled?: boolean;
+  followUpArena?: ArenaDoc | null;
 };
 
-export function PromptBar({ onStarted, disabled }: Props) {
+export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
   const t = useTranslations("arena");
   const [prompt, setPrompt] = useState("");
   const [feedback, setFeedback] = useState<"critic" | "heldout">("critic");
@@ -20,6 +22,8 @@ export function PromptBar({ onStarted, disabled }: Props) {
   // warning confirmed up front.
   const operator = process.env.NEXT_PUBLIC_EVO_OPERATOR_CONTROLS === "1";
   const text = prompt.trim();
+  const followUp = canFollowUp(followUpArena);
+  const followUpId = followUp && followUpArena ? followUpArena.arena_id : null;
 
   const onStart = async () => {
     if (busy || disabled || !operator || !text) return;
@@ -27,7 +31,9 @@ export function PromptBar({ onStarted, disabled }: Props) {
     setBusy(true);
     setError(null);
     try {
-      const res = await postPromptArena(text, feedback, "tolerant");
+      const res = followUpId
+        ? await postPromptFollowup(followUpId, text)
+        : await postPromptArena(text, feedback, "tolerant");
       if (!res?.arena_id) throw new Error("missing arena id");
       setPrompt("");
       onStarted?.(res.arena_id);
@@ -58,26 +64,28 @@ export function PromptBar({ onStarted, disabled }: Props) {
             onChange={(e) => setPrompt(e.target.value)}
             maxLength={2000}
             rows={2}
-            placeholder={t("prompt-placeholder")}
-            aria-label={t("prompt-placeholder")}
+            placeholder={t(followUp ? "prompt-followup-placeholder" : "prompt-placeholder")}
+            aria-label={t(followUp ? "prompt-followup-placeholder" : "prompt-placeholder")}
             className="w-full px-2 py-1 rounded text-xs border border-border bg-background-secondary text-text-primary"
           />
           <span className="text-text-tertiary font-mono">
             {prompt.length}/2000
           </span>
         </label>
-        <label className="text-xs flex items-center gap-1.5">
-          {t("feedback-label")}
-          <select
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value as "critic" | "heldout")}
-            className="px-2 py-1 rounded text-xs border border-border bg-background-secondary cursor-pointer"
-            aria-label={t("feedback-label")}
-          >
-            <option value="critic">{t("feedback-critic")}</option>
-            <option value="heldout">{t("feedback-heldout")}</option>
-          </select>
-        </label>
+        {!followUp && (
+          <label className="text-xs flex items-center gap-1.5">
+            {t("feedback-label")}
+            <select
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value as "critic" | "heldout")}
+              className="px-2 py-1 rounded text-xs border border-border bg-background-secondary cursor-pointer"
+              aria-label={t("feedback-label")}
+            >
+              <option value="critic">{t("feedback-critic")}</option>
+              <option value="heldout">{t("feedback-heldout")}</option>
+            </select>
+          </label>
+        )}
         <button
           type="button"
           onClick={onStart}
@@ -85,7 +93,7 @@ export function PromptBar({ onStarted, disabled }: Props) {
           title={operator ? undefined : t("operator-only")}
           className="px-3 py-1 rounded text-xs border border-border bg-background-secondary cursor-pointer font-semibold"
         >
-          {t("prompt-start")}
+          {t(followUp ? "prompt-followup-start" : "prompt-start")}
         </button>
         {error && <span style={{ color: "#f87171", fontSize: 12 }}>{error}</span>}
       </div>

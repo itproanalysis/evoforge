@@ -103,6 +103,113 @@ export function previewView(lane: ArenaLane | null | undefined): { html: string 
   return { html: null, source: "none", error };
 }
 
+export function canFollowUp(doc: ArenaDoc | null | undefined): boolean {
+  if (doc == null || typeof doc !== "object") return false;
+  const rec = doc as unknown as Record<string, unknown>;
+  return rec.mode === "prompt" && doc.status === "succeeded";
+}
+
+export interface PromptChainRow {
+  round: number;
+  arenaId: string;
+  prompt: string;
+  running: boolean;
+  unscorable: boolean;
+  single: string;
+  evoforge: string;
+  singlePreview: string | null;
+  evoforgePreview: string | null;
+  winner: "evoforge" | "single" | "tie" | null;
+  round_index?: number;
+  arena_id?: string;
+  singleScore?: string;
+  evoforgeScore?: string;
+}
+
+function chainLaneScore(lane: ArenaLane | null | undefined): string | null {
+  const heldout = (lane as unknown as { heldout?: unknown } | null | undefined)?.heldout as
+    | { passed?: unknown; n?: unknown } | null | undefined;
+  const passed = heldout?.passed;
+  const n = heldout?.n;
+  if (!Number.isInteger(passed) || !Number.isInteger(n)) return null;
+  const p = passed as number;
+  const total = n as number;
+  if (total <= 0 || p < 0 || p > total) return null;
+  return `${p}/${total}`;
+}
+
+function chainLanePreview(lane: ArenaLane | null | undefined): string | null {
+  const html = (lane as unknown as Record<string, unknown> | null | undefined)?.preview_html;
+  return typeof html === "string" ? html : null;
+}
+
+export function promptChainView(
+  chain: { rounds?: unknown } | unknown[] | null | undefined,
+): PromptChainRow[] {
+  if (chain == null) return [];
+  let rounds: unknown;
+  if (Array.isArray(chain)) {
+    rounds = chain;
+  } else if (typeof chain === "object" && Array.isArray((chain as { rounds?: unknown }).rounds)) {
+    rounds = (chain as { rounds?: unknown }).rounds;
+  } else {
+    return [];
+  }
+  const docs = (rounds as unknown[]).filter(
+    (d): d is Record<string, unknown> => d != null && typeof d === "object",
+  );
+  if (docs.length === 0) return [];
+  const sorted = [...docs].sort((a, b) => {
+    const ra = Number.isInteger(a.round_index) ? (a.round_index as number) : Number.MAX_SAFE_INTEGER;
+    const rb = Number.isInteger(b.round_index) ? (b.round_index as number) : Number.MAX_SAFE_INTEGER;
+    if (ra !== rb) return ra - rb;
+    const aa = typeof a.arena_id === "string" ? (a.arena_id as string) : "";
+    const bb = typeof b.arena_id === "string" ? (b.arena_id as string) : "";
+    return aa < bb ? -1 : aa > bb ? 1 : 0;
+  });
+  return sorted.map((d, i) => {
+    const rec = d as unknown as Record<string, unknown> & {
+      lanes?: { single?: ArenaLane; evoforge?: ArenaLane };
+      verdict?: { winner?: unknown };
+      manifest?: { acceptance_count?: unknown };
+    };
+    const round = Number.isInteger(rec.round_index) ? (rec.round_index as number) : i + 1;
+    const arenaId = typeof rec.arena_id === "string" ? (rec.arena_id as string) : "";
+    const prompt = typeof rec.prompt === "string" ? (rec.prompt as string) : "";
+    const status = rec.status;
+    const running = status !== "succeeded" && status !== "failed";
+    const finished = !running;
+    const count = Number.isInteger(rec.manifest?.acceptance_count)
+      ? (rec.manifest?.acceptance_count as number)
+      : 0;
+    const rawWinner = rec.verdict?.winner;
+    const unscorable = finished
+      && (rawWinner === "unscorable" || count < 3);
+    const singleScore = running ? null : chainLaneScore(rec.lanes?.single);
+    const evoforgeScore = running ? null : chainLaneScore(rec.lanes?.evoforge);
+    const scorable = finished && !unscorable;
+    const winner = scorable
+      && (rawWinner === "evoforge" || rawWinner === "single" || rawWinner === "tie")
+      ? rawWinner : null;
+    return {
+      round,
+      arenaId,
+      prompt,
+      running,
+      unscorable,
+      single: singleScore ?? "—",
+      evoforge: evoforgeScore ?? "—",
+      singlePreview: running ? null : chainLanePreview(rec.lanes?.single),
+      evoforgePreview: running ? null : chainLanePreview(rec.lanes?.evoforge),
+      winner,
+      round_index: round,
+      arena_id: arenaId,
+      singleScore: singleScore ?? "—",
+      evoforgeScore: evoforgeScore ?? "—",
+    };
+  });
+}
+
 export interface PromptArenaView {
   prompt: string;
   acceptanceCount: number;

@@ -780,6 +780,19 @@ export function postPromptArena(
   });
 }
 
+export function postPromptFollowup(arenaId: string, prompt: string) {
+  return req<{ arena_id: string; status: string }>(
+    `/v1/arena/${encodeURIComponent(arenaId)}/followup`,
+    { method: "POST", body: JSON.stringify({ prompt }) },
+  );
+}
+
+export function getPromptChain(arenaId: string) {
+  return req<{ rounds: ArenaDoc[] }>(
+    `/v1/arena/${encodeURIComponent(arenaId)}/chain`,
+  );
+}
+
 export function listArenas() {
   return req<{ arenas: ArenaDoc[] }>("/v1/arena");
 }
