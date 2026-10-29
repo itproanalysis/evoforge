@@ -41,8 +41,8 @@ window.fetch=async(input,options)=>{
  return new Response(JSON.stringify(saved[key]),{status:200,headers:{'Content-Type':'application/json'}});
 };
 Object.defineProperty(window,'EventSource',{value:undefined,configurable:true});
-document.addEventListener('click',event=>{const anchor=event.target.closest?.('a[href]');if(anchor&&anchor.getAttribute('href')?.startsWith('/')){event.preventDefault();document.querySelector('.studio-review-notice').textContent='디자인 검토 화면입니다. 기능 이동과 실행은 실제 서비스에서 사용할 수 있습니다.';}});
-createRoot(document.getElementById('studio-review-root')).render(<div className="studio-shell"><FeatureRail/><div className="studio-column"><header className="studio-topbar"><StudioBreadcrumb/><LanguageSwitcher/></header><div className="studio-content"><p className="studio-review-notice">{${JSON.stringify(reviewNotice)}}</p><Home/></div></div></div>);
+document.addEventListener('click',event=>{const anchor=event.target.closest?.('a[href]');if(anchor&&anchor.getAttribute('href')?.startsWith('/')){event.preventDefault();document.querySelector('.studio-review-notice').textContent='검토본 · 이동 비활성';}});
+createRoot(document.getElementById('studio-review-root')).render(<div className="studio-shell"><FeatureRail/><div className="studio-column"><header className="studio-topbar"><StudioBreadcrumb/><LanguageSwitcher/></header><div className="studio-content"><p className="studio-review-notice" title={${JSON.stringify(reviewNotice)}}>검토본 · 저장기록</p><Home/></div></div></div>);
 `);
 const entry = readFileSync(path.join(output, 'review-entry.jsx'), 'utf8');
 const boundary = {location: {origin: 'http://127.0.0.1:47839'}};
@@ -71,6 +71,6 @@ await new Promise((resolve, reject) => {
     resolve();
   });
 });
-const css = readFileSync(path.join(output, 'studio.css'), 'utf8');
+const css = readFileSync(path.join(output, 'studio.css'), 'utf8') + readFileSync(path.join(web, 'styles/canvas.css'), 'utf8');
 save('interactive.html', `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data:; frame-src 'self' about:; form-action 'none'; base-uri 'none'"><title>EvoForge 작업실 · 디자인 검토</title><style>${css}</style></head><body style="margin:0;background:#f5f4f0;color:#282a26"><div id="studio-review-root"></div><script src="/studio-review.js" defer></script></body></html>`);
 console.log(`Interactive local review built; ${Object.keys(snapshot.responses ?? {}).length} saved GET responses, live requests denied, operator actions off.`);

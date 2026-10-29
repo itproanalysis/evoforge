@@ -6,6 +6,7 @@ import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { StudioBreadcrumb } from '../../components/StudioBreadcrumb';
 import { StudioIcon } from '../../components/StudioIcon';
 import '../../styles/globals.css';
+import '../../styles/canvas.css';
 
 const locales = ['en', 'ko'];
 

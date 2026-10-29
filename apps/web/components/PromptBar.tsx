@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { postPromptArena, postPromptFollowup, type ArenaDoc } from "../lib/api";
 import { canFollowUp } from "../lib/arenaStatus";
+import { StudioIcon } from './StudioIcon';
 
 type Props = {
   onStarted?: (arenaId: string) => void;
@@ -14,6 +15,7 @@ type Props = {
 export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
   const t = useTranslations("arena");
   const ts = useTranslations("studio");
+  const tc = useTranslations("canvas");
   const [prompt, setPrompt] = useState("");
   const [feedback, setFeedback] = useState<"critic" | "heldout">("critic");
   const [busy, setBusy] = useState(false);
@@ -59,8 +61,8 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
               }
             }}
             maxLength={2000}
-            rows={2}
-            placeholder={t(followUp ? "prompt-followup-placeholder" : "prompt-placeholder")}
+            rows={1}
+            placeholder={tc(followUp ? 'followup' : 'prompt')}
             aria-label={t(followUp ? "prompt-followup-placeholder" : "prompt-placeholder")}
             className="w-full px-2 py-1 rounded text-xs border border-border bg-background-secondary text-text-primary"
           />
@@ -69,8 +71,8 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           </span>
         </label>
         {!followUp && (
-          <details className="studio-composer-settings">
-          <summary>{ts('settings')}</summary>
+          <details className="studio-composer-settings" onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
+          <summary aria-label={ts('settings')} title={ts('settings')}><StudioIcon name="settings" width="17" height="17"/><span className="sr-only">{ts('settings')}</span></summary>
           <div>
           <label className="text-xs flex items-center gap-1.5">
             {t("feedback-label")}
@@ -92,15 +94,17 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           type="button"
           onClick={onStart}
           disabled={busy || disabled || !operator || !text}
-          title={operator ? undefined : t("operator-only")}
+          title={operator ? t("prompt-start") : tc('readonly')}
+          aria-label={t(followUp ? "prompt-followup-start" : "prompt-start")}
           className="studio-submit px-3 py-1 rounded text-xs border border-border cursor-pointer font-semibold"
         >
-          {t(followUp ? "prompt-followup-start" : "prompt-start")}
+          <StudioIcon name="arrow" width="17" height="17" className="canvas-send-arrow"/>
+          <span className="sr-only">{t(followUp ? "prompt-followup-start" : "prompt-start")}</span>
         </button>
         {error && <span style={{ color: "#a2352e", fontSize: 12 }}>{error}</span>}
       </div>
-      {followUp && <p className="studio-composer-note mt-1 text-xs text-text-secondary">{t("prompt-equal-tools")}</p>}
-      {!operator && <p className="studio-composer-note mt-1 text-xs text-text-secondary">{t("operator-only")}</p>}
+      {followUp && <p className="sr-only">{t("prompt-equal-tools")}</p>}
+      {!operator && <p className="sr-only">{t("operator-only")}</p>}
     </div>
   );
 }

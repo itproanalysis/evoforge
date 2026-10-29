@@ -48,6 +48,8 @@ const {StudioBreadcrumb} = load(path.join(web, 'components/StudioBreadcrumb.tsx'
 const {FeatureRail} = load(path.join(web, 'components/FeatureRail.tsx'));
 const {LanguageSwitcher} = load(path.join(web, 'components/LanguageSwitcher.tsx'));
 const {StudioTabs, StudioPeople, StudioHistory} = load(path.join(web, 'components/StudioViews.tsx'));
+const {CanvasWorkspace} = load(path.join(web, 'components/CanvasWorkspace.tsx'));
+const {previewView, arenaAgentPanel} = load(path.join(web, 'lib/arenaStatus.ts'));
 const {default: Home} = load(path.join(web, 'app/[locale]/page.tsx'));
 const render = (Component, props = {}) => renderToStaticMarkup(React.createElement(Component, props));
 const empty = {running: false, measured: null, verified: null, participants: null, heldout: null};
@@ -79,7 +81,7 @@ for (const lang of ['en', 'ko']) {
   for (const route of ['/arena', '/replay', '/performance']) {
     pathname = `${lang === 'ko' ? '/ko' : ''}${route}`;
     const rail = render(FeatureRail);
-    const link = rail.match(/<a[^>]*aria-current="page"[^>]*>/g) ?? [];
+    const link = rail.split('</nav>')[0].match(/<a[^>]*aria-current="page"[^>]*>/g) ?? [];
     assert.equal(link.length, 1, `${lang} ${route} must mark exactly one current page`);
     assert.ok(link[0].includes(`href="${pathname}"`));
     assert.ok(render(StudioBreadcrumb).includes(messages[lang].navigation[route.slice(1)]));
@@ -90,8 +92,8 @@ for (const lang of ['en', 'ko']) {
   checks++;
   pathname = lang === 'ko' ? '/ko' : '/';
   const home = render(Home);
-  assert.ok(home.includes('studio-preview-lanes') || home.includes('studio-empty'));
-  assert.ok(home.includes(messages[lang].studio['empty-title']));
+  assert.ok(home.includes('canvas-stage'));
+  assert.ok(home.includes(messages[lang].canvas.empty));
   assert.ok(home.includes('studio-composer'));
   assert.ok(!home.includes('recorded_fixture') && !home.includes('active_fixture'));
   checks += 4;
@@ -114,8 +116,30 @@ for (const lang of ['en', 'ko']) {
   assert.ok(history.includes('1970-01-01T00:01:40.000Z'));
   assert.ok(history.includes('1 / 2'));
   checks += 5;
+  const emptyCanvasProps = {label: messages[lang].studio.title, doc: null, runs: [], busy: false, loading: false, pollError: false, onSelect() {}, onRetry() {}, previews: {evoforge: previewView(null), single: previewView(null)}, agents: {evoforge: [], single: []}, participants: null, history: null, overview: null, management: null, composer: null, renderPreview: (html, title) => React.createElement('iframe', {sandbox: '', srcDoc: html, title})};
+  const blank = render(CanvasWorkspace, emptyCanvasProps);
+  assert.equal((blank.match(/class="canvas-output"/g) ?? []).length, 2);
+  assert.ok(blank.includes(messages[lang].canvas.waiting));
+  assert.ok(!blank.includes('0¢') && !blank.includes('0/0'));
+  assert.ok(!blank.includes('<dialog open'));
+  checks += 4;
+  const fixtureLane = {status: 'succeeded', attempts: 1, heldout: {passed: 2, n: 2}, outcome: 'passed', cost_cents: 50, cost_status: 'estimated', usage_missing: true, preview_source: 'candidate', preview_html: '<h1>fixture output</h1>', events: []};
+  const fixtureDoc = {arena_id: 'canvas_fixture', status: 'succeeded', prompt: 'fixture goal', lanes: {evoforge: fixtureLane, single: {...fixtureLane, cost_cents: 0, cost_status: 'usage_reported', usage_missing: false, preview_html: '<h1>single output</h1>'}}};
+  const finished = render(CanvasWorkspace, {...emptyCanvasProps, doc: fixtureDoc, previews: {evoforge: previewView(fixtureDoc.lanes.evoforge), single: previewView(fixtureDoc.lanes.single)}, agents: {evoforge: arenaAgentPanel(fixtureDoc, 'evoforge'), single: arenaAgentPanel(fixtureDoc, 'single')}});
+  assert.ok(finished.includes('50¢') && finished.includes('0¢'));
+  assert.ok(finished.includes(messages[lang].studio['cost-estimated']));
+  assert.ok(finished.includes('canvas_fixture-evoforge') && finished.includes('canvas_fixture-single'));
+  assert.ok(finished.includes('fixture output') && finished.includes('single output'));
+  assert.ok(finished.includes('sandbox=""'));
+  checks += 5;
+  const pending = render(CanvasWorkspace, {...emptyCanvasProps, busy: true, runs: [fixtureDoc]});
+  assert.ok(!pending.includes('fixture output') && !pending.includes('50¢'));
+  assert.ok(pending.includes('selected=""'));
+  checks += 2;
 }
 assert.deepEqual(Object.keys(messages.ko.studio).sort(), Object.keys(messages.en.studio).sort());
+checks++;
+assert.deepEqual(Object.keys(messages.ko.canvas).sort(), Object.keys(messages.en.canvas).sort());
 checks++;
 console.log(`${checks} studio render assertions passed (actual components, English and Korean, no network).`);
 
@@ -123,8 +147,8 @@ if (process.argv.includes('--write-preview')) {
   locale = 'ko'; pathname = '/ko';
   const output = path.resolve(web, '../..', '.local/design-review');
   mkdirSync(output, {recursive: true});
-  const css = readFileSync(path.join(output, 'studio.css'), 'utf8');
-  const body = `<div class="studio-shell">${render(FeatureRail)}<div class="studio-column"><header class="studio-topbar">${render(StudioBreadcrumb)}${render(LanguageSwitcher)}</header><div class="studio-content"><p class="studio-review-notice">로컬 디자인 검토 · API 연결 없음</p>${render(Home)}</div></div></div>`;
+  const css = readFileSync(path.join(output, 'studio.css'), 'utf8') + readFileSync(path.join(web, 'styles/canvas.css'), 'utf8');
+  const body = `<div class="studio-shell">${render(FeatureRail)}<div class="studio-column"><header class="studio-topbar">${render(StudioBreadcrumb)}${render(LanguageSwitcher)}</header><div class="studio-content"><p class="studio-review-notice" title="로컬 디자인 검토 · API 연결 없음">검토본</p>${render(Home)}</div></div></div>`;
   writeFileSync(path.join(output, 'index.html'), `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"><title>EvoForge 디자인 검토</title><style>${css}</style></head><body style="margin:0;background:#f5f4f0;color:#282a26">${body}</body></html>`);
   console.log(`Static empty-state preview: ${path.join(output, 'index.html')} (no JS, API, live metrics, or model calls).`);
 }
