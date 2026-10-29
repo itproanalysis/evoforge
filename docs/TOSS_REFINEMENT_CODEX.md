@@ -36,3 +36,10 @@ was changed. The local review uses saved public GET records and disables writes.
 Browser control is disabled: mobile rendering, real input, focus behavior and
 hydration still need browser review. Not deployed; release captain integrates
 the candidate through normal gates. Validation evidence is recorded separately.
+
+Final evidence: app source ed60f35b passed 122 actual-component SSR assertions,
+64 existing web regressions, TypeScript and a clean Next production build. The
+local review bundle/read boundary passed; HTML and script returned 200, and the
+model-action POST route returned 404. Logs and artifact hashes are saved in
+docs/validation/2026-10-30-toss-refinement.json. The browser limits above still
+apply; these checks do not establish visual polish in a running browser.
