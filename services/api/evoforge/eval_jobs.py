@@ -40,6 +40,16 @@ def _short_error(exc: BaseException) -> str:
     return msg[:300]
 
 
+_SUMMARY_ONLY = ("ARENA", "EVOLUTION")  # full documents live at /v1/arena/{id} and /v1/evolution/runs/{id}
+
+
+def _public_result(kind, result):
+    """Arena / evolution jobs carry candidate patches in their result; the jobs list shows only ids and verdicts."""
+    if kind in _SUMMARY_ONLY and isinstance(result, dict):
+        return {k: result.get(k) for k in ("arena_id", "run_id", "status", "verdict") if k in result}
+    return result
+
+
 def _public(job: dict) -> dict:
     return {
         "job_id": job["job_id"],
@@ -48,7 +58,7 @@ def _public(job: dict) -> dict:
         "created_at": job["created_at"],
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
-        "result": job.get("result"),
+        "result": _public_result(job["kind"], job.get("result")),
         "error": job.get("error"),
     }
 

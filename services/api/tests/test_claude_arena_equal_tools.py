@@ -81,3 +81,12 @@ def test_default_strict_is_unchanged(stubs):
     assert a["lanes"]["single"]["outcome"] == "apply_failed"
     assert a["manifest"]["lanes"]["single"]["harness"] == "api-sealed-eval/1"
     assert a["manifest"]["lanes"]["single"]["apply"] == "strict" and "Equal tools" not in a["manifest"]["disclosure"]
+
+
+def test_jobs_endpoint_never_carries_lane_patches(stubs):
+    """Cloud Build (one process) found the Arena's lane patches in GET /v1/eval/jobs; they belong to /v1/arena/{id}."""
+    a = _arena({"suite_version": "v2", "task_id": TASK, "single_apply": "tolerant"})
+    jobs = c.get("/v1/eval/jobs").text + c.get(f"/v1/eval/jobs/{a['arena_id']}").text
+    assert "+++ " not in jobs and stubs["reference_fix"] not in jobs
+    job = c.get(f"/v1/eval/jobs/{a['arena_id']}").json()
+    assert job["result"]["arena_id"] == a["arena_id"] and "lanes" not in job["result"]
