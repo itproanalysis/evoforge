@@ -29,9 +29,18 @@ LIST_LIMIT = 20
 PREVIEW_TIMEOUT_S = 10
 PREVIEW_MAX_BYTES = 65536
 FEEDBACKS = ("critic", "heldout")
+SINGLE_APPLIES = ("strict", "tolerant")
 DISCLOSURE = ("The EvoForge lane may retry using the names of failing tests, "
               "an upper-bound oracle signal the single lane does not get, "
               "and reported costs cover only model API usage, not Runner compute.")
+
+
+def _disclosure_for(single_apply: str) -> str:
+    if single_apply == "tolerant":
+        return (DISCLOSURE + " Both lanes apply diffs with tolerant recounting "
+                "(equal_tools comparison).")
+    return (DISCLOSURE + " The single lane applies diffs with strict hunk counts "
+            "while the EvoForge lane recounts (chat_vs_system comparison).")
 
 _STORE = None
 _FALLBACK = None
@@ -612,7 +621,12 @@ def _score_and_preview(files: dict, cumulative: list[dict],
 # ---------------------------------------------------------------------------
 
 def build_manifest(app_id: str, title: str, n_rounds: int, base_files: dict,
-                   rounds: list[dict], model: str, feedback: str) -> dict:
+                   rounds: list[dict], model: str, feedback: str,
+                   single_apply: str = "strict") -> dict:
+    if single_apply not in SINGLE_APPLIES:
+        single_apply = "strict"
+    single_harness = ("api-sealed-eval/2" if single_apply == "tolerant"
+                      else "api-sealed-eval/1")
     return {
         "app_id": app_id,
         "rounds": int(n_rounds),
@@ -620,33 +634,42 @@ def build_manifest(app_id: str, title: str, n_rounds: int, base_files: dict,
         "goals_hash": _goals_hash(rounds),
         "heldout_hash": _heldout_hash(rounds),
         "lanes": {
-            "single": {"model": model, "harness": "api-sealed-eval/1",
-                       "max_attempts": 1, "feedback": "none"},
+            "single": {"model": model, "harness": single_harness,
+                       "max_attempts": 1, "feedback": "none",
+                       "apply": single_apply},
             "evoforge": {"model": model, "harness": "api-sealed-eval/2",
                          "max_attempts": _sealed.PIPELINE_MAX_ATTEMPTS,
-                         "feedback": feedback},
+                         "feedback": feedback, "apply": "tolerant"},
         },
+        "single_apply": single_apply,
+        "comparison": ("equal_tools" if single_apply == "tolerant"
+                       else "chat_vs_system"),
         "cost_basis": "model_api_usage",
         "runner_cost": "not_measured",
-        "disclosure": DISCLOSURE,
+        "disclosure": _disclosure_for(single_apply),
     }
 
 
-def seed_running(run_id: str, app_id: str, feedback: str, n_rounds: int) -> dict:
+def seed_running(run_id: str, app_id: str, feedback: str, n_rounds: int,
+                 single_apply: str = "strict") -> dict:
+    if single_apply not in SINGLE_APPLIES:
+        single_apply = "strict"
     app = find_app(app_id)
     rounds = [r for r in app.get("rounds", []) if int(r.get("index", 0)) <= int(n_rounds)]
     rounds = sorted(rounds, key=lambda r: int(r.get("index", 0)))
     base_files = _base_files(app)
     now = time.time()
     manifest = build_manifest(app_id, app.get("title", ""), len(rounds),
-                              base_files, rounds, BASELINE_MODEL, feedback)
+                              base_files, rounds, BASELINE_MODEL, feedback,
+                              single_apply)
     seed_rounds = [{"index": int(r.get("index", 0)), "name": r.get("name", ""),
                     "goal": r.get("goal", ""),
                     "sides": {"single": _pending(), "evoforge": _pending()}}
                    for r in rounds]
     doc = {"run_id": run_id, "app_id": app_id,
            "title": app.get("title", ""), "status": "running",
-           "feedback": feedback, "created_at": now, "started_at": now,
+           "feedback": feedback, "single_apply": single_apply,
+           "created_at": now, "started_at": now,
            "finished_at": None, "manifest": manifest,
            "rounds": seed_rounds, "totals": {
                "single": {"cost_cents": 0, "elapsed_ms": 0, "verified_rounds": 0},
@@ -665,7 +688,11 @@ def _pending() -> str:
 # ---------------------------------------------------------------------------
 
 def _run_single_round(app_round: dict, cumulative: list[dict],
-                      lane_files: dict, timeout_s: int) -> tuple[dict, dict]:
+                      lane_files: dict, timeout_s: int,
+                      single_apply: str = "strict") -> tuple[dict, dict]:
+    if single_apply not in SINGLE_APPLIES:
+        single_apply = "strict"
+    recount = single_apply == "tolerant"
     t0 = time.perf_counter()
     events: list[dict] = []
     goal = app_round.get("goal", "")
@@ -688,14 +715,20 @@ def _run_single_round(app_round: dict, cumulative: list[dict],
             applied = False
             _emit(events, "runner", f"single: empty diff{_why_empty(out)}, scoring current files")
         else:
-            nxt, ok = _apply_diff_to_files(lane_files, diff, recount=False)
+            nxt, ok = _apply_diff_to_files(lane_files, diff, recount=recount)
             if ok and nxt is not None:
                 applied = True
                 new_files = nxt
-                _emit(events, "runner", "single: diff applied (strict hunk counts)")
+                if recount:
+                    _emit(events, "runner", "single: diff applied (tolerant recount)")
+                else:
+                    _emit(events, "runner", "single: diff applied (strict hunk counts)")
             else:
                 applied = False
-                _emit(events, "runner", "single: diff did not apply under strict hunk counts")
+                if recount:
+                    _emit(events, "runner", "single: diff did not apply under tolerant recount")
+                else:
+                    _emit(events, "runner", "single: diff did not apply under strict hunk counts")
     except Exception as e:
         error = _short_error(e)
         applied = False
@@ -1007,7 +1040,14 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
 # ---------------------------------------------------------------------------
 
 def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
-                  n_rounds: int = 5, timeout_s: int | None = None) -> dict:
+                  n_rounds: int = 5, timeout_s: int | None = None,
+                  single_apply: str = "strict") -> dict:
+    # Tolerate a positional single_apply in the timeout_s slot for
+    # backward/forward compatibility: run_evolution(rid, app, fb, nr, "tolerant").
+    if isinstance(timeout_s, str) and timeout_s in SINGLE_APPLIES and single_apply == "strict":
+        single_apply, timeout_s = timeout_s, None
+    if single_apply not in SINGLE_APPLIES:
+        single_apply = "strict"
     started = time.time()
     if timeout_s is None:
         timeout_s = _sealed.PYTEST_TIMEOUT_S
@@ -1023,6 +1063,7 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
     except UnknownApp as e:
         doc = {"run_id": run_id, "app_id": app_id, "title": "",
                "status": "failed", "feedback": feedback,
+               "single_apply": single_apply,
                "created_at": started, "started_at": started,
                "finished_at": time.time(), "manifest": None,
                "rounds": [], "totals": {
@@ -1044,7 +1085,10 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
         manifest = None
     if manifest is None:
         manifest = build_manifest(app_id, app.get("title", ""), len(rounds_all),
-                                  base_files, rounds_all, BASELINE_MODEL, feedback)
+                                  base_files, rounds_all, BASELINE_MODEL, feedback,
+                                  single_apply)
+    if isinstance(manifest, dict) and manifest.get("single_apply") in SINGLE_APPLIES:
+        single_apply = manifest["single_apply"]
     created_at = started
     try:
         prev = get_run(run_id)
@@ -1078,7 +1122,8 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                             "verified_rounds": sum(1 for s in lane_snaps if s.get("status") == "READY")}
         doc = {"run_id": run_id, "app_id": app_id,
                "title": app.get("title", ""), "status": "running",
-               "feedback": feedback, "created_at": created_at,
+               "feedback": feedback, "single_apply": single_apply,
+               "created_at": created_at,
                "started_at": started, "finished_at": None,
                "manifest": copy.deepcopy(manifest),
                "rounds": round_docs, "totals": totals, "error": None}
@@ -1093,7 +1138,8 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                 idx = int(r.get("index", 0))
                 cumulative = _cumulative_heldout(rounds_all, idx)
                 if lane == "single":
-                    files, snap = _run_single_round(r, cumulative, files, timeout_s)
+                    files, snap = _run_single_round(r, cumulative, files, timeout_s,
+                                                    single_apply)
                 else:
                     files, snap = _run_evoforge_round(r, cumulative, files, feedback, timeout_s,
                                                       critic_history)
@@ -1178,7 +1224,8 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
     status = "succeeded" if top_error is None else "failed"
     doc = {"run_id": run_id, "app_id": app_id,
            "title": app.get("title", ""), "status": status,
-           "feedback": feedback, "created_at": created_at,
+           "feedback": feedback, "single_apply": single_apply,
+           "created_at": created_at,
            "started_at": started, "finished_at": time.time(),
            "manifest": manifest, "rounds": round_docs,
            "totals": totals, "error": top_error}
@@ -1265,12 +1312,31 @@ METHOD_SENTENCE = ("Rounds are counted as independent trials, which is an "
                    "approximation because rounds within a run are correlated.")
 
 
-def stats(feedback: str | None = None) -> dict:
+def _doc_single_apply(doc: dict) -> str:
+    sa = doc.get("single_apply")
+    if sa in SINGLE_APPLIES:
+        return sa
+    try:
+        m = doc.get("manifest")
+        if isinstance(m, dict) and m.get("single_apply") in SINGLE_APPLIES:
+            return m["single_apply"]
+    except Exception:
+        pass
+    return "strict"
+
+
+def stats(feedback: str | None = None,
+          single_apply: str | None = None) -> dict:
     """Aggregate evolution statistics across all stored runs (read-only)."""
+    # Tolerate a positional single_apply in the feedback slot: stats("tolerant").
+    if feedback in SINGLE_APPLIES and single_apply is None:
+        feedback, single_apply = None, feedback
     docs = [d for d in _all_run_docs()
             if d.get("status") in ("succeeded", "failed")]
     if feedback is not None:
         docs = [d for d in docs if d.get("feedback") == feedback]
+    if single_apply is not None:
+        docs = [d for d in docs if _doc_single_apply(d) == single_apply]
     evo = _side_stats(docs, "evoforge")
     single = _side_stats(docs, "single")
     if evo["wilson95"][0] > single["wilson95"][1]:

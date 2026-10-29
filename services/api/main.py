@@ -2110,6 +2110,7 @@ class EvolutionRunRequest(BaseModel):
     app_id: str
     feedback: Literal["critic", "heldout"] = "critic"
     rounds: int = Field(5, ge=1, le=5)
+    single_apply: Literal["strict", "tolerant"] = "strict"
 
 
 def _evo_rounds_budget_or_402(n_rounds: int, feedback: str) -> None:
@@ -2149,17 +2150,19 @@ def evolution_runs_create(req: EvolutionRunRequest):
     box: dict = {}
     ready = threading.Event()
 
-    def _runner(a=aid, fb=req.feedback, nr=int(req.rounds)):
+    def _runner(a=aid, fb=req.feedback, nr=int(req.rounds), sa=req.single_apply):
         if not ready.wait(timeout=60):
             raise RuntimeError("evolution start sync failed")
-        return evo_rounds_mod.run_evolution(box["run_id"], a, fb, nr)
+        return evo_rounds_mod.run_evolution(box["run_id"], a, fb, nr,
+                                            single_apply=sa)
 
     try:
         job = eval_jobs_mod.create_job(kind="EVOLUTION", runner=_runner)
     except eval_jobs_mod.ActiveJobError as e:
         raise HTTPException(409, f"another eval job is active: {e.job_id}")
     box["run_id"] = job["job_id"]
-    evo_rounds_mod.seed_running(job["job_id"], aid, req.feedback, int(req.rounds))
+    evo_rounds_mod.seed_running(job["job_id"], aid, req.feedback, int(req.rounds),
+                                req.single_apply)
     ready.set()
     return {"run_id": job["job_id"], "status": "running"}
 
@@ -2178,10 +2181,12 @@ def evolution_runs_get(run_id: str):
 
 
 @app.get("/v1/evolution/stats")
-def evolution_stats(feedback: str | None = None):
+def evolution_stats(feedback: str | None = None, single_apply: str | None = None):
     if feedback is not None and feedback not in ("critic", "heldout"):
         raise HTTPException(422, "feedback must be critic or heldout")
-    return evo_rounds_mod.stats(feedback=feedback)
+    if single_apply is not None and single_apply not in ("strict", "tolerant"):
+        raise HTTPException(422, "single_apply must be strict or tolerant")
+    return evo_rounds_mod.stats(feedback=feedback, single_apply=single_apply)
 
 
 # ---------------------------------------------------------------------------
