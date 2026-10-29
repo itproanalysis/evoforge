@@ -56,7 +56,7 @@ PYTEST_TIMEOUT_S = 90
 SCAFFOLD_NAME = "evoforge-sealed-v0"
 HARNESS_VERSION = "api-sealed-eval/2"  # /2: hunk counts recomputed from the body (T26)
 # Selectable so the service can A/B its own harness on one suite (/1 = strict hunk counts).
-HARNESSES = ("api-sealed-eval/1", "api-sealed-eval/2")
+HARNESSES = ("api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3")
 
 
 def _check_harness(harness: str | None) -> str:
@@ -548,7 +548,7 @@ def _safe_rel(path: str, sandbox_real: str, sandbox: str) -> bool:
     return common == sandbox_real
 
 
-def _apply_candidate(sandbox: str, diff, recount: bool = True) -> bool:
+def _apply_candidate(sandbox: str, diff, recount: bool = True, whole_file: bool = False) -> bool:
     """Apply a Builder diff; empty or unappliable diffs simply miss (score 0)."""
     if diff is None or (isinstance(diff, str) and not diff.strip()):
         return False
@@ -575,7 +575,7 @@ def _apply_candidate(sandbox: str, diff, recount: bool = True) -> bool:
                 return False
             else:
                 files[p] = None
-        changed = _patch.apply_unified_diff(files, diff, recount=recount)
+        changed = _patch.apply_unified_diff(files, diff, recount=recount, whole_file=whole_file)
     except Exception:
         return False
     try:
@@ -758,7 +758,8 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                     outcome = "empty_diff"
                 elif _candidate_verification_failures(diff):
                     outcome = "verification_inconclusive"
-                elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
+                elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1",
+                                whole_file=harness == "api-sealed-eval/3"):
                     # Local execution: the task source is an ephemeral local
                     # repo that a remote runner cannot read (same reason suite
                     # validation never uses the runner). Remote execution is
@@ -1238,7 +1239,8 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
             goal = task["goal"] + "\nPrevious candidate could not be independently verified."
             continue
         if not _apply_candidate(dest, diff,
-                                recount=harness != "api-sealed-eval/1"):
+                                recount=harness != "api-sealed-eval/1",
+                                whole_file=harness == "api-sealed-eval/3"):
             last_outcome = "apply_failed"
             last_dest = None
             goal = _critic_apply_failed_feedback(task["goal"])
@@ -1404,7 +1406,8 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                         elif _candidate_verification_failures(diff):
                             outcome, failing = "verification_inconclusive", []
                             failures = _candidate_verification_failures(diff)
-                        elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
+                        elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1",
+                                whole_file=harness == "api-sealed-eval/3"):
                             # Always local, like the baseline: the task source is an ephemeral local repo that the remote
                             # runner cannot read (production returned RunnerBadRequest for every pipeline task).
                             score, failures = _run_heldout_local_detail(

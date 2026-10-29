@@ -1042,14 +1042,14 @@ def eval_sandbox(req: SandboxRequest):
 
 class EvalBaselineRequest(BaseModel):
     suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
-    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
 
 class EvalPipelineRequest(BaseModel):
     suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
-    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
     feedback: Literal["heldout", "critic"] = "heldout"
@@ -1318,7 +1318,7 @@ def eval_pipeline(req: EvalPipelineRequest):
 class EvalJobRequest(BaseModel):
     kind: Literal["X_SINGLE", "PIPELINE"]
     suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
-    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
     feedback: Literal["heldout", "critic"] = "heldout"
@@ -1379,8 +1379,8 @@ class EvalABTestRequest(BaseModel):
     kind: Literal["X_SINGLE", "PIPELINE"]
     family: str | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
-    champion: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
-    challenger: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
+    champion: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"]
+    challenger: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"]
     feedback: Literal["heldout", "critic"] = "heldout"
 
 

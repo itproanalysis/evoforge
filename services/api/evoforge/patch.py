@@ -199,7 +199,26 @@ def _apply(path: str, orig: list[str], hunks: list) -> list[str]:
     return out + orig[cursor:]
 
 
-def apply_unified_diff(files: dict[str, str | None], diff: str, recount: bool = True) -> dict[str, str | None]:
+def _whole_file_rewrite(orig: list[str], hunks: list) -> list[str] | None:
+    """New file content when the diff is one hunk rewriting the whole file, else None (harness /3).
+
+    Models often express a large rewrite as a single hunk from line 1 whose context lines are out of order, so it does
+    not apply although its intent is unambiguous: the hunk's old side holds exactly the file's non-blank lines (only
+    blank lines may differ) and its new side is the file the model wrote.
+    """
+    if len(hunks) != 1:
+        return None
+    a, old_l, new_l = hunks[0]
+    if a not in (0, 1) or not old_l or not new_l:
+        return None
+    key = lambda xs: sorted(x.rstrip("\n").rstrip() for x in xs if x.strip())  # noqa: E731
+    if key(old_l) != key(orig):
+        return None
+    return list(new_l)
+
+
+def apply_unified_diff(files: dict[str, str | None], diff: str, recount: bool = True,
+                       whole_file: bool = False) -> dict[str, str | None]:
     result: dict[str, str | None] = {}
     for f in _parse(diff, recount):
         path = f["path"]
@@ -208,7 +227,14 @@ def apply_unified_diff(files: dict[str, str | None], diff: str, recount: bool = 
             raise PatchError(f"cannot add {path}: file already exists")
         if f["old"] != NULL and cur is None:
             raise PatchError(f"cannot modify {path}: file is absent")
-        new = _apply(path, [] if cur is None else cur.splitlines(keepends=True), f["hunks"])
+        orig = [] if cur is None else cur.splitlines(keepends=True)
+        try:
+            new = _apply(path, orig, f["hunks"])
+        except PatchError:
+            rewrite = _whole_file_rewrite(orig, f["hunks"]) if whole_file and cur is not None else None
+            if rewrite is None:
+                raise
+            new = rewrite
         if f["new"] == NULL:
             if new:
                 raise PatchError(f"delete of {path} leaves {len(new)} line(s)")
