@@ -39,6 +39,8 @@ DISCLOSURE = ("The EvoForge lane may retry using the names of failing held-out "
               "tests, an upper-bound oracle signal the single lane does not get, "
               "and reported costs cover only model API usage, not Runner compute.")
 
+EQUAL_TOOLS_NOTE = (" Equal tools: both lanes apply patches with tolerant hunk recounting.")
+
 DISCLOSURE_CRITIC = ("The EvoForge lane gets no held-out signal; it retries using only "
                      "the independent Critic's own tests and adds one Critic call, "
                      "and reported costs cover only model API usage, not Runner compute.")
@@ -786,7 +788,8 @@ def _critic_fairness() -> tuple[str, str]:
 
 def build_manifest(suite_version: str, task_id: str,
                    model: str, task: dict,
-                   feedback: str = "heldout") -> dict:
+                   feedback: str = "heldout",
+                   single_apply: str = "strict") -> dict:
     """Fairness manifest: same task + same held-out tests for both lanes."""
     if feedback not in ("heldout", "critic"):
         raise ValueError(f"unknown feedback: {feedback!r}")
@@ -805,7 +808,10 @@ def build_manifest(suite_version: str, task_id: str,
         "base_tree_sha": _compute_base_tree_sha(
             tid if isinstance(tid, str) else task_id, files),
         "lanes": {
-            "single": {"model": model, "harness": "api-sealed-eval/1",
+            "single": {"model": model,
+                       "harness": ("api-sealed-eval/2" if single_apply == "tolerant"
+                                   else "api-sealed-eval/1"),
+                       "apply": single_apply,
                        "max_attempts": 1, "critic": False,
                        "feedback": "none"},
             "evoforge": {"model": model, "harness": "api-sealed-eval/2",
@@ -817,13 +823,15 @@ def build_manifest(suite_version: str, task_id: str,
         },
         "cost_basis": "model_api_usage",
         "runner_cost": "not_measured",
-        "disclosure": DISCLOSURE_CRITIC if critic else DISCLOSURE,
+        "disclosure": (DISCLOSURE_CRITIC if critic else DISCLOSURE)
+        + (EQUAL_TOOLS_NOTE if single_apply == "tolerant" else ""),
     }
 
 
 def seed_running(arena_id: str, suite_version: str, task_id: str,
                  model: str, task: dict,
-                 feedback: str = "heldout") -> dict:
+                 feedback: str = "heldout",
+                 single_apply: str = "strict") -> dict:
     """Seed the ``running`` document synchronously at POST time."""
     if feedback not in ("heldout", "critic"):
         raise ValueError(f"unknown feedback: {feedback!r}")
@@ -831,11 +839,11 @@ def seed_running(arena_id: str, suite_version: str, task_id: str,
     goal = task.get("goal", "") if isinstance(task, dict) else ""
     now = time.time()
     manifest = build_manifest(suite_version, task_id, model, task,
-                              feedback=feedback)
+                              feedback=feedback, single_apply=single_apply)
     doc = {"arena_id": arena_id, "status": "running",
            "suite_version": suite_version, "task_id": task_id,
            "model": model, "goal": goal if isinstance(goal, str) else "",
-           "feedback": feedback,
+           "feedback": feedback, "single_apply": single_apply,
            "created_at": now, "started_at": now, "finished_at": None,
            "manifest": manifest,
            "lanes": {"single": _lane_skeleton("running", n),
@@ -939,8 +947,8 @@ def _score_heldout_counted(sandbox: str, heldout: list[dict],
 
 
 def _run_single_lane(task: dict, model: str, timeout_s: int,
-                       arena_id: str = "") -> dict:
-    """Lane ``single``: ONE Builder call, strict apply, no Critic, no retry."""
+                       arena_id: str = "", recount: bool = False) -> dict:
+    """Lane ``single``: ONE Builder call, no Critic, no retry; strict apply unless ``recount`` (equal tools)."""
     t0 = time.perf_counter()
     events: list[dict] = []
     _live_bind(events, arena_id, "single", None)
@@ -994,11 +1002,12 @@ def _run_single_lane(task: dict, model: str, timeout_s: int,
                 outcome = "verification_inconclusive"
                 passed, n = 0, n_total
                 _emit(events, "runner", "single: candidate requires independent execution verification")
-            elif _sealed._apply_candidate(dest, diff, recount=False):
+            elif _sealed._apply_candidate(dest, diff, recount=recount):
                 applied = True
                 _emit(events, "runner",
-                      "single: diff applied (strict hunk counts), "
-                      "scoring held-out")
+                      "single: diff applied ("
+                      + ("tolerant recount" if recount else "strict hunk counts")
+                      + "), scoring held-out")
                 passed, n, failures = _score_heldout_counted(
                     dest, task["heldout"], timeout_s, tmpbase)
                 if n_total > 0 and passed == n and n >= n_total:
@@ -1015,7 +1024,8 @@ def _run_single_lane(task: dict, model: str, timeout_s: int,
                 applied = False
                 passed, n = 0, n_total
                 _emit(events, "runner",
-                      "single: diff did not apply under strict hunk counts")
+                      "single: diff did not apply"
+                      + ("" if recount else " under strict hunk counts"))
             _emit(events, "gate", f"single: {outcome}")
     except Exception as e:
         error = _short_error(e)
@@ -1405,7 +1415,8 @@ def _run_lanes(task: dict, model: str,
                timeout_s: int,
                feedback: str = "heldout",
                arena_id: str = "",
-               scrub: list[str] | None = None) -> tuple[dict, dict]:
+               scrub: list[str] | None = None,
+               single_apply: str = "strict") -> tuple[dict, dict]:
     """Run both lanes concurrently in two threads."""
     out: dict[str, object] = {}
 
@@ -1417,7 +1428,8 @@ def _run_lanes(task: dict, model: str,
 
     single_t = threading.Thread(
         target=_target,
-        args=("single", lambda: _run_single_lane(task, model, timeout_s, arena_id=arena_id)),
+        args=("single", lambda: _run_single_lane(task, model, timeout_s, arena_id=arena_id,
+                                                 recount=single_apply == "tolerant")),
         daemon=True)
     evo_t = threading.Thread(
         target=_target,
@@ -1448,7 +1460,7 @@ def _run_lanes(task: dict, model: str,
 
 def run_arena(suite_version: str, task_id: str, model: str,
               timeout_s: int | None = None, arena_id: str = "",
-              feedback: str = "heldout") -> dict:
+              feedback: str = "heldout", single_apply: str | None = None) -> dict:
     """Background worker body: run both lanes, store and return the arena.
 
     Never raises: provider or sandbox trouble is recorded as a failed
@@ -1478,17 +1490,21 @@ def run_arena(suite_version: str, task_id: str, model: str,
                 if isinstance(prev_fb, str) and prev_fb in (
                         "heldout", "critic"):
                     feedback = prev_fb
+                if single_apply is None and prev.get("single_apply") in ("strict", "tolerant"):
+                    single_apply = prev["single_apply"]
         except Exception:
             manifest = None
+        if single_apply not in ("strict", "tolerant"):
+            single_apply = "strict"
         if manifest is None:
             manifest = build_manifest(suite_version, task_id, model, task,
-                                      feedback=feedback)
+                                      feedback=feedback, single_apply=single_apply)
         maybe_goal = task.get("goal", "")
         goal = maybe_goal if isinstance(maybe_goal, str) else ""
         _live_init(aid)
         single, evo = _run_lanes(task, model, timeout_s, feedback=feedback,
-                                 arena_id=aid)
-        for _lane, _recount in ((single, False), (evo, True)):
+                                 arena_id=aid, single_apply=single_apply)
+        for _lane, _recount in ((single, single_apply == "tolerant"), (evo, True)):
             if isinstance(_lane, dict) and "preview_source" not in _lane:
                 _attach_preview(_lane, task, _recount)
         sp = single.get("heldout", {}).get("passed", 0)
@@ -1543,6 +1559,7 @@ def run_arena(suite_version: str, task_id: str, model: str,
     doc = {"arena_id": aid, "status": status,
            "suite_version": suite_version, "task_id": task_id,
            "model": model, "goal": goal, "feedback": feedback,
+           "single_apply": single_apply if single_apply in ("strict", "tolerant") else "strict",
            "created_at": started, "started_at": started,
            "finished_at": time.time(),
            "lanes": {"single": single, "evoforge": evo},

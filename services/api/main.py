@@ -1490,6 +1490,9 @@ class ArenaRequest(BaseModel):
     task_id: str
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     feedback: Literal["heldout", "critic"] = "heldout"
+    # "tolerant" = equal tools (both lanes recount hunks, as in the prompt Arena); "strict" keeps the original
+    # single-lane harness for comparisons already on record.
+    single_apply: Literal["strict", "tolerant"] = "strict"
 
 
 def _arena_budget_or_402(feedback: str = "heldout") -> None:
@@ -1523,11 +1526,11 @@ def arena_create(req: ArenaRequest):
     box: dict = {}
     ready = threading.Event()
 
-    def _runner(sv=req.suite_version, t=tid, m=req.model, fb=req.feedback):
+    def _runner(sv=req.suite_version, t=tid, m=req.model, fb=req.feedback, sa=req.single_apply):
         if not ready.wait(timeout=60):
             raise RuntimeError("arena start sync failed")
         return arena_mod.run_arena(sv, t, m, arena_id=box["arena_id"],
-                                   feedback=fb)
+                                   feedback=fb, single_apply=sa)
 
     try:
         job = eval_jobs_mod.create_job(kind="ARENA",
@@ -1537,7 +1540,8 @@ def arena_create(req: ArenaRequest):
         raise HTTPException(409, f"another eval job is active: {e.job_id}")
     box["arena_id"] = job["job_id"]
     arena_mod.seed_running(job["job_id"], req.suite_version, tid,
-                           req.model, task, feedback=req.feedback)
+                           req.model, task, feedback=req.feedback,
+                           single_apply=req.single_apply)
     ready.set()
     return {"arena_id": job["job_id"], "status": "running"}
 

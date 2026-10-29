@@ -751,6 +751,7 @@ export function postArena(
   suite_version: "v1" | "v2" | "v3" | "v4" | "v5" = "v2",
   feedback: "heldout" | "critic" = "critic",
   model = "muse-spark-1.3",
+  single_apply: "tolerant" | "strict" = "tolerant",
 ) {
   // Backwards tolerance: a legacy caller may pass the model as the 3rd arg.
   let fb: "heldout" | "critic" = feedback;
@@ -761,7 +762,8 @@ export function postArena(
   }
   return req<{ arena_id: string; status: string }>("/v1/arena", {
     method: "POST",
-    body: JSON.stringify({ task_id, suite_version, model: md, feedback: fb }),
+    // Equal tools by default: the single lane also recounts hunks (manifest records it).
+    body: JSON.stringify({ task_id, suite_version, model: md, feedback: fb, single_apply }),
   });
 }
 
