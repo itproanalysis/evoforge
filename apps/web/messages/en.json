@@ -104,7 +104,7 @@
     "source-unknown": "Source unconfirmed",
     "cost-pending": "Model cost pending",
     "cost-incomplete": "Model cost partly unconfirmed",
-    "cost-estimated": "Model cost · reservation-cap estimate",
+    "cost-reservation-cap": "Model cost · reservation cap (usage not reported)",
     "cost-usage_reported": "Model cost · usage based",
     "cost-legacy": "Server-reported cost · source unconfirmed",
     "cost-unavailable": "Cost source unconfirmed"

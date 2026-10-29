@@ -127,7 +127,7 @@ for (const lang of ['en', 'ko']) {
   const fixtureDoc = {arena_id: 'canvas_fixture', status: 'succeeded', prompt: 'fixture goal', lanes: {evoforge: fixtureLane, single: {...fixtureLane, cost_cents: 0, cost_status: 'usage_reported', usage_missing: false, preview_html: '<h1>single output</h1>'}}};
   const finished = render(CanvasWorkspace, {...emptyCanvasProps, doc: fixtureDoc, previews: {evoforge: previewView(fixtureDoc.lanes.evoforge), single: previewView(fixtureDoc.lanes.single)}, agents: {evoforge: arenaAgentPanel(fixtureDoc, 'evoforge'), single: arenaAgentPanel(fixtureDoc, 'single')}});
   assert.ok(finished.includes('50¢') && finished.includes('0¢'));
-  assert.ok(finished.includes(messages[lang].studio['cost-estimated']));
+  assert.ok(finished.includes(messages[lang].studio['cost-reservation-cap']));
   assert.ok(finished.includes('canvas_fixture-evoforge') && finished.includes('canvas_fixture-single'));
   assert.ok(finished.includes('fixture output') && finished.includes('single output'));
   assert.ok(finished.includes('sandbox=""'));

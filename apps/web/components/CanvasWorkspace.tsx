@@ -7,6 +7,9 @@ import { laneView, manifestView, type ArenaAgentRow, type PreviewSource } from '
 import { StudioIcon } from './StudioIcon';
 import { StudioHistory, StudioPeople } from './StudioViews';
 
+// Usage not reported -> priced at the reservation cap; the label says so in words (no "estimate").
+const costKey = (state: string) => state === 'estimated' ? 'cost-reservation-cap' : `cost-${state}`;
+
 type Panel = 'activity' | 'history' | 'metrics' | 'admin' | null;
 type View = 'preview' | 'diff' | 'tests';
 type Preview = { html: string | null; source: PreviewSource; error: string | null };
@@ -100,7 +103,7 @@ export function CanvasWorkspace(props: Props) {
             <strong>{name}</strong>
             <div className="canvas-output-numbers">
               {result.result === 'passed' && <StudioIcon name="check" width="14" height="14" className="canvas-passed"/>}<span title={t('score')}>{result.score ?? '—'}</span><span className="canvas-number-divider" aria-hidden="true">·</span>
-              <span title={ts(`cost-${result.costState}`)}>{result.cost === null ? '—' : `${result.cost}¢`}</span>
+              <span title={ts(costKey(result.costState))}>{result.cost === null ? '—' : `${result.cost}¢`}</span>
               {preview.source === 'base' && <span className="canvas-base" title={t('base-detail')}>{t('base')}</span>}
             </div>
           </header>
@@ -126,7 +129,7 @@ export function CanvasWorkspace(props: Props) {
           <StudioPeople people={props.participants?.participants ?? []} available={props.participants?.status === 'available'} loading={props.loading} hasMore={props.participants?.has_more}/>
         </>}
         {panel === 'history' && <StudioHistory records={props.history ?? []} available={props.history !== null} loading={props.loading}/>}
-        {panel === 'metrics' && <>{props.overview}<section className="canvas-conditions"><h3>{t('conditions')}</h3><p>{props.doc?.prompt || props.doc?.goal || '—'}</p><code>{props.doc?.arena_id ?? '—'}</code>{manifest && <><dl><dt>{t('spec')}</dt><dd>{manifest.spec ?? '—'}</dd><dt>{t('base')}</dt><dd>{manifest.baseTree ?? '—'}</dd></dl><p>{manifest.disclosure ?? '—'}</p></>}{(['evoforge', 'single'] as const).map(side => <p key={side}>{side === 'evoforge' ? 'EvoForge' : t('single')} · {ts(`cost-${laneView(props.doc?.lanes?.[side]).costState}`)}</p>)}</section></>}
+        {panel === 'metrics' && <>{props.overview}<section className="canvas-conditions"><h3>{t('conditions')}</h3><p>{props.doc?.prompt || props.doc?.goal || '—'}</p><code>{props.doc?.arena_id ?? '—'}</code>{manifest && <><dl><dt>{t('spec')}</dt><dd>{manifest.spec ?? '—'}</dd><dt>{t('base')}</dt><dd>{manifest.baseTree ?? '—'}</dd></dl><p>{manifest.disclosure ?? '—'}</p></>}{(['evoforge', 'single'] as const).map(side => <p key={side}>{side === 'evoforge' ? 'EvoForge' : t('single')} · {ts(costKey(laneView(props.doc?.lanes?.[side]).costState))}</p>)}</section></>}
         {panel === 'admin' && props.management}
       </div>
     </dialog>

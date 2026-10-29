@@ -104,7 +104,7 @@
     "source-unknown": "출처 미확인",
     "cost-pending": "모델 비용 집계 대기",
     "cost-incomplete": "모델 비용 일부 미확인",
-    "cost-estimated": "모델 비용 · 예약 상한 추정",
+    "cost-reservation-cap": "모델 비용 · 예약 상한(사용량 미보고)",
     "cost-usage_reported": "모델 비용 · 사용량 기준",
     "cost-legacy": "서버 비용 집계 · 출처 미확인",
     "cost-unavailable": "비용 출처 미확인"
