@@ -1,0 +1,65 @@
+{
+  "app_code_commit": "cd5479a60d5e87504181b7b9fc01bc5c52770721",
+  "baseline_code_commit": "333d88d9",
+  "branch": "codex/design-studio",
+  "copy_budget": {
+    "scope": "Default/empty Korean desktop SSR visible copy and placeholders. Excludes hidden mobile navigation, screen-reader labels, closed details/dialogs, styles and SVG. The canvas-hidden global header is excluded. No generated output is counted; not browser screenshot proof.",
+    "before": 409,
+    "after": 79,
+    "reduction_percent": 80.7,
+    "documents": [
+      {
+        "file": "before-canvas.html",
+        "sha256": "c8ef64262f82729ee3912acd862a368039a1efc0e7ce28278f30c1a5844c6fa4"
+      },
+      {
+        "file": "index.html",
+        "sha256": "6c8a784c75c71308966981ffd80c4442fe62aa9ccdd8f55cb4891037caf2e43d"
+      }
+    ]
+  },
+  "results": {
+    "component_ssr_assertions": 104,
+    "existing_web_regressions": 64,
+    "typescript": "passed",
+    "clean_next_build": "passed",
+    "local_review_bundle": "passed",
+    "review_http": 200,
+    "script_http": 200,
+    "review_model_write_route": 404
+  },
+  "logs": [
+    {
+      "file": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\canvas-render-final.log",
+      "sha256": "8735639378bba8fe635564c0b28a28443f1861f265485a1f48b267521e930ea4"
+    },
+    {
+      "file": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\canvas-typescript-final.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "file": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\canvas-build-final.log",
+      "sha256": "acb8bed954cdbb55fffa4140bc9cafc7167fbb7d0aa9d903a317ad37d4ce5285"
+    },
+    {
+      "file": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\canvas-web-regression-final.log",
+      "sha256": "bda832b10f51521a3c5b4f758afc6cc37bf6b5f0352a73d28e3056fff88448d2"
+    },
+    {
+      "file": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\canvas-copy-budget.log",
+      "sha256": "6fae5bd87d7ac5a28f4182d39bc802f751088b120327429ae2e663c82fc3daaf"
+    },
+    {
+      "file": "C:\\Projects\\EvoForge\\worktrees\\design-studio\\.local\\canvas-review-bundle.log",
+      "sha256": "f09812cd1b149f9b7937bd6fced9036a892438247822567909ba23bbba955c45"
+    }
+  ],
+  "review": {
+    "url": "http://127.0.0.1:47839/?review=canvas",
+    "source": "saved public GET records, review-labelled; no live API or new model run",
+    "bundle_sha256": "16d222b417ab89a58984d28be60b4abe023dcd675d511ba0a1b06786f9a79b81",
+    "browser_verification": "UNVERIFIED: local browser control disabled; no screenshot, mobile/hydration or input validation."
+  },
+  "deployment": "Not deployed; release captain integrates via normal clean gates.",
+  "test_adaptation": "Only Builder checks updated for extracted canvas and native disclosures. Independent Critic tests unchanged."
+}

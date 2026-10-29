@@ -40,3 +40,19 @@ Not deployed; release captain integrates through the existing clean gates.
 
 The compact read-only cue remains visible when operator controls are off; this
 adds four Korean characters while keeping the requested 80 percent reduction.
+
+## Final evidence
+
+App code cd5479a6: 104 component SSR assertions, 64 existing web regressions,
+TypeScript and clean Next production build passed. Local review bundle and
+HTTP/script delivery passed; model-action POST route is absent (404). Final
+review-only caption is shortened to match the static copy budget; full saved
+record provenance/time remains in its title and run state says Recorded.
+See docs/validation/2026-10-30-canvas-rebuild.json for source/log/artifact hashes.
+
+The first focused regression run exposed three obsolete Builder source checks
+(double-quote spelling, custom button instead of native summary, old inline
+layout/state-marker placement). These now check the actual extracted modules
+and native controls, with all existing behavior tests retained. No Critic or
+frozen contract was altered. This evidence does not establish browser pixels,
+model quality, PostgreSQL gates or production deployment.

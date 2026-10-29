@@ -42,7 +42,7 @@ window.fetch=async(input,options)=>{
 };
 Object.defineProperty(window,'EventSource',{value:undefined,configurable:true});
 document.addEventListener('click',event=>{const anchor=event.target.closest?.('a[href]');if(anchor&&anchor.getAttribute('href')?.startsWith('/')){event.preventDefault();document.querySelector('.studio-review-notice').textContent='검토본 · 이동 비활성';}});
-createRoot(document.getElementById('studio-review-root')).render(<div className="studio-shell"><FeatureRail/><div className="studio-column"><header className="studio-topbar"><StudioBreadcrumb/><LanguageSwitcher/></header><div className="studio-content"><p className="studio-review-notice" title={${JSON.stringify(reviewNotice)}}>검토본 · 저장기록</p><Home/></div></div></div>);
+createRoot(document.getElementById('studio-review-root')).render(<div className="studio-shell"><FeatureRail/><div className="studio-column"><header className="studio-topbar"><StudioBreadcrumb/><LanguageSwitcher/></header><div className="studio-content"><p className="studio-review-notice" title={${JSON.stringify(reviewNotice)}}>검토본</p><Home/></div></div></div>);
 `);
 const entry = readFileSync(path.join(output, 'review-entry.jsx'), 'utf8');
 const boundary = {location: {origin: 'http://127.0.0.1:47839'}};
