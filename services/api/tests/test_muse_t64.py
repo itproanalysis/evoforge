@@ -85,6 +85,17 @@ def _hello_world_diff():
         "a/app.py", "b/app.py"))
 
 
+def _reference_diff():
+    import difflib
+
+    old = arena_prompt.TEMPLATE
+    new = old.replace("'<main></main>'", "'<main>hello world goodbye</main>'")
+    assert new != old
+    return "".join(difflib.unified_diff(
+        old.splitlines(True), new.splitlines(True),
+        "a/app.py", "b/app.py"))
+
+
 class _Stubs:
     """Mock providers: first Critic call is the judge, the rest internal."""
 
@@ -94,6 +105,7 @@ class _Stubs:
         self.internal_critic = 0
         self.judge_codes = list(judge_codes)
         self.diff = _hello_world_diff()
+        self.reference_diff = _reference_diff()
         self.lock = threading.Lock()
         monkeypatch.setattr(broker_meta, "call_builder", self.builder)
         monkeypatch.setattr(broker_meta, "call_critic", self.critic)
@@ -101,7 +113,11 @@ class _Stubs:
     def builder(self, goal, sha, file_context=None, **k):
         with self.lock:
             self.builder_goals.append(goal)
-        return {"diff": self.diff, "tests": [], "rationale": "x",
+        if arena_prompt.REFERENCE_MARKER in (goal or ""):
+            diff = self.reference_diff
+        else:
+            diff = self.diff
+        return {"diff": diff, "tests": [], "rationale": "x",
                 "stub": False, "model": "muse-spark-1.3",
                 "provider_calls": [], "usage": dict(USAGE)}
 

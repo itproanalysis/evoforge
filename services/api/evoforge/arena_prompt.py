@@ -45,6 +45,12 @@ JUDGE_SENTENCE = ("Independent Critic wrote acceptance tests from the prompt "
 BASELINE_MODEL = "muse-spark-1.3"
 COMPARISON_MODE = "user_prompt_same_template"
 
+REFERENCE_MARKER = "Judge reference build"
+
+
+def build_reference_goal(lane_goal: str) -> str:
+    return f"{REFERENCE_MARKER}\n\n{lane_goal}"
+
 
 def build_judge_goal(prompt: str) -> str:
     return f"{prompt}\n\n{JUDGE_INSTRUCTION}"
@@ -371,7 +377,8 @@ def seed_running(arena_id: str, prompt: str, feedback: str = "critic",
            "lanes": {"single": _arena._lane_skeleton("running", 0),
                       "evoforge": _arena._lane_skeleton("running", 0)},
            "verdict": {"winner": "tie", "reason": "arena running"},
-           "error": None}
+           "error": None, "events": []}
+    _arena._live_init(arena_id)
     _arena._save_if_absent(doc)
     return copy.deepcopy(doc)
 
@@ -428,6 +435,90 @@ def _filter_on_template(suite: list[dict], timeout_s: int) -> tuple[list[dict], 
                 dropped += 1
             else:
                 kept.append({"code": code})
+        return kept, dropped
+    finally:
+        _sealed._remove_tree(tmpbase)
+
+
+def _build_judge_reference(lane_goal: str) -> tuple[int, str]:
+    """ONE Builder call implementing the lanes' goal for judge checking.
+
+    Returns ``(cost_cents, diff)``; the diff is applied tolerantly by the
+    caller and each kept test must pass on the result to stay scored.
+    """
+    ref_goal = build_reference_goal(lane_goal)
+    file_context = [{"path": "app.py", "content": TEMPLATE}]
+    tmpbase = tempfile.mkdtemp(prefix="evoforge-prompt-refbuild-")
+    try:
+        _source, base, _future = _sealed._make_task_source_repo(
+            tmpbase, "prompt", {"app.py": TEMPLATE})
+        _rsv, out, actual, _missing = _sealed._call_builder_task(
+            ref_goal, base, file_context)
+    finally:
+        _sealed._remove_tree(tmpbase)
+    diff = out.get("diff") if isinstance(out, dict) else ""
+    if not isinstance(diff, str):
+        diff = ""
+    return int(actual), diff
+
+
+def _filter_on_reference(suite: list[dict], ref_files: dict,
+                         timeout_s: int) -> tuple[list[dict], int]:
+    """Keep entries that pass on the judge reference build.
+
+    Fail closed: a test that could not be run on the reference is dropped, so only verified tests are scored.
+    """
+    if not suite:
+        return [], 0
+    files = dict(ref_files or {})
+    if _runner_client.runner_url():
+        kept: list[dict] = []
+        dropped = 0
+        for entry in suite:
+            code = entry.get("code", "") if isinstance(entry, dict) else ""
+            if not isinstance(code, str) or not code.strip():
+                continue
+            try:
+                res = _runner_client.run_files(dict(files),
+                                               [{"code": code}], timeout_s)
+                held = res.get("heldout", {})
+                n = held.get("n", 0) if isinstance(held, dict) else 0
+                passed = held.get("pass", 0) if isinstance(held, dict) else 0
+            except Exception:
+                dropped += 1  # unverified on the reference -> not scored (fail closed)
+                continue
+            if n >= 1 and passed == n:
+                kept.append({"code": code})
+            else:
+                dropped += 1
+        return kept, dropped
+    tmpbase = tempfile.mkdtemp(prefix="evoforge-prompt-refcheck-")
+    try:
+        source, base, future = _sealed._make_task_source_repo(
+            tmpbase, "prompt-reference", files)
+        kept: list[dict] = []
+        dropped = 0
+        for entry in suite:
+            code = entry.get("code", "") if isinstance(entry, dict) else ""
+            if not isinstance(code, str) or not code.strip():
+                continue
+            dest = os.path.join(
+                tmpbase, f"sandbox-refcheck-{uuid.uuid4().hex[:6]}")
+            try:
+                _sealed._build_clean_sandbox(source, base, dest, future)
+            except Exception:
+                dropped += 1  # unverified on the reference -> not scored (fail closed)
+                continue
+            try:
+                passed, n, _fail = _arena._score_heldout_counted(
+                    dest, [{"code": code}], timeout_s, tmpbase)
+            except Exception:
+                dropped += 1  # unverified on the reference -> not scored (fail closed)
+                continue
+            if n >= 1 and passed == n:
+                kept.append({"code": code})
+            else:
+                dropped += 1
         return kept, dropped
     finally:
         _sealed._remove_tree(tmpbase)
@@ -506,11 +597,14 @@ def _filter_on_starting_files(suite: list[dict], single_start: dict,
 
 
 def _run_single_lane(task: dict, model: str, timeout_s: int,
-                     single_apply: str = "tolerant") -> dict:
+                     single_apply: str = "tolerant",
+                     arena_id: str = "",
+                     scrub: list[str] | None = None) -> dict:
     """Lane ``single``: ONE Builder call, apply per single_apply, no retry."""
     recount = single_apply == "tolerant"
     t0 = time.perf_counter()
     events: list[dict] = []
+    _arena._live_bind(events, arena_id, "single", scrub)
     n_total = len(task["heldout"])
     cost = 0
     usage_missing = False
@@ -587,6 +681,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int,
         status = "failed"
         _arena._emit(events, "gate", f"single: lane failed ({type(e).__name__})")
     finally:
+        _arena._live_unbind(events)
         _sealed._remove_tree(tmpbase)
     lane = {"status": status, "attempts": attempts,
             "heldout": {"passed": int(passed), "n": int(n)},
@@ -626,18 +721,29 @@ def _scrub_lane(lane: dict, names: list[str]) -> dict:
                 msg = ev.get("message")
                 if not isinstance(msg, str):
                     continue
-                msg = _FAILING_SUFFIX_RE.sub("", msg)
-                for nm in names or []:
-                    if isinstance(nm, str) and nm and nm in msg:
-                        msg = msg.replace(nm, "held-out")
-                ev["message"] = msg[:300]
+                ev["message"] = _arena._scrub_text(msg, names)
     except Exception:
         pass
     return lane
 
 
+def _judge_message(count: int) -> str:
+    try:
+        n = int(count)
+    except Exception:
+        n = 0
+    return f"Judge wrote {n} acceptance tests (hidden from both lanes)"
+
+
+def _push_judge_event(arena_id: str, count: int) -> dict:
+    """Record the judge step live and return the event for the final doc."""
+    ev = _arena._live_top(arena_id, "judge", _judge_message(count))
+    return ev
+
+
 def _run_lanes(task: dict, model: str, timeout_s: int, feedback: str,
-               single_apply: str) -> tuple[dict, dict]:
+               single_apply: str, arena_id: str = "",
+               scrub: list[str] | None = None) -> tuple[dict, dict]:
     out: dict[str, object] = {}
 
     def _target(name: str, fn) -> None:
@@ -649,12 +755,14 @@ def _run_lanes(task: dict, model: str, timeout_s: int, feedback: str,
     single_t = threading.Thread(
         target=_target,
         args=("single", lambda: _run_single_lane(
-            task, model, timeout_s, single_apply)),
+            task, model, timeout_s, single_apply,
+            arena_id=arena_id, scrub=scrub)),
         daemon=True)
     evo_t = threading.Thread(
         target=_target,
         args=("evoforge", lambda: _arena._run_evoforge_lane(
-            task, model, timeout_s, feedback=feedback)),
+            task, model, timeout_s, feedback=feedback,
+            arena_id=arena_id, scrub=scrub)),
         daemon=True)
     single_t.start()
     evo_t.start()
@@ -718,18 +826,38 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
             _sealed._check_size(critic_suite)
         except Exception:
             pass
-        kept, dropped = _filter_on_template(critic_suite, timeout_s)
-        manifest = _manifest_with_acceptance(manifest, kept, dropped, 0,
-                                             len(kept))
-        goal = _goal_with_interface(goal, kept)
+        kept, template_dropped = _filter_on_template(critic_suite,
+                                                           timeout_s)
+        lane_goal = _goal_with_interface(goal, kept)
+        try:
+            ref_cost, ref_diff = _build_judge_reference(lane_goal)
+        except Exception:
+            ref_cost, ref_diff = 0, ""
+        ref_files = _final_files({"app.py": TEMPLATE}, ref_diff, True)
+        scored, ref_dropped = _filter_on_reference(kept, ref_files,
+                                                   timeout_s)
+        judge_cost += int(ref_cost)
+        manifest = _manifest_with_acceptance(manifest, scored,
+                                             template_dropped, 0,
+                                             len(scored))
+        manifest["reference_checked"] = True
+        manifest["acceptance_reference_dropped"] = int(ref_dropped)
+        goal = lane_goal
         task = {"id": "prompt", "goal": goal,
-                "files": {"app.py": TEMPLATE}, "heldout": list(kept)}
+                "files": {"app.py": TEMPLATE}, "heldout": list(scored)}
+        _arena._live_init(arena_id)
+        try:
+            _names = _sealed._heldout_test_names(task["heldout"])
+        except Exception:
+            _names = []
+        judge_events = [_push_judge_event(arena_id, len(scored))]
         try:
             _sealed._check_size(task["heldout"])
         except Exception:
             pass
         single, evo = _run_lanes(task, model, timeout_s, feedback,
-                                 single_apply)
+                                 single_apply, arena_id=arena_id,
+                                 scrub=list(_names))
         try:
             names = _sealed._heldout_test_names(task["heldout"])
         except Exception:
@@ -746,10 +874,11 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
             sp, ep = int(sp), int(ep)
         except (TypeError, ValueError):
             sp, ep = 0, 0
-        if len(kept) < 3:
+        if len(scored) < 3:
             verdict = {"winner": "unscorable",
-                       "reason": (f"unscorable: only {len(kept)} acceptance "
-                                  "tests remained after filtering")}
+                       "reason": (f"unscorable: only {len(scored)} acceptance "
+                                  "tests remained after checking against "
+                                  "the judge reference build")}
             status = "succeeded"
             error = None
         else:
@@ -788,7 +917,9 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
            "finished_at": time.time(), "manifest": manifest,
            "judge_cost_cents": int(judge_cost),
            "lanes": {"single": single, "evoforge": evo},
-           "verdict": verdict, "error": error}
+           "verdict": verdict, "error": error,
+           "events": list(judge_events) if "judge_events" in locals()
+           else _arena._live_snapshot(arena_id)}
     _arena._save(doc)
     try:
         start = {"app.py": TEMPLATE}
@@ -797,8 +928,8 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
                                single_apply == "tolerant")
         e_files = _final_files(start, evo.get("diff", "")
                                if isinstance(evo, dict) else "", True)
-        _save_private(arena_id, s_files, e_files, list(kept)
-                      if "kept" in locals() else [])
+        _save_private(arena_id, s_files, e_files, list(scored)
+                      if "scored" in locals() else [])
     except Exception:
         pass
     return copy.deepcopy(doc)
@@ -806,7 +937,8 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
 
 def _run_followup_lanes(single_task: dict, evo_task: dict, model: str,
                         timeout_s: int, feedback: str,
-                        single_apply: str) -> tuple[dict, dict]:
+                        single_apply: str, arena_id: str = "",
+                        scrub: list[str] | None = None) -> tuple[dict, dict]:
     out: dict[str, object] = {}
 
     def _target(name: str, fn) -> None:
@@ -818,12 +950,14 @@ def _run_followup_lanes(single_task: dict, evo_task: dict, model: str,
     single_t = threading.Thread(
         target=_target,
         args=("single", lambda: _run_single_lane(
-            single_task, model, timeout_s, single_apply)),
+            single_task, model, timeout_s, single_apply,
+            arena_id=arena_id, scrub=scrub)),
         daemon=True)
     evo_t = threading.Thread(
         target=_target,
         args=("evoforge", lambda: _arena._run_evoforge_lane(
-            evo_task, model, timeout_s, feedback=feedback)),
+            evo_task, model, timeout_s, feedback=feedback,
+            arena_id=arena_id, scrub=scrub)),
         daemon=True)
     single_t.start()
     evo_t.start()
@@ -924,6 +1058,7 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
             _sealed._check_size(critic_suite)
         except Exception:
             pass
+        _arena._live_init(arena_id)
         kept_new, dropped = _filter_on_starting_files(
             critic_suite, s_start, e_start, timeout_s)
         full_suite = list(parent_suite) + list(kept_new)
@@ -938,8 +1073,14 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
                        "files": dict(s_start), "heldout": list(full_suite)}
         evo_task = {"id": "prompt", "goal": goal,
                     "files": dict(e_start), "heldout": list(full_suite)}
+        try:
+            _names = _sealed._heldout_test_names(full_suite)
+        except Exception:
+            _names = []
+        judge_events = [_push_judge_event(arena_id, len(kept_new))]
         single, evo = _run_followup_lanes(
-            single_task, evo_task, model, timeout_s, feedback, single_apply)
+            single_task, evo_task, model, timeout_s, feedback, single_apply,
+            arena_id=arena_id, scrub=list(_names))
         try:
             names = _sealed._heldout_test_names(full_suite)
         except Exception:
@@ -1005,7 +1146,9 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
            "finished_at": time.time(), "manifest": manifest,
            "judge_cost_cents": int(judge_cost),
            "lanes": {"single": single, "evoforge": evo},
-           "verdict": verdict, "error": error}
+           "verdict": verdict, "error": error,
+           "events": list(judge_events) if "judge_events" in locals()
+           else _arena._live_snapshot(arena_id)}
     _arena._save(doc)
     try:
         s_files = _final_files(s_start, single.get("diff", "")
@@ -1083,4 +1226,4 @@ def get_chain(arena_id: str) -> list[dict] | None:
         return (ri, ca, aid)
 
     chain.sort(key=_key)
-    return [copy.deepcopy(d) for d in chain]
+    return [_arena._with_live(copy.deepcopy(d)) for d in chain]

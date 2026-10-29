@@ -25,6 +25,7 @@ import main  # noqa: E402
 from evoforge import broker_meta, ledger  # noqa: E402
 
 c = TestClient(main.app, raise_server_exceptions=False)
+REFERENCE_MARK = getattr(__import__("evoforge.arena_prompt", fromlist=["x"]), "REFERENCE_MARKER", "<no reference build>")
 USAGE = {"prompt_tokens": 1000, "completion_tokens": 200}
 PROMPT = "A landing page for a coffee shop called Coffee Corner with a menu of at least three drinks and their prices."
 PARTIAL = '''def render():
@@ -76,7 +77,8 @@ def _stubs(monkeypatch, goals, accept=ACCEPT):
 
     def builder(goal, sha, file_context=None, **k):
         current = next(f["content"] for f in (file_context or []) if f["path"] == "app.py")
-        target = FULL if "Previous attempt" in goal else PARTIAL  # a first try that misses the menu
+        # T76: the judge's reference build (marked) is a correct page; lanes' first tries miss the menu
+        target = FULL if ("Previous attempt" in goal or REFERENCE_MARK in goal) else PARTIAL
         with lock:
             goals.append(goal)
         d = "".join(difflib.unified_diff(current.splitlines(True), target.splitlines(True), "a/app.py", "b/app.py"))
