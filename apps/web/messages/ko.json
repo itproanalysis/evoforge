@@ -468,7 +468,14 @@
     "failed": "실패",
     "passed": "통과",
     "running": "실행 중",
-    "succeeded": "완료"
+    "succeeded": "완료",
+    "prompt-placeholder": "양측이 만들 페이지나 앱을 설명하세요 (최대 2000자)…",
+    "prompt-start": "프롬프트 대결 시작",
+    "prompt-heading": "입력한 프롬프트",
+    "prompt-acceptance": "어느 쪽이 실행되기 전에 독립 심사가 작성한 수락 테스트 {count}개 (이미 통과되어 제외 {dropped}개)",
+    "prompt-unscorable": "의미 있는 수락 테스트가 너무 적게 남아 점수 비교 없이 표시합니다.",
+    "prompt-judge-cost": "독립 심사 비용: {cost}",
+    "prompt-equal-tools": "동등한 도구: 양쪽 레인 모두 tolerant recounting으로 diff를 적용합니다."
   },
   "replay": {
     "title": "라운드 리플레이",

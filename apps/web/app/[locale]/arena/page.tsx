@@ -9,8 +9,9 @@ import {
   type ArenaDoc,
 } from "../../../lib/api";
 import { Button, Card } from "../../../components/ui";
-import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView } from "../../../lib/arenaStatus";
+import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView, promptArenaView } from "../../../lib/arenaStatus";
 import { SandboxedPreview } from "../../../components/SandboxedPreview";
+import { PromptBar } from "../../../components/PromptBar";
 
 const BENCHMARK_TASKS: Record<"v1" | "v2" | "v3" | "v4", { id: string; goal: string }[]> = {
   v2: [
@@ -176,6 +177,7 @@ export default function ArenaPage() {
   const evoView = laneView(evoLane);
   const singleView = laneView(singleLane);
   const manifest = manifestView(activeArena);
+  const promptView = promptArenaView(activeArena);
   const evoPreview = previewView(evoLane);
   const singlePreview = previewView(singleLane);
   const verdict = arenaVerdict(activeArena);
@@ -184,7 +186,7 @@ export default function ArenaPage() {
     || evoView.outcome === "verification_inconclusive" || singleView.outcome === "verification_inconclusive";
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 py-8 pb-40 space-y-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
@@ -414,6 +416,30 @@ export default function ArenaPage() {
         </div>
       )}
 
+      {/* Prompt-arena acceptance panel (above the lanes) */}
+      {activeArena && promptView && (
+        <Card className="bg-background-secondary border border-border p-4">
+          <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
+            {t("prompt-heading")}
+          </span>
+          <p className="text-sm font-medium text-text-primary mt-1 whitespace-pre-wrap">{promptView.prompt}</p>
+          <p className="mt-2 text-xs text-text-secondary">
+            {t("prompt-acceptance", { count: promptView.acceptanceCount, dropped: promptView.dropped })}
+          </p>
+          {promptView.scorable === false && (
+            <p role="alert" className="mt-2 text-xs font-semibold text-amber-300">
+              {t("prompt-unscorable")}
+            </p>
+          )}
+          <p className="mt-2 text-xs text-text-secondary">
+            {t("prompt-judge-cost", { cost: promptView.judgeCost })}
+          </p>
+          {promptView.judge && (
+            <p className="mt-1 text-xs text-text-tertiary">{promptView.judge}</p>
+          )}
+        </Card>
+      )}
+
       {/* Split-Screen Lanes */}
       {activeArena && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -616,6 +642,16 @@ export default function ArenaPage() {
           </div>
         )}
       </div>
+
+      <PromptBar
+        disabled={running}
+        onStarted={(id) => {
+          setPendingId(id);
+          setActiveArena(null);
+          setPollError(false);
+          setError(null);
+        }}
+      />
     </div>
   );
 }
