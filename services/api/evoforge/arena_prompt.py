@@ -382,7 +382,9 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
         except Exception as e:
             raise _sealed.SealedEvalError(
                 f"judge Critic failed: {type(e).__name__}")
-        critic_suite = _sealed._critic_suite_from_output(cout)
+        # Only tests that can run in the stdlib-only sandbox count: a judge test importing another package would fail
+        # for both lanes and only shrink what can be scored.
+        critic_suite = _sealed._critic_suite_from_output(cout, ["app"])
         try:
             _sealed._check_size(critic_suite)
         except Exception:
