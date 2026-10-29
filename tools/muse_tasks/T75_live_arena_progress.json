@@ -1,0 +1,17 @@
+{
+  "id": "T75_live_arena_progress",
+  "planned_by": "Claude (Critic): production home AI status stayed idle",
+  "goal": "T75 — live Arena progress (owner: \"type and watch the result evolve live\"). Production 2026-10-30: a running prompt\nArena showed no lane events at all — each lane appends to a local `events` list that is stored only when the lane\nfinishes — so the home \"AI status\" panel stayed idle the whole run. API only.\n1. While an Arena runs (prompt first round, prompt follow-up, and sealed mode), GET /v1/arena/{id} and GET /v1/arena\n   (the list the home workspace reads) show each lane's events as they are emitted (seq strictly increasing, same\n   messages as the final document, which they must be a prefix of). Keep it in process memory (a lock-protected live\n   overlay keyed by arena id, cleared when the final document is saved); do NOT write the store per event.\n2. Hidden acceptance test names are scrubbed in live events exactly as _scrub_lane does for the final document (the\n   names are known once the judge suite is filtered, before the lanes start).\n3. Prompt Arenas get a top-level \"events\" list with the judge's step, e.g. {\"role\": \"judge\", \"message\": \"Judge wrote 3\n   acceptance tests (hidden from both lanes)\"} — visible live and kept in the final document.\nTests: services/api/tests/test_muse_t75.py.",
+  "edit": [
+    "services/api/evoforge/arena.py",
+    "services/api/evoforge/arena_prompt.py",
+    "services/api/tests/test_muse_t75.py"
+  ],
+  "context": [
+    "services/api/main.py",
+    "apps/web/lib/arenaStatus.ts"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t75.py services/api/tests/test_sealed_t75_live_arena_progress.py services/api/tests/test_arena_status_http_codex.py services/api/tests/test_arena_verification_codex.py services/api/tests/test_critic_sealed_v5.py services/api/tests/test_critic_t48_arena_manifest.py services/api/tests/test_critic_t49_arena_preview.py services/api/tests/test_critic_t50_arena_critic_lane.py services/api/tests/test_critic_t64_prompt_arena.py services/api/tests/test_critic_t65_prompt_bar.py services/api/tests/test_critic_t66_prompt_followup.py services/api/tests/test_critic_t68_candidate_code_in_runner.py services/api/tests/test_critic_t70_arena_certificates.py services/api/tests/test_muse_t44.py services/api/tests/test_muse_t48.py services/api/tests/test_muse_t49.py services/api/tests/test_muse_t50.py services/api/tests/test_muse_t59.py services/api/tests/test_muse_t64.py services/api/tests/test_muse_t65.py services/api/tests/test_muse_t66.py services/api/tests/test_muse_t67.py services/api/tests/test_muse_t70.py services/api/tests/test_muse_t73.py services/api/tests/test_sealed_t44_arena.py services/api/tests/test_sealed_t70_arena_certificates.py services/api/tests/test_sealed_t73_acceptance_interface.py -q -p no:cacheprovider"
+  ]
+}
