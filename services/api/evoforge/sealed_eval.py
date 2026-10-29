@@ -392,17 +392,29 @@ def _check_size(heldout: list[dict]) -> None:
             raise SealedTooLarge("sealed test over size budget")
 
 
-def _heldout_result_passes(result: dict, expected: int) -> bool:
-    """Never credit counts contradicted by exit status or Runner evidence.
+def _candidate_verification_failures(diff: str) -> list[dict]:
+    from evoforge.runner_diff_screen import report_tampering_risks
 
-    Missing integrity flags remain compatible with older remote Runners; an
-    explicitly supplied flag must be True. Local Runners always supply it.
-    """
-    n, passed = result.get("n"), result.get("pass")
+    if report_tampering_risks(diff):
+        return [{"test": "held-out", "message": "candidate requires independent execution verification",
+                 "verification": "INCONCLUSIVE"}]
+    return []
+
+
+def _heldout_result_is_consistent(result: dict, expected: int) -> bool:
+    """Check count/exit consistency; missing legacy remote flags stay compatible."""
+    n, passed, exit_code = result.get("n"), result.get("pass"), result.get("exit_code")
     return (type(n) is int and type(passed) is int
-            and n >= expected and n > 0 and passed == n
-            and type(result.get("exit_code")) is int and result["exit_code"] == 0
+            and n >= expected and n > 0 and 0 <= passed <= n
+            and type(exit_code) is int and exit_code in (0, 1)
+            and ((exit_code == 0) == (passed == n))
             and ("report_integrity" not in result or result["report_integrity"] is True))
+
+
+def _heldout_result_passes(result: dict, expected: int) -> bool:
+    """Never credit counts contradicted by exit status or Runner evidence."""
+    return (_heldout_result_is_consistent(result, expected)
+            and result["pass"] == result["n"])
 
 
 def _run_heldout_local(sandbox: str, heldout: list[dict],
@@ -463,6 +475,8 @@ def _run_heldout_remote(source: str, base: str, diff: str,
 
 def _score_heldout(sandbox: str, source: str, base: str, diff: str,
                    heldout: list[dict], timeout_s: int, tmpbase: str) -> float:
+    if _candidate_verification_failures(diff):
+        return 0.0
     if _runner_client.runner_url():
         return _run_heldout_remote(source, base, diff, heldout, timeout_s)
     return _run_heldout_local(sandbox, heldout, timeout_s, tmpbase)
@@ -742,6 +756,8 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                 failing: list[str] = []
                 if _is_empty_diff(diff):
                     outcome = "empty_diff"
+                elif _candidate_verification_failures(diff):
+                    outcome = "verification_inconclusive"
                 elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
                     # Local execution: the task source is an ephemeral local
                     # repo that a remote runner cannot read (same reason suite
@@ -1021,7 +1037,7 @@ def _run_heldout_local_detail(sandbox: str, heldout: list[dict],
     if not isinstance(result, dict) or result.get("timed_out"):
         raise SealedTimeout("sealed held-out run timed out")
     if not _heldout_result_passes(result, len(heldout)):
-        if "report_integrity" in result and result["report_integrity"] is not True:
+        if not _heldout_result_is_consistent(result, len(heldout)):
             return 0.0, [{"test": "held-out", "message": "verification inconclusive",
                           "verification": "INCONCLUSIVE"}]
         failures = _parse_failure_xml(xml)
@@ -1119,6 +1135,9 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                     if _is_empty_diff(diff):
                         outcome: str = "empty_diff"
                         failing: list[str] = []
+                    elif _candidate_verification_failures(diff):
+                        outcome, failing = "verification_inconclusive", []
+                        failures = _candidate_verification_failures(diff)
                     elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
                         # Always local, like the baseline: the task source is an ephemeral local repo that the remote
                         # runner cannot read (production returned RunnerBadRequest for every pipeline task).
