@@ -45,19 +45,8 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 40,
-        borderTop: "1px solid var(--border, #1e293b)",
-        background: "var(--background, #0f172a)",
-        padding: "10px 16px",
-      }}
-    >
-      <div className="max-w-7xl mx-auto flex items-end gap-3 flex-wrap">
+    <div className="studio-composer">
+      <div className="studio-composer-inner flex items-end gap-3 flex-wrap">
         <label className="flex-1 min-w-52 text-xs flex flex-col gap-1">
           <textarea
             value={prompt}
@@ -91,14 +80,14 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           onClick={onStart}
           disabled={busy || disabled || !operator || !text}
           title={operator ? undefined : t("operator-only")}
-          className="px-3 py-1 rounded text-xs border border-border bg-background-secondary cursor-pointer font-semibold"
+          className="studio-submit px-3 py-1 rounded text-xs border border-border cursor-pointer font-semibold"
         >
           {t(followUp ? "prompt-followup-start" : "prompt-start")}
         </button>
         {error && <span style={{ color: "#f87171", fontSize: 12 }}>{error}</span>}
       </div>
-      <p className="max-w-7xl mx-auto mt-1 text-xs text-text-secondary">{t("prompt-equal-tools")}</p>
-      {!operator && <p className="max-w-7xl mx-auto mt-1 text-xs text-text-secondary">{t("operator-only")}</p>}
+      <p className="studio-composer-note mt-1 text-xs text-text-secondary">{t("prompt-equal-tools")}</p>
+      {!operator && <p className="studio-composer-note mt-1 text-xs text-text-secondary">{t("operator-only")}</p>}
     </div>
   );
 }

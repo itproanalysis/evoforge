@@ -93,3 +93,10 @@ Rules that came from today's incidents:
   `gcloud builds list` before submitting.
 - Web traffic follows the latest revision; do not pin traffic without writing it here.
 - A live eval that is still running dies when the API is redeployed. Check §6 W3 before deploying.
+
+
+## Codex owner-requested design refresh (2026-10-30)
+
+| Work | Owner | Branch / state | Acceptance |
+|---|---|---|---|
+| W32 workspace organization and studio design | Codex (web ownership exception requested by the owner) | `codex/design-studio`, based on release 23; C:/Projects/EvoForge/worktrees/design-studio | 98 clean worktrees relocated with HEAD/branch preserved; existing web regressions + actual-component SSR, TypeScript and clean build; browser screenshot review remains pending because local browser control is disabled; release captain integrates/deploys |

@@ -1,55 +1,75 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { usePathname } from 'next/navigation';
+import { StudioIcon, StudioMark } from './StudioIcon';
 
 export const ITEMS = [
-  { path: "/", key: "mission-control", icon: "◉" },
-  { path: "/arena", key: "arena", icon: "⚔️" },
-  { path: "/replay", key: "replay", icon: "▶" },
-  { path: "/evidence", key: "evidence", icon: "📜" },
-  { path: "/performance", key: "performance", icon: "📈" },
-  { path: "/lab", key: "improvement-lab", icon: "🧪" },
+  { path: "/", key: "mission-control", icon: "home" },
+  { path: "/arena", key: "arena", icon: "arena" },
+  { path: "/replay", key: "replay", icon: "replay" },
+  { path: "/evidence", key: "evidence", icon: "evidence" },
+  { path: "/performance", key: "performance", icon: "performance" },
+  { path: "/lab", key: "improvement-lab", icon: "lab" },
 ];
 
 export const MORE_ITEMS = [
-  { path: "/evolution", key: "autopilot", icon: "🤖" },
-  { path: "/leaderboard", key: "leaderboard", icon: "🏆" },
+  { path: "/evolution", key: "autopilot", icon: "evolution" },
+  { path: "/leaderboard", key: "leaderboard", icon: "leaderboard" },
 ];
 
 function stripLocalePrefix(pathname: string): string {
-  const stripped = pathname.replace(/^\/(en)(?=\/|$)/, '');
+  const stripped = pathname.replace(/^\/(en|ko)(?=\/|$)/, '');
   return stripped === '' ? '/' : stripped;
 }
 
 function linkClass(isActive: boolean): string {
-  const base = 'flex items-center gap-2 rounded px-3 py-2 text-sm no-underline';
-  return isActive
-    ? `${base} bg-background-secondary text-text-primary font-semibold`
-    : `${base} text-text-tertiary hover:text-text-primary`;
+  return `studio-nav-link${isActive ? ' is-active' : ''}`;
 }
 
 export function FeatureRail() {
   const locale = useLocale();
   const t = useTranslations('navigation');
+  const ts = useTranslations('studio');
   const pathname = usePathname() ?? '';
   const [open, setOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
+  const drawer = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const priorOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const first = drawer.current?.querySelector<HTMLButtonElement>('button:not([tabindex="-1"])');
+    first?.focus();
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+      if (event.key !== 'Tab') return;
+      const nodes = drawer.current?.querySelectorAll<HTMLElement>('button:not([tabindex="-1"]), a[href]');
+      if (!nodes?.length) return;
+      const first = nodes[0], last = nodes[nodes.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => { document.body.style.overflow = priorOverflow; document.removeEventListener('keydown', onKey); menuButton.current?.focus(); };
+  }, [open]);
   const prefix = locale === 'en' ? '' : `/${locale}`;
   const routePath = stripLocalePrefix(pathname);
 
   const renderLink = ({ path, key, icon }: { path: string; key: string; icon: string }) => {
     const href = `${prefix}${path}`;
-    const isActive = routePath === path;
+    const isActive = path === '/' ? routePath === '/' : routePath === path || routePath.startsWith(`${path}/`);
     return (
       <a
         key={path}
         href={href}
         aria-current={isActive ? "page" : undefined}
         className={linkClass(isActive)}
+        onClick={() => setOpen(false)}
       >
-        <span aria-hidden="true">{icon}</span>
+        <StudioIcon name={icon}/>
         <span>{t(key)}</span>
       </a>
     );
@@ -62,7 +82,7 @@ export function FeatureRail() {
         aria-expanded={moreOpen}
         aria-controls={`${idPrefix}-more-links`}
         onClick={() => setMoreOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded px-3 py-2 text-sm text-text-tertiary hover:text-text-primary"
+        className="studio-nav-link studio-nav-more"
       >
         <span aria-hidden="true">{moreOpen ? '▾' : '▸'}</span>
         <span>{t('more')}</span>
@@ -77,10 +97,11 @@ export function FeatureRail() {
 
   return (
     <>
-      <div className="flex items-center gap-2 px-4 py-2 md:hidden">
+      <div className="studio-mobile-bar md:hidden">
         <button
           type="button"
-          aria-label="Open menu"
+          aria-label={ts("open-menu")}
+          ref={menuButton}
           aria-expanded={open}
           aria-controls="feature-rail-drawer"
           onClick={() => setOpen(true)}
@@ -88,31 +109,35 @@ export function FeatureRail() {
         >
           ☰
         </button>
-        <span className="text-sm font-semibold text-text-primary">{t('mission-control')}</span>
+        <a href={prefix || '/'} className="studio-brand"><StudioMark/><span>EvoForge</span></a>
       </div>
       <nav
-        aria-label="Feature navigation"
-        className="hidden md:flex w-56 shrink-0 flex-col gap-1 border-r border-border px-3 py-4"
+        aria-label={ts("navigation")}
+        className="studio-rail hidden md:flex"
       >
+        <a href={prefix || '/'} className="studio-brand"><StudioMark/><span>EvoForge<small>{ts('brand-caption')}</small></span></a>
+        <p className="studio-nav-caption">{ts('workspace')}</p>
         {ITEMS.map(renderLink)}
         {moreSection('desktop')}
+        <div className="studio-rail-note"><StudioIcon name="evolution"/><strong>{ts('rail-title')}</strong><p>{ts('rail-description')}</p><a href={`${prefix}/replay`}>{ts('replay')}<StudioIcon name="arrow" width="14" height="14"/></a></div>
       </nav>
       {open && (
-        <div id="feature-rail-drawer" className="fixed inset-0 z-50 md:hidden">
+        <div ref={drawer} id="feature-rail-drawer" role="dialog" aria-modal="true" aria-label={ts("navigation")} className="fixed inset-0 z-50 md:hidden">
           <button
             type="button"
-            aria-label="Close menu"
+            aria-label={ts("close-menu")}
             onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-black/50"
+            className="absolute inset-0 bg-black/70"
+            tabIndex={-1}
           />
           <nav
-            aria-label="Feature navigation"
-            className="absolute left-0 top-0 flex h-full w-64 flex-col gap-1 bg-background-primary px-3 py-4"
+            aria-label={ts("navigation")}
+            className="studio-mobile-drawer"
           >
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close menu"
+              aria-label={ts("close-menu")}
               className="self-end rounded px-2 py-1 text-text-tertiary"
             >
               ✕

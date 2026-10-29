@@ -11,32 +11,32 @@ const config: Config = {
       colors: {
         // Background colors
         background: {
-          primary: "#0b0e14",
-          secondary: "#141b2d",
-          tertiary: "#111726",
-          elevated: "#0f1524",
+          primary: "#0d1014",
+          secondary: "#161b22",
+          tertiary: "#11161c",
+          elevated: "#131920",
         },
         // Border colors
         border: {
-          DEFAULT: "#263048",
-          secondary: "#33405c",
+          DEFAULT: "#2a333d",
+          secondary: "#3b4755",
         },
         // Text colors
         text: {
-          primary: "#e8edf5",
-          secondary: "#8b96ad",
-          tertiary: "#cfe3ff",
-          link: "#7db4ff",
+          primary: "#edf1f5",
+          secondary: "#a0acba",
+          tertiary: "#c4cdd7",
+          link: "#b8df91",
         },
         // Accent colors
         accent: {
-          blue: "#2563eb",
-          green: "#22c55e",
+          blue: "#31624f",
+          green: "#a9d979",
           red: "#ef4444",
           amber: "#f59e0b",
-          cyan: "#38bdf8",
+          cyan: "#9dd9c4",
           "red-dark": "#7f1d1d",
-          "cyan-dark": "#0891b2",
+          "cyan-dark": "#356957",
         },
       },
       spacing: {
@@ -45,7 +45,7 @@ const config: Config = {
         18: "4.5rem",
       },
       borderRadius: {
-        card: "10px",
+        card: "16px",
         badge: "20px",
       },
       fontSize: {

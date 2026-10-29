@@ -42,6 +42,8 @@ import {
   previewView,
   promptArenaView,
 } from "../../lib/arenaStatus";
+import { StudioOverview } from "../../components/StudioOverview";
+import { StudioIcon } from "../../components/StudioIcon";
 import { PromptBar } from "../../components/PromptBar";
 import { SandboxedPreview } from "../../components/SandboxedPreview";
 
@@ -78,6 +80,7 @@ export default function MissionControl() {
   const tErrors = useTranslations("errors");
   const tCommon = useTranslations("common");
   const tWorkspace = useTranslations("workspace");
+  const tStudio = useTranslations("studio");
   const tArena = useTranslations("arena");
   const locale = useLocale();
 
@@ -412,9 +415,18 @@ export default function MissionControl() {
     arenaPendingId !== null || workspaceArena?.status === "running";
 
   return (
-    <main className="pb-40">
+    <main className="pb-40 studio-home">
+      <StudioOverview
+        running={wsRunning}
+        runId={workspaceArena?.arena_id}
+        measured={arenaSummary?.equal_tools?.scored ?? null}
+        verified={dashboard?.validated_improvements ?? null}
+        participants={participants?.status === 'available' ? participants.participants.length : null}
+        participantsMore={participants?.has_more}
+        heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null}
+      />
       {/* Plain-language intro above the workspace: what happens when you type. */}
-      <section aria-label={tWorkspace("intro")} className="mt-2">
+      <section aria-label={tWorkspace("intro")} className="studio-intro">
         <p className="text-sm text-text-primary mt-0 mb-2">
           {tWorkspace("intro")}
         </p>
@@ -425,7 +437,9 @@ export default function MissionControl() {
         </ol>
       </section>
       {/* Home scoreboard: measured Arena results from getArenaSummary(). */}
-      <section aria-label={tWorkspace("scoreboard-heading")} className="mt-2">
+      <section aria-label={tWorkspace("scoreboard-heading")}>
+        <details className="studio-scoreboard">
+          <summary>{tWorkspace("scoreboard-heading")}</summary>
         <Card className="bg-background-secondary border border-border p-3">
           <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
             {tWorkspace("scoreboard-heading")}
@@ -545,14 +559,15 @@ export default function MissionControl() {
             </a>
           </div>
         </Card>
+        </details>
       </section>
       {/* Home workspace: AI status left (~1/3), implementation right (~2/3).
           Mobile (<768px): grid stacks AI status above the implementation;
           the PromptBar stays fixed at the bottom. */}
-      <section aria-label={tWorkspace("heading")} className="mt-2">
-        <h1 className="my-1 text-2xl font-bold">{tWorkspace("heading")}</h1>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-3">
-          <div className="md:col-span-1 space-y-3">
+      <section aria-label={tWorkspace("heading")} className="studio-workspace">
+        <h2 className="my-1 text-2xl font-bold">{tWorkspace("heading")}</h2>
+        <div className="studio-workspace-grid">
+          <div className="studio-agent-panel space-y-3">
             <h2 className="text-base font-semibold m-0">
               {tWorkspace("ai-status-heading")}
             </h2>
@@ -564,7 +579,7 @@ export default function MissionControl() {
               </p>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 gap-3">
                   {WS_SIDES.map((side) => {
                     const rows = arenaAgentPanel(workspaceArena, side);
                     const label =
@@ -637,17 +652,20 @@ export default function MissionControl() {
               </>
             )}
           </div>
-          <div className="md:col-span-2 space-y-3">
+          <div className="studio-implementation space-y-3">
             <h2 className="text-base font-semibold m-0">
               {tWorkspace("implementation-heading")}
             </h2>
             {!workspaceArena ? (
-              <p className="text-sm text-text-secondary">
-                {tWorkspace("empty")}
-              </p>
+              <div className="studio-empty">
+                <StudioIcon name="spark"/>
+                <strong>{tStudio('empty-title')}</strong>
+                <p>{tWorkspace("empty")}</p>
+                <a className="studio-action-link" href={`${locale === 'en' ? '' : `/${locale}`}/replay`}>{tStudio('replay')}<StudioIcon name="arrow" width="16" height="16"/></a>
+              </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="studio-preview-lanes">
                   {(
                     [
                       {
@@ -674,6 +692,10 @@ export default function MissionControl() {
                           {tWorkspace("scores-label")}:{" "}
                           {lane.view.score ?? "—"}
                         </span>
+                      </div>
+                      <div className="studio-lane-cost">
+                        <span>{tStudio(`cost-${lane.view.costState}`)}</span>
+                        <strong>{lane.view.cost === null ? '—' : `${lane.view.cost}¢`}</strong>
                       </div>
                       {lane.preview.html ? (
                         <SandboxedPreview

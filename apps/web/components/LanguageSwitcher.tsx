@@ -46,7 +46,7 @@ export function LanguageSwitcher() {
   };
   
   return (
-    <div className="flex items-center gap-2" aria-label="Select language">
+    <div className="studio-language" aria-label="Select language">
       <button
         onClick={() => handleLanguageChange('en')}
         className={`px-2 py-1 text-sm rounded transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue ${
@@ -59,7 +59,7 @@ export function LanguageSwitcher() {
       >
         English
       </button>
-      <span className="text-text-secondary">|</span>
+      
       <button
         onClick={() => handleLanguageChange('ko')}
         className={`px-2 py-1 text-sm rounded transition-colors focus:outline-none focus:ring-2 focus:ring-accent-blue ${
