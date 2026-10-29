@@ -1,0 +1,22 @@
+{
+  "id": "T56_stats_panel",
+  "planned_by": "Claude (Critic): v3.8 §9",
+  "goal": "T56 — evolution stats panel on the replay screen (v3.8 §9: show measured values, never a win without evidence).\nWeb only; data from GET /v1/evolution/stats (T55): {runs, comparison: evoforge_better|single_better|not_significant,\nmethod, by_side: {evoforge|single: {rounds, verified, wilson95: [lo, hi], cost_cents, cost_per_verified_cents|null}}}.\n1. apps/web/lib/roundReplay.ts: statsView(stats) -> null for null input, else {runs, verdict (= stats.comparison, never\n   computed on the client), evoforge: V, single: V} with V = {verified \"k/n\", rate \"P%\" (Math.round(100k/n)) or \"—\" when\n   n == 0, interval \"L–H%\" (en dash; Math.round of lo*100 and hi*100) or \"—\" when n == 0, costPerVerified \"N¢\" or \"—\"}.\n2. apps/web/lib/api.ts: getEvolutionStats(feedback?) -> GET /v1/evolution/stats.\n3. apps/web/components/EvolutionStats.tsx: two side cards (verified, rate, interval bar, cost per verified round), the\n   verdict as a label (not significant shown prominently when that is the verdict), number of runs and the method note.\n4. Show it on apps/web/app/[locale]/replay/page.tsx above the run list.\n5. i18n \"replay\" (en + ko): stats-title, stats-runs, stats-not-significant, stats-evoforge-better, stats-single-better,\n   stats-method (plus labels you add).\nKeep tsc green. Tests: services/api/tests/test_muse_t56.py.",
+  "edit": [
+    "apps/web/lib/roundReplay.ts",
+    "apps/web/lib/api.ts",
+    "apps/web/components/EvolutionStats.tsx",
+    "apps/web/app/[locale]/replay/page.tsx",
+    "apps/web/messages/en.json",
+    "apps/web/messages/ko.json",
+    "services/api/tests/test_muse_t56.py"
+  ],
+  "context": [
+    "apps/web/components/RoundReplay.tsx",
+    "services/api/tests/test_critic_t55_evolution_stats.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t56.py services/api/tests/test_sealed_t56_stats_panel.py services/api/tests/test_critic_t52_round_replay_ui.py services/api/tests/test_critic_t54_live_panel_command_bar.py -q -p no:cacheprovider",
+    "node apps/web/node_modules/typescript/bin/tsc --noEmit --incremental false -p apps/web"
+  ]
+}
