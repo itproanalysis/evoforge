@@ -1,0 +1,24 @@
+{
+  "id": "T54_live_panel_command_bar",
+  "planned_by": "Claude (Critic): v3.8 D3 / v3.6 CMD-01",
+  "goal": "T54 — live AI panel + command bar on the evolution screen (v3.8 §2.2 D3 Mission Control; v3.6 CMD-01 RECEIVED !=\nAPPLIED). Web only; builds on T52 (apps/web/lib/roundReplay.ts, components/RoundReplay.tsx, app/[locale]/replay/page.tsx)\nand the T51 API (snapshots carry events [{seq, ts, role: builder|critic|runner|gate, message}]).\n\n1. In apps/web/lib/roundReplay.ts add pure functions (no fetch, no React):\n   - agentPanel(run, side) -> exactly four rows in order builder, critic, runner, gate: {role, state, message}. For each\n     role take that side's event with the highest seq across all rounds; message = its message; state \"active\" only\n     when run.status === \"running\" AND that event is the newest event of the side overall; otherwise \"done\". A role with\n     no event: state \"idle\", message null (never invent activity; the single lane has no Critic).\n   - commandState(httpStatus: number | null, runStatus: string | null) -> {state, reason}: null http -> RECEIVED\n     (sent, no answer); 409 -> REJECTED \"busy\"; 402 -> REJECTED \"budget\"; 422 -> REJECTED \"invalid\"; any other non-202\n     -> REJECTED \"error\"; 202 with runStatus \"running\" -> RUNNING, \"succeeded\" -> APPLIED, \"failed\" -> FAILED, else\n     QUEUED. reason null unless REJECTED.\n2. apps/web/lib/api.ts: startEvolutionRun(app_id, feedback) -> POST /v1/evolution/runs returning {status, body}\n   (the HTTP status is needed for commandState; do not throw on 402/409/422).\n3. apps/web/components/AgentPanel.tsx: shows agentPanel for EvoForge and for the single AI (roles, state dot\n   active/done/idle, last message).\n4. apps/web/components/CommandBar.tsx: fixed to the bottom of the replay page; app select (from /v1/evolution/apps via\n   a new listEvolutionApps() in api.ts), feedback select (critic default, heldout labelled \"upper bound\"), Start button\n   calling startEvolutionRun, the current commandState badge, and a visible warning that starting a run calls the\n   model and spends money. After 202, select the new run and let the page poll it.\n5. Wire both into apps/web/app/[locale]/replay/page.tsx (AI panel beside the round view, command bar at the bottom).\n6. i18n \"replay\" namespace (en + ko): start, cost-warning, state-received, state-queued, state-running, state-applied,\n   state-rejected, state-failed, agents, idle, active, done (plus any labels you add).\nKeep tsc green. Tests: services/api/tests/test_muse_t54.py.",
+  "edit": [
+    "apps/web/lib/roundReplay.ts",
+    "apps/web/lib/api.ts",
+    "apps/web/components/AgentPanel.tsx",
+    "apps/web/components/CommandBar.tsx",
+    "apps/web/app/[locale]/replay/page.tsx",
+    "apps/web/messages/en.json",
+    "apps/web/messages/ko.json",
+    "services/api/tests/test_muse_t54.py"
+  ],
+  "context": [
+    "docs/V38_EVOLUTION_ARENA_PLAN.md",
+    "apps/web/components/RoundReplay.tsx",
+    "services/api/tests/test_critic_t52_round_replay_ui.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t54.py services/api/tests/test_sealed_t54_live_panel_command_bar.py services/api/tests/test_critic_t52_round_replay_ui.py -q -p no:cacheprovider",
+    "node apps/web/node_modules/typescript/bin/tsc --noEmit --incremental false -p apps/web"
+  ]
+}
