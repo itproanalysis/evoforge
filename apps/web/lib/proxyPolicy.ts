@@ -29,6 +29,7 @@ const EXACT_ALLOW = new Set([
   "/v1/eval/abtest",
   "/v1/eval/decisions",
   "/v1/arena",
+  "/v1/arena/prompt",
   "/v1/stream",
   "/v1/mcp",
 ]);
