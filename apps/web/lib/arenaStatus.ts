@@ -102,3 +102,32 @@ export function previewView(lane: ArenaLane | null | undefined): { html: string 
   const error = typeof rec.preview_error === "string" ? (rec.preview_error as string) : null;
   return { html: null, source: "none", error };
 }
+
+export interface PromptArenaView {
+  prompt: string;
+  acceptanceCount: number;
+  dropped: number;
+  scorable: boolean | null;
+  judgeCost: string;
+  judge: string;
+  winner: "evoforge" | "single" | "tie" | null;
+}
+
+export function promptArenaView(doc: ArenaDoc | null | undefined): PromptArenaView | null {
+  const rec = (doc ?? {}) as unknown as Record<string, unknown>;
+  if (rec.mode !== "prompt") return null;
+  const prompt = typeof rec.prompt === "string" ? (rec.prompt as string) : "";
+  const manifest = (rec.manifest ?? {}) as Record<string, unknown>;
+  const acceptanceCount = Number.isInteger(manifest.acceptance_count) ? (manifest.acceptance_count as number) : 0;
+  const dropped = Number.isInteger(manifest.acceptance_dropped) ? (manifest.acceptance_dropped as number) : 0;
+  const finished = doc?.status === "succeeded" || doc?.status === "failed";
+  const rawWinner = (doc?.verdict as { winner?: unknown } | undefined)?.winner;
+  const scorable = !finished ? null : acceptanceCount >= 3 && rawWinner !== "unscorable";
+  const judgeCents = (doc as unknown as Record<string, unknown>)?.judge_cost_cents;
+  const judgeCost = Number.isInteger(judgeCents) && (judgeCents as number) >= 0 ? `${judgeCents}¢` : "—";
+  const judge = typeof manifest.judge === "string" ? (manifest.judge as string) : "";
+  const winner = finished && scorable === true
+    && (rawWinner === "evoforge" || rawWinner === "single" || rawWinner === "tie")
+    ? rawWinner : null;
+  return { prompt, acceptanceCount, dropped, scorable, judgeCost, judge, winner };
+}

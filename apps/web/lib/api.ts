@@ -686,6 +686,11 @@ export interface ArenaManifest {
   heldout_hash?: string;
   heldout_count?: number;
   base_tree_sha?: string;
+  acceptance_count?: number;
+  acceptance_dropped?: number;
+  acceptance_hash?: string;
+  prompt_hash?: string;
+  judge?: string;
   lanes?: {
     single?: ArenaLaneManifest;
     evoforge?: ArenaLaneManifest;
@@ -717,6 +722,10 @@ export interface ArenaLane {
 export interface ArenaDoc {
   arena_id: string;
   status: "running" | "succeeded" | "failed";
+  mode?: string;
+  prompt?: string;
+  judge_cost_cents?: number;
+  single_apply?: string;
   suite_version: "v1" | "v2" | "v3" | "v4";
   task_id: string;
   model: string;
@@ -731,7 +740,7 @@ export interface ArenaDoc {
     evoforge: ArenaLane;
   };
   verdict: {
-    winner: "evoforge" | "single" | "tie" | "inconclusive";
+    winner: "evoforge" | "single" | "tie" | "inconclusive" | "unscorable";
     reason: string;
   };
   error?: string | null;
@@ -758,6 +767,17 @@ export function postArena(
 
 export function getArena(arena_id: string) {
   return req<ArenaDoc>(`/v1/arena/${encodeURIComponent(arena_id)}`);
+}
+
+export function postPromptArena(
+  prompt: string,
+  feedback: "critic" | "heldout" = "critic",
+  single_apply: "tolerant" | "strict" = "tolerant",
+) {
+  return req<{ arena_id: string; status: string }>("/v1/arena/prompt", {
+    method: "POST",
+    body: JSON.stringify({ prompt, feedback, single_apply }),
+  });
 }
 
 export function listArenas() {

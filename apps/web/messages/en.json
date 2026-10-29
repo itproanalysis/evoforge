@@ -468,7 +468,14 @@
     "failed": "FAIL",
     "passed": "PASS",
     "running": "RUNNING",
-    "succeeded": "FINISHED"
+    "succeeded": "FINISHED",
+    "prompt-placeholder": "Describe the page or app you want both sides to build (up to 2000 chars)…",
+    "prompt-start": "Start prompt arena",
+    "prompt-heading": "Your prompt",
+    "prompt-acceptance": "{count} acceptance tests written by an independent judge before either side ran ({dropped} dropped as already passing)",
+    "prompt-unscorable": "Too few meaningful acceptance tests remained after filtering — shown as unscorable, not a win.",
+    "prompt-judge-cost": "Independent judge cost: {cost}",
+    "prompt-equal-tools": "Equal tools: both lanes apply diffs with tolerant recounting."
   },
   "replay": {
     "title": "Round Replay",
