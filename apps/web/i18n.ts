@@ -8,7 +8,7 @@ export default getRequestConfig(async ({ requestLocale }) => {
   // Validate that the incoming `locale` parameter is valid
   const locales = ['en', 'ko'];
   if (!locale || !locales.includes(locale)) {
-    locale = 'ko'; // Match the middleware's default locale.
+    locale = 'en'; // Match the middleware's default locale.
   }
 
   return {

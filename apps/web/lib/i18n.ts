@@ -4,7 +4,7 @@ import { notFound } from 'next/navigation';
 export const locales = ['en', 'ko'] as const;
 export type Locale = (typeof locales)[number];
 
-export const defaultLocale: Locale = 'ko';
+export const defaultLocale: Locale = 'en';
 
 export default getRequestConfig(async ({ requestLocale }) => {
   // Await requestLocale (required in next-intl 4.x)
