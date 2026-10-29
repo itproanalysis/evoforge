@@ -1,0 +1,16 @@
+{
+  "id": "T73_acceptance_interface",
+  "planned_by": "Claude (Critic): production prompt-Arena 0/5 vs 0/5",
+  "goal": "T73 — prompt Arena: tell BOTH lanes the interface the hidden acceptance tests call. Production 2026-10-30 (password\nstrength meter): EvoForge's own Critic passed 3/3, yet the judge's hidden tests scored 0/5 for both lanes — they called\nan interface neither Builder was told about, so the result measured guessing, not quality. API only.\n1. evoforge/arena_prompt.py: acceptance_interface(suite) -> sorted list of {\"name\", \"arities\", \"keys\"}: every attribute\n   of the module `app` the suite's tests reference (ast, never regex; unparsable tests skipped), the sorted set of\n   positional-argument counts of calls to it, and the sorted string keys of dict literals passed to those calls.\n   Nothing else from the tests (no expected values, test names or code). interface_text(iface) -> one deterministic\n   sentence naming each function, its argument counts and input keys (\"\" for an empty interface).\n2. TEMPLATE: render(state=None) (preview() still returns render()); JUDGE_INSTRUCTION also says that when the result\n   depends on user input, tests call app.render(state) with a dict of input values; TASK_INSTRUCTION says\n   render(state=None).\n3. After the judge suite is filtered (kept), append interface_text(kept interface) to the task goal both lanes get\n   (first round AND follow-ups; the EvoForge lane's own Critic sees the same goal) — identical text for both lanes.\n4. Manifest: \"acceptance_interface\" (the list) and \"interface_hash\" (\"sha256:\" + hex of the canonical JSON), first\n   round and follow-ups.\nKeep every existing prompt-Arena test green (judge test names must never reach a lane).\nTests: services/api/tests/test_muse_t73.py.",
+  "edit": [
+    "services/api/evoforge/arena_prompt.py",
+    "services/api/tests/test_muse_t73.py"
+  ],
+  "context": [
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/evoforge/arena.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t73.py services/api/tests/test_sealed_t73_acceptance_interface.py services/api/tests/test_critic_t64_prompt_arena.py services/api/tests/test_critic_t65_prompt_bar.py services/api/tests/test_critic_t66_prompt_followup.py services/api/tests/test_muse_t64.py services/api/tests/test_muse_t65.py services/api/tests/test_muse_t66.py -q -p no:cacheprovider"
+  ]
+}
