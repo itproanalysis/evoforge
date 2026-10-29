@@ -1,0 +1,125 @@
+{
+  "app_id": "scoreboard",
+  "title": "Scoreboard",
+  "suite": "rounds_v1",
+  "file": "scoreboard.py",
+  "base": "def render(entries):\n    return '<table class=\"scoreboard\"></table>'\n\n\ndef preview():\n    return render([])\n",
+  "rule": "render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+  "rounds": [
+    {
+      "index": 1,
+      "name": "Initial Build",
+      "goal": "Round 1 — Initial Build. In scoreboard.py, render(entries) takes dicts {lane, passed, n} and returns <table class=\"scoreboard\"><thead><tr><th>Lane</th><th>Held-out</th></tr></thead><tbody>...</tbody></table> with one <tr data-lane=\"LANE\"><td>LANE</td><td>PASSED/N</td></tr> per entry in input order. Add a module-level SAMPLE list of at least two entries. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "def render(entries):\n    rows = \"\".join(f'<tr data-lane=\"{e[\"lane\"]}\"><td>{e[\"lane\"]}</td><td>{e[\"passed\"]}/{e[\"n\"]}</td></tr>' for e in entries)\n    return ('<table class=\"scoreboard\"><thead><tr><th>Lane</th><th>Held-out</th></tr></thead>'\n            f\"<tbody>{rows}</tbody></table>\")\n\n\nSAMPLE = [\n    {\"lane\": \"single\", \"passed\": 4, \"n\": 6, \"cost_cents\": 31},\n    {\"lane\": \"evoforge\", \"passed\": 6, \"n\": 6, \"cost_cents\": 110},\n    {\"lane\": \"baseline\", \"passed\": 2, \"n\": 6},\n]\ndef preview():\n    return render(SAMPLE)\n",
+      "heldout": [
+        {
+          "id": "R1-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r1_compositional():\n    e = ET.fromstring(scoreboard.render([{'lane': 'evoforge', 'passed': 3, 'n': 3}, {'lane': 'single', 'passed': 1, 'n': 3}]))\n    assert e.tag == 'table' and e.get('class') == 'scoreboard'\n    assert [r.get('data-lane') for r in e.find('tbody').findall('tr')] == ['evoforge', 'single']\n    assert [r.findall('td')[1].text for r in e.find('tbody').findall('tr')] == ['3/3', '1/3']\n"
+        },
+        {
+          "id": "R1-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r1_negative():\n    e = ET.fromstring(scoreboard.render([]))\n    assert e.find('tbody').findall('tr') == [] and e.find('thead') is not None\n    assert [th.text for th in e.find('thead').iter('th')][:2] == ['Lane', 'Held-out']\n"
+        },
+        {
+          "id": "R1-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r1_boundary():\n    e = ET.fromstring(scoreboard.render([{'lane': 'x', 'passed': 0, 'n': 2}]))\n    assert e.find('tbody').findall('tr')[0].find('td').text == 'x'\n    assert len(ET.fromstring(scoreboard.preview()).find('tbody').findall('tr')) >= 2\n"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "name": "Feature Growth",
+      "goal": "Round 2 — Feature Growth. Add a third column <th>Cost</th> whose cell shows cost_cents as dollars with two decimals (\"$0.20\" for 20; \"n/a\" when an entry has no cost_cents). Order rows by pass rate passed/n, highest first (n == 0 counts as 0), keeping input order for ties. After tbody add <tfoot><tr><td colspan=\"3\">LANE leads</td></tr></tfoot> naming the first row's lane, or \"No runs\" when there are no entries. An entry with n < 0, passed < 0 or passed > n raises ValueError. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "def _rate(e):\n    return e[\"passed\"] / e[\"n\"] if e[\"n\"] else 0.0\n\n\ndef _check(e):\n    if e[\"n\"] < 0 or e[\"passed\"] < 0 or e[\"passed\"] > e[\"n\"]:\n        raise ValueError(f\"bad score for {e['lane']!r}\")\n\n\ndef _cost(e):\n    c = e.get(\"cost_cents\")\n    return \"n/a\" if c is None else f\"${c / 100:.2f}\"\n\n\ndef render(entries):\n    for e in entries:\n        _check(e)\n    ordered = sorted(entries, key=lambda e: -_rate(e))\n    rows = \"\".join(f'<tr data-lane=\"{e[\"lane\"]}\"><td>{e[\"lane\"]}</td><td>{e[\"passed\"]}/{e[\"n\"]}</td>'\n                   f\"<td>{_cost(e)}</td></tr>\" for e in ordered)\n    lead = f\"{ordered[0]['lane']} leads\" if ordered else \"No runs\"\n    return ('<table class=\"scoreboard\"><thead><tr><th>Lane</th><th>Held-out</th><th>Cost</th></tr></thead>'\n            f'<tbody>{rows}</tbody><tfoot><tr><td colspan=\"3\">{lead}</td></tr></tfoot></table>')\n\n\nSAMPLE = [\n    {\"lane\": \"single\", \"passed\": 4, \"n\": 6, \"cost_cents\": 31},\n    {\"lane\": \"evoforge\", \"passed\": 6, \"n\": 6, \"cost_cents\": 110},\n    {\"lane\": \"baseline\", \"passed\": 2, \"n\": 6},\n]\ndef preview():\n    return render(SAMPLE)\n",
+      "heldout": [
+        {
+          "id": "R2-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r2_compositional():\n    e = ET.fromstring(scoreboard.render([{'lane': 'single', 'passed': 1, 'n': 3, 'cost_cents': 5}, {'lane': 'evoforge', 'passed': 3, 'n': 3, 'cost_cents': 2000}]))\n    assert [r.get('data-lane') for r in e.find('tbody').findall('tr')] == ['evoforge', 'single']\n    assert [r.findall('td')[2].text for r in e.find('tbody').findall('tr')] == ['$20.00', '$0.05']\n    assert e.find('tfoot').find('tr').find('td').text == 'evoforge leads'\n"
+        },
+        {
+          "id": "R2-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r2_negative():\n    with pytest.raises(ValueError):\n        scoreboard.render([{'lane': 'x', 'passed': 4, 'n': 3}])\n"
+        },
+        {
+          "id": "R2-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r2_boundary():\n    assert ET.fromstring(scoreboard.render([])).find('tfoot').find('tr').find('td').text == 'No runs'\n    e = ET.fromstring(scoreboard.render([{'lane': 'a', 'passed': 1, 'n': 2}, {'lane': 'b', 'passed': 1, 'n': 2}]))\n    assert [r.get('data-lane') for r in e.find('tbody').findall('tr')] == ['a', 'b'] and e.find('tbody').findall('tr')[0].findall('td')[2].text == 'n/a'\n"
+        }
+      ]
+    },
+    {
+      "index": 3,
+      "name": "UX Refinement",
+      "goal": "Round 3 — UX Refinement. Add <caption>Held-out scoreboard</caption> as the table's first child and scope=\"col\" on every header cell. The first (leading) row gets class=\"leader\" (no other row has a class). The score cell gets title=\"P of N held-out tests passed\" and data-rate=\"R\" with R = round(100 * P / N), 0 when N is 0. render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "def _rate(e):\n    return e[\"passed\"] / e[\"n\"] if e[\"n\"] else 0.0\n\n\ndef _check(e):\n    if e[\"n\"] < 0 or e[\"passed\"] < 0 or e[\"passed\"] > e[\"n\"]:\n        raise ValueError(f\"bad score for {e['lane']!r}\")\n\n\ndef _cost(e):\n    c = e.get(\"cost_cents\")\n    return \"n/a\" if c is None else f\"${c / 100:.2f}\"\n\n\ndef _row(e, leader):\n    cls = ' class=\"leader\"' if leader else \"\"\n    title = f\"{e['passed']} of {e['n']} held-out tests passed\"\n    return (f'<tr data-lane=\"{e[\"lane\"]}\"{cls}><td>{e[\"lane\"]}</td>'\n            f'<td title=\"{title}\" data-rate=\"{round(100 * _rate(e))}\">{e[\"passed\"]}/{e[\"n\"]}</td>'\n            f\"<td>{_cost(e)}</td></tr>\")\n\n\ndef render(entries):\n    for e in entries:\n        _check(e)\n    ordered = sorted(entries, key=lambda e: -_rate(e))\n    rows = \"\".join(_row(e, i == 0) for i, e in enumerate(ordered))\n    lead = f\"{ordered[0]['lane']} leads\" if ordered else \"No runs\"\n    return ('<table class=\"scoreboard\"><caption>Held-out scoreboard</caption><thead><tr><th scope=\"col\">Lane</th>'\n            '<th scope=\"col\">Held-out</th><th scope=\"col\">Cost</th></tr></thead>'\n            f'<tbody>{rows}</tbody><tfoot><tr><td colspan=\"3\">{lead}</td></tr></tfoot></table>')\n\n\nSAMPLE = [\n    {\"lane\": \"single\", \"passed\": 4, \"n\": 6, \"cost_cents\": 31},\n    {\"lane\": \"evoforge\", \"passed\": 6, \"n\": 6, \"cost_cents\": 110},\n    {\"lane\": \"baseline\", \"passed\": 2, \"n\": 6},\n]\ndef preview():\n    return render(SAMPLE)\n",
+      "heldout": [
+        {
+          "id": "R3-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r3_compositional():\n    e = ET.fromstring(scoreboard.render([{'lane': 'single', 'passed': 1, 'n': 3}, {'lane': 'evoforge', 'passed': 3, 'n': 3}]))\n    assert e[0].tag == 'caption' and e[0].text == 'Held-out scoreboard'\n    assert all(th.get('scope') == 'col' for th in e.find('thead').iter('th'))\n    assert [r.get('class') for r in e.find('tbody').findall('tr')] == ['leader', None]\n"
+        },
+        {
+          "id": "R3-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r3_negative():\n    e = ET.fromstring(scoreboard.render([{'lane': 'z', 'passed': 0, 'n': 0}]))\n    cell = e.find('tbody').findall('tr')[0].findall('td')[1]\n    assert cell.text == '0/0' and cell.get('data-rate') == '0'\n"
+        },
+        {
+          "id": "R3-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r3_boundary():\n    e = ET.fromstring(scoreboard.render([{'lane': 'q', 'passed': 1, 'n': 3}]))\n    cell = e.find('tbody').findall('tr')[0].findall('td')[1]\n    assert cell.get('title') == '1 of 3 held-out tests passed' and cell.get('data-rate') == '33'\n"
+        }
+      ]
+    },
+    {
+      "index": 4,
+      "name": "Optimization",
+      "goal": "Round 4 — Robustness. HTML-escape lane names in text and attributes. When a lane appears more than once keep only the entry with the most passed tests (the first one on ties), in the lane's first position. Show at most 8 rows, then <tr class=\"more\"><td colspan=\"3\">+K more</td></tr> inside tbody. Dollar amounts of $1,000 or more use thousands separators (\"$1,234.56\"). render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "import html\n\nVISIBLE = 8\n\n\ndef _e(text):\n    return html.escape(str(text), quote=True)\n\n\ndef _rate(e):\n    return e[\"passed\"] / e[\"n\"] if e[\"n\"] else 0.0\n\n\ndef _check(e):\n    if e[\"n\"] < 0 or e[\"passed\"] < 0 or e[\"passed\"] > e[\"n\"]:\n        raise ValueError(f\"bad score for {e['lane']!r}\")\n\n\ndef _money(c):\n    if c is None:\n        return \"n/a\"\n    return f\"${c / 100:,.2f}\"\n\n\ndef _cost(e):\n    return _money(e.get(\"cost_cents\"))\n\n\ndef _best_per_lane(entries):\n    best = {}\n    order = []\n    for e in entries:\n        lane = e[\"lane\"]\n        if lane not in best:\n            best[lane] = e\n            order.append(lane)\n        elif e[\"passed\"] > best[lane][\"passed\"]:\n            best[lane] = e\n    return [best[lane] for lane in order]\n\n\ndef _row(e, leader):\n    cls = ' class=\"leader\"' if leader else \"\"\n    title = f\"{e['passed']} of {e['n']} held-out tests passed\"\n    return (f'<tr data-lane=\"{_e(e[\"lane\"])}\"{cls}><td>{_e(e[\"lane\"])}</td>'\n            f'<td title=\"{title}\" data-rate=\"{round(100 * _rate(e))}\">{e[\"passed\"]}/{e[\"n\"]}</td>'\n            f\"<td>{_cost(e)}</td></tr>\")\n\n\ndef render(entries):\n    for e in entries:\n        _check(e)\n    ordered = sorted(_best_per_lane(entries), key=lambda e: -_rate(e))\n    rows = \"\".join(_row(e, i == 0) for i, e in enumerate(ordered[:VISIBLE]))\n    if len(ordered) > VISIBLE:\n        rows += f'<tr class=\"more\"><td colspan=\"3\">+{len(ordered) - VISIBLE} more</td></tr>'\n    lead = f\"{_e(ordered[0]['lane'])} leads\" if ordered else \"No runs\"\n    return ('<table class=\"scoreboard\"><caption>Held-out scoreboard</caption><thead><tr><th scope=\"col\">Lane</th>'\n            '<th scope=\"col\">Held-out</th><th scope=\"col\">Cost</th></tr></thead>'\n            f'<tbody>{rows}</tbody><tfoot><tr><td colspan=\"3\">{lead}</td></tr></tfoot></table>')\n\n\nSAMPLE = [\n    {\"lane\": \"single\", \"passed\": 4, \"n\": 6, \"cost_cents\": 31},\n    {\"lane\": \"evoforge\", \"passed\": 6, \"n\": 6, \"cost_cents\": 110},\n    {\"lane\": \"baseline\", \"passed\": 2, \"n\": 6},\n]\ndef preview():\n    return render(SAMPLE)\n",
+      "heldout": [
+        {
+          "id": "R4-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r4_compositional():\n    out = scoreboard.render([{'lane': '<b>x</b>', 'passed': 1, 'n': 1}])\n    assert '<b>' not in out\n    e = ET.fromstring(out)\n    assert e.find('tbody').findall('tr')[0].find('td').text == '<b>x</b>' and e.find('tbody').findall('tr')[0].get('data-lane') == '<b>x</b>'\n"
+        },
+        {
+          "id": "R4-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r4_negative():\n    e = ET.fromstring(scoreboard.render([{'lane': 'a', 'passed': 1, 'n': 3}, {'lane': 'b', 'passed': 2, 'n': 3}, {'lane': 'a', 'passed': 3, 'n': 3}]))\n    assert [r.get('data-lane') for r in e.find('tbody').findall('tr')] == ['a', 'b'] and e.find('tbody').findall('tr')[0].findall('td')[1].text == '3/3'\n"
+        },
+        {
+          "id": "R4-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r4_boundary():\n    rows = [{'lane': f'l{i}', 'passed': 0, 'n': 1, 'cost_cents': 123456 if i == 0 else 99} for i in range(10)]\n    e = ET.fromstring(scoreboard.render(rows))\n    body = e.find('tbody').findall('tr')\n    assert len(body) == 9 and body[-1].get('class') == 'more' and body[-1].find('td').text == '+2 more'\n    assert body[0].findall('td')[2].text == '$1,234.56' and body[1].findall('td')[2].text == '$0.99'\n"
+        }
+      ]
+    },
+    {
+      "index": 5,
+      "name": "Verified Release",
+      "goal": "Round 5 — Verified Release. render(entries, title=None): when title is given the caption shows it (HTML-escaped) instead of \"Held-out scoreboard\". When there is at least one row, tfoot gets a second row <tr class=\"total\"><td>Total</td><td>SUMP/SUMN</td><td>COST</td></tr> summing the shown lanes' passed and n and their cost_cents (formatted like the cost cells; \"n/a\" when no lane has a cost). render returns one well-formed XHTML element (parseable by xml.etree.ElementTree.fromstring). preview() returns render of the module's SAMPLE. Keep every earlier round's behaviour.",
+      "reference": "import html\n\nVISIBLE = 8\n\n\ndef _e(text):\n    return html.escape(str(text), quote=True)\n\n\ndef _rate(e):\n    return e[\"passed\"] / e[\"n\"] if e[\"n\"] else 0.0\n\n\ndef _check(e):\n    if e[\"n\"] < 0 or e[\"passed\"] < 0 or e[\"passed\"] > e[\"n\"]:\n        raise ValueError(f\"bad score for {e['lane']!r}\")\n\n\ndef _money(c):\n    if c is None:\n        return \"n/a\"\n    return f\"${c / 100:,.2f}\"\n\n\ndef _cost(e):\n    return _money(e.get(\"cost_cents\"))\n\n\ndef _best_per_lane(entries):\n    best = {}\n    order = []\n    for e in entries:\n        lane = e[\"lane\"]\n        if lane not in best:\n            best[lane] = e\n            order.append(lane)\n        elif e[\"passed\"] > best[lane][\"passed\"]:\n            best[lane] = e\n    return [best[lane] for lane in order]\n\n\ndef _row(e, leader):\n    cls = ' class=\"leader\"' if leader else \"\"\n    title = f\"{e['passed']} of {e['n']} held-out tests passed\"\n    return (f'<tr data-lane=\"{_e(e[\"lane\"])}\"{cls}><td>{_e(e[\"lane\"])}</td>'\n            f'<td title=\"{title}\" data-rate=\"{round(100 * _rate(e))}\">{e[\"passed\"]}/{e[\"n\"]}</td>'\n            f\"<td>{_cost(e)}</td></tr>\")\n\n\ndef render(entries, title=None):\n    for e in entries:\n        _check(e)\n    ordered = sorted(_best_per_lane(entries), key=lambda e: -_rate(e))\n    rows = \"\".join(_row(e, i == 0) for i, e in enumerate(ordered[:VISIBLE]))\n    if len(ordered) > VISIBLE:\n        rows += f'<tr class=\"more\"><td colspan=\"3\">+{len(ordered) - VISIBLE} more</td></tr>'\n    lead = f\"{_e(ordered[0]['lane'])} leads\" if ordered else \"No runs\"\n    foot = f'<tr><td colspan=\"3\">{lead}</td></tr>'\n    if ordered:\n        passed = sum(e[\"passed\"] for e in ordered)\n        n = sum(e[\"n\"] for e in ordered)\n        costs = [e.get(\"cost_cents\") for e in ordered]\n        total = None if all(c is None for c in costs) else sum(c for c in costs if c is not None)\n        foot += f'<tr class=\"total\"><td>Total</td><td>{passed}/{n}</td><td>{_money(total)}</td></tr>'\n    caption = _e(title) if title else \"Held-out scoreboard\"\n    return (f'<table class=\"scoreboard\"><caption>{caption}</caption><thead><tr><th scope=\"col\">Lane</th>'\n            '<th scope=\"col\">Held-out</th><th scope=\"col\">Cost</th></tr></thead>'\n            f\"<tbody>{rows}</tbody><tfoot>{foot}</tfoot></table>\")\n\n\nSAMPLE = [\n    {\"lane\": \"single\", \"passed\": 4, \"n\": 6, \"cost_cents\": 31},\n    {\"lane\": \"evoforge\", \"passed\": 6, \"n\": 6, \"cost_cents\": 110},\n    {\"lane\": \"baseline\", \"passed\": 2, \"n\": 6},\n]\ndef preview():\n    return render(SAMPLE, title=\"Mission Board R5\")\n",
+      "heldout": [
+        {
+          "id": "R5-C",
+          "kind": "compositional",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r5_compositional():\n    e = ET.fromstring(scoreboard.render([{'lane': 'evoforge', 'passed': 3, 'n': 3, 'cost_cents': 110}, {'lane': 'single', 'passed': 1, 'n': 3, 'cost_cents': 15}]))\n    total = [r for r in e.find('tfoot').findall('tr') if r.get('class') == 'total'][0]\n    assert [td.text for td in total.findall('td')] == ['Total', '4/6', '$1.25']\n"
+        },
+        {
+          "id": "R5-N",
+          "kind": "negative",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r5_negative():\n    e = ET.fromstring(scoreboard.render([], title='Empty board'))\n    assert e.find('caption').text == 'Empty board'\n    assert [r for r in e.find('tfoot').findall('tr') if r.get('class') == 'total'] == []\n"
+        },
+        {
+          "id": "R5-B",
+          "kind": "boundary",
+          "code": "import xml.etree.ElementTree as ET\n\nimport pytest\n\nimport scoreboard\n\n\ndef test_r5_boundary():\n    e = ET.fromstring(scoreboard.render([{'lane': 'a', 'passed': 1, 'n': 1}], title='R5 <final>'))\n    assert e.find('caption').text == 'R5 <final>'\n    total = [r for r in e.find('tfoot').findall('tr') if r.get('class') == 'total'][0]\n    assert [td.text for td in total.findall('td')] == ['Total', '1/1', 'n/a']\n"
+        }
+      ]
+    }
+  ]
+}
