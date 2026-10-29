@@ -1588,6 +1588,69 @@ def arena_get(arena_id: str):
     return doc
 
 
+class ArenaFollowupRequest(BaseModel):
+    prompt: str
+    feedback: Literal["heldout", "critic"] | None = None
+    single_apply: Literal["strict", "tolerant"] | None = None
+
+
+@app.post("/v1/arena/{arena_id}/followup", status_code=202)
+def arena_followup(arena_id: str, req: ArenaFollowupRequest):
+    """Follow-up round: each lane continues from its own final files."""
+    parent = arena_mod.get_arena(arena_id)
+    if parent is None:
+        raise HTTPException(404, "unknown arena")
+    if parent.get("mode") != "prompt" or parent.get("status") not in (
+            "succeeded", "failed"):
+        raise HTTPException(409, "parent is not a finished prompt arena")
+    raw = req.prompt if isinstance(req.prompt, str) else ""
+    stripped = raw.strip()
+    if not stripped or len(stripped) > 2000:
+        raise HTTPException(422, "prompt must be 1..2000 chars")
+    feedback = req.feedback if req.feedback is not None else parent.get(
+        "feedback", "critic")
+    if feedback not in ("heldout", "critic"):
+        feedback = "critic"
+    single_apply = (req.single_apply if req.single_apply is not None
+                    else parent.get("single_apply", "tolerant"))
+    if single_apply not in ("strict", "tolerant"):
+        single_apply = "tolerant"
+    _arena_prompt_budget_or_402(feedback)
+    root_id = parent.get("root_id") or parent.get("arena_id") or arena_id
+    try:
+        round_index = int(parent.get("round_index", 1)) + 1
+    except Exception:
+        round_index = 2
+    box: dict = {}
+    ready = threading.Event()
+
+    def _runner(p=stripped, par=arena_id, fb=feedback, sa=single_apply):
+        if not ready.wait(timeout=60):
+            raise RuntimeError("arena start sync failed")
+        return arena_prompt_mod.run_followup_arena(
+            box["arena_id"], par, p, feedback=fb, single_apply=sa)
+
+    try:
+        job = eval_jobs_mod.create_job(kind="ARENA", runner=_runner)
+    except eval_jobs_mod.ActiveJobError as e:
+        raise HTTPException(409, f"another eval job is active: {e.job_id}")
+    box["arena_id"] = job["job_id"]
+    arena_prompt_mod.seed_running(job["job_id"], stripped, feedback,
+                                  single_apply, parent_id=arena_id,
+                                  root_id=root_id,
+                                  round_index=round_index)
+    ready.set()
+    return {"arena_id": job["job_id"], "status": "running"}
+
+
+@app.get("/v1/arena/{arena_id}/chain")
+def arena_chain(arena_id: str):
+    rounds = arena_prompt_mod.get_chain(arena_id)
+    if rounds is None:
+        raise HTTPException(404, "unknown arena")
+    return {"rounds": rounds}
+
+
 @app.get("/v1/performance")
 def performance():
     """Measured-only performance summary; missing data is not_measured."""

@@ -1012,6 +1012,24 @@
     ]
   },
   {
+    "expected": "/v1/arena/arena_abc123/followup",
+    "path_segments": [
+      "v1",
+      "arena",
+      "arena_abc123",
+      "followup"
+    ]
+  },
+  {
+    "expected": "/v1/arena/arena_abc123/chain",
+    "path_segments": [
+      "v1",
+      "arena",
+      "arena_abc123",
+      "chain"
+    ]
+  },
+  {
     "expected": null,
     "path_segments": [
       "v1",
