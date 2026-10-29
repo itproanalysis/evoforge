@@ -55,3 +55,50 @@ export function arenaCost(arena: ArenaDoc | null | undefined) {
   const evo = laneView(arena?.lanes?.evoforge).cost;
   return single === null || evo === null ? null : single + evo;
 }
+
+function shortHash(value: unknown): string | null {
+  if (typeof value !== "string" || value.length === 0) return null;
+  const hex = value.startsWith("sha256:") ? value.slice("sha256:".length) : value;
+  if (hex.length === 0) return null;
+  return hex.slice(0, 12);
+}
+
+function manifestLane(lane: unknown) {
+  const rec = (lane ?? {}) as Record<string, unknown>;
+  const harness = typeof rec.harness === "string" ? rec.harness : null;
+  const attempts = Number.isInteger(rec.max_attempts) ? (rec.max_attempts as number) : null;
+  const feedback = typeof rec.feedback === "string" ? rec.feedback : null;
+  return { harness, attempts, feedback };
+}
+
+export function manifestView(doc: ArenaDoc | null | undefined) {
+  const manifest = (doc as { manifest?: unknown } | null | undefined)?.manifest as Record<string, unknown> | null | undefined;
+  if (manifest == null || typeof manifest !== "object") return null;
+  const lanes = (manifest.lanes ?? {}) as Record<string, unknown>;
+  const evoforge = manifestLane(lanes.evoforge);
+  const single = manifestLane(lanes.single);
+  const disclosure = typeof manifest.disclosure === "string" ? manifest.disclosure : null;
+  return {
+    spec: shortHash(manifest.task_spec_hash),
+    heldout: shortHash(manifest.heldout_hash),
+    baseTree: shortHash(manifest.base_tree_sha),
+    single,
+    evoforge,
+    upperBound: evoforge.feedback === "heldout_failing_test_names",
+    disclosure,
+  };
+}
+
+export type PreviewSource = "pending" | "candidate" | "base" | "none";
+
+export function previewView(lane: ArenaLane | null | undefined): { html: string | null; source: PreviewSource; error: string | null } {
+  if (lane?.status !== "succeeded") return { html: null, source: "pending", error: null };
+  const rec = lane as unknown as Record<string, unknown>;
+  const source = rec.preview_source;
+  const html = rec.preview_html;
+  if ((source === "candidate" || source === "base") && typeof html === "string") {
+    return { html, source, error: null };
+  }
+  const error = typeof rec.preview_error === "string" ? (rec.preview_error as string) : null;
+  return { html: null, source: "none", error };
+}

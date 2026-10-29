@@ -670,6 +670,31 @@ export interface ArenaEvent {
   message: string;
 }
 
+export interface ArenaLaneManifest {
+  model?: string;
+  harness?: string | null;
+  max_attempts?: number | null;
+  critic?: boolean;
+  feedback?: string | null;
+}
+
+export interface ArenaManifest {
+  comparison_mode?: string;
+  suite_version?: string;
+  task_id?: string;
+  task_spec_hash?: string;
+  heldout_hash?: string;
+  heldout_count?: number;
+  base_tree_sha?: string;
+  lanes?: {
+    single?: ArenaLaneManifest;
+    evoforge?: ArenaLaneManifest;
+  };
+  cost_basis?: string;
+  runner_cost?: string;
+  disclosure?: string;
+}
+
 export interface ArenaLane {
   status: "running" | "succeeded" | "failed";
   attempts: number;
@@ -683,18 +708,24 @@ export interface ArenaLane {
   events: ArenaEvent[];
   failing_tests?: string[];
   error?: string | null;
+  base_tree_sha?: string | null;
+  preview_source?: "candidate" | "base" | "none" | string;
+  preview_html?: string | null;
+  preview_error?: string | null;
 }
 
 export interface ArenaDoc {
   arena_id: string;
   status: "running" | "succeeded" | "failed";
-  suite_version: "v1" | "v2";
+  suite_version: "v1" | "v2" | "v3" | "v4";
   task_id: string;
   model: string;
+  feedback?: "heldout" | "critic" | string;
   goal: string;
   created_at: number;
   started_at?: number | null;
   finished_at?: number | null;
+  manifest?: ArenaManifest | null;
   lanes: {
     single: ArenaLane;
     evoforge: ArenaLane;
@@ -706,10 +737,22 @@ export interface ArenaDoc {
   error?: string | null;
 }
 
-export function postArena(task_id: string, suite_version: "v1" | "v2" = "v2", model: string = "muse-spark-1.3") {
+export function postArena(
+  task_id: string,
+  suite_version: "v1" | "v2" | "v3" | "v4" = "v2",
+  feedback: "heldout" | "critic" = "critic",
+  model = "muse-spark-1.3",
+) {
+  // Backwards tolerance: a legacy caller may pass the model as the 3rd arg.
+  let fb: "heldout" | "critic" = feedback;
+  let md = model;
+  if ((feedback as unknown as string) !== "heldout" && (feedback as unknown as string) !== "critic") {
+    md = feedback as unknown as string;
+    fb = "critic";
+  }
   return req<{ arena_id: string; status: string }>("/v1/arena", {
     method: "POST",
-    body: JSON.stringify({ task_id, suite_version, model }),
+    body: JSON.stringify({ task_id, suite_version, model: md, feedback: fb }),
   });
 }
 

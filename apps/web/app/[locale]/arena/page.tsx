@@ -9,9 +9,10 @@ import {
   type ArenaDoc,
 } from "../../../lib/api";
 import { Button, Card } from "../../../components/ui";
-import { laneView, arenaVerdict, arenaCost, costLabel } from "../../../lib/arenaStatus";
+import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView } from "../../../lib/arenaStatus";
+import { SandboxedPreview } from "../../../components/SandboxedPreview";
 
-const BENCHMARK_TASKS: Record<"v2" | "v1", { id: string; goal: string }[]> = {
+const BENCHMARK_TASKS: Record<"v1" | "v2" | "v3" | "v4", { id: string; goal: string }[]> = {
   v2: [
     { id: "SV2-AO-01", goal: "In bsearch.py, bsearch(seq, target) returns index in sorted sequence, or -1" },
     { id: "SV2-AO-02", goal: "In qsort.py, quicksort in-place with 3-way partition" },
@@ -25,6 +26,22 @@ const BENCHMARK_TASKS: Record<"v2" | "v1", { id: string; goal: string }[]> = {
     { id: "SV1-AO-02", goal: "In qsort.py, quicksort in-place with 3-way partition" },
     { id: "SV1-CD-01", goal: "In chat.py, exponential backoff with retry" },
     { id: "SV1-CI-01", goal: "In ci.py, fair task scheduler" },
+  ],
+  v3: [
+    { id: "SV3-AO-01", goal: "In bsearch.py, bsearch(seq, target) returns index in sorted sequence, or -1" },
+    { id: "SV3-AO-02", goal: "In topk.py, topk(items, k) returns the k largest elements in descending order" },
+    { id: "SV3-AO-03", goal: "In dedupe.py, dedupe(items) removes duplicates, keeping first occurrence order" },
+    { id: "SV3-AO-04", goal: "In window.py, max_window_sum(values, k) returns the largest sum of k consecutive values" },
+    { id: "SV3-CI-01", goal: "In ci.py, saturated build queue fair scheduler" },
+    { id: "SV3-SS-01", goal: "In auth.py, constant-time token comparison" },
+  ],
+  v4: [
+    { id: "SV4-AO-01", goal: "In barchart.py, render(values, ...) returns an SVG bar chart" },
+    { id: "SV4-AO-02", goal: "In sparkline.py, render(points, ...) returns an SVG sparkline" },
+    { id: "SV4-CD-01", goal: "In transcript.py, render(messages) returns an ordered transcript list" },
+    { id: "SV4-CI-01", goal: "In results_table.py, render(results) returns a results table" },
+    { id: "SV4-SEC-01", goal: "In comment.py, render(author, text) returns an escaped comment article" },
+    { id: "SV4-SS-01", goal: "In badge.py, render(status) returns a status badge span" },
   ],
 };
 
@@ -61,9 +78,10 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
 
 export default function ArenaPage() {
   const t = useTranslations("arena");
-  const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2">("v2");
+  const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2" | "v3" | "v4">("v2");
   const [selectedTaskId, setSelectedTaskId] = useState<string>("SV2-AO-01");
   const [customTaskId, setCustomTaskId] = useState<string>("");
+  const [feedback, setFeedback] = useState<"heldout" | "critic">("critic");
   const [starting, setStarting] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [pollError, setPollError] = useState(false);
@@ -129,12 +147,16 @@ export default function ArenaPage() {
 
   const handleStartMatch = async () => {
     if (!activeTaskId || running) return;
+    // Starting an arena spends model credits: operator-only, with a cost
+    // warning confirmed up front.
+    if (process.env.NEXT_PUBLIC_EVO_OPERATOR_CONTROLS !== "1") return;
+    if (typeof window !== "undefined" && !window.confirm(t("cost-confirm"))) return;
     setError(null);
     setPollError(false);
     setStarting(true);
     setActiveArena(null);
     try {
-      const res = await postArena(activeTaskId, suiteVersion);
+      const res = await postArena(activeTaskId, suiteVersion, feedback);
       if (!res?.arena_id) throw new Error("missing arena id");
       setPendingId(res.arena_id);
     } catch (cause) {
@@ -153,7 +175,11 @@ export default function ArenaPage() {
   const evoLane = activeArena?.lanes?.evoforge;
   const evoView = laneView(evoLane);
   const singleView = laneView(singleLane);
+  const manifest = manifestView(activeArena);
+  const evoPreview = previewView(evoLane);
+  const singlePreview = previewView(singleLane);
   const verdict = arenaVerdict(activeArena);
+  const operator = process.env.NEXT_PUBLIC_EVO_OPERATOR_CONTROLS === "1";
   const verificationInconclusive = activeArena?.verdict?.winner === "inconclusive"
     || evoView.outcome === "verification_inconclusive" || singleView.outcome === "verification_inconclusive";
 
@@ -179,15 +205,31 @@ export default function ArenaPage() {
             <select
               value={suiteVersion}
               onChange={(e) => {
-                const sv = e.target.value as "v1" | "v2";
+                const sv = e.target.value as "v1" | "v2" | "v3" | "v4";
                 setSuiteVersion(sv);
                 setSelectedTaskId(BENCHMARK_TASKS[sv]?.[0]?.id || "");
               }}
               className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary"
               disabled={running}
             >
+              <option value="v4">Sealed v4 (12 tasks)</option>
+              <option value="v3">Sealed v3 (48 tasks)</option>
               <option value="v2">Sealed v2 (36 tasks)</option>
               <option value="v1">Sealed v1 (12 tasks)</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-text-secondary font-medium">{t("feedback-label")}:</label>
+            <select
+              value={feedback}
+              onChange={(e) => setFeedback(e.target.value as "heldout" | "critic")}
+              className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary"
+              disabled={running}
+              aria-label={t("feedback-label")}
+            >
+              <option value="critic">{t("feedback-critic")}</option>
+              <option value="heldout">{t("feedback-heldout")}</option>
             </select>
           </div>
 
@@ -212,14 +254,18 @@ export default function ArenaPage() {
 
           <Button
             onClick={handleStartMatch}
-            disabled={running || !activeTaskId}
+            disabled={running || !activeTaskId || !operator}
             variant="primary"
             className="text-xs font-semibold px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white"
+            title={operator ? undefined : t("operator-only")}
           >
             {running ? t("running-match") : t("run-match")}
           </Button>
         </div>
       </div>
+      {!operator && (
+        <p className="text-xs text-text-secondary">{t("operator-only")}</p>
+      )}
 
       {error && (
         <div role="alert" className="bg-red-950/50 border border-red-500/40 text-red-300 text-xs px-4 py-2.5 rounded-lg">
@@ -250,6 +296,40 @@ export default function ArenaPage() {
               </span>
             </div>
           </div>
+        </Card>
+      )}
+
+      {/* Fairness manifest strip */}
+      {activeArena && manifest && (
+        <Card className="bg-background-secondary border border-border p-4">
+          <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
+            {t("manifest-heading")}
+          </span>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-2 text-xs font-mono">
+            <span className="text-text-secondary">{t("manifest-spec")}: <strong className="text-text-primary">{manifest.spec ?? "—"}</strong></span>
+            <span className="text-text-secondary">{t("manifest-heldout")}: <strong className="text-text-primary">{manifest.heldout ?? "—"}</strong></span>
+            <span className="text-text-secondary">{t("manifest-base")}: <strong className="text-text-primary">{manifest.baseTree ?? "—"}</strong></span>
+          </div>
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+            <span className="text-text-secondary">
+              {t("evoforge-lane")}: {t("manifest-harness")} <strong className="text-text-primary font-mono">{manifest.evoforge.harness ?? "—"}</strong>
+              {" · "}{t("attempts")} <strong className="text-text-primary">{manifest.evoforge.attempts ?? "—"}</strong>
+              {" · "}{t("feedback-label")} <strong className="text-text-primary font-mono">{manifest.evoforge.feedback ?? "—"}</strong>
+            </span>
+            <span className="text-text-secondary">
+              {t("single-lane")}: {t("manifest-harness")} <strong className="text-text-primary font-mono">{manifest.single.harness ?? "—"}</strong>
+              {" · "}{t("attempts")} <strong className="text-text-primary">{manifest.single.attempts ?? "—"}</strong>
+              {" · "}{t("feedback-label")} <strong className="text-text-primary font-mono">{manifest.single.feedback ?? "—"}</strong>
+            </span>
+          </div>
+          {manifest.upperBound && (
+            <p role="note" className="mt-2 text-xs font-semibold text-amber-300">
+              {t("manifest-upper-bound")}
+            </p>
+          )}
+          {manifest.disclosure && (
+            <p className="mt-2 text-xs text-text-tertiary">{manifest.disclosure}</p>
+          )}
         </Card>
       )}
 
@@ -365,6 +445,28 @@ export default function ArenaPage() {
               </pre>
             </Card>
 
+            {/* Side-by-side preview */}
+            <Card className="bg-background-secondary border border-border p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs text-text-tertiary font-mono">
+                <span>{t("preview-heading")}</span>
+                <span>
+                  {evoPreview.source === "candidate" ? t("preview-candidate")
+                    : evoPreview.source === "base" ? t("preview-base-unchanged")
+                    : evoPreview.source === "pending" ? t("preview-pending")
+                    : t("preview-none")}
+                </span>
+              </div>
+              {evoPreview.html ? (
+                <SandboxedPreview html={evoPreview.html} title={`evoforge-${activeArena.arena_id}`} />
+              ) : (
+                <p className="text-xs text-text-tertiary">
+                  {evoPreview.source === "none" && evoPreview.error
+                    ? `${t("preview-none")}: ${evoPreview.error}`
+                    : evoPreview.source === "pending" ? t("preview-pending") : t("preview-none")}
+                </p>
+              )}
+            </Card>
+
             {/* Event Timeline */}
             <Card className="bg-background-secondary border border-border p-3 space-y-2">
               <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
@@ -415,6 +517,28 @@ export default function ArenaPage() {
               <pre className="text-xs font-mono bg-black/60 p-3 rounded overflow-x-auto max-h-64 text-blue-300 whitespace-pre">
                 {singleLane?.diff || "// Waiting for candidate patch generation…"}
               </pre>
+            </Card>
+
+            {/* Side-by-side preview */}
+            <Card className="bg-background-secondary border border-border p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs text-text-tertiary font-mono">
+                <span>{t("preview-heading")}</span>
+                <span>
+                  {singlePreview.source === "candidate" ? t("preview-candidate")
+                    : singlePreview.source === "base" ? t("preview-base-unchanged")
+                    : singlePreview.source === "pending" ? t("preview-pending")
+                    : t("preview-none")}
+                </span>
+              </div>
+              {singlePreview.html ? (
+                <SandboxedPreview html={singlePreview.html} title={`single-${activeArena.arena_id}`} />
+              ) : (
+                <p className="text-xs text-text-tertiary">
+                  {singlePreview.source === "none" && singlePreview.error
+                    ? `${t("preview-none")}: ${singlePreview.error}`
+                    : singlePreview.source === "pending" ? t("preview-pending") : t("preview-none")}
+                </p>
+              )}
             </Card>
 
             {/* Event Timeline */}
