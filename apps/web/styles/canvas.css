@@ -60,7 +60,7 @@
 .canvas-test-result { display: flex; min-height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 30px; color: #6b7684; font-size: 11px; }
 .canvas-test-result strong { font-size: 38px; font-weight: 450; color: #333d4b; letter-spacing: -1.7px; }
 .canvas-test-result small { font-size: 11px; }
-.canvas-workspace .studio-composer { width: min(760px, calc(100vw - 120px)); left: calc(50% + 32px); right: auto; bottom: 28px; transform: translateX(-50%); z-index: 40; border: 1px solid #e5e8eb; border-radius: 22px; padding: 12px 14px; background: #fff; color: #333d4b; box-shadow: 0 8px 32px #18283c0c; }
+.canvas-workspace .studio-composer { width: min(760px, calc(100vw - 120px)); left: calc(50% + 32px); right: auto; bottom: 28px; transform: translateX(-50%); z-index: 40; border: 1px solid #e5e8eb; border-radius: 22px; padding: 12px 14px; background: #fff; color: #333d4b; box-shadow: 0 8px 32px #18283c0c; max-height: none; overflow: visible; }
 .canvas-workspace .studio-composer:focus-within { border-color: #3182f6; }
 .canvas-workspace .studio-composer-inner { gap: 8px; flex-wrap: nowrap; align-items: center; }
 .canvas-workspace .studio-composer-inner > label:first-child { min-width: 0; flex: 1; }
