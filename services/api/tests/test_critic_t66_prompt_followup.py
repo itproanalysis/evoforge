@@ -23,6 +23,7 @@ import main  # noqa: E402
 from evoforge import broker_meta, ledger  # noqa: E402
 
 c = TestClient(main.app, raise_server_exceptions=False)
+REFERENCE_MARK = getattr(__import__("evoforge.arena_prompt", fromlist=["x"]), "REFERENCE_MARKER", "<no reference build>")
 USAGE = {"prompt_tokens": 1000, "completion_tokens": 200}
 PROMPT = "A landing page for a coffee shop called Coffee Corner with a menu of at least three drinks and their prices."
 FOLLOW = "Add a footer that shows the opening hours 7:00-19:00."
@@ -72,6 +73,10 @@ def _stubs(monkeypatch, seen):
         current = next(f["content"] for f in (file_context or []) if f["path"] == "app.py")
         if FOLLOW in goal:
             target = FOOTER
+        elif REFERENCE_MARK in goal:  # T76: the judge's reference build is never a lane call
+            d = "".join(difflib.unified_diff(current.splitlines(True), FULL.splitlines(True), "a/app.py", "b/app.py"))
+            return {"diff": d, "tests": [], "rationale": "x", "stub": False, "model": "muse-spark-1.3",
+                    "provider_calls": [], "usage": USAGE}
         else:
             target = FULL if "Previous attempt" in goal else PARTIAL
         with lock:

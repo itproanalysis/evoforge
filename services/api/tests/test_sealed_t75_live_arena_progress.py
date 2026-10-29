@@ -23,6 +23,7 @@ import main  # noqa: E402
 from evoforge import broker_meta, ledger  # noqa: E402
 
 c = TestClient(main.app, raise_server_exceptions=False)
+REFERENCE_MARK = getattr(__import__("evoforge.arena_prompt", fromlist=["x"]), "REFERENCE_MARKER", "<no reference build>")
 USAGE = {"prompt_tokens": 1000, "completion_tokens": 200}
 PROMPT = "A landing page for a tea shop called Leaf & Cup with a menu of at least three teas and their prices."
 FULL = '''def render(state=None):
@@ -60,7 +61,8 @@ def gate(monkeypatch):
     release = threading.Event()
 
     def builder(goal, sha, file_context=None, **k):
-        release.wait(120)  # hold every Builder call until the test has looked at the running Arena
+        if REFERENCE_MARK not in goal:  # T76: the judge's reference build runs before the lanes
+            release.wait(120)  # hold every lane Builder call until the test has looked at the running Arena
         current = next(f["content"] for f in (file_context or []) if f["path"] == "app.py")
         d = "".join(difflib.unified_diff(current.splitlines(True), FULL.splitlines(True), "a/app.py", "b/app.py"))
         return {"diff": d, "tests": [], "rationale": "x", "stub": False, "model": "muse-spark-1.3",
