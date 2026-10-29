@@ -55,6 +55,154 @@ _FALLBACK = None
 _MIRROR: dict[str, dict] = {}  # postgres-mode overlay for non-terminal state
 _MIRROR_LOCK = threading.Lock()
 
+# T75 live overlay: in-process, lock-protected, keyed by arena id. Holds
+# lane events (and prompt top-level events) as they are emitted. Merged on
+# read by get_arena/list_arenas; cleared when the terminal document is
+# saved. Never written to the store per event.
+_LIVE: dict[str, dict] = {}
+_LIVE_LOCK = threading.Lock()
+_LIVE_CTX: dict[int, tuple[str, str, list[str] | None]] = {}
+_LIVE_CTX_LOCK = threading.Lock()
+
+_FAILING_SUFFIX_RE = re.compile(r" \(failing: [^)]*\)")
+
+
+def _scrub_text(message: str, names: list[str] | None) -> str:
+    """Scrub hidden acceptance names from one event message.
+
+    Same transform as arena_prompt._scrub_lane applies to stored lane
+    events: drop the `` (failing: ...)`` suffix, replace known test names
+    with ``held-out``, truncate to 300 chars. Never raises.
+    """
+    try:
+        msg = message if isinstance(message, str) else str(message)
+        msg = _FAILING_SUFFIX_RE.sub("", msg)
+        for nm in names or []:
+            if isinstance(nm, str) and nm and nm in msg:
+                msg = msg.replace(nm, "held-out")
+        return msg[:300]
+    except Exception:
+        try:
+            return str(message)[:300]
+        except Exception:
+            return ""
+
+
+def _live_init(arena_id: str) -> None:
+    try:
+        with _LIVE_LOCK:
+            entry = _LIVE.get(arena_id)
+            if entry is None:
+                _LIVE[arena_id] = {"single": [], "evoforge": [],
+                                   "events": []}
+            else:
+                for key in ("single", "evoforge", "events"):
+                    if not isinstance(entry.get(key), list):
+                        entry[key] = []
+    except Exception:
+        pass
+
+
+def _live_top(arena_id: str, role: str, message: str) -> dict:
+    """Append a top-level (judge) event to the live overlay."""
+    try:
+        with _LIVE_LOCK:
+            entry = _LIVE.get(arena_id)
+            if entry is None:
+                entry = {"single": [], "evoforge": [], "events": []}
+                _LIVE[arena_id] = entry
+            lst = entry.get("events")
+            if not isinstance(lst, list):
+                lst = entry["events"] = []
+            ev = {"seq": len(lst) + 1, "ts": time.time(),
+                  "role": role, "message": str(message)[:300]}
+            lst.append(ev)
+            return copy.deepcopy(ev)
+    except Exception:
+        pass
+    return {"seq": 1, "ts": time.time(), "role": role,
+            "message": str(message)[:300]}
+
+
+def _live_snapshot(arena_id: str) -> list[dict]:
+    try:
+        with _LIVE_LOCK:
+            lst = (_LIVE.get(arena_id) or {}).get("events")
+            return copy.deepcopy(lst) if isinstance(lst, list) else []
+    except Exception:
+        return []
+
+
+def _live_bind(events: list[dict], arena_id: str, lane: str,
+               scrub: list[str] | None) -> None:
+    """Bind a lane-local ``events`` list so _emit mirrors into the overlay."""
+    if not arena_id or not isinstance(events, list):
+        return
+    _live_init(arena_id)
+    try:
+        with _LIVE_CTX_LOCK:
+            _LIVE_CTX[id(events)] = (arena_id, lane,
+                                      list(scrub) if scrub is not None
+                                      else None)
+    except Exception:
+        pass
+
+
+def _live_unbind(events: list[dict]) -> None:
+    try:
+        with _LIVE_CTX_LOCK:
+            _LIVE_CTX.pop(id(events), None)
+    except Exception:
+        pass
+
+
+def _live_clear(arena_id: str) -> None:
+    try:
+        with _LIVE_LOCK:
+            _LIVE.pop(arena_id, None)
+    except Exception:
+        pass
+
+
+def _with_live(doc: dict) -> dict:
+    """Overlay live lane/top events onto a (copied) arena document."""
+    try:
+        aid = doc.get("arena_id")
+    except Exception:
+        return doc
+    if not isinstance(aid, str):
+        return doc
+    try:
+        with _LIVE_LOCK:
+            live = _LIVE.get(aid)
+            if not live:
+                return doc
+            snap = {k: copy.deepcopy(live.get(k, []))
+                    for k in ("single", "evoforge", "events")}
+    except Exception:
+        return doc
+    try:
+        lanes = doc.get("lanes")
+        if isinstance(lanes, dict):
+            for name in ("single", "evoforge"):
+                lane = lanes.get(name)
+                if isinstance(lane, dict) and isinstance(
+                        snap.get(name), list):
+                    lane["events"] = snap[name]
+    except Exception:
+        pass
+    try:
+        if isinstance(snap.get("events"), list) and snap["events"]:
+            doc["events"] = snap["events"]
+        elif "events" in doc and isinstance(doc.get("events"), list):
+            if not isinstance(snap.get("events"), list):
+                pass
+            elif not snap["events"] and not doc["events"]:
+                doc["events"] = snap["events"]
+    except Exception:
+        pass
+    return doc
+
 
 class UnknownTask(ValueError):
     """Requested task id is not in the sealed suite."""
@@ -106,6 +254,11 @@ def _record_of(doc: dict) -> dict:
 def _save(doc: dict) -> None:
     """Persist an arena document (terminal or running)."""
     rec = _record_of(doc)
+    try:
+        if doc.get("status") in ("succeeded", "failed"):
+            _live_clear(doc.get("arena_id", ""))
+    except Exception:
+        pass
     if _is_pg():
         # Evidence is immutable in postgres mode: mirror live state and
         # store exactly one immutable record, at terminal status.
@@ -141,7 +294,7 @@ def get_arena(arena_id: str) -> dict | None:
         with _MIRROR_LOCK:
             mirror = _MIRROR.get(arena_id)
         if isinstance(mirror, dict):
-            return copy.deepcopy(mirror)
+            return _with_live(copy.deepcopy(mirror))
     try:
         rec = _store().get(arena_id, None)
     except Exception:
@@ -149,7 +302,7 @@ def get_arena(arena_id: str) -> dict | None:
     if not isinstance(rec, dict) or rec.get("kind") != KIND:
         return None
     inner = rec.get("arena")
-    return copy.deepcopy(inner) if isinstance(inner, dict) else None
+    return _with_live(copy.deepcopy(inner)) if isinstance(inner, dict) else None
 
 
 def list_arenas(limit: int = LIST_LIMIT) -> list[dict]:
@@ -180,12 +333,17 @@ def list_arenas(limit: int = LIST_LIMIT) -> list[dict]:
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0.0
 
     ordered = sorted(cands.values(), key=_ts, reverse=True)
-    return [copy.deepcopy(d) for d in ordered[:n]]
+    out = [copy.deepcopy(d) for d in ordered[:n]]
+    return [_with_live(d) for d in out]
 
 
 def clear() -> None:
     with _MIRROR_LOCK:
         _MIRROR.clear()
+    with _LIVE_LOCK:
+        _LIVE.clear()
+    with _LIVE_CTX_LOCK:
+        _LIVE_CTX.clear()
     try:
         keys = [k for k, _rec in _postgres_state.scan(_store(), kind=KIND)]
     except Exception:
@@ -258,8 +416,28 @@ def _short_error(exc: BaseException) -> str:
 
 
 def _emit(events: list[dict], role: str, message: str) -> None:
+    bound = None
+    try:
+        with _LIVE_CTX_LOCK:
+            bound = _LIVE_CTX.get(id(events))
+    except Exception:
+        bound = None
+    msg = str(message)[:300]
+    if bound is not None and bound[2] is not None:
+        msg = _scrub_text(msg, bound[2])
     events.append({"seq": len(events) + 1, "ts": time.time(),
-                   "role": role, "message": str(message)[:300]})
+                   "role": role, "message": msg})
+    if bound is not None:
+        try:
+            aid, lane, _s = bound
+            with _LIVE_LOCK:
+                entry = _LIVE.get(aid)
+                if entry is not None:
+                    lst = entry.get(lane)
+                    if isinstance(lst, list):
+                        lst.append(copy.deepcopy(events[-1]))
+        except Exception:
+            pass
 
 
 def _lane_skeleton(status: str, n: int) -> dict:
@@ -557,6 +735,7 @@ def seed_running(arena_id: str, suite_version: str, task_id: str,
                      "evoforge": _lane_skeleton("running", n)},
            "verdict": {"winner": "tie", "reason": "arena running"},
            "error": None}
+    _live_init(arena_id)
     _save_if_absent(doc)
     return copy.deepcopy(doc)
 
@@ -652,10 +831,12 @@ def _score_heldout_counted(sandbox: str, heldout: list[dict],
     return passed, n, failures
 
 
-def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
+def _run_single_lane(task: dict, model: str, timeout_s: int,
+                       arena_id: str = "") -> dict:
     """Lane ``single``: ONE Builder call, strict apply, no Critic, no retry."""
     t0 = time.perf_counter()
     events: list[dict] = []
+    _live_bind(events, arena_id, "single", None)
     n_total = len(task["heldout"])
     cost = 0
     usage_missing = False
@@ -734,6 +915,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
         status = "failed"
         _emit(events, "gate", f"single: lane failed ({type(e).__name__})")
     finally:
+        _live_unbind(events)
         _sealed._remove_tree(tmpbase)
     lane = {"status": status, "attempts": attempts,
             "heldout": {"passed": int(passed), "n": int(n)},
@@ -758,7 +940,9 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
 
 def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                        max_attempts: int | None = None,
-                       feedback: str = "heldout") -> dict:
+                       feedback: str = "heldout",
+                       arena_id: str = "",
+                       scrub: list[str] | None = None) -> dict:
     """Lane ``evoforge``: pipeline attempts with failing-test-name feedback.
 
     With ``feedback="critic"`` the retry signal comes only from the
@@ -767,7 +951,8 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
     (else the last applied attempt) and never enters feedback.
     """
     if feedback == "critic":
-        return _run_evoforge_lane_critic(task, model, timeout_s, max_attempts)
+        return _run_evoforge_lane_critic(task, model, timeout_s, max_attempts,
+                                        arena_id=arena_id, scrub=scrub)
     if feedback != "heldout":
         raise ValueError(f"unknown feedback: {feedback!r}")
     t0 = time.perf_counter()
@@ -787,6 +972,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
     failing: list[str] = []
     error = None
     status = "succeeded"
+    _live_bind(events, arena_id, "evoforge", scrub)
     tmpbase = tempfile.mkdtemp(prefix="evoforge-arena-evo-")
     base_tree_sha = None
     try:
@@ -877,6 +1063,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
         status = "failed"
         _emit(events, "gate", f"evoforge: lane failed ({type(e).__name__})")
     finally:
+        _live_unbind(events)
         _sealed._remove_tree(tmpbase)
     lane = {"status": status, "attempts": attempts,
             "heldout": {"passed": int(passed), "n": int(n)},
@@ -900,10 +1087,13 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
 
 
 def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
-                              max_attempts: int | None = None) -> dict:
+                              max_attempts: int | None = None,
+                              arena_id: str = "",
+                              scrub: list[str] | None = None) -> dict:
     """Lane ``evoforge`` in critic mode (T47 ``feedback="critic"`` semantics)."""
     t0 = time.perf_counter()
     events: list[dict] = []
+    _live_bind(events, arena_id, "evoforge", scrub)
     n_total = len(task["heldout"])
     if max_attempts is None:
         max_attempts = _sealed.PIPELINE_MAX_ATTEMPTS
@@ -1077,6 +1267,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
         status = "failed"
         _emit(events, "gate", f"evoforge: lane failed ({type(e).__name__})")
     finally:
+        _live_unbind(events)
         _sealed._remove_tree(tmpbase)
     lane = {"status": status, "attempts": attempts,
             "heldout": {"passed": int(passed), "n": int(n)},
@@ -1105,7 +1296,9 @@ class _DoneCriticLane(Exception):
 
 def _run_lanes(task: dict, model: str,
                timeout_s: int,
-               feedback: str = "heldout") -> tuple[dict, dict]:
+               feedback: str = "heldout",
+               arena_id: str = "",
+               scrub: list[str] | None = None) -> tuple[dict, dict]:
     """Run both lanes concurrently in two threads."""
     out: dict[str, object] = {}
 
@@ -1117,12 +1310,13 @@ def _run_lanes(task: dict, model: str,
 
     single_t = threading.Thread(
         target=_target,
-        args=("single", lambda: _run_single_lane(task, model, timeout_s)),
+        args=("single", lambda: _run_single_lane(task, model, timeout_s, arena_id=arena_id)),
         daemon=True)
     evo_t = threading.Thread(
         target=_target,
         args=("evoforge", lambda: _run_evoforge_lane(
-            task, model, timeout_s, feedback=feedback)),
+            task, model, timeout_s, feedback=feedback,
+            arena_id=arena_id, scrub=scrub)),
         daemon=True)
     single_t.start()
     evo_t.start()
@@ -1184,7 +1378,9 @@ def run_arena(suite_version: str, task_id: str, model: str,
                                       feedback=feedback)
         maybe_goal = task.get("goal", "")
         goal = maybe_goal if isinstance(maybe_goal, str) else ""
-        single, evo = _run_lanes(task, model, timeout_s, feedback=feedback)
+        _live_init(aid)
+        single, evo = _run_lanes(task, model, timeout_s, feedback=feedback,
+                                 arena_id=aid)
         for _lane, _recount in ((single, False), (evo, True)):
             if isinstance(_lane, dict) and "preview_source" not in _lane:
                 _attach_preview(_lane, task, _recount)
