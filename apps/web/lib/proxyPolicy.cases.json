@@ -1004,6 +1004,14 @@
     ]
   },
   {
+    "expected": "/v1/arena/prompt",
+    "path_segments": [
+      "v1",
+      "arena",
+      "prompt"
+    ]
+  },
+  {
     "expected": null,
     "path_segments": [
       "v1",

@@ -30,6 +30,7 @@ from evoforge import performance as performance_mod
 from evoforge import eval_jobs as eval_jobs_mod
 from evoforge import decisions as decisions_mod
 from evoforge import arena as arena_mod
+from evoforge import arena_prompt as arena_prompt_mod
 from evoforge import event_bus_and_sse as event_bus_mod
 from evoforge import sealed_eval as sealed_eval_mod
 from evoforge import postgres_state
@@ -1527,6 +1528,49 @@ def arena_create(req: ArenaRequest):
     box["arena_id"] = job["job_id"]
     arena_mod.seed_running(job["job_id"], req.suite_version, tid,
                            req.model, task, feedback=req.feedback)
+    ready.set()
+    return {"arena_id": job["job_id"], "status": "running"}
+
+
+class ArenaPromptRequest(BaseModel):
+    prompt: str
+    feedback: Literal["heldout", "critic"] = "critic"
+    single_apply: Literal["strict", "tolerant"] = "tolerant"
+
+
+def _arena_prompt_budget_or_402(feedback: str = "critic") -> None:
+    try:
+        arena_prompt_mod.check_budget(feedback)
+    except performance_mod.BudgetExceeded as e:
+        raise HTTPException(402, str(e))
+    except ledger.Overdraft:
+        raise HTTPException(402, "budget exhausted (reserve_cost refused)")
+
+
+@app.post("/v1/arena/prompt", status_code=202)
+def arena_prompt_create(req: ArenaPromptRequest):
+    """Compare what the USER asks for: both lanes implement one user prompt."""
+    raw = req.prompt if isinstance(req.prompt, str) else ""
+    stripped = raw.strip()
+    if not stripped or len(stripped) > 2000:
+        raise HTTPException(422, "prompt must be 1..2000 chars")
+    _arena_prompt_budget_or_402(req.feedback)
+    box: dict = {}
+    ready = threading.Event()
+
+    def _runner(p=stripped, fb=req.feedback, sa=req.single_apply):
+        if not ready.wait(timeout=60):
+            raise RuntimeError("arena start sync failed")
+        return arena_prompt_mod.run_prompt_arena(
+            box["arena_id"], p, feedback=fb, single_apply=sa)
+
+    try:
+        job = eval_jobs_mod.create_job(kind="ARENA", runner=_runner)
+    except eval_jobs_mod.ActiveJobError as e:
+        raise HTTPException(409, f"another eval job is active: {e.job_id}")
+    box["arena_id"] = job["job_id"]
+    arena_prompt_mod.seed_running(job["job_id"], stripped, req.feedback,
+                                  req.single_apply)
     ready.set()
     return {"arena_id": job["job_id"], "status": "running"}
 
