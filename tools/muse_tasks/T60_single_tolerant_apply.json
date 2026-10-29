@@ -1,0 +1,17 @@
+{
+  "id": "T60_single_tolerant_apply",
+  "planned_by": "Claude (Critic): v3.8 §4.1",
+  "goal": "T60 — equal-tools comparison in evolution runs (v3.8 §4.1 \"same tool access\"; answers the obvious judge question:\ndoes EvoForge win only because the single AI's diffs are applied strictly?).\nIn services/api/evoforge/evolution_rounds.py + services/api/main.py:\n- POST /v1/evolution/runs accepts single_apply: \"strict\" | \"tolerant\" (default \"strict\", so recorded runs stay\n  comparable; anything else -> 422). \"tolerant\" applies the single lane's ONE diff with recount=True (harness\n  api-sealed-eval/2) exactly like the EvoForge lane; it is still one Builder call with no Critic and no retry.\n- Manifest: lanes.single gets {harness: \"api-sealed-eval/1\"|\"api-sealed-eval/2\", apply: \"strict\"|\"tolerant\"}, lanes.evoforge\n  gets apply: \"tolerant\"; add manifest.single_apply and manifest.comparison = \"equal_tools\" when tolerant else\n  \"chat_vs_system\". Update the disclosure sentence to say which applies. Store single_apply on the run document.\n- GET /v1/evolution/stats also accepts single_apply=strict|tolerant (filter; other values 422) so the two experiments\n  are never mixed in one interval. Runs without the field count as \"strict\".\n- Nothing else changes (scoring, statuses, previews, critic logic).\nTests: services/api/tests/test_muse_t60.py.",
+  "edit": [
+    "services/api/evoforge/evolution_rounds.py",
+    "services/api/main.py",
+    "services/api/tests/test_muse_t60.py"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t51_evolution_rounds.py",
+    "services/api/tests/test_critic_t55_evolution_stats.py"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t60.py services/api/tests/test_sealed_t60_single_tolerant_apply.py services/api/tests/test_critic_t51_evolution_rounds.py services/api/tests/test_critic_t55_evolution_stats.py services/api/tests/test_critic_t57_stale_critic_retire.py -q -p no:cacheprovider"
+  ]
+}
