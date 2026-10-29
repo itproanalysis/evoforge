@@ -43,16 +43,22 @@ def _with_preview(body):
     return "".join(difflib.unified_diff(old.splitlines(True), new.splitlines(True), "a/barchart.py", "b/barchart.py"))
 
 
+
+def _settle(limit=300):
+    """Wait until no eval job (from this or an earlier test file) is active."""
+    end = time.time() + limit
+    while time.time() < end and any(j["status"] in ("queued", "running") for j in c.get("/v1/eval/jobs").json()["jobs"]):
+        time.sleep(0.3)
+
 @pytest.fixture(autouse=True)
 def fresh(monkeypatch):
+    _settle()
     monkeypatch.delenv("MODEL_API_KEY", raising=False)
     monkeypatch.delenv("EVO_RUNNER_URL", raising=False)
     monkeypatch.setenv("EVO_EVAL_MAX_CENTS", "100000")
     ledger.reset(); ledger.configure({"default": 500000})
     yield
-    end = time.time() + 120
-    while time.time() < end and any(j["status"] in ("queued", "running") for j in c.get("/v1/eval/jobs").json()["jobs"]):
-        time.sleep(0.2)
+    _settle()
 
 
 def _builder(monkeypatch, diff):
