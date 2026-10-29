@@ -140,7 +140,8 @@ export function StrategiesPanel({ strategies: initialStrategies, overview: initi
             </strong>
             <div className="mt-1 text-xs text-text-secondary font-mono">{view.champion.id}</div>
           </div>
-          <table className="mt-2 w-full text-xs">
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full text-xs">
             <thead>
               <tr className="text-text-secondary">
                 <th className="text-left font-normal">{t("strategies-champion")}</th>
@@ -209,6 +210,7 @@ export function StrategiesPanel({ strategies: initialStrategies, overview: initi
               })}
             </tbody>
           </table>
+          </div>
           <h3 className="mt-3 text-sm font-semibold">{t("strategies-history")}</h3>
           {view.decisions.length === 0 ? (
             <p className="mt-1 text-xs text-text-secondary">{t("strategies-history")}</p>

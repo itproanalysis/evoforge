@@ -15,7 +15,7 @@ import main  # noqa: E402
 
 c = TestClient(main.app, raise_server_exceptions=False)
 STAGES = ["ObjectiveVersion", "Task", "Candidate", "Gate", "Review", "PR", "Outcome"]
-LINKS = {"ev_obj": {"ObjectiveVersion": "e1"}, "ev_run": {"Candidate": "e3", "Gate": "e4"},
+LINKS = {"ev_obj": {"ObjectiveVersion": "e1"}, "ev_run1": {"Candidate": "e2", "Gate": "e2g"}, "ev_run": {"Candidate": "e3", "Gate": "e4"},
          "ev_pr": {"Candidate": "e3", "Gate": "e4", "PR": "e6"}}
 
 

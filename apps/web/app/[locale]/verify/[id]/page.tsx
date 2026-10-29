@@ -1,6 +1,6 @@
 "use client";
 import { use, useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { type ProofCertificate, getProof, getProofKey } from "../../../../lib/api";
 import { Card } from "../../../../components/ui";
 import { getErrorMessageKey } from "../../../../lib/apiErrors";
@@ -9,6 +9,7 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
   const { id } = use(params);
   const t = useTranslations("verify");
   const tErrors = useTranslations("errors");
+  const locale = useLocale();
   const [cert, setCert] = useState<ProofCertificate | null>(null);
   const [serverKey, setServerKey] = useState<string | null>(null);
   const [err, setErr] = useState("");
@@ -53,10 +54,10 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
         ) : (
           <p style={{ color: "#fbbf24", fontSize: 13 }}>{t("unsigned")}</p>
         )}
-        <dl style={{ display: "grid", gridTemplateColumns: "140px 1fr", gap: 6, fontSize: 13 }}>
+        <dl style={{ display: "grid", gridTemplateColumns: "minmax(80px, 140px) minmax(0, 1fr)", gap: 6, fontSize: 13, overflowWrap: "anywhere" }}>
           <dt>certificate</dt><dd style={{ margin: 0, fontFamily: "monospace" }}>{cert.certificate_id}</dd>
           <dt>evidence</dt><dd style={{ margin: 0, fontFamily: "monospace" }}>{cert.evidence_id}</dd>
-          <dt>issued</dt><dd style={{ margin: 0 }}>{new Date(cert.issued_at * 1000).toLocaleString()}</dd>
+          <dt>issued</dt><dd style={{ margin: 0 }}>{new Date(cert.issued_at * 1000).toLocaleString(locale)}</dd>
           <dt>signature</dt><dd style={{ margin: 0, fontFamily: "monospace", wordBreak: "break-all" }}>{cert.signature}</dd>
           <dt>verify</dt><dd style={{ margin: 0 }}>{cert.verify?.ok ? `✅ ${cert.verify.reason}` : `❌ ${cert.verify?.reason}`}</dd>
           <dt>{t("server-key-label")}</dt>
