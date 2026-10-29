@@ -160,6 +160,23 @@ def check_budget(feedback: str = "critic") -> int:
                               _sealed.BASELINE_COST_CENTS)
 
 
+def _critic_fairness() -> tuple[str, str]:
+    """(critic_model, critic_provider) from the Critic endpoint (T72).
+
+    Both lanes' Builder model stays the same; this only discloses which
+    model/provider writes the hidden acceptance tests and Critic feedback.
+    """
+    try:
+        from evoforge.critic import critic_endpoint
+
+        endpoint = critic_endpoint()
+        model = endpoint.get("model") or os.getenv("MODEL_CRITIC", "muse-spark-1.3")
+        provider = endpoint.get("provider") or "api.meta.ai"
+        return str(model), str(provider)
+    except Exception:
+        return os.getenv("MODEL_CRITIC", "muse-spark-1.3"), "api.meta.ai"
+
+
 def _disclosure_for(feedback: str, single_apply: str) -> str:
     if feedback == "critic":
         base = _arena.DISCLOSURE_CRITIC
@@ -176,6 +193,7 @@ def build_manifest(prompt: str, feedback: str, single_apply: str,
                    model: str = BASELINE_MODEL) -> dict:
     single_harness = ("api-sealed-eval/2" if single_apply == "tolerant"
                       else "api-sealed-eval/1")
+    critic_model, critic_provider = _critic_fairness()
     return {
         "comparison_mode": COMPARISON_MODE,
         "prompt_hash": prompt_hash(prompt),
@@ -185,6 +203,7 @@ def build_manifest(prompt: str, feedback: str, single_apply: str,
         "acceptance_new": 0,
         "acceptance_dropped": 0,
         "judge": JUDGE_SENTENCE,
+        "judge_model": critic_model,
         "lanes": {
             "single": {"model": model, "harness": single_harness,
                        "apply": single_apply, "max_attempts": 1,
@@ -192,7 +211,9 @@ def build_manifest(prompt: str, feedback: str, single_apply: str,
             "evoforge": {"model": model, "harness": "api-sealed-eval/2",
                          "apply": "tolerant",
                          "max_attempts": _sealed.PIPELINE_MAX_ATTEMPTS,
-                         "feedback": feedback},
+                         "feedback": feedback,
+                         "critic_model": critic_model,
+                         "critic_provider": critic_provider},
         },
         "cost_basis": "model_api_usage",
         "runner_cost": "not_measured",

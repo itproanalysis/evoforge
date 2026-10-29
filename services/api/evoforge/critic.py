@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+from urllib.parse import urlparse
 
 CRITIC_SYSTEM = (
     "You are EvoForge Critic (independent verifier). You NEVER see builder rationale, "
@@ -21,6 +22,38 @@ CRITIC_SYSTEM = (
 
 
 ALLOWED_SEALED_KINDS = frozenset({"compositional", "negative", "boundary"})
+
+DEFAULT_BASE_URL = "https://api.meta.ai/v1"
+DEFAULT_MODEL = "muse-spark-1.3"
+DEFAULT_PROVIDER = "api.meta.ai"
+
+
+def _host_of(base_url: str) -> str:
+    """Host of a base URL (e.g. ``api.fireworks.ai``); default host when unparseable."""
+    try:
+        host = urlparse(base_url).hostname
+    except Exception:
+        host = None
+    return host or DEFAULT_PROVIDER
+
+
+def critic_endpoint() -> dict:
+    """Where Critic calls go: base URL, model, provider host, second-provider flag.
+
+    The second provider (another Meta open-weight model via Fireworks or
+    Baseten) applies when CRITIC_API_BASE and CRITIC_API_KEY are both set;
+    otherwise today's MODEL_API_BASE + MODEL_API_KEY. The key never appears
+    in the returned dict. Read at call time.
+    """
+    model = os.getenv("MODEL_CRITIC", DEFAULT_MODEL)
+    second_base = os.getenv("CRITIC_API_BASE")
+    second_key = os.getenv("CRITIC_API_KEY")
+    if second_base and second_key:
+        return {"base_url": second_base, "model": model,
+                "provider": _host_of(second_base), "second": True}
+    base_url = os.getenv("MODEL_API_BASE", DEFAULT_BASE_URL)
+    return {"base_url": base_url, "model": model,
+            "provider": _host_of(base_url), "second": False}
 
 
 def _output_budget() -> int:
@@ -116,15 +149,25 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
         return {"sealed_tests": sealed, "review": review, "stub": True,
                 "execution_verified": False,
                 "model": os.getenv("MODEL_CRITIC", "muse-spark-1.3")}
-    from openai import OpenAI
-
     from evoforge.broker_meta import (
         ProviderNotAccepted, ProviderOutcomeUnknown, call_metadata, provider_errors,
     )
+    from evoforge.performance import critic_prices
 
-    model = os.getenv("MODEL_CRITIC", "muse-spark-1.3")
-    client = OpenAI(base_url=os.getenv("MODEL_API_BASE", "https://api.meta.ai/v1"),
-                    api_key=os.environ["MODEL_API_KEY"], max_retries=0)
+    endpoint = critic_endpoint()
+    if endpoint["second"] and critic_prices() is None:
+        # Refuse before creating any client: nothing sent, nothing billed.
+        # The owner sets both prices from the provider's price page.
+        raise ProviderNotAccepted(
+            "critic provider prices not configured "
+            "(set CRITIC_PRICE_INPUT_PER_MTOK and CRITIC_PRICE_OUTPUT_PER_MTOK)")
+    import openai
+
+    model = endpoint["model"]
+    provider = endpoint["provider"]
+    client = openai.OpenAI(base_url=endpoint["base_url"],
+                           api_key=os.getenv("CRITIC_API_KEY") or os.environ["MODEL_API_KEY"],
+                           max_retries=0)
     completed = []
 
     def complete(messages, phase):
@@ -143,13 +186,15 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
             if completed:
                 raise ProviderOutcomeUnknown("critic partially completed", completed) from None
             raise
-        completed.append(call_metadata(response, model, phase))
+        completed.append({**call_metadata(response, model, phase),
+                          "provider": provider})
         return response, budget
 
     a, budget_a = complete([{"role": "system", "content": CRITIC_SYSTEM},
                   {"role": "user", "content": f"SPEC (Phase A, no diff shown):\n{goal_contract}"}], "critic_spec")
     if _is_truncated(a):
-        return {"sealed_tests": [], "stub": False, "model": model, "provider_calls": completed,
+        return {"sealed_tests": [], "stub": False, "model": model, "provider": provider,
+                "provider_calls": completed,
                 "execution_verified": False,
                 "review": {"result": "INCONCLUSIVE", "findings": [
                     {"note": f"truncated Phase A output (finish_reason='length', budget {budget_a})",
@@ -157,7 +202,8 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
     sealed = _json(a).get("sealed_tests", [])
     ok, _normalized, shape_findings = ensure_sealed_suite(sealed)
     if not ok:
-        return {"sealed_tests": [], "stub": False, "model": model, "provider_calls": completed,
+        return {"sealed_tests": [], "stub": False, "model": model, "provider": provider,
+                "provider_calls": completed,
                 "execution_verified": False,
                 "review": {"result": "INCONCLUSIVE", "findings": shape_findings or [
                     {"note": "invalid sealed suite", "evidence": "none"}]}}
@@ -167,7 +213,7 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
         return {"review": {"result": "INCONCLUSIVE", "findings": [
                     {"note": f"truncated Phase B output (finish_reason='length', budget {budget_b})",
                      "evidence": "none"}]},
-                "sealed_tests": sealed, "stub": False, "model": model,
+                "sealed_tests": sealed, "stub": False, "model": model, "provider": provider,
                 "provider_calls": completed, "execution_verified": False}
     data = _json(b)
     review = data.get("review")
@@ -175,4 +221,4 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
             or not isinstance(review.get("findings", []), list)):
         data["review"] = {"result": "INCONCLUSIVE", "findings": [{"note": "unparseable critic output", "evidence": "none"}]}
     return {"review": data["review"], "sealed_tests": sealed, "stub": False, "model": model,
-            "provider_calls": completed, "execution_verified": False}
+            "provider": provider, "provider_calls": completed, "execution_verified": False}

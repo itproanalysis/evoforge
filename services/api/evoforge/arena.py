@@ -502,6 +502,23 @@ def _lane_tree_sha(source: str, base: str) -> str | None:
     return None
 
 
+def _critic_fairness() -> tuple[str, str]:
+    """(critic_model, critic_provider) from the Critic endpoint (T72).
+
+    Both lanes' Builder model stays the same; this only discloses which
+    model/provider writes the hidden acceptance tests and Critic feedback.
+    """
+    try:
+        from evoforge.critic import critic_endpoint
+
+        endpoint = critic_endpoint()
+        model = endpoint.get("model") or os.getenv("MODEL_CRITIC", "muse-spark-1.3")
+        provider = endpoint.get("provider") or "api.meta.ai"
+        return str(model), str(provider)
+    except Exception:
+        return os.getenv("MODEL_CRITIC", "muse-spark-1.3"), "api.meta.ai"
+
+
 def build_manifest(suite_version: str, task_id: str,
                    model: str, task: dict,
                    feedback: str = "heldout") -> dict:
@@ -512,6 +529,7 @@ def build_manifest(suite_version: str, task_id: str,
     heldout = task.get("heldout", []) if isinstance(task, dict) else []
     tid = task.get("id", task_id) if isinstance(task, dict) else task_id
     critic = feedback == "critic"
+    critic_model, critic_provider = _critic_fairness()
     return {
         "comparison_mode": "same_task_same_tests_concurrent",
         "suite_version": suite_version,
@@ -528,7 +546,9 @@ def build_manifest(suite_version: str, task_id: str,
             "evoforge": {"model": model, "harness": "api-sealed-eval/2",
                          "max_attempts": _sealed.PIPELINE_MAX_ATTEMPTS,
                          "feedback": ("critic" if critic
-                                      else "heldout_failing_test_names")},
+                                      else "heldout_failing_test_names"),
+                         "critic_model": critic_model,
+                         "critic_provider": critic_provider},
         },
         "cost_basis": "model_api_usage",
         "runner_cost": "not_measured",
