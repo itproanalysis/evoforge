@@ -13,6 +13,7 @@ type Props = {
 
 export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
   const t = useTranslations("arena");
+  const ts = useTranslations("studio");
   const [prompt, setPrompt] = useState("");
   const [feedback, setFeedback] = useState<"critic" | "heldout">("critic");
   const [busy, setBusy] = useState(false);
@@ -51,6 +52,12 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           <textarea
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && (event.ctrlKey || event.metaKey) && !event.repeat && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                void onStart();
+              }
+            }}
             maxLength={2000}
             rows={2}
             placeholder={t(followUp ? "prompt-followup-placeholder" : "prompt-placeholder")}
@@ -62,6 +69,9 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           </span>
         </label>
         {!followUp && (
+          <details className="studio-composer-settings">
+          <summary>{ts('settings')}</summary>
+          <div>
           <label className="text-xs flex items-center gap-1.5">
             {t("feedback-label")}
             <select
@@ -74,6 +84,9 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
               <option value="heldout">{t("feedback-heldout")}</option>
             </select>
           </label>
+          <p className="studio-composer-note">{t("prompt-equal-tools")}</p>
+          </div>
+          </details>
         )}
         <button
           type="button"
@@ -82,11 +95,11 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           title={operator ? undefined : t("operator-only")}
           className="studio-submit px-3 py-1 rounded text-xs border border-border cursor-pointer font-semibold"
         >
-          {t(followUp ? "prompt-followup-start" : "prompt-start")}
+          {followUp ? t("prompt-followup-start") : ts('submit')}
         </button>
-        {error && <span style={{ color: "#f87171", fontSize: 12 }}>{error}</span>}
+        {error && <span style={{ color: "#a2352e", fontSize: 12 }}>{error}</span>}
       </div>
-      <p className="studio-composer-note mt-1 text-xs text-text-secondary">{t("prompt-equal-tools")}</p>
+      {followUp && <p className="studio-composer-note mt-1 text-xs text-text-secondary">{t("prompt-equal-tools")}</p>}
       {!operator && <p className="studio-composer-note mt-1 text-xs text-text-secondary">{t("operator-only")}</p>}
     </div>
   );

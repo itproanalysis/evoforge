@@ -47,6 +47,7 @@ const {StudioOverview} = load(path.join(web, 'components/StudioOverview.tsx'));
 const {StudioBreadcrumb} = load(path.join(web, 'components/StudioBreadcrumb.tsx'));
 const {FeatureRail} = load(path.join(web, 'components/FeatureRail.tsx'));
 const {LanguageSwitcher} = load(path.join(web, 'components/LanguageSwitcher.tsx'));
+const {StudioTabs, StudioPeople, StudioHistory} = load(path.join(web, 'components/StudioViews.tsx'));
 const {default: Home} = load(path.join(web, 'app/[locale]/page.tsx'));
 const render = (Component, props = {}) => renderToStaticMarkup(React.createElement(Component, props));
 const empty = {running: false, measured: null, verified: null, participants: null, heldout: null};
@@ -84,6 +85,9 @@ for (const lang of ['en', 'ko']) {
     assert.ok(render(StudioBreadcrumb).includes(messages[lang].navigation[route.slice(1)]));
     checks += 3;
   }
+  pathname = `${lang === 'ko' ? '/ko' : ''}/workspace`;
+  assert.ok(render(StudioBreadcrumb).includes(messages[lang].navigation['mission-control']));
+  checks++;
   pathname = lang === 'ko' ? '/ko' : '/';
   const home = render(Home);
   assert.ok(home.includes('studio-preview-lanes') || home.includes('studio-empty'));
@@ -91,6 +95,25 @@ for (const lang of ['en', 'ko']) {
   assert.ok(home.includes('studio-composer'));
   assert.ok(!home.includes('recorded_fixture') && !home.includes('active_fixture'));
   checks += 4;
+  for (const active of ['work', 'people', 'history']) {
+    const tabs = render(StudioTabs, {active, onChange: () => { throw new Error('SSR cannot change tabs'); }});
+    assert.equal((tabs.match(/aria-selected="true"/g) ?? []).length, 1);
+    assert.ok(tabs.includes(`aria-controls="studio-panel-${active}"`));
+    checks += 2;
+  }
+  assert.ok(render(StudioPeople, {people: [], available: false, loading: false}).includes(messages[lang].studio['people-unavailable']));
+  assert.ok(render(StudioPeople, {people: [], available: true, loading: false}).includes(messages[lang].studio['people-empty']));
+  assert.ok(render(StudioHistory, {records: [], available: false, loading: false}).includes(messages[lang].studio['history-unavailable']));
+  assert.ok(render(StudioHistory, {records: [], available: true, loading: false}).includes(messages[lang].studio['history-empty']));
+  checks += 4;
+  const record = {measurement_id: 'measurement_fixture', kind: 'X_SINGLE', model: 'test-model', suite_version: 'test-suite', passed: 1, n: 2, created_at: 100, provider_stub: true, evidence_id: 'fixture/id&x'};
+  const history = render(StudioHistory, {records: [record], available: true, loading: false});
+  assert.ok(history.includes(messages[lang].studio['source-test']));
+  assert.ok(!history.includes(messages[lang].studio['source-model']));
+  assert.ok(history.includes('fixture%2Fid%26x'));
+  assert.ok(history.includes('1970-01-01T00:01:40.000Z'));
+  assert.ok(history.includes('1 / 2'));
+  checks += 5;
 }
 assert.deepEqual(Object.keys(messages.ko.studio).sort(), Object.keys(messages.en.studio).sort());
 checks++;
@@ -101,7 +124,7 @@ if (process.argv.includes('--write-preview')) {
   const output = path.resolve(web, '../..', '.local/design-review');
   mkdirSync(output, {recursive: true});
   const css = readFileSync(path.join(output, 'studio.css'), 'utf8');
-  const body = `<div class="studio-shell">${render(FeatureRail)}<div class="studio-column"><header class="studio-topbar">${render(StudioBreadcrumb)}${render(LanguageSwitcher)}</header><div class="studio-content"><p style="font-size:11px;color:#c6ec94;margin:0 0 18px">로컬 디자인 검토 · 빈 상태 · 실제 실행 결과 아님</p>${render(Home)}</div></div></div>`;
-  writeFileSync(path.join(output, 'index.html'), `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"><title>EvoForge 디자인 검토</title><style>${css}</style></head><body style="margin:0;background:#0d1014;color:#edf1f5">${body}</body></html>`);
+  const body = `<div class="studio-shell">${render(FeatureRail)}<div class="studio-column"><header class="studio-topbar">${render(StudioBreadcrumb)}${render(LanguageSwitcher)}</header><div class="studio-content"><p class="studio-review-notice">로컬 디자인 검토 · API 연결 없음</p>${render(Home)}</div></div></div>`;
+  writeFileSync(path.join(output, 'index.html'), `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; form-action 'none'; base-uri 'none'"><title>EvoForge 디자인 검토</title><style>${css}</style></head><body style="margin:0;background:#f5f4f0;color:#282a26">${body}</body></html>`);
   console.log(`Static empty-state preview: ${path.join(output, 'index.html')} (no JS, API, live metrics, or model calls).`);
 }

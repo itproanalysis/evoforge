@@ -11,7 +11,7 @@ export function StudioBreadcrumb() {
   const labels: Record<string, string> = {
     arena: 'arena', replay: 'replay', evidence: 'evidence', performance: 'performance',
     lab: 'improvement-lab', evolution: 'autopilot', leaderboard: 'leaderboard',
-    workspace: 'workspace', verify: 'evidence',
+    workspace: 'mission-control', verify: 'evidence',
   };
   return <div className="studio-breadcrumb"><span>{ts('workspace')}</span><span aria-hidden="true">/</span><strong>{labels[route] ? t(labels[route]) : ts('overview')}</strong></div>;
 }

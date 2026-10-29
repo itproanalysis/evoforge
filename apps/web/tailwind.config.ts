@@ -11,32 +11,32 @@ const config: Config = {
       colors: {
         // Background colors
         background: {
-          primary: "#0d1014",
-          secondary: "#161b22",
-          tertiary: "#11161c",
-          elevated: "#131920",
+          primary: "rgb(var(--surface-base) / <alpha-value>)",
+          secondary: "rgb(var(--surface-panel) / <alpha-value>)",
+          tertiary: "rgb(var(--surface-muted) / <alpha-value>)",
+          elevated: "rgb(var(--surface-raised) / <alpha-value>)",
         },
         // Border colors
         border: {
-          DEFAULT: "#2a333d",
-          secondary: "#3b4755",
+          DEFAULT: "rgb(var(--line) / <alpha-value>)",
+          secondary: "rgb(var(--line-strong) / <alpha-value>)",
         },
         // Text colors
         text: {
-          primary: "#edf1f5",
-          secondary: "#a0acba",
-          tertiary: "#c4cdd7",
-          link: "#b8df91",
+          primary: "rgb(var(--ink) / <alpha-value>)",
+          secondary: "rgb(var(--ink-muted) / <alpha-value>)",
+          tertiary: "rgb(var(--ink-soft) / <alpha-value>)",
+          link: "rgb(var(--accent-action) / <alpha-value>)",
         },
         // Accent colors
         accent: {
-          blue: "#31624f",
-          green: "#a9d979",
-          red: "#ef4444",
-          amber: "#f59e0b",
-          cyan: "#9dd9c4",
-          "red-dark": "#7f1d1d",
-          "cyan-dark": "#356957",
+          blue: "rgb(var(--accent-action) / <alpha-value>)",
+          green: "rgb(var(--accent-success) / <alpha-value>)",
+          red: "rgb(var(--accent-error) / <alpha-value>)",
+          amber: "rgb(var(--accent-warning) / <alpha-value>)",
+          cyan: "rgb(var(--accent-info) / <alpha-value>)",
+          "red-dark": "rgb(var(--accent-error-deep) / <alpha-value>)",
+          "cyan-dark": "rgb(var(--accent-info-deep) / <alpha-value>)",
         },
       },
       spacing: {
@@ -45,7 +45,7 @@ const config: Config = {
         18: "4.5rem",
       },
       borderRadius: {
-        card: "16px",
+        card: "8px",
         badge: "20px",
       },
       fontSize: {

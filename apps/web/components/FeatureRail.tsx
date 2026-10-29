@@ -115,11 +115,11 @@ export function FeatureRail() {
         aria-label={ts("navigation")}
         className="studio-rail hidden md:flex"
       >
-        <a href={prefix || '/'} className="studio-brand"><StudioMark/><span>EvoForge<small>{ts('brand-caption')}</small></span></a>
+        <a href={prefix || '/'} className="studio-brand"><StudioMark/><span>EvoForge</span></a>
         <p className="studio-nav-caption">{ts('workspace')}</p>
         {ITEMS.map(renderLink)}
         {moreSection('desktop')}
-        <div className="studio-rail-note"><StudioIcon name="evolution"/><strong>{ts('rail-title')}</strong><p>{ts('rail-description')}</p><a href={`${prefix}/replay`}>{ts('replay')}<StudioIcon name="arrow" width="14" height="14"/></a></div>
+        <div className="studio-rail-note"><span className="studio-rail-project">E / {ts('project')}</span><a href={`${prefix}/replay`}>{ts('replay')} <span aria-hidden="true">↗</span></a></div>
       </nav>
       {open && (
         <div ref={drawer} id="feature-rail-drawer" role="dialog" aria-modal="true" aria-label={ts("navigation")} className="fixed inset-0 z-50 md:hidden">

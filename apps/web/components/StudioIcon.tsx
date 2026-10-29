@@ -20,5 +20,5 @@ export function StudioIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
 }
 
 export function StudioMark() {
-  return <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect width="32" height="32" rx="10" fill="currentColor"/><path d="M10 10h13l-3 4H9l-2 8h13l2-4H12" stroke="#11160d" strokeWidth="2.5" strokeLinejoin="round"/></svg>;
+  return <svg width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true"><rect width="32" height="32" rx="6" fill="currentColor"/><path d="M10 10h13l-3 4H9l-2 8h13l2-4H12" stroke="var(--studio-mark-ink, #f7f6f2)" strokeWidth="2.5" strokeLinejoin="round"/></svg>;
 }
