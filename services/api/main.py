@@ -1475,7 +1475,7 @@ def eval_decisions_list():
 
 
 class ArenaRequest(BaseModel):
-    suite_version: Literal["v1", "v2"] = "v2"
+    suite_version: Literal["v1", "v2", "v3", "v4"] = "v2"
     task_id: str
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
 

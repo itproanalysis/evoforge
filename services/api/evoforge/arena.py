@@ -21,7 +21,10 @@ from __future__ import annotations
 import copy
 import json
 import os
+import re
 import secrets
+import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -31,9 +34,11 @@ from evoforge import postgres_state as _postgres_state
 from evoforge import sealed_eval as _sealed
 
 KIND = "arena"
-SUITE_VERSIONS = ("v1", "v2")
+SUITE_VERSIONS = ("v1", "v2", "v3", "v4")
 BASELINE_MODEL = "muse-spark-1.3"
 LIST_LIMIT = 20
+PREVIEW_TIMEOUT_S = 10
+PREVIEW_MAX_BYTES = 65536
 
 _STORE = None
 _FALLBACK = None
@@ -260,7 +265,180 @@ def _lane_skeleton(status: str, n: int) -> dict:
     return {"status": status, "attempts": 0,
             "heldout": {"passed": 0, "n": int(n)},
             "outcome": "heldout_failed", "cost_cents": 0,
-            "elapsed_ms": 0, "diff": "", "events": []}
+            "elapsed_ms": 0, "diff": "", "events": [],
+            "preview_source": "none"}
+
+
+_PREVIEW_ENV_KEEP = ("PATH", "SYSTEMROOT", "WINDIR", "SYSTEMDRIVE", "OS",
+                     "COMSPEC", "PATHEXT", "TEMP", "TMP", "HOME",
+                     "USERPROFILE", "LANG")
+
+_PREVIEW_BOOT = (
+    "import sys; sys.path.insert(0, sys.argv[1]); "
+    "import importlib; "
+    "mod = importlib.import_module(sys.argv[2]); "
+    "out = mod.preview(); "
+    "import sys as _s; "
+    "(_s.exit('preview must return str') "
+    "if not isinstance(out, str) else _s.stdout.write(out))"
+)
+
+
+def _find_preview_module(files: dict) -> tuple[str | None, str | None]:
+    """First task file (sorted path order) defining ``def preview(``.
+
+    Returns (path, module_name) with module_name = file stem, or
+    (None, None) when the task has no preview.
+    """
+    if not isinstance(files, dict):
+        return None, None
+    for path in sorted(files):
+        content = files.get(path)
+        if isinstance(content, str) and "def preview(" in content:
+            stem = os.path.splitext(os.path.basename(path))[0]
+            return path, stem
+    return None, None
+
+
+def _preview_env() -> dict:
+    env = {k: os.environ[k] for k in _PREVIEW_ENV_KEEP if k in os.environ}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["PYTHONNOUSERSITE"] = "1"
+    return env
+
+
+def _write_preview_tree(root: str, files: dict) -> None:
+    real_root = os.path.normcase(os.path.realpath(root))
+    for path, content in files.items():
+        if not isinstance(path, str) or not path:
+            raise ValueError(f"bad preview path: {path!r}")
+        target = os.path.normcase(
+            os.path.realpath(os.path.join(root, path)))
+        try:
+            common = os.path.commonpath([real_root, target])
+        except ValueError:
+            raise ValueError(f"bad preview path: {path!r}")
+        if common != real_root:
+            raise ValueError(f"bad preview path: {path!r}")
+        if not isinstance(content, str):
+            raise ValueError(f"bad preview content: {path!r}")
+        full = os.path.join(root, path)
+        parent = os.path.dirname(full)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        with open(full, "w", encoding="utf-8", newline="") as fh:
+            fh.write(content)
+
+
+def _run_preview_code(files: dict, module: str) -> tuple[str | None, str | None]:
+    """Run ``preview()`` in a fresh subprocess; never in the API process.
+
+    Returns (html, None) on success or (None, short_error) on failure.
+    Only candidate/base file contents are used — never held-out code or
+    the reference fix.
+    """
+    tmpdir = tempfile.mkdtemp(prefix="evoforge-arena-preview-")
+    try:
+        try:
+            _write_preview_tree(tmpdir, files)
+        except Exception as e:
+            return None, _short_error(e)
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", module or ""):
+            return None, "ValueError: bad preview module"
+        cmd = [sys.executable, "-I", "-c", _PREVIEW_BOOT, tmpdir, module]
+        try:
+            proc = subprocess.run(cmd, cwd=tmpdir, env=_preview_env(),
+                                  capture_output=True, timeout=PREVIEW_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            return None, f"TimeoutExpired: preview timeout after {PREVIEW_TIMEOUT_S}s"
+        except OSError as e:
+            return None, _short_error(e)
+        except Exception as e:
+            return None, _short_error(e)
+        out = proc.stdout if isinstance(proc.stdout, bytes) else b""
+        if len(out) > PREVIEW_MAX_BYTES:
+            return None, (f"ValueError: preview output too large "
+                           f"({len(out)} bytes)")
+        if proc.returncode != 0:
+            try:
+                err = (proc.stderr or b"").decode("utf-8", errors="replace")
+            except Exception:
+                err = ""
+            tail = " ".join(err.strip().split())[-280:] or "preview failed"
+            return None, f"RuntimeError: {tail}"[:300]
+        try:
+            return out.decode("utf-8"), None
+        except Exception as e:
+            return None, _short_error(e)
+    finally:
+        _sealed._remove_tree(tmpdir)
+
+
+def _preview_files_for_lane(task_files: dict, diff: str, applied: bool,
+                            recount: bool) -> dict:
+    """File set for the preview run: candidate code when it applied cleanly."""
+    if applied and isinstance(diff, str) and diff.strip():
+        try:
+            from evoforge import patch as _patch
+
+            base = dict(task_files)
+            changed = _patch.apply_unified_diff(base, diff, recount=recount)
+            out: dict = {}
+            for p, text in base.items():
+                out[p] = changed.get(p, text) if p in changed else text
+            for p, text in changed.items():
+                if text is None:
+                    out.pop(p, None)
+                else:
+                    out[p] = text
+            return out
+        except Exception:
+            pass
+    return dict(task_files)
+
+
+def _compute_lane_preview(task: dict, diff: str, applied: bool,
+                          recount: bool) -> dict:
+    """Preview fields for one lane (never raises, never leaks held-out code)."""
+    try:
+        files = task.get("files") if isinstance(task, dict) else None
+        if not isinstance(files, dict) or not files:
+            return {"preview_source": "none"}
+        _path, module = _find_preview_module(files)
+        if module is None:
+            return {"preview_source": "none"}
+        provisional = "candidate" if (applied and isinstance(diff, str)
+                                      and diff.strip()) else "base"
+        snap = _preview_files_for_lane(files, diff, applied, recount)
+        html, err = _run_preview_code(snap, module)
+        if err is not None or html is None:
+            out: dict = {"preview_source": "none"}
+            if err is not None:
+                out["preview_error"] = str(err)[:300]
+            return out
+        return {"preview_source": provisional, "preview_html": html}
+    except Exception as e:
+        return {"preview_source": "none",
+                "preview_error": _short_error(e)}
+
+
+def _attach_preview(lane: dict, task: dict, recount: bool) -> dict:
+    """Ensure preview fields exist on a lane dict (never raises)."""
+    try:
+        if isinstance(lane, dict) and "preview_source" not in lane:
+            diff = lane.get("diff", "")
+            if not isinstance(diff, str):
+                diff = ""
+            applied = (isinstance(diff, str) and bool(diff.strip())
+                       and lane.get("outcome") not in (
+                           "empty_diff", "apply_failed"))
+            lane.update(_compute_lane_preview(task, diff, applied, recount))
+    except Exception:
+        try:
+            lane.setdefault("preview_source", "none")
+        except Exception:
+            pass
+    return lane
 
 
 def seed_running(arena_id: str, suite_version: str, task_id: str,
@@ -346,6 +524,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
     cost = 0
     attempts = 0
     diff = ""
+    applied = False
     outcome = "heldout_failed"
     passed, n = 0, n_total
     failing: list[str] = []
@@ -379,10 +558,12 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
                   f"single: Builder returned a {len(diff)}-char diff")
             if _sealed._is_empty_diff(diff):
                 outcome = "empty_diff"
+                applied = False
                 passed, n = 0, n_total
                 _emit(events, "runner",
                       "single: empty diff, held-out not run")
             elif _sealed._apply_candidate(dest, diff, recount=False):
+                applied = True
                 _emit(events, "runner",
                       "single: diff applied (strict hunk counts), "
                       "scoring held-out")
@@ -399,6 +580,7 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
                 _emit(events, "runner", detail)
             else:
                 outcome = "apply_failed"
+                applied = False
                 passed, n = 0, n_total
                 _emit(events, "runner",
                       "single: diff did not apply under strict hunk counts")
@@ -418,6 +600,10 @@ def _run_single_lane(task: dict, model: str, timeout_s: int) -> dict:
         lane["failing_tests"] = list(failing)
     if error is not None:
         lane["error"] = error
+    try:
+        lane.update(_compute_lane_preview(task, diff, applied, False))
+    except Exception:
+        lane.setdefault("preview_source", "none")
     return lane
 
 
@@ -434,6 +620,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
     cost = 0
     attempts = 0
     diff = ""
+    applied = False
     outcome = "empty_diff"
     passed, n = 0, n_total
     failing: list[str] = []
@@ -470,6 +657,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
             diff = cand if isinstance(cand, str) else ""
             if _sealed._is_empty_diff(diff):
                 outcome = "empty_diff"
+                applied = False
                 passed, n = 0, n_total
                 failing = []
                 failures = [{"test": "held-out",
@@ -477,6 +665,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} empty diff")
             elif _sealed._apply_candidate(dest, diff, recount=True):
+                applied = True
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} diff applied, "
                       "scoring held-out")
@@ -500,6 +689,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                 _emit(events, "runner", detail)
             else:
                 outcome = "apply_failed"
+                applied = False
                 passed, n = 0, n_total
                 failing = []
                 failures = [{"test": "held-out",
@@ -528,6 +718,10 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
         lane["failing_tests"] = list(failing)
     if error is not None:
         lane["error"] = error
+    try:
+        lane.update(_compute_lane_preview(task, diff, applied, True))
+    except Exception:
+        lane.setdefault("preview_source", "none")
     return lane
 
 
@@ -564,6 +758,10 @@ def _run_lanes(task: dict, model: str,
         lane = _lane_skeleton("failed", len(task["heldout"]))
         lane["error"] = _short_error(evo)
         evo = lane
+    if isinstance(single, dict) and "preview_source" not in single:
+        _attach_preview(single, task, False)
+    if isinstance(evo, dict) and "preview_source" not in evo:
+        _attach_preview(evo, task, True)
     return single, evo
 
 
@@ -589,6 +787,9 @@ def run_arena(suite_version: str, task_id: str, model: str,
         maybe_goal = task.get("goal", "")
         goal = maybe_goal if isinstance(maybe_goal, str) else ""
         single, evo = _run_lanes(task, model, timeout_s)
+        for _lane, _recount in ((single, False), (evo, True)):
+            if isinstance(_lane, dict) and "preview_source" not in _lane:
+                _attach_preview(_lane, task, _recount)
         sp = single.get("heldout", {}).get("passed", 0)
         ep = evo.get("heldout", {}).get("passed", 0)
         try:
