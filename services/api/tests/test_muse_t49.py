@@ -12,7 +12,7 @@ from evoforge import arena as arena_mod  # noqa: E402
 
 
 def test_suite_versions_include_v3_v4():
-    assert set(arena_mod.SUITE_VERSIONS) == {"v1", "v2", "v3", "v4"}
+    assert {"v1", "v2", "v3", "v4"} <= set(arena_mod.SUITE_VERSIONS)  # v5 added with the hard suite
     assert arena_mod.PREVIEW_TIMEOUT_S == 10
     assert arena_mod.PREVIEW_MAX_BYTES == 65536
 

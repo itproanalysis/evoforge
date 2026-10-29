@@ -18,7 +18,7 @@ def _stub(monkeypatch, critic_new_code, score_behavior):
         lambda goal: ("rsv", {"sealed_tests": [{"code": critic_new_code}]}, 10, False))
     monkeypatch.setattr(
         se, "_critic_suite_from_output",
-        lambda out: [{"code": t["code"]} for t in out.get("sealed_tests", [])])
+        lambda out, *_a, **_k: [{"code": t["code"]} for t in out.get("sealed_tests", [])])
     monkeypatch.setattr(se, "_is_empty_diff",
                         lambda d: not (isinstance(d, str) and d.strip()))
     monkeypatch.setattr(

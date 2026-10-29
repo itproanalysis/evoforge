@@ -22,7 +22,7 @@ def _stub_common(monkeypatch, critic_by_goal, score_behavior=None, feedback_log=
     monkeypatch.setattr(se, "_call_critic_suite", _critic_suite)
     monkeypatch.setattr(
         se, "_critic_suite_from_output",
-        lambda out: [{"code": t["code"]} for t in out.get("sealed_tests", [])])
+        lambda out, *_a, **_k: [{"code": t["code"]} for t in out.get("sealed_tests", [])])
     monkeypatch.setattr(se, "_is_empty_diff",
                         lambda d: not (isinstance(d, str) and d.strip()))
     monkeypatch.setattr(
