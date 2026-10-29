@@ -71,12 +71,13 @@ def _stubs(monkeypatch, seen):
 
     def builder(goal, sha, file_context=None, **k):
         current = next(f["content"] for f in (file_context or []) if f["path"] == "app.py")
-        if FOLLOW in goal:
-            target = FOOTER
-        elif REFERENCE_MARK in goal:  # T76: the judge's reference build is never a lane call
-            d = "".join(difflib.unified_diff(current.splitlines(True), FULL.splitlines(True), "a/app.py", "b/app.py"))
+        if REFERENCE_MARK in goal:  # T76/T80: the judge's reference build is never a lane call
+            ref = FOOTER if FOLLOW in goal else FULL
+            d = "".join(difflib.unified_diff(current.splitlines(True), ref.splitlines(True), "a/app.py", "b/app.py"))
             return {"diff": d, "tests": [], "rationale": "x", "stub": False, "model": "muse-spark-1.3",
                     "provider_calls": [], "usage": USAGE}
+        if FOLLOW in goal:
+            target = FOOTER
         else:
             target = FULL if "Previous attempt" in goal else PARTIAL
         with lock:
