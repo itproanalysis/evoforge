@@ -359,6 +359,86 @@ class RunRequest(BaseModel):
     visible: list = []
     sealed: list = []
     timeout_s: int = Field(120, ge=1, le=600)
+    failures: bool = False
+    preview_module: str = ""
+
+
+_PREVIEW_TIMEOUT_S = 10
+_PREVIEW_MAX_BYTES = 65536
+_PREVIEW_BOOT = (
+    "import sys; sys.path.insert(0, sys.argv[1]); "
+    "import importlib; "
+    "mod = importlib.import_module(sys.argv[2]); "
+    "out = mod.preview(); "
+    "import sys as _s; "
+    "(_s.exit('preview must return str') "
+    "if not isinstance(out, str) else _s.stdout.write(out))"
+)
+_IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
+
+
+def _collect_failures(xml_path: str) -> list[dict]:
+    try:
+        cases = list(ET.parse(xml_path).getroot().iter("testcase"))
+    except Exception:
+        return []
+    out: list[dict] = []
+    for tc in cases:
+        bad = None
+        for child in tc:
+            if child.tag.rsplit("}", 1)[-1] in ("failure", "error"):
+                bad = child
+                break
+        if bad is None:
+            continue
+        name = tc.get("name", "test") or "test"
+        classname = tc.get("classname", "") or ""
+        label = f"{classname}::{name}" if classname else name
+        raw = (bad.get("message", "") or "")
+        try:
+            body = bad.text or ""
+        except Exception:
+            body = ""
+        if raw.strip():
+            first = raw.strip().splitlines()[0].strip()
+        elif body.strip():
+            first = body.strip().splitlines()[0].strip()
+        else:
+            first = "assertion failed"
+        out.append({"test": label[:200], "message": first[:300]})
+    return out
+
+
+def _run_preview(sandbox: str, module: str) -> dict:
+    env = {k: os.environ[k] for k in _ENV_ALLOW if k in os.environ}
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["PYTHONNOUSERSITE"] = "1"
+    cmd = [sys.executable, "-I", "-c", _PREVIEW_BOOT, sandbox, module]
+    try:
+        proc = subprocess.run(cmd, cwd=sandbox, env=env,
+                              capture_output=True, timeout=_PREVIEW_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        return {"html": None,
+                "error": f"preview timeout after {_PREVIEW_TIMEOUT_S}s"}
+    except OSError as e:
+        return {"html": None, "error": f"{type(e).__name__}: {e}"[:300]}
+    except Exception as e:
+        return {"html": None, "error": f"{type(e).__name__}: {e}"[:300]}
+    out = proc.stdout if isinstance(proc.stdout, bytes) else b""
+    if len(out) > _PREVIEW_MAX_BYTES:
+        return {"html": None,
+                "error": f"preview output too large ({len(out)} bytes)"}
+    if proc.returncode != 0:
+        try:
+            err = (proc.stderr or b"").decode("utf-8", errors="replace")
+        except Exception:
+            err = ""
+        tail = " ".join(err.strip().split())[-280:] or "preview failed"
+        return {"html": None, "error": f"RuntimeError: {tail}"[:300]}
+    try:
+        return {"html": out.decode("utf-8"), "error": None}
+    except Exception as e:
+        return {"html": None, "error": f"{type(e).__name__}: {e}"[:300]}
 
 
 app = FastAPI(title="EvoForge Runner", version="0.1.0")
@@ -423,6 +503,10 @@ def run(req: RunRequest):
         raise HTTPException(400, "bundle_b64 required")
 
     timeout_s = req.timeout_s
+    want_failures = bool(req.failures) if isinstance(req.failures, bool) else False
+    pm = req.preview_module if isinstance(req.preview_module, str) else ""
+    if pm and not _IDENT_RE.match(pm):
+        raise HTTPException(400, "preview_module must be a Python identifier")
     tmpbase = tempfile.mkdtemp(prefix="evoforge-runner-")
     try:
         try:
@@ -457,10 +541,23 @@ def run(req: RunRequest):
         ini = os.path.join(tmpbase, f"sealed-{secrets.token_hex(8)}.ini")
         with open(ini, "w", encoding="utf-8") as fh:
             fh.write("[pytest]\n")
-        held = _run_suite(dest, sealed_dir, os.path.join(tmpbase, f"held-{secrets.token_hex(8)}.xml"),
+        held_xml = os.path.join(tmpbase, f"held-{secrets.token_hex(8)}.xml")
+        held = _run_suite(dest, sealed_dir, held_xml,
                           sealed, timeout_s, sealed_ini=ini)
-        return runner_attestation.attach({"base": base.lower(), "visible": vis, "heldout": held,
-                "heldout_kinds": [t["kind"] for t in sealed]}, provenance)
+        if want_failures:
+            try:
+                held["failures"] = _collect_failures(held_xml)
+            except Exception:
+                held["failures"] = []
+        report = {"base": base.lower(), "visible": vis, "heldout": held,
+                "heldout_kinds": [t["kind"] for t in sealed]}
+        if pm:
+            try:
+                report["preview"] = _run_preview(dest, pm)
+            except Exception as e:
+                report["preview"] = {"html": None,
+                                     "error": f"{type(e).__name__}: {e}"[:300]}
+        return runner_attestation.attach(report, provenance)
     finally:
         _remove_tree(tmpbase)
 

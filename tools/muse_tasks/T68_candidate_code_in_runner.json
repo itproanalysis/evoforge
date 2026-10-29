@@ -1,0 +1,23 @@
+{
+  "id": "T68_candidate_code_in_runner",
+  "planned_by": "Claude (Critic): SEC-02, blocks any public/BYOK use",
+  "goal": "T68 / SEC-02 — candidate code leaves the API container. Today the API runs Builder output itself (pipeline\nscoring, Arena lanes, evolution rounds, preview() renders, and the judge's/Critic's model-written tests); the API holds\nsecrets and can reach the metadata server. When a Runner is configured (EVO_RUNNER_URL; services/runner/app.py, no\nsecrets, no roles) all of that must run there. Ownership note: services/runner/app.py is Codex's module; keep its\nexisting /run behaviour and tests intact (backward compatible additions only) and say so in your tests.\n\nRunner (services/runner/app.py), POST /run additions (optional fields, defaults keep today's reply exactly):\n- failures: bool = False -> heldout gets \"failures\": [{\"test\": <failing test id/name from the JUnit report>,\n  \"message\": <first line of the failure, at most 300 chars>}] (no test code).\n- preview_module: str = \"\" (a Python identifier, else 400) -> after the tests, run preview() of that module in the\n  sandbox in a fresh `python -I` subprocess with the Runner's env allowlist, 10 s timeout, stdout capped at 65536 bytes;\n  reply \"preview\": {\"html\": str | None, \"error\": str | None} (error mentions \"timeout\" / \"too large\" / the exception).\nAPI:\n- services/api/evoforge/runner_client.py: run_files(files: dict[path, text], sealed_tests: list[{code}], timeout_s=120,\n  preview_module=None) -> {\"heldout\": {pass, n, timed_out, exit_code, report_integrity, failures}, \"preview\": {...} or\n  None}. It builds a throw-away git repo holding exactly these files (server-created, trusted), bundles it like\n  run_via_runner (_create_bundle), POSTs /run with diff \"\" and failures=True, validates the reply as run_via_runner does\n  (base match, counts, kinds) and raises RunnerClientError / RunnerBadRequest / RunnerTooLarge on problems.\n- Routing when runner_client.runner_url() is set — every execution of candidate or model-written code goes through\n  run_files: sealed_eval._run_heldout_local / _run_heldout_local_detail when scoring candidates (read the sandbox's\n  files, skipping .git), arena._score_heldout_counted, evolution_rounds._score_files_counted, the preview renders in\n  arena.py and evolution_rounds.py (use preview_module), and arena_prompt.py's judge-test filtering on the template /\n  starting files. Convert replies to the existing return shapes (including failure names for retry feedback) and keep\n  sealed_eval._heldout_result_is_consistent checks. Suite validation of trusted Critic data (check_task /\n  load_suites) may stay local. Fail closed: a Runner error is a lane/round error or SealedEvalError — never a local\n  fallback, never a READY/passed result.\n- Without a Runner URL everything behaves exactly as today (dev and tests).\nTests: services/api/tests/test_muse_t68.py (load the Runner app in-process like test_critic_t16_runner_service.py).",
+  "edit": [
+    "services/runner/app.py",
+    "services/api/evoforge/runner_client.py",
+    "services/api/evoforge/sealed_eval.py",
+    "services/api/evoforge/arena.py",
+    "services/api/evoforge/evolution_rounds.py",
+    "services/api/evoforge/arena_prompt.py",
+    "services/api/tests/test_muse_t68.py"
+  ],
+  "context": [
+    "services/api/tests/test_critic_t16_runner_service.py",
+    "services/api/tests/test_runner_attestation.py",
+    "services/api/evoforge/runner.py",
+    "docs/V36_EXECUTION_PLAN.md"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t68.py services/api/tests/test_sealed_t68_candidate_code_in_runner.py services/api/tests/test_critic_t16_runner_service.py services/api/tests/test_muse_runner_service.py services/api/tests/test_runner_attestation.py services/api/tests/test_runner_base_binding.py services/api/tests/test_critic_t51_evolution_rounds.py services/api/tests/test_critic_t49_arena_preview.py services/api/tests/test_critic_t64_prompt_arena.py services/api/tests/test_critic_t66_prompt_followup.py services/api/tests/test_critic_t47_critic_feedback_pipeline.py -q -p no:cacheprovider"
+  ]
+}

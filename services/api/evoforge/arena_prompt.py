@@ -18,6 +18,7 @@ import time
 import uuid
 
 from evoforge import arena as _arena
+from evoforge import runner_client as _runner_client
 from evoforge import sealed_eval as _sealed
 
 TEMPLATE = ("def render():\n"
@@ -249,6 +250,27 @@ def _filter_on_template(suite: list[dict], timeout_s: int) -> tuple[list[dict], 
     """Keep entries that do NOT already pass on the TEMPLATE."""
     if not suite:
         return [], 0
+    if _runner_client.runner_url():
+        kept: list[dict] = []
+        dropped = 0
+        for entry in suite:
+            code = entry.get("code", "") if isinstance(entry, dict) else ""
+            if not isinstance(code, str) or not code.strip():
+                continue
+            try:
+                res = _runner_client.run_files({"app.py": TEMPLATE},
+                                               [{"code": code}], timeout_s)
+                held = res.get("heldout", {})
+                n = held.get("n", 0) if isinstance(held, dict) else 0
+                passed = held.get("pass", 0) if isinstance(held, dict) else 0
+            except Exception:
+                kept.append({"code": code})
+                continue
+            if n >= 1 and passed == n:
+                dropped += 1
+            else:
+                kept.append({"code": code})
+        return kept, dropped
     tmpbase = tempfile.mkdtemp(prefix="evoforge-prompt-judge-")
     try:
         source, base, future = _sealed._make_task_source_repo(
@@ -285,6 +307,22 @@ def _passes_on_files(files: dict, code: str, timeout_s: int,
                      tmpbase: str, source: str, base: str,
                      future: list) -> bool | None:
     """Run one test file on ``files``; True/False, None when inconclusive."""
+    if _runner_client.runner_url():
+        try:
+            res = _runner_client.run_files(dict(files or {}),
+                                           [{"code": code}], timeout_s)
+        except Exception:
+            return None
+        held = res.get("heldout", {})
+        if not isinstance(held, dict) or held.get("timed_out"):
+            return None
+        n = held.get("n", 0)
+        passed = held.get("pass", 0)
+        if not isinstance(n, int) or not isinstance(passed, int) or n < 1:
+            return None
+        if not _sealed._heldout_result_is_consistent(held, 1):
+            return None
+        return bool(passed == n)
     dest = os.path.join(tmpbase, f"sandbox-follow-{uuid.uuid4().hex[:6]}")
     try:
         _sealed._build_clean_sandbox(source, base, dest, future)
