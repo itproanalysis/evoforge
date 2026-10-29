@@ -60,3 +60,13 @@ The local manifest and restoration tool live at:
 No data or branches were deleted. Existing documents may reference old absolute
 paths; use the manifest or `git worktree list` to resolve their new locations.
 Unrelated services, personal files and operating-system folders were preserved.
+
+## Final validation record
+
+Code source `a889c893`: 49 SSR assertions, 44 existing regressions, Arena
+presentation checks, TypeScript and clean Next production build all passed.
+`docs/validation/2026-10-30-design-studio.json` records source and raw log hashes.
+A cp949 console-print error occurred after the build returned exit 0; the raw
+UTF-8 build log is intact. Static empty-state review is served on loopback
+`http://127.0.0.1:47839` (HTTP 200, no scripts/model/API actions). This is not a
+production deployment or a screenshot-verified live-data browser session.
