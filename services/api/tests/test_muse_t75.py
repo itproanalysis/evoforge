@@ -131,10 +131,10 @@ def test_prompt_arena_live_events_are_prefix_of_final(monkeypatch):
         listed = [x for x in c.get("/v1/arena").json()["arenas"]
                   if x["arena_id"] == aid]
         assert listed, "running arena missing from GET /v1/arena"
-        # Both reads show the same live lane events.
+        # Both reads show the same live lane events; the list is read a moment later, so it may have more.
         for lane in ("single", "evoforge"):
-            assert (listed[0]["lanes"][lane]["events"]
-                    == a["lanes"][lane]["events"])
+            first, later = a["lanes"][lane]["events"], listed[0]["lanes"][lane]["events"]
+            assert later[:len(first)] == first
         if a["status"] in ("succeeded", "failed"):
             final = a
             break
