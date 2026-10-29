@@ -43,7 +43,7 @@ from evoforge import runner_client as _runner_client  # noqa: E402
 
 SUITE_VERSION = "v0"  # default suite
 # v1 keeps v0 held-out tests, files and reference fixes unchanged; only the goals state the contract.
-SUITE_VERSIONS = ("v0", "v1", "v2", "v3", "v4")
+SUITE_VERSIONS = ("v0", "v1", "v2", "v3", "v4", "v5")
 BASELINE_MODEL = "muse-spark-1.3"
 BASELINE_COST_CENTS = 120
 ALLOWED_KINDS = frozenset({"compositional", "negative", "boundary"})
@@ -56,7 +56,7 @@ PYTEST_TIMEOUT_S = 90
 SCAFFOLD_NAME = "evoforge-sealed-v0"
 HARNESS_VERSION = "api-sealed-eval/2"  # /2: hunk counts recomputed from the body (T26)
 # Selectable so the service can A/B its own harness on one suite (/1 = strict hunk counts).
-HARNESSES = ("api-sealed-eval/1", "api-sealed-eval/2")
+HARNESSES = ("api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3")
 
 
 def _check_harness(harness: str | None) -> str:
@@ -548,7 +548,7 @@ def _safe_rel(path: str, sandbox_real: str, sandbox: str) -> bool:
     return common == sandbox_real
 
 
-def _apply_candidate(sandbox: str, diff, recount: bool = True) -> bool:
+def _apply_candidate(sandbox: str, diff, recount: bool = True, whole_file: bool = False) -> bool:
     """Apply a Builder diff; empty or unappliable diffs simply miss (score 0)."""
     if diff is None or (isinstance(diff, str) and not diff.strip()):
         return False
@@ -575,7 +575,7 @@ def _apply_candidate(sandbox: str, diff, recount: bool = True) -> bool:
                 return False
             else:
                 files[p] = None
-        changed = _patch.apply_unified_diff(files, diff, recount=recount)
+        changed = _patch.apply_unified_diff(files, diff, recount=recount, whole_file=whole_file)
     except Exception:
         return False
     try:
@@ -758,7 +758,8 @@ def run_baseline(suite_version: str, model: str, family: str | None = None,
                     outcome = "empty_diff"
                 elif _candidate_verification_failures(diff):
                     outcome = "verification_inconclusive"
-                elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
+                elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1",
+                                whole_file=harness == "api-sealed-eval/3"):
                     # Local execution: the task source is an ephemeral local
                     # repo that a remote runner cannot read (same reason suite
                     # validation never uses the runner). Remote execution is
@@ -1121,8 +1122,33 @@ def _call_critic_suite(critic_goal: str) -> tuple[str, object, int, bool]:
     return rsv, out, int(actual), missing
 
 
-def _critic_suite_from_output(out) -> list[dict]:
-    """Critic sealed_tests entries carrying top-level def test_* code."""
+def _imports_outside(code: str, allowed_modules) -> bool:
+    """True when the code does not parse or imports anything but stdlib, pytest and the target modules."""
+    import ast
+    import sys as _sys
+    try:
+        tree = ast.parse(code)
+    except SyntaxError:
+        return True
+    ok = set(_sys.stdlib_module_names) | {"pytest"} | set(allowed_modules)
+    for node in ast.walk(tree):
+        names = []
+        if isinstance(node, ast.Import):
+            names = [a.name for a in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            names = [node.module]
+        if any(n.split(".")[0] not in ok for n in names):
+            return True
+    return False
+
+
+def _critic_suite_from_output(out, allowed_modules=None) -> list[dict]:
+    """Critic sealed_tests entries carrying top-level def test_* code.
+
+    With allowed_modules (the target files' module stems), entries that do not parse or import a third-party package
+    are dropped: the sandbox has only the standard library and pytest, so such a file fails at collection and makes
+    every attempt look like a Critic failure (seen in production as "critic 0/N" on every retry).
+    """
     sealed = out.get("sealed_tests") if isinstance(out, dict) else None
     if not isinstance(sealed, list):
         return []
@@ -1132,6 +1158,8 @@ def _critic_suite_from_output(out) -> list[dict]:
         if not isinstance(code, str) or "def test_" not in code:
             continue
         if not re.search(r"(?m)^[ \t]*def\s+test_[A-Za-z0-9_]+\s*\(", code):
+            continue
+        if allowed_modules is not None and _imports_outside(code, allowed_modules):
             continue
         suite.append({"code": code})
     return suite
@@ -1211,7 +1239,8 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
             goal = task["goal"] + "\nPrevious candidate could not be independently verified."
             continue
         if not _apply_candidate(dest, diff,
-                                recount=harness != "api-sealed-eval/1"):
+                                recount=harness != "api-sealed-eval/1",
+                                whole_file=harness == "api-sealed-eval/3"):
             last_outcome = "apply_failed"
             last_dest = None
             goal = _critic_apply_failed_feedback(task["goal"])
@@ -1331,7 +1360,8 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                         usage_missing = True
                     if isinstance(cout, dict) and not cout.get("stub"):
                         provider_stub = False
-                    critic_suite = _critic_suite_from_output(cout)
+                    critic_suite = _critic_suite_from_output(
+                        cout, [os.path.splitext(os.path.basename(p))[0] for p in task["files"]])
                 best = 0.0
                 final_outcome = "empty_diff"
                 final_failing: list[str] = []
@@ -1376,7 +1406,8 @@ def run_pipeline(suite_version: str, model: str, family: str | None = None,
                         elif _candidate_verification_failures(diff):
                             outcome, failing = "verification_inconclusive", []
                             failures = _candidate_verification_failures(diff)
-                        elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1"):
+                        elif _apply_candidate(dest, diff, recount=harness != "api-sealed-eval/1",
+                                whole_file=harness == "api-sealed-eval/3"):
                             # Always local, like the baseline: the task source is an ephemeral local repo that the remote
                             # runner cannot read (production returned RunnerBadRequest for every pipeline task).
                             score, failures = _run_heldout_local_detail(

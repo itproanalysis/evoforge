@@ -1,0 +1,56 @@
+{
+  "family": "algorithmic_optimization",
+  "suite_version": "v5",
+  "tasks": [
+    {
+      "id": "SV5-AO-01",
+      "goal": "In semver_range.py, satisfies(version, rng) decides whether a semantic version satisfies an npm-style range. Versions are MAJOR.MINOR.PATCH with an optional -PRERELEASE of dot-separated identifiers; anything else raises ValueError. Precedence: compare MAJOR, MINOR, PATCH numerically; a version with a prerelease is lower than the same version without one; prerelease identifiers compare left to right, numeric ones numerically, alphanumeric ones lexically, numeric lower than alphanumeric, and a shorter list is lower when all shared identifiers are equal. A range is one or more comparator sets joined by '||' (satisfied if any set is); a set is space-separated comparators that must all hold: =V, V, >V, >=V, <V, <=V. '^V' means >=V and below the next major when MAJOR > 0, below 0.(MINOR+1).0 when MAJOR is 0 and MINOR > 0, and below 0.0.(PATCH+1) when both are 0. '~V' means >=V and below MAJOR.(MINOR+1).0. X-ranges: '*' or '' match any version; '1.x', '1.X', '1.*' and '1' mean >=1.0.0 <2.0.0; '1.2.x' and '1.2' mean >=1.2.0 <1.3.0. Hyphen ranges 'A - B' mean >=A and <=B, where a partial B such as '1.4' means below 1.5.0. A version with a prerelease satisfies a set only if some comparator in that set carries a prerelease on the same MAJOR.MINOR.PATCH; otherwise prerelease versions never match. An unparsable range raises ValueError.",
+      "files": {
+        "semver_range.py": "def _parse(v):\n    return tuple(int(x) for x in v.split(\".\"))\n\n\ndef satisfies(version, rng):\n    v = _parse(version)\n    rng = rng.strip()\n    if rng.startswith(\">=\"):\n        return v >= _parse(rng[2:])\n    return v == _parse(rng.lstrip(\"=\"))\n"
+      },
+      "reference_fix": "--- a/semver_range.py\n+++ b/semver_range.py\n@@ -1,10 +1,138 @@\n+import re\n+\n+_V = re.compile(r\"^(\\d+)\\.(\\d+)\\.(\\d+)(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$\")\n+_P = re.compile(r\"^(\\d+|[xX*])(?:\\.(\\d+|[xX*]))?(?:\\.(\\d+|[xX*]))?(?:-([0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*))?$\")\n+\n+\n def _parse(v):\n-    return tuple(int(x) for x in v.split(\".\"))\n+    m = _V.match(v.strip())\n+    if not m:\n+        raise ValueError(f\"invalid version: {v!r}\")\n+    pre = tuple(m.group(4).split(\".\")) if m.group(4) else ()\n+    return (int(m.group(1)), int(m.group(2)), int(m.group(3))), pre\n+\n+\n+def _cmp_pre(a, b):\n+    if a == b:\n+        return 0\n+    if not a:\n+        return 1\n+    if not b:\n+        return -1\n+    for x, y in zip(a, b):\n+        if x == y:\n+            continue\n+        xd, yd = x.isdigit(), y.isdigit()\n+        if xd and yd:\n+            return -1 if int(x) < int(y) else 1\n+        if xd != yd:\n+            return -1 if xd else 1\n+        return -1 if x < y else 1\n+    return -1 if len(a) < len(b) else 1\n+\n+\n+def _cmp(a, b):\n+    if a[0] != b[0]:\n+        return -1 if a[0] < b[0] else 1\n+    return _cmp_pre(a[1], b[1])\n+\n+\n+def _partial(s):\n+    m = _P.match(s.strip())\n+    if not m:\n+        raise ValueError(f\"invalid range part: {s!r}\")\n+    parts = [m.group(1), m.group(2), m.group(3)]\n+    nums = []\n+    for p in parts:\n+        if p is None or p in (\"x\", \"X\", \"*\"):\n+            break\n+        nums.append(int(p))\n+    pre = tuple(m.group(4).split(\".\")) if m.group(4) and len(nums) == 3 else ()\n+    return nums, pre\n+\n+\n+def _lower(nums, pre):\n+    return (tuple(nums + [0] * (3 - len(nums))), pre)\n+\n+\n+def _upper_excl(nums):\n+    if not nums:\n+        return None\n+    if len(nums) == 1:\n+        return ((nums[0] + 1, 0, 0), (\"0\",))\n+    return ((nums[0], nums[1] + 1, 0), (\"0\",))\n+\n+\n+def _expand(tok):\n+    if tok in (\"\", \"*\", \"x\", \"X\"):\n+        return []\n+    if tok[0] == \"^\":\n+        nums, pre = _partial(tok[1:])\n+        lo = _lower(nums, pre)\n+        full = nums + [0] * (3 - len(nums))\n+        if full[0] > 0 or len(nums) == 1:\n+            hi = ((full[0] + 1, 0, 0), (\"0\",))\n+        elif full[1] > 0 or len(nums) == 2:\n+            hi = ((0, full[1] + 1, 0), (\"0\",))\n+        else:\n+            hi = ((0, 0, full[2] + 1), (\"0\",))\n+        return [(\">=\", lo), (\"<\", hi)]\n+    if tok[0] == \"~\":\n+        nums, pre = _partial(tok[1:])\n+        lo = _lower(nums, pre)\n+        hi = _upper_excl(nums[:2] if len(nums) >= 2 else nums)\n+        return [(\">=\", lo)] + ([(\"<\", hi)] if hi else [])\n+    for op in (\">=\", \"<=\", \">\", \"<\", \"=\"):\n+        if tok.startswith(op):\n+            nums, pre = _partial(tok[len(op):])\n+            if len(nums) < 3:\n+                if op in (\">\", \"<=\"):\n+                    hi = _upper_excl(nums)\n+                    return [(\">=\" if op == \">\" else \"<\", hi)] if hi else ([] if op == \"<=\" else [(\"<\", ((0, 0, 0), (\"0\",)))])\n+                if op == \"<\":\n+                    return [(\"<\", _lower(nums, ()))]\n+                if op == \">=\":\n+                    return [(\">=\", _lower(nums, ()))]\n+                break\n+            return [(op if op != \"=\" else \"=\", (tuple(nums), pre))]\n+    nums, pre = _partial(tok)\n+    if len(nums) == 3:\n+        return [(\"=\", (tuple(nums), pre))]\n+    hi = _upper_excl(nums)\n+    return [(\">=\", _lower(nums, ()))] + ([(\"<\", hi)] if hi else [])\n+\n+\n+def _set(text):\n+    text = text.strip()\n+    m = re.match(r\"^(\\S+)\\s+-\\s+(\\S+)$\", text)\n+    if m:\n+        lo_n, lo_p = _partial(m.group(1))\n+        hi_n, hi_p = _partial(m.group(2))\n+        comps = [(\">=\", _lower(lo_n, lo_p))]\n+        if len(hi_n) == 3:\n+            comps.append((\"<=\", (tuple(hi_n), hi_p)))\n+        elif hi_n:\n+            comps.append((\"<\", _upper_excl(hi_n)))\n+        return comps\n+    comps = []\n+    for tok in re.sub(r\"(>=|<=|>|<|=)\\s+\", r\"\\1\", text).split():\n+        comps.extend(_expand(tok))\n+    return comps\n+\n+\n+def _holds(v, op, c):\n+    r = _cmp(v, c)\n+    return {\"=\": r == 0, \">\": r > 0, \">=\": r >= 0, \"<\": r < 0, \"<=\": r <= 0}[op]\n \n \n def satisfies(version, rng):\n     v = _parse(version)\n-    rng = rng.strip()\n-    if rng.startswith(\">=\"):\n-        return v >= _parse(rng[2:])\n-    return v == _parse(rng.lstrip(\"=\"))\n+    for part in rng.split(\"||\"):\n+        comps = _set(part)\n+        if not all(_holds(v, op, c) for op, c in comps):\n+            continue\n+        if v[1]:\n+            if not any(c[1] and c[0] == v[0] and c[1] != (\"0\",) for _op, c in comps):\n+                continue\n+        return True\n+    return False\n",
+      "heldout": [
+        {
+          "id": "SV5-AO-01-C",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport semver_range\n\n\ndef test_sv5ao01_compositional():\n    s = semver_range.satisfies\n    assert s('1.2.3', '^1.0.0') and not s('2.0.0', '^1.0.0')\n    assert s('0.2.5', '^0.2.3') and not s('0.3.0', '^0.2.3') and not s('0.0.4', '^0.0.3')\n    assert s('1.2.9', '~1.2.3') and not s('1.3.0', '~1.2.3')\n    assert s('1.4.9', '1.2.3 - 1.4') and not s('1.5.0', '1.2.3 - 1.4')\n"
+        },
+        {
+          "id": "SV5-AO-01-N",
+          "kind": "negative",
+          "code": "import pytest\n\nimport semver_range\n\n\ndef test_sv5ao01_negative():\n    s = semver_range.satisfies\n    assert s('1.2.3-alpha.2', '>=1.2.3-alpha.1')\n    assert not s('1.2.4-alpha.1', '>=1.2.3-alpha.1') and not s('1.2.3-alpha', '^1.0.0')\n    with pytest.raises(ValueError):\n        s('1.2', '*')\n    with pytest.raises(ValueError):\n        s('1.2.3', '>=a.b')\n"
+        },
+        {
+          "id": "SV5-AO-01-B",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport semver_range\n\n\ndef test_sv5ao01_boundary():\n    s = semver_range.satisfies\n    assert s('1.0.0-beta.11', '>1.0.0-beta.2') and not s('1.0.0-beta.2', '>1.0.0-beta.11')\n    assert s('1.0.0-alpha.beta', '>1.0.0-alpha.1') and s('1.0.0-rc.1', '<1.0.0 >=1.0.0-alpha')\n    assert s('3.1.0', '^1.0.0 || ^3.0.0') and s('7.7.7', '*') and not s('7.7.7-x', '*')\n    assert s('1.2.3', '1.x') and not s('2.0.0', '1.x') and s('1.2.0', '1.2.x') and not s('1.3.0', '1.2')\n"
+        }
+      ]
+    },
+    {
+      "id": "SV5-AO-02",
+      "goal": "In intervals.py, merge(intervals) flattens labelled half-open intervals [start, end) that may overlap into non-overlapping segments. Each input is (start, end, label, priority) with int start < end (anything else raises ValueError). Every point covered by at least one interval belongs to the interval with the highest priority there; on equal priority the one that comes first in the input wins. Return (start, end, label) segments sorted by start; uncovered gaps produce no segment; adjacent segments with the same label are joined into one.",
+      "files": {
+        "intervals.py": "def merge(intervals):\n    out = []\n    for s, e, label, prio in sorted(intervals):\n        out.append((s, e, label))\n    return out\n"
+      },
+      "reference_fix": "--- a/intervals.py\n+++ b/intervals.py\n@@ -1,5 +1,16 @@\n def merge(intervals):\n-    out = []\n-    for s, e, label, prio in sorted(intervals):\n-        out.append((s, e, label))\n-    return out\n+    for s, e, _label, _prio in intervals:\n+        if not (isinstance(s, int) and isinstance(e, int)) or s >= e:\n+            raise ValueError(f\"bad interval: {(s, e)!r}\")\n+    points = sorted({p for s, e, _l, _p in intervals for p in (s, e)})\n+    segs = []\n+    for a, b in zip(points, points[1:]):\n+        live = [(prio, -i, label) for i, (s, e, label, prio) in enumerate(intervals) if s <= a and b <= e]\n+        if not live:\n+            continue\n+        label = max(live)[2]\n+        if segs and segs[-1][1] == a and segs[-1][2] == label:\n+            segs[-1] = (segs[-1][0], b, label)\n+        else:\n+            segs.append((a, b, label))\n+    return segs\n",
+      "heldout": [
+        {
+          "id": "SV5-AO-02-C",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport intervals\n\n\ndef test_sv5ao02_compositional():\n    r = intervals.merge([(0, 10, 'base', 1), (3, 5, 'hot', 5), (8, 12, 'late', 2)])\n    assert r == [(0, 3, 'base'), (3, 5, 'hot'), (5, 8, 'base'), (8, 12, 'late')]\n    assert intervals.merge([(0, 4, 'a', 1), (2, 6, 'b', 1)]) == [(0, 6, 'a')][:0] + [(0, 4, 'a'), (4, 6, 'b')]\n"
+        },
+        {
+          "id": "SV5-AO-02-N",
+          "kind": "negative",
+          "code": "import pytest\n\nimport intervals\n\n\ndef test_sv5ao02_negative():\n    for bad in ([(5, 5, 'x', 1)], [(6, 2, 'x', 1)], [(0.5, 2, 'x', 1)]):\n        with pytest.raises(ValueError):\n            intervals.merge(bad)\n    assert intervals.merge([]) == []\n"
+        },
+        {
+          "id": "SV5-AO-02-B",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport intervals\n\n\ndef test_sv5ao02_boundary():\n    assert intervals.merge([(0, 2, 'a', 1), (5, 7, 'a', 1)]) == [(0, 2, 'a'), (5, 7, 'a')]\n    assert intervals.merge([(0, 2, 'a', 1), (2, 4, 'a', 3)]) == [(0, 4, 'a')]\n    assert intervals.merge([(0, 9, 'low', 1), (2, 4, 'mid', 2), (3, 6, 'top', 3), (0, 9, 'low2', 1)]) == [(0, 2, 'low'), (2, 3, 'mid'), (3, 6, 'top'), (6, 9, 'low')]\n"
+        }
+      ]
+    }
+  ]
+}

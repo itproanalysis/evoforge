@@ -24,6 +24,7 @@ from evoforge import postgres_state as _postgres_state
 from evoforge import sealed_eval as _sealed
 
 KIND = "evolution_run"
+STRATEGY_KIND = "strategy_decision"
 BASELINE_MODEL = "muse-spark-1.3"
 LIST_LIMIT = 20
 PREVIEW_TIMEOUT_S = 10
@@ -51,6 +52,185 @@ _DOC_LOCK = threading.Lock()
 
 class UnknownApp(ValueError):
     """Requested app id is not in the rounds suite."""
+
+
+STRATEGY_KEYS = ("max_attempts", "accumulate_critic", "retire_stale")
+DEFAULT_STRATEGY = {"max_attempts": 3, "accumulate_critic": True,
+                    "retire_stale": True}
+
+
+class UnknownStrategy(LookupError):
+    """No finished run used this strategy id."""
+
+
+class StrategyNotPromotable(ValueError):
+    """Candidate cannot be promoted (409)."""
+
+
+def strategy_id_for(strategy: dict) -> str:
+    raw = json.dumps(dict(strategy), sort_keys=True,
+                     separators=(",", ":")).encode("utf-8")
+    return "st_" + hashlib.sha256(raw).hexdigest()[:10]
+
+
+def validate_strategy(strategy) -> dict:
+    if not isinstance(strategy, dict):
+        raise ValueError("strategy must be an object")
+    if set(strategy.keys()) != set(STRATEGY_KEYS):
+        raise ValueError("strategy must have exactly max_attempts, "
+                         "accumulate_critic, retire_stale")
+    ma = strategy.get("max_attempts")
+    if type(ma) is not int or not 1 <= ma <= 3:
+        raise ValueError("max_attempts must be int 1..3")
+    for key in ("accumulate_critic", "retire_stale"):
+        if type(strategy.get(key)) is not bool:
+            raise ValueError(f"{key} must be bool")
+    return {"max_attempts": ma,
+            "accumulate_critic": strategy["accumulate_critic"],
+            "retire_stale": strategy["retire_stale"]}
+
+
+def _strategy_from_doc(doc: dict) -> dict:
+    try:
+        inner = doc.get("strategy")
+        if isinstance(inner, dict):
+            return validate_strategy(inner)
+    except Exception:
+        pass
+    return dict(DEFAULT_STRATEGY)
+
+
+def _strategy_id_of_doc(doc: dict) -> str:
+    try:
+        sid = doc.get("strategy_id")
+        expected = strategy_id_for(_strategy_from_doc(doc))
+        if isinstance(sid, str) and sid == expected:
+            return sid
+        return expected
+    except Exception:
+        pass
+    return strategy_id_for(dict(DEFAULT_STRATEGY))
+
+
+def list_strategy_decisions() -> list[dict]:
+    """Strategy promotion decisions, oldest first."""
+    cands: list[dict] = []
+    try:
+        keys = list(_store())
+    except Exception:
+        return []
+    for key in keys:
+        try:
+            rec = _store().get(key, None)
+        except Exception:
+            continue
+        if not isinstance(rec, dict) or rec.get("kind") != STRATEGY_KIND:
+            continue
+        inner = rec.get("strategy_decision")
+        if isinstance(inner, dict) and isinstance(inner.get("promoted"), str):
+            cands.append(copy.deepcopy(inner))
+
+    def _ts(d: dict) -> float:
+        v = d.get("at")
+        return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0.0
+
+    cands.sort(key=_ts)
+    return cands
+
+
+def current_champion() -> dict:
+    decs = list_strategy_decisions()
+    if not decs:
+        return {"strategy_id": strategy_id_for(dict(DEFAULT_STRATEGY)),
+                "strategy": dict(DEFAULT_STRATEGY), "since": 0.0}
+    last = decs[-1]
+    sid = last.get("promoted")
+    strat: dict | None = None
+    if sid == strategy_id_for(dict(DEFAULT_STRATEGY)):
+        strat = dict(DEFAULT_STRATEGY)
+    else:
+        for doc in _all_run_docs():
+            if doc.get("status") not in ("succeeded", "failed"):
+                continue
+            if _strategy_id_of_doc(doc) == sid:
+                strat = _strategy_from_doc(doc)
+                break
+    if strat is None:
+        strat = dict(DEFAULT_STRATEGY)
+    since = last.get("at", 0.0)
+    if not isinstance(since, (int, float)) or isinstance(since, bool):
+        since = 0.0
+    return {"strategy_id": sid, "strategy": strat, "since": float(since)}
+
+
+def _group_finished_by_strategy() -> dict:
+    grouped: dict[str, dict] = {}
+    for doc in _all_run_docs():
+        if doc.get("status") not in ("succeeded", "failed"):
+            continue
+        sid = _strategy_id_of_doc(doc)
+        strat = _strategy_from_doc(doc)
+        entry = grouped.get(sid)
+        if entry is None:
+            grouped[sid] = {"strategy": strat, "docs": [doc]}
+        else:
+            entry["docs"].append(doc)
+    return grouped
+
+
+def strategies_overview() -> dict:
+    champ = current_champion()
+    grouped = _group_finished_by_strategy()
+    candidates: list[dict] = []
+    for sid in sorted(grouped):
+        entry = grouped[sid]
+        st = _side_stats(entry["docs"], "evoforge")
+        candidates.append({"strategy_id": sid,
+                           "strategy": dict(entry["strategy"]),
+                           "runs": len(entry["docs"]),
+                           "evoforge": {"rounds": int(st["rounds"]),
+                                        "verified": int(st["verified"]),
+                                        "wilson95": [float(st["wilson95"][0]),
+                                                     float(st["wilson95"][1])]}})
+    return {"champion": copy.deepcopy(champ),
+            "candidates": candidates,
+            "decisions": list_strategy_decisions()}
+
+
+def promote_strategy(strategy_id: str) -> dict:
+    champ = current_champion()
+    if not isinstance(strategy_id, str) or not strategy_id:
+        raise UnknownStrategy("unknown strategy")
+    if strategy_id == champ.get("strategy_id"):
+        raise StrategyNotPromotable(
+            "already the champion; cannot promote the champion itself")
+    grouped = _group_finished_by_strategy()
+    entry = grouped.get(strategy_id)
+    if entry is None:
+        raise UnknownStrategy(f"unknown strategy: {strategy_id!r}")
+    cand_stats = _side_stats(entry["docs"], "evoforge")
+    cand_interval = [float(cand_stats["wilson95"][0]),
+                     float(cand_stats["wilson95"][1])]
+    champ_entry = grouped.get(champ.get("strategy_id", ""))
+    if champ_entry is None:
+        champ_interval = [0.0, 0.0]
+    else:
+        champ_stats = _side_stats(champ_entry["docs"], "evoforge")
+        champ_interval = [float(champ_stats["wilson95"][0]),
+                          float(champ_stats["wilson95"][1])]
+    if not (cand_interval[0] > champ_interval[1]):
+        raise StrategyNotPromotable(
+            f"intervals overlap: candidate {cand_interval} vs "
+            f"champion {champ_interval}; promotion requires the candidate "
+            "wilson95 lower bound to exceed the champion upper bound")
+    decision = {"promoted": strategy_id, "previous": champ.get("strategy_id"),
+                "candidate_interval": cand_interval,
+                "champion_interval": champ_interval, "at": time.time()}
+    rec_id = f"stdec_{uuid.uuid4().hex[:12]}"
+    _store()[rec_id] = {"id": rec_id, "kind": STRATEGY_KIND,
+                        "created_at": decision["at"],
+                        "strategy_decision": copy.deepcopy(decision)}
+    return copy.deepcopy(decision)
 
 
 def configure(store) -> None:
@@ -185,7 +365,7 @@ def clear() -> None:
             rec = _store().get(key, None)
         except Exception:
             continue
-        if isinstance(rec, dict) and rec.get("kind") == KIND:
+        if isinstance(rec, dict) and rec.get("kind") in (KIND, STRATEGY_KIND):
             try:
                 del _store()[key]
             except Exception:
@@ -622,9 +802,14 @@ def _score_and_preview(files: dict, cumulative: list[dict],
 
 def build_manifest(app_id: str, title: str, n_rounds: int, base_files: dict,
                    rounds: list[dict], model: str, feedback: str,
-                   single_apply: str = "strict") -> dict:
+                   single_apply: str = "strict", strategy: dict | None = None) -> dict:
     if single_apply not in SINGLE_APPLIES:
         single_apply = "strict"
+    try:
+        strat = validate_strategy(strategy) if strategy is not None else dict(DEFAULT_STRATEGY)
+    except ValueError:
+        strat = dict(DEFAULT_STRATEGY)
+    sid = strategy_id_for(strat)
     single_harness = ("api-sealed-eval/2" if single_apply == "tolerant"
                       else "api-sealed-eval/1")
     return {
@@ -638,7 +823,7 @@ def build_manifest(app_id: str, title: str, n_rounds: int, base_files: dict,
                        "max_attempts": 1, "feedback": "none",
                        "apply": single_apply},
             "evoforge": {"model": model, "harness": "api-sealed-eval/2",
-                         "max_attempts": _sealed.PIPELINE_MAX_ATTEMPTS,
+                         "max_attempts": int(strat["max_attempts"]),
                          "feedback": feedback, "apply": "tolerant"},
         },
         "single_apply": single_apply,
@@ -647,13 +832,24 @@ def build_manifest(app_id: str, title: str, n_rounds: int, base_files: dict,
         "cost_basis": "model_api_usage",
         "runner_cost": "not_measured",
         "disclosure": _disclosure_for(single_apply),
+        "strategy": dict(strat),
+        "strategy_id": sid,
     }
 
 
 def seed_running(run_id: str, app_id: str, feedback: str, n_rounds: int,
-                 single_apply: str = "strict") -> dict:
+                 single_apply: str = "strict", strategy: dict | None = None) -> dict:
     if single_apply not in SINGLE_APPLIES:
         single_apply = "strict"
+    if strategy is None:
+        try:
+            strat = dict(current_champion().get("strategy") or DEFAULT_STRATEGY)
+            strat = validate_strategy(strat)
+        except Exception:
+            strat = dict(DEFAULT_STRATEGY)
+    else:
+        strat = validate_strategy(strategy)
+    sid = strategy_id_for(strat)
     app = find_app(app_id)
     rounds = [r for r in app.get("rounds", []) if int(r.get("index", 0)) <= int(n_rounds)]
     rounds = sorted(rounds, key=lambda r: int(r.get("index", 0)))
@@ -661,7 +857,7 @@ def seed_running(run_id: str, app_id: str, feedback: str, n_rounds: int,
     now = time.time()
     manifest = build_manifest(app_id, app.get("title", ""), len(rounds),
                               base_files, rounds, BASELINE_MODEL, feedback,
-                              single_apply)
+                              single_apply, strat)
     seed_rounds = [{"index": int(r.get("index", 0)), "name": r.get("name", ""),
                     "goal": r.get("goal", ""),
                     "sides": {"single": _pending(), "evoforge": _pending()}}
@@ -669,6 +865,7 @@ def seed_running(run_id: str, app_id: str, feedback: str, n_rounds: int,
     doc = {"run_id": run_id, "app_id": app_id,
            "title": app.get("title", ""), "status": "running",
            "feedback": feedback, "single_apply": single_apply,
+           "strategy": dict(strat), "strategy_id": sid,
            "created_at": now, "started_at": now,
            "finished_at": None, "manifest": manifest,
            "rounds": seed_rounds, "totals": {
@@ -792,11 +989,29 @@ def _run_single_round(app_round: dict, cumulative: list[dict],
 
 def _run_evoforge_round(app_round: dict, cumulative: list[dict],
                         lane_files: dict, feedback: str, timeout_s: int,
-                        critic_history: list[dict] | None = None) -> tuple[dict, dict]:
+                        critic_history: list[dict] | None = None,
+                        strategy: dict | None = None,
+                        max_attempts: int | None = None,
+                        accumulate_critic: bool = True,
+                        retire_stale: bool = True) -> tuple[dict, dict]:
+    if strategy is not None:
+        try:
+            _strat = validate_strategy(strategy)
+        except ValueError:
+            _strat = dict(DEFAULT_STRATEGY)
+        max_attempts = int(_strat["max_attempts"])
+        accumulate_critic = bool(_strat["accumulate_critic"])
+        retire_stale = bool(_strat["retire_stale"])
+    if max_attempts is None:
+        max_attempts = _sealed.PIPELINE_MAX_ATTEMPTS
+    try:
+        max_attempts = int(max_attempts)
+    except (TypeError, ValueError):
+        max_attempts = _sealed.PIPELINE_MAX_ATTEMPTS
+    max_attempts = max(1, min(max_attempts, _sealed.PIPELINE_MAX_ATTEMPTS))
     t0 = time.perf_counter()
     events: list[dict] = []
     goal = app_round.get("goal", "")
-    max_attempts = _sealed.PIPELINE_MAX_ATTEMPTS
     cost = 0
     attempts = 0
     final_diff = ""
@@ -811,14 +1026,15 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
             _crsv, _cout, _cactual, _cmiss = _sealed._call_critic_suite(
                 _sealed._critic_goal_for_task({"goal": goal}, file_context))
             cost += int(_cactual)
-            critic_new = _sealed._critic_suite_from_output(_cout)
+            critic_new = _sealed._critic_suite_from_output(
+                _cout, [os.path.splitext(os.path.basename(p))[0] for p in lane_files])
             _emit(events, "critic",
                   f"evoforge: Critic returned {len(critic_new)} tests")
         except Exception as e:
             error = _short_error(e)
             _emit(events, "critic", f"evoforge: Critic call failed ({type(e).__name__})")
             critic_new = []
-    prior: list[dict] = list(critic_history) if isinstance(critic_history, list) else []
+    prior: list[dict] = (list(critic_history) if (accumulate_critic and isinstance(critic_history, list)) else [])
     critic_suite: list[dict] = list(prior) + list(critic_new)
     critic_retired = 0
     try:
@@ -833,7 +1049,7 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
     if feedback == "critic":
         _emit(events, "critic",
               f"Critic suite: {len(critic_suite)} tests ({len(critic_new)} new)")
-        if isinstance(critic_history, list):
+        if isinstance(critic_history, list) and accumulate_critic:
             critic_history.extend(list(critic_new))
     goal_attempt = goal
     try:
@@ -885,6 +1101,11 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
                             nxt, critic_suite, timeout_s,
                             f"evo-critic-r{app_round.get('index')}")
                         n_c = len(critic_suite)
+                        if _sealed._failed_run_outcome(cfail or []) == "verification_inconclusive":
+                            # An unscorable Critic suite says nothing about the candidate: judge it, do not retry.
+                            _emit(events, "critic",
+                                  "Critic suite could not be scored (verification inconclusive); judging this attempt")
+                            break
                     except Exception as e:
                         _emit(events, "runner",
                               f"evoforge: critic scoring failed ({type(e).__name__})")
@@ -899,7 +1120,7 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
                     _emit(events, "runner",
                           f"evoforge: attempt {attempts} critic {cp}/{_cn} failed")
                     _stale_hit = False
-                    if critic_new:
+                    if retire_stale and critic_new:
                         try:
                             _failing = set(_sealed._failing_test_names(
                                 cfail or [], critic_suite))
@@ -1041,11 +1262,15 @@ def _run_evoforge_round(app_round: dict, cumulative: list[dict],
 
 def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                   n_rounds: int = 5, timeout_s: int | None = None,
-                  single_apply: str = "strict") -> dict:
+                  single_apply: str = "strict",
+                  strategy: dict | None = None) -> dict:
     # Tolerate a positional single_apply in the timeout_s slot for
     # backward/forward compatibility: run_evolution(rid, app, fb, nr, "tolerant").
     if isinstance(timeout_s, str) and timeout_s in SINGLE_APPLIES and single_apply == "strict":
         single_apply, timeout_s = timeout_s, None
+    # Tolerate a strategy passed positionally in the single_apply slot.
+    if isinstance(single_apply, dict) and strategy is None:
+        strategy, single_apply = single_apply, "strict"
     if single_apply not in SINGLE_APPLIES:
         single_apply = "strict"
     started = time.time()
@@ -1077,18 +1302,57 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
     base_files = _base_files(app)
     # Reuse the seeded manifest when present (seeded synchronously at POST).
     manifest = None
+    seeded_strategy: dict | None = None
+    seeded_strategy_id: str | None = None
     try:
         prev = get_run(run_id)
         if isinstance(prev, dict) and isinstance(prev.get("manifest"), dict):
             manifest = copy.deepcopy(prev["manifest"])
+        if isinstance(prev, dict):
+            try:
+                if isinstance(prev.get("strategy"), dict):
+                    seeded_strategy = validate_strategy(prev["strategy"])
+                    seeded_strategy_id = strategy_id_for(seeded_strategy)
+            except ValueError:
+                seeded_strategy = None
+            if not isinstance(prev.get("strategy_id"), str):
+                seeded_strategy_id = None
+            elif seeded_strategy is not None and prev.get("strategy_id") == seeded_strategy_id:
+                pass
+            elif seeded_strategy is None:
+                seeded_strategy_id = None
     except Exception:
         manifest = None
+    if strategy is not None:
+        try:
+            strat = validate_strategy(strategy)
+        except ValueError:
+            strat = dict(DEFAULT_STRATEGY)
+    elif seeded_strategy is not None:
+        strat = seeded_strategy
+    else:
+        _mstrat = None
+        try:
+            _mstrat = manifest.get("strategy") if isinstance(manifest, dict) else None
+            strat = validate_strategy(_mstrat) if isinstance(_mstrat, dict) else None
+        except ValueError:
+            strat = None
+        if strat is None:
+            try:
+                strat = dict(current_champion().get("strategy") or DEFAULT_STRATEGY)
+                strat = validate_strategy(strat)
+            except Exception:
+                strat = dict(DEFAULT_STRATEGY)
+    strat_id = strategy_id_for(strat)
     if manifest is None:
         manifest = build_manifest(app_id, app.get("title", ""), len(rounds_all),
                                   base_files, rounds_all, BASELINE_MODEL, feedback,
-                                  single_apply)
+                                  single_apply, strat)
     if isinstance(manifest, dict) and manifest.get("single_apply") in SINGLE_APPLIES:
         single_apply = manifest["single_apply"]
+    if isinstance(manifest, dict):
+        manifest["strategy"] = dict(strat)
+        manifest["strategy_id"] = strat_id
     created_at = started
     try:
         prev = get_run(run_id)
@@ -1123,6 +1387,7 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
         doc = {"run_id": run_id, "app_id": app_id,
                "title": app.get("title", ""), "status": "running",
                "feedback": feedback, "single_apply": single_apply,
+               "strategy": dict(strat), "strategy_id": strat_id,
                "created_at": created_at,
                "started_at": started, "finished_at": None,
                "manifest": copy.deepcopy(manifest),
@@ -1142,7 +1407,7 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
                                                     single_apply)
                 else:
                     files, snap = _run_evoforge_round(r, cumulative, files, feedback, timeout_s,
-                                                      critic_history)
+                                                      critic_history, strat)
             except Exception as e:
                 try:
                     idx = int(r.get("index", 0))
@@ -1225,6 +1490,7 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
     doc = {"run_id": run_id, "app_id": app_id,
            "title": app.get("title", ""), "status": status,
            "feedback": feedback, "single_apply": single_apply,
+           "strategy": dict(strat), "strategy_id": strat_id,
            "created_at": created_at,
            "started_at": started, "finished_at": time.time(),
            "manifest": manifest, "rounds": round_docs,

@@ -1041,15 +1041,15 @@ def eval_sandbox(req: SandboxRequest):
 
 
 class EvalBaselineRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
-    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4", "v5"] = "v0"
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
 
 
 class EvalPipelineRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
-    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4", "v5"] = "v0"
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
     feedback: Literal["heldout", "critic"] = "heldout"
@@ -1111,7 +1111,7 @@ def _production_stats() -> dict:
 
 
 @app.get("/v1/eval/suites")
-def eval_suites(suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"):
+def eval_suites(suite_version: Literal["v0", "v1", "v2", "v3", "v4", "v5"] = "v0"):
     """Redacted sealed catalogue for one suite version: families plus sha256/len metadata only."""
     from evoforge import repo_source as _rs_eval
 
@@ -1317,8 +1317,8 @@ def eval_pipeline(req: EvalPipelineRequest):
 
 class EvalJobRequest(BaseModel):
     kind: Literal["X_SINGLE", "PIPELINE"]
-    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v0"
-    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2"] | None = None
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4", "v5"] = "v0"
+    harness_version: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"] | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     family: str | None = None
     feedback: Literal["heldout", "critic"] = "heldout"
@@ -1375,12 +1375,12 @@ def eval_job_get(job_id: str):
 
 
 class EvalABTestRequest(BaseModel):
-    suite_version: Literal["v0", "v1", "v2", "v3", "v4"] = "v2"
+    suite_version: Literal["v0", "v1", "v2", "v3", "v4", "v5"] = "v2"
     kind: Literal["X_SINGLE", "PIPELINE"]
     family: str | None = None
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
-    champion: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
-    challenger: Literal["api-sealed-eval/1", "api-sealed-eval/2"]
+    champion: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"]
+    challenger: Literal["api-sealed-eval/1", "api-sealed-eval/2", "api-sealed-eval/3"]
     feedback: Literal["heldout", "critic"] = "heldout"
 
 
@@ -1475,7 +1475,7 @@ def eval_decisions_list():
 
 
 class ArenaRequest(BaseModel):
-    suite_version: Literal["v1", "v2", "v3", "v4"] = "v2"
+    suite_version: Literal["v1", "v2", "v3", "v4", "v5"] = "v2"
     task_id: str
     model: Literal["muse-spark-1.3"] = "muse-spark-1.3"
     feedback: Literal["heldout", "critic"] = "heldout"
@@ -2111,6 +2111,21 @@ class EvolutionRunRequest(BaseModel):
     feedback: Literal["critic", "heldout"] = "critic"
     rounds: int = Field(5, ge=1, le=5)
     single_apply: Literal["strict", "tolerant"] = "strict"
+    strategy: dict | None = None
+
+    @model_validator(mode="after")
+    def _check_strategy(self):
+        if self.strategy is None:
+            return self
+        try:
+            evo_rounds_mod.validate_strategy(self.strategy)
+        except ValueError as e:
+            raise ValueError(str(e))
+        return self
+
+
+class StrategyPromoteRequest(BaseModel):
+    strategy_id: str
 
 
 def _evo_rounds_budget_or_402(n_rounds: int, feedback: str) -> None:
@@ -2147,14 +2162,27 @@ def evolution_runs_create(req: EvolutionRunRequest):
     except sealed_eval_mod.SealedEvalError as e:
         raise HTTPException(502, _rs_evo2.redact(str(e) or "rounds suite unavailable"))
     _evo_rounds_budget_or_402(int(req.rounds), req.feedback)
+    if req.strategy is None:
+        try:
+            strat = dict(evo_rounds_mod.current_champion().get("strategy")
+                         or evo_rounds_mod.DEFAULT_STRATEGY)
+            strat = evo_rounds_mod.validate_strategy(strat)
+        except Exception:
+            strat = dict(evo_rounds_mod.DEFAULT_STRATEGY)
+    else:
+        try:
+            strat = evo_rounds_mod.validate_strategy(req.strategy)
+        except ValueError as e:
+            raise HTTPException(422, str(e))
     box: dict = {}
     ready = threading.Event()
 
-    def _runner(a=aid, fb=req.feedback, nr=int(req.rounds), sa=req.single_apply):
+    def _runner(a=aid, fb=req.feedback, nr=int(req.rounds), sa=req.single_apply,
+                st=dict(strat)):
         if not ready.wait(timeout=60):
             raise RuntimeError("evolution start sync failed")
         return evo_rounds_mod.run_evolution(box["run_id"], a, fb, nr,
-                                            single_apply=sa)
+                                            single_apply=sa, strategy=st)
 
     try:
         job = eval_jobs_mod.create_job(kind="EVOLUTION", runner=_runner)
@@ -2162,7 +2190,7 @@ def evolution_runs_create(req: EvolutionRunRequest):
         raise HTTPException(409, f"another eval job is active: {e.job_id}")
     box["run_id"] = job["job_id"]
     evo_rounds_mod.seed_running(job["job_id"], aid, req.feedback, int(req.rounds),
-                                req.single_apply)
+                                req.single_apply, strat)
     ready.set()
     return {"run_id": job["job_id"], "status": "running"}
 
@@ -2187,6 +2215,24 @@ def evolution_stats(feedback: str | None = None, single_apply: str | None = None
     if single_apply is not None and single_apply not in ("strict", "tolerant"):
         raise HTTPException(422, "single_apply must be strict or tolerant")
     return evo_rounds_mod.stats(feedback=feedback, single_apply=single_apply)
+
+
+@app.get("/v1/evolution/strategies")
+def evolution_strategies():
+    return evo_rounds_mod.strategies_overview()
+
+
+@app.post("/v1/evolution/strategies/promote")
+def evolution_strategies_promote(req: StrategyPromoteRequest):
+    sid = req.strategy_id.strip() if isinstance(req.strategy_id, str) else ""
+    if not sid:
+        raise HTTPException(404, "unknown strategy")
+    try:
+        return evo_rounds_mod.promote_strategy(sid)
+    except evo_rounds_mod.UnknownStrategy as e:
+        raise HTTPException(404, str(e) or "unknown strategy")
+    except evo_rounds_mod.StrategyNotPromotable as e:
+        raise HTTPException(409, str(e))
 
 
 # ---------------------------------------------------------------------------
