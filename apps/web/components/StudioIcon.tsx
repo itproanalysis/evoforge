@@ -13,6 +13,7 @@ export function StudioIcon({ name, ...props }: SVGProps<SVGSVGElement> & { name:
     arrow: <path d="M5 12h14m-6-6 6 6-6 6"/>,
     menu: <path d="M4 6h16M4 12h16M4 18h16"/>,
     close: <path d="m6 6 12 12M18 6 6 18"/>,
+    check: <path d="m5 12 4 4L19 6"/>,
     more: <><circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/></>,
     users: <><circle cx="9" cy="8" r="3"/><path d="M3 21v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6M17 14a5 5 0 0 1 4 5v2"/></>,
     history: <><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6M12 7v5l3 2"/></>,

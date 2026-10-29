@@ -136,6 +136,19 @@ for (const lang of ['en', 'ko']) {
   assert.ok(!pending.includes('fixture output') && !pending.includes('50¢'));
   assert.ok(pending.includes('selected=""'));
   checks += 2;
+  assert.ok(pending.includes(`role="status">${messages[lang].canvas.received}</span>`));
+  assert.ok(!pending.includes('canvas-passed'));
+  assert.equal((finished.match(/class="canvas-passed"/g) ?? []).length, 2);
+  const activeCanvas = render(CanvasWorkspace, {...emptyCanvasProps, busy: true, doc: {...fixtureDoc, status: 'running', lanes: {evoforge: {...fixtureLane, status: 'running', heldout: null, outcome: null}}}});
+  assert.ok(activeCanvas.includes(`role="status">${messages[lang].canvas.running}</span>`));
+  assert.ok(!activeCanvas.includes('canvas-passed'));
+  const loadFailure = render(CanvasWorkspace, {...emptyCanvasProps, pollError: true});
+  assert.ok(loadFailure.includes(`role="alert">${renderToStaticMarkup(React.createElement('span', null, messages[lang].canvas['load-failed']))}`));
+  assert.ok(loadFailure.includes(messages[lang].canvas.retry));
+  assert.ok(!blank.includes('role="alert"'));
+  const invalidDate = render(CanvasWorkspace, {...emptyCanvasProps, runs: [{...fixtureDoc, created_at: 1e100}]});
+  assert.ok(invalidDate.includes('fixture goal') && !invalidDate.includes('Invalid Date'));
+  checks += 9;
 }
 assert.deepEqual(Object.keys(messages.ko.studio).sort(), Object.keys(messages.en.studio).sort());
 checks++;

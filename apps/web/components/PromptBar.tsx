@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { postPromptArena, postPromptFollowup, type ArenaDoc } from "../lib/api";
 import { canFollowUp } from "../lib/arenaStatus";
@@ -20,6 +20,13 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
   const [feedback, setFeedback] = useState<"critic" | "heldout">("critic");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const textarea = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const field = textarea.current;
+    if (!field) return;
+    field.style.height = 'auto';
+    field.style.height = `${Math.max(42, Math.min(field.scrollHeight, 144))}px`;
+  }, [prompt]);
 
   // Starting a prompt arena spends model credits: operator-only, with a cost
   // warning confirmed up front.
@@ -52,6 +59,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
       <div className="studio-composer-inner flex items-end gap-3 flex-wrap">
         <label className="flex-1 min-w-52 text-xs flex flex-col gap-1">
           <textarea
+            ref={textarea}
             value={prompt}
             onChange={(e) => setPrompt(e.target.value)}
             onKeyDown={(event) => {
