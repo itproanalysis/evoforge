@@ -228,7 +228,11 @@ def test_page_and_api_and_nav():
     assert "listEvolutionRuns" in api and "getEvolutionRun" in api
     assert "/v1/evolution/runs" in api
     layout = LAYOUT.read_text(encoding="utf-8")
-    assert "${prefix}/replay" in layout
+    # T58 moved the nav links into components/FeatureRail.tsx, rendered by the layout.
+    rail_path = LAYOUT.parents[2] / "components" / "FeatureRail.tsx"
+    if "FeatureRail" in layout and rail_path.exists():
+        layout += rail_path.read_text(encoding="utf-8")
+    assert "${prefix}/replay" in layout or ("${prefix}${path}" in layout and '"/replay"' in layout)
 
 
 def test_replay_i18n_keys():

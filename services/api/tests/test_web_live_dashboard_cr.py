@@ -43,8 +43,11 @@ def test_next_intl_plugin_and_locale_performance_route_configured():
     assert "PerformancePage" in locale_perf.read_text(encoding="utf-8")
 
     locale_layout = (WEB / "app" / "[locale]" / "layout.tsx").read_text(encoding="utf-8")
+    rail = WEB / "components" / "FeatureRail.tsx"  # T58: nav links live in the rail the layout renders
+    if "FeatureRail" in locale_layout and rail.is_file():
+        locale_layout += rail.read_text(encoding="utf-8")
     assert "/performance" in locale_layout
-    assert "t('performance')" in locale_layout
+    assert "t('performance')" in locale_layout or 'key: "performance"' in locale_layout  # rail labels come from ITEMS keys
 
 
 def test_mission_control_pages_have_live_missions_outcomes_wvi_and_performance():
