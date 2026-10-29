@@ -2101,14 +2101,92 @@ def ledger_snapshot():
 
 
 # ---------------------------------------------------------------------------
+# T51 Evolution Rounds: one app visibly evolves R1->R5, EvoForge vs single AI.
+# ---------------------------------------------------------------------------
+
+class EvolutionRunRequest(BaseModel):
+    app_id: str
+    feedback: Literal["critic", "heldout"] = "critic"
+    rounds: int = Field(5, ge=1, le=5)
+
+
+def _evo_rounds_budget_or_402(n_rounds: int, feedback: str) -> None:
+    try:
+        evo_rounds_mod.check_budget(n_rounds, feedback)
+    except performance_mod.BudgetExceeded as e:
+        raise HTTPException(402, str(e))
+    except ledger.Overdraft:
+        raise HTTPException(402, "budget exhausted (reserve_cost refused)")
+
+
+@app.get("/v1/evolution/apps")
+def evolution_apps():
+    from evoforge import repo_source as _rs_evo
+
+    try:
+        apps = evo_rounds_mod.list_apps()
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_evo.redact(str(e) or "rounds suite unavailable"))
+    return {"apps": apps}
+
+
+@app.post("/v1/evolution/runs", status_code=202)
+def evolution_runs_create(req: EvolutionRunRequest):
+    from evoforge import repo_source as _rs_evo2
+
+    aid = req.app_id.strip() if isinstance(req.app_id, str) else ""
+    if not aid:
+        raise HTTPException(404, "unknown app")
+    try:
+        app = evo_rounds_mod.find_app(aid)
+    except evo_rounds_mod.UnknownApp:
+        raise HTTPException(404, f"unknown app: {aid!r}")
+    except sealed_eval_mod.SealedEvalError as e:
+        raise HTTPException(502, _rs_evo2.redact(str(e) or "rounds suite unavailable"))
+    _evo_rounds_budget_or_402(int(req.rounds), req.feedback)
+    box: dict = {}
+    ready = threading.Event()
+
+    def _runner(a=aid, fb=req.feedback, nr=int(req.rounds)):
+        if not ready.wait(timeout=60):
+            raise RuntimeError("evolution start sync failed")
+        return evo_rounds_mod.run_evolution(box["run_id"], a, fb, nr)
+
+    try:
+        job = eval_jobs_mod.create_job(kind="EVOLUTION", runner=_runner)
+    except eval_jobs_mod.ActiveJobError as e:
+        raise HTTPException(409, f"another eval job is active: {e.job_id}")
+    box["run_id"] = job["job_id"]
+    evo_rounds_mod.seed_running(job["job_id"], aid, req.feedback, int(req.rounds))
+    ready.set()
+    return {"run_id": job["job_id"], "status": "running"}
+
+
+@app.get("/v1/evolution/runs")
+def evolution_runs_list():
+    return {"runs": evo_rounds_mod.list_runs()}
+
+
+@app.get("/v1/evolution/runs/{run_id}")
+def evolution_runs_get(run_id: str):
+    doc = evo_rounds_mod.get_run(run_id)
+    if doc is None:
+        raise HTTPException(404, "unknown evolution run")
+    return doc
+
+
+# ---------------------------------------------------------------------------
 # Autonomous Evolution (Autopilot) + Proof Certificates — the new horizon.
 # Goal in, verified PR out. Every generation reuses the same trust-kernel
 # cores (_generate_core/_review_core/_run_core/_pr_core); nothing here can
 # mint a PASS on its own. Certificates carry digests, never code.
 # ---------------------------------------------------------------------------
 from evoforge import evolution as evo_engine
+from evoforge import evolution_rounds as evo_rounds_mod
 from evoforge import proof as proof_mod
 from evoforge import memory as evo_memory
+
+evo_rounds_mod.configure(_evidence)
 
 # T31: background evolution runs. run_active tracks live daemon workers per
 # evolution; run_error records the last worker failure (type + message only).
