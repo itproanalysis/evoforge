@@ -12,6 +12,7 @@ import { watchReplaySelection, type ReplaySelection } from "../../../lib/replayS
 import { AgentPanel } from "../../../components/AgentPanel";
 import { CommandBar } from "../../../components/CommandBar";
 import { EvolutionStats } from "../../../components/EvolutionStats";
+import { StrategiesPanel } from "../../../components/StrategiesPanel";
 
 export default function ReplayPage() {
   const t = useTranslations("replay");
@@ -67,6 +68,7 @@ export default function ReplayPage() {
     <div>
       <h1>{t("title")}</h1>
       <EvolutionStats />
+      <StrategiesPanel />
       {listError && <p role="alert" style={{ color: "#f87171" }}>
         {t("load-failed")} <button type="button" onClick={() => setListAttempt((n) => n + 1)}>{t("retry")}</button>
       </p>}
