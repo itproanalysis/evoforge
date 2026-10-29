@@ -427,7 +427,7 @@ export default function MissionControl() {
         heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null}
       />
       {/* Plain-language intro above the workspace: what happens when you type. */}
-      <div className="studio-tools">
+      <div className="studio-tools flex flex-col md:flex-row">
       <section aria-label={tWorkspace("intro")} className="studio-intro">
         <details><summary>{tStudio('guide')}</summary>
         <p className="text-sm text-text-primary mt-0 mb-2">

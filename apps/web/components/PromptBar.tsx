@@ -46,7 +46,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
   };
 
   return (
-    <div className="studio-composer">
+    <div className="studio-composer fixed">
       <div className="studio-composer-inner flex items-end gap-3 flex-wrap">
         <label className="flex-1 min-w-52 text-xs flex flex-col gap-1">
           <textarea
@@ -95,7 +95,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           title={operator ? undefined : t("operator-only")}
           className="studio-submit px-3 py-1 rounded text-xs border border-border cursor-pointer font-semibold"
         >
-          {followUp ? t("prompt-followup-start") : ts('submit')}
+          {t(followUp ? "prompt-followup-start" : "prompt-start")}
         </button>
         {error && <span style={{ color: "#a2352e", fontSize: 12 }}>{error}</span>}
       </div>
