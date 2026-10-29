@@ -351,6 +351,27 @@ def _summary_int(value) -> int:
     return 0
 
 
+def _is_equal_tools(doc: dict) -> bool:
+    """A match is "equal tools" when manifest.lanes.single.apply == "tolerant".
+
+    Prompt Arenas are tolerant by default; records without "apply" count
+    as strict (not equal tools). Never raises.
+    """
+    try:
+        manifest = doc.get("manifest")
+        if not isinstance(manifest, dict):
+            return False
+        lanes = manifest.get("lanes")
+        if not isinstance(lanes, dict):
+            return False
+        single = lanes.get("single")
+        if not isinstance(single, dict):
+            return False
+        return single.get("apply") == "tolerant"
+    except Exception:
+        return False
+
+
 def summary() -> dict:
     """Scoreboard over EVERY stored arena document, sealed and prompt alike.
 
@@ -358,6 +379,8 @@ def summary() -> dict:
     list). ``scored`` counts succeeded arenas with a clear winner
     (evoforge/single/tie); held-out totals and costs are summed over scored
     arenas only. Money is integer cents; zeros when there is nothing.
+    ``equal_tools`` applies the same rules over equal-tools matches only
+    (manifest.lanes.single.apply == "tolerant").
     """
     try:
         pairs = _postgres_state.scan(_store(), kind=KIND)
@@ -387,6 +410,11 @@ def summary() -> dict:
     heldout = {"single": {"passed": 0, "n": 0},
                "evoforge": {"passed": 0, "n": 0}}
     cost_cents = {"single": 0, "evoforge": 0, "judge": 0}
+    eq_scored = 0
+    eq_wins = {"evoforge": 0, "single": 0, "tie": 0}
+    eq_heldout = {"single": {"passed": 0, "n": 0},
+                  "evoforge": {"passed": 0, "n": 0}}
+    eq_cost_cents = {"single": 0, "evoforge": 0, "judge": 0}
     for doc in cands.values():
         if not isinstance(doc, dict):
             continue
@@ -419,10 +447,30 @@ def summary() -> dict:
                 cost_cents[side] += _summary_int(lane.get("cost_cents"))
             cost_cents["judge"] += _summary_int(
                 doc.get("judge_cost_cents"))
+            if _is_equal_tools(doc):
+                eq_scored += 1
+                eq_wins[winner] += 1
+                for side in ("single", "evoforge"):
+                    lane = lanes.get(side)
+                    if not isinstance(lane, dict):
+                        continue
+                    held = lane.get("heldout")
+                    if isinstance(held, dict):
+                        eq_heldout[side]["passed"] += _summary_int(
+                            held.get("passed"))
+                        eq_heldout[side]["n"] += _summary_int(
+                            held.get("n"))
+                    eq_cost_cents[side] += _summary_int(
+                        lane.get("cost_cents"))
+                eq_cost_cents["judge"] += _summary_int(
+                    doc.get("judge_cost_cents"))
     return {"total": total, "running": running, "failed": failed,
             "scored": scored, "unscorable": unscorable,
             "inconclusive": inconclusive, "wins": wins,
             "heldout": heldout, "cost_cents": cost_cents,
+            "equal_tools": {"scored": eq_scored, "wins": eq_wins,
+                            "heldout": eq_heldout,
+                            "cost_cents": eq_cost_cents},
             "basis": SUMMARY_BASIS}
 
 
@@ -1458,6 +1506,30 @@ def _run_lanes(task: dict, model: str,
     return single, evo
 
 
+def _job_result(doc: dict) -> dict:
+    """Leak-free copy of a terminal arena doc for the eval-jobs API.
+
+    The jobs list/status endpoints are a status surface: they must not
+    serve candidate patch text or lane event streams (a sealed-eval
+    check asserts job responses never contain ``"+++ "`` or reference
+    fixes, over EVERY stored job). Verdict, scores, costs, manifest and
+    timings stay; the full document stays in the arena store for
+    ``GET /v1/arena/{id}``. Never raises.
+    """
+    out = copy.deepcopy(doc)
+    try:
+        lanes = out.get("lanes")
+        if isinstance(lanes, dict):
+            for side in ("single", "evoforge"):
+                lane = lanes.get(side)
+                if isinstance(lane, dict):
+                    lane["diff"] = ""
+                    lane["events"] = []
+    except Exception:
+        pass
+    return out
+
+
 def run_arena(suite_version: str, task_id: str, model: str,
               timeout_s: int | None = None, arena_id: str = "",
               feedback: str = "heldout", single_apply: str | None = None) -> dict:
@@ -1567,4 +1639,4 @@ def run_arena(suite_version: str, task_id: str, model: str,
     if manifest is not None:
         doc["manifest"] = manifest
     _save(doc)
-    return copy.deepcopy(doc)
+    return _job_result(doc)

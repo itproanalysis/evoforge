@@ -11,7 +11,9 @@ import {
   type MissionSummary,
   type Outcome,
   type PerformanceSnapshot,
+  type ArenaSummary,
   getArena,
+  getArenaSummary,
   getDashboard,
   getEvidence,
   getLedger,
@@ -76,6 +78,7 @@ export default function MissionControl() {
   const tErrors = useTranslations("errors");
   const tCommon = useTranslations("common");
   const tWorkspace = useTranslations("workspace");
+  const tArena = useTranslations("arena");
   const locale = useLocale();
 
   const [goal, setGoal] = useState("");
@@ -101,6 +104,7 @@ export default function MissionControl() {
   const [perf, setPerf] = useState<PerformanceSnapshot | null>(null);
   const [participants, setParticipants] = useState<Awaited<ReturnType<typeof getParticipants>> | null>(null);
   const [workspaceArena, setWorkspaceArena] = useState<ArenaDoc | null>(null);
+  const [arenaSummary, setArenaSummary] = useState<ArenaSummary | null>(null);
   const [arenaPendingId, setArenaPendingId] = useState<string | null>(null);
   const [arenaPollError, setArenaPollError] = useState(false);
   const stopRef = useRef(false);
@@ -214,6 +218,20 @@ export default function MissionControl() {
         if (cancelled) return;
         const list = res && Array.isArray(res.arenas) ? res.arenas : [];
         setWorkspaceArena((cur) => cur ?? pickWorkspaceArena(list));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Home scoreboard: measured Arena results from getArenaSummary().
+  useEffect(() => {
+    let cancelled = false;
+    void getArenaSummary()
+      .then((res) => {
+        if (cancelled) return;
+        if (res && typeof res === "object") setArenaSummary(res);
       })
       .catch(() => {});
     return () => {
@@ -405,6 +423,128 @@ export default function MissionControl() {
           <li>{tWorkspace("intro-step-2")}</li>
           <li>{tWorkspace("intro-step-3")}</li>
         </ol>
+      </section>
+      {/* Home scoreboard: measured Arena results from getArenaSummary(). */}
+      <section aria-label={tWorkspace("scoreboard-heading")} className="mt-2">
+        <Card className="bg-background-secondary border border-border p-3">
+          <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
+            {tWorkspace("scoreboard-heading")}
+          </span>
+          {!arenaSummary || (arenaSummary.scored ?? 0) === 0 ? (
+            <p className="text-sm text-text-secondary mt-2 mb-0 break-words">
+              {tWorkspace("scoreboard-empty")}
+            </p>
+          ) : (
+            <>
+              <div className="mt-2 text-xs font-semibold text-text-primary break-words">
+                {tArena("summary-equal-tools")}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-evoforge-wins")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.wins?.evoforge ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-single-wins")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.wins?.single ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-ties")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.wins?.tie ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-scored")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.scored ?? 0}</strong>
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-heldout-evoforge")}:{" "}
+                  <strong className="text-text-primary">
+                    {arenaSummary.equal_tools?.heldout?.evoforge?.passed ?? 0}/{arenaSummary.equal_tools?.heldout?.evoforge?.n ?? 0}
+                  </strong>
+                </span>
+                <span>
+                  {tArena("summary-heldout-single")}:{" "}
+                  <strong className="text-text-primary">
+                    {arenaSummary.equal_tools?.heldout?.single?.passed ?? 0}/{arenaSummary.equal_tools?.heldout?.single?.n ?? 0}
+                  </strong>
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-cost-evoforge")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.cost_cents?.evoforge ?? 0}¢</strong>
+                </span>
+                <span>
+                  {tArena("summary-cost-single")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.cost_cents?.single ?? 0}¢</strong>
+                </span>
+                <span>
+                  {tArena("summary-cost-judge")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.equal_tools?.cost_cents?.judge ?? 0}¢</strong>
+                </span>
+              </div>
+              <div className="mt-2 text-xs font-semibold text-text-primary break-words">
+                {tArena("summary-all-matches")}
+              </div>
+              <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-evoforge-wins")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.wins?.evoforge ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-single-wins")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.wins?.single ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-ties")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.wins?.tie ?? 0}</strong>
+                </span>
+                <span>
+                  {tArena("summary-scored")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.scored ?? 0}</strong>
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-heldout-evoforge")}:{" "}
+                  <strong className="text-text-primary">
+                    {arenaSummary.heldout?.evoforge?.passed ?? 0}/{arenaSummary.heldout?.evoforge?.n ?? 0}
+                  </strong>
+                </span>
+                <span>
+                  {tArena("summary-heldout-single")}:{" "}
+                  <strong className="text-text-primary">
+                    {arenaSummary.heldout?.single?.passed ?? 0}/{arenaSummary.heldout?.single?.n ?? 0}
+                  </strong>
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
+                <span>
+                  {tArena("summary-cost-evoforge")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.cost_cents?.evoforge ?? 0}¢</strong>
+                </span>
+                <span>
+                  {tArena("summary-cost-single")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.cost_cents?.single ?? 0}¢</strong>
+                </span>
+                <span>
+                  {tArena("summary-cost-judge")}:{" "}
+                  <strong className="text-text-primary">{arenaSummary.cost_cents?.judge ?? 0}¢</strong>
+                </span>
+              </div>
+            </>
+          )}
+          <div className="mt-2 text-xs break-words">
+            <a
+              href={`${locale === "en" ? "" : `/${locale}`}/arena`}
+              className="text-accent-cyan hover:underline"
+            >
+              {tWorkspace("view-arena")}
+            </a>
+          </div>
+        </Card>
       </section>
       {/* Home workspace: AI status left (~1/3), implementation right (~2/3).
           Mobile (<768px): grid stacks AI status above the implementation;
