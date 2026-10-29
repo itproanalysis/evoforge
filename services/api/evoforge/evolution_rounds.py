@@ -117,16 +117,10 @@ def list_strategy_decisions() -> list[dict]:
     """Strategy promotion decisions, oldest first."""
     cands: list[dict] = []
     try:
-        keys = list(_store())
+        recs = [rec for _k, rec in _postgres_state.scan(_store(), kind=STRATEGY_KIND)]
     except Exception:
         return []
-    for key in keys:
-        try:
-            rec = _store().get(key, None)
-        except Exception:
-            continue
-        if not isinstance(rec, dict) or rec.get("kind") != STRATEGY_KIND:
-            continue
+    for rec in recs:
         inner = rec.get("strategy_decision")
         if isinstance(inner, dict) and isinstance(inner.get("promoted"), str):
             cands.append(copy.deepcopy(inner))
@@ -328,16 +322,10 @@ def list_runs(limit: int = LIST_LIMIT) -> list[dict]:
         return []
     cands: dict[str, dict] = {}
     try:
-        keys = list(_store())
+        recs = [rec for _k, rec in _postgres_state.scan(_store(), kind=KIND)]
     except Exception:
-        keys = []
-    for key in keys:
-        try:
-            rec = _store().get(key, None)
-        except Exception:
-            continue
-        if not isinstance(rec, dict) or rec.get("kind") != KIND:
-            continue
+        recs = []
+    for rec in recs:
         inner = rec.get("evolution_run")
         if isinstance(inner, dict) and isinstance(inner.get("run_id"), str):
             cands[inner["run_id"]] = inner
@@ -358,19 +346,14 @@ def clear() -> None:
     with _MIRROR_LOCK:
         _MIRROR.clear()
     try:
-        keys = list(_store())
+        keys = [k for kind in (KIND, STRATEGY_KIND) for k, _rec in _postgres_state.scan(_store(), kind=kind)]
     except Exception:
         return
     for key in keys:
         try:
-            rec = _store().get(key, None)
+            del _store()[key]
         except Exception:
-            continue
-        if isinstance(rec, dict) and rec.get("kind") in (KIND, STRATEGY_KIND):
-            try:
-                del _store()[key]
-            except Exception:
-                pass
+            pass
 
 
 def reset() -> None:
@@ -1575,16 +1558,10 @@ def _all_run_docs() -> list[dict]:
     """All stored evolution runs (no 20-newest cap), mirror wins on overlap."""
     cands: dict[str, dict] = {}
     try:
-        keys = list(_store())
+        recs = [rec for _k, rec in _postgres_state.scan(_store(), kind=KIND)]
     except Exception:
-        keys = []
-    for key in keys:
-        try:
-            rec = _store().get(key, None)
-        except Exception:
-            continue
-        if not isinstance(rec, dict) or rec.get("kind") != KIND:
-            continue
+        recs = []
+    for rec in recs:
         inner = rec.get("evolution_run")
         if isinstance(inner, dict) and isinstance(inner.get("run_id"), str):
             cands[inner["run_id"]] = inner

@@ -396,7 +396,7 @@
   },
   "verify": {
     "heading": "Proof certificate",
-    "description": "Tamper-evident proof over public evidence digests — code never leaves the server. Share this URL instead of a chat transcript.",
+    "description": "Tamper-evident proof over evidence digests. Held-out tests never leave the server (only their hashes); the candidate patch is shown openly, as in its pull request. Share this URL instead of a chat transcript.",
     "loading": "Loading certificate…",
     "gates": "Gates",
     "chain": "Evidence chain",

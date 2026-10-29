@@ -58,6 +58,121 @@ class ReservationState:
     outcome: str
 
 
+class _ConnectionPool:
+    """Bounded, thread-safe reuse of autocommit connections (production: EVO_PG_POOL_SIZE).
+
+    Opening a connection per transaction exhausted the small Cloud SQL instance's slots under load ("remaining
+    connection slots are reserved"), which stalled every endpoint. Each process now holds at most `size`
+    connections (up to 2x only for a transaction nested inside one this thread already holds, so it cannot wait on
+    itself); a caller waits up to `wait_s` for a free one instead of opening more.
+    """
+
+    def __init__(self, dsn: str, size: int, wait_s: float, idle_check_s: float = 30.0):
+        import threading
+        self.dsn, self.size, self.wait_s, self.idle_check_s = dsn, size, wait_s, idle_check_s
+        self._idle: list = []  # [(conn, released_at)]
+        self._open = 0
+        self._cond = threading.Condition()
+        self._held = threading.local()  # connections this thread holds: a nested transaction must not wait on itself
+
+    def _connect(self):
+        import psycopg
+        from psycopg.rows import dict_row
+        return psycopg.connect(self.dsn, autocommit=True, connect_timeout=5, row_factory=dict_row)
+
+    def acquire(self):
+        import time as _time
+        deadline = _time.monotonic() + self.wait_s
+        with self._cond:
+            while True:
+                while self._idle:
+                    conn, released = self._idle.pop()
+                    if conn.closed:
+                        self._open -= 1
+                        continue
+                    if _time.monotonic() - released > self.idle_check_s:
+                        try:  # a long-idle connection may have been dropped by the server
+                            conn.execute("SELECT 1")
+                        except Exception:
+                            self._discard(conn)
+                            continue
+                    self._held.n = getattr(self._held, "n", 0) + 1
+                    return conn
+                nested = getattr(self._held, "n", 0) > 0
+                if self._open < self.size or (nested and self._open < 2 * self.size):
+                    self._open += 1
+                    break
+                left = deadline - _time.monotonic()
+                if left <= 0:
+                    raise KernelUnavailable("PostgreSQL Trust Kernel busy")
+                self._cond.wait(left)
+        try:
+            conn = self._connect()
+        except Exception:
+            with self._cond:
+                self._open -= 1
+                self._cond.notify()
+            raise
+        self._held.n = getattr(self._held, "n", 0) + 1
+        return conn
+
+    def _discard(self, conn):
+        try:
+            conn.close()
+        except Exception:
+            pass
+        self._open -= 1
+
+    def release(self, conn):
+        import time as _time
+        import psycopg
+        self._held.n = max(getattr(self._held, "n", 1) - 1, 0)
+        with self._cond:
+            try:
+                reusable = (not conn.closed and
+                            conn.info.transaction_status == psycopg.pq.TransactionStatus.IDLE)
+            except Exception:
+                reusable = False
+            if reusable:
+                self._idle.append((conn, _time.monotonic()))
+            else:
+                self._discard(conn)
+            self._cond.notify()
+
+    def close(self):
+        with self._cond:
+            while self._idle:
+                self._discard(self._idle.pop()[0])
+
+
+_POOLS: dict = {}
+
+
+def _pool_for(dsn: str):
+    """The process pool for this DSN when EVO_PG_POOL_SIZE > 0, else None (one connection per transaction)."""
+    import os
+    try:
+        size = int(os.getenv("EVO_PG_POOL_SIZE", "0"))
+    except ValueError:
+        size = 0
+    if size <= 0:
+        return None
+    pool = _POOLS.get(dsn)
+    if pool is None:
+        try:
+            wait_s = float(os.getenv("EVO_PG_POOL_WAIT_S", "30"))
+        except ValueError:
+            wait_s = 30.0
+        pool = _POOLS.setdefault(dsn, _ConnectionPool(dsn, size, wait_s))
+    return pool
+
+
+def close_pools() -> None:
+    for pool in list(_POOLS.values()):
+        pool.close()
+    _POOLS.clear()
+
+
 class PostgresKernel:
     def __init__(self, dsn: str, scope: KernelScope):
         if not dsn or not isinstance(scope, KernelScope):
@@ -72,14 +187,29 @@ class PostgresKernel:
             from psycopg.rows import dict_row
         except ImportError:
             raise KernelUnavailable("PostgreSQL client unavailable") from None
+        pool = _pool_for(self._dsn)
         try:
-            with psycopg.connect(self._dsn, autocommit=True, connect_timeout=5, row_factory=dict_row) as conn:
-                with conn.transaction():
-                    conn.execute("SET LOCAL ROLE core_app")
-                    conn.execute("SELECT set_config('app.tenant_id', %s, true), "
-                                 "set_config('app.project_ids', %s, true)",
-                                 (str(self.scope.tenant_id), str(self.scope.project_id)))
-                    yield conn
+            if pool is None:
+                with psycopg.connect(self._dsn, autocommit=True, connect_timeout=5, row_factory=dict_row) as conn:
+                    with conn.transaction():
+                        conn.execute("SET LOCAL ROLE core_app")
+                        conn.execute("SELECT set_config('app.tenant_id', %s, true), "
+                                     "set_config('app.project_ids', %s, true)",
+                                     (str(self.scope.tenant_id), str(self.scope.project_id)))
+                        yield conn
+            else:
+                conn = pool.acquire()
+                try:
+                    # SET LOCAL and set_config(..., true) end with the transaction, so a reused connection
+                    # never carries another request's role or scope.
+                    with conn.transaction():
+                        conn.execute("SET LOCAL ROLE core_app")
+                        conn.execute("SELECT set_config('app.tenant_id', %s, true), "
+                                     "set_config('app.project_ids', %s, true)",
+                                     (str(self.scope.tenant_id), str(self.scope.project_id)))
+                        yield conn
+                finally:
+                    pool.release(conn)
         except psycopg.errors.CheckViolation as error:
             if (error.diag.message_primary or "").startswith(("BUDGET_", "CREDIT_EXHAUSTED")):
                 raise BudgetRefused("project budget or prepaid credit refused reservation") from None

@@ -889,18 +889,11 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
 
 def _all_arena_docs() -> list[dict]:
     try:
-        store = _arena._store()
-        keys = list(store)
+        recs = [rec for _k, rec in _arena._postgres_state.scan(_arena._store(), kind=_arena.KIND)]
     except Exception:
         return []
     out: list[dict] = []
-    for key in keys:
-        try:
-            rec = store.get(key, None)
-        except Exception:
-            continue
-        if not isinstance(rec, dict) or rec.get("kind") != _arena.KIND:
-            continue
+    for rec in recs:
         inner = rec.get("arena")
         if isinstance(inner, dict) and isinstance(inner.get("arena_id"), str):
             out.append(inner)

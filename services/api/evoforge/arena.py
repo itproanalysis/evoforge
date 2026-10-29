@@ -163,16 +163,10 @@ def list_arenas(limit: int = LIST_LIMIT) -> list[dict]:
         return []
     cands: dict[str, dict] = {}
     try:
-        keys = list(_store())
+        recs = [rec for _k, rec in _postgres_state.scan(_store(), kind=KIND)]
     except Exception:
-        keys = []
-    for key in keys:
-        try:
-            rec = _store().get(key, None)
-        except Exception:
-            continue
-        if not isinstance(rec, dict) or rec.get("kind") != KIND:
-            continue
+        recs = []
+    for rec in recs:
         inner = rec.get("arena")
         if isinstance(inner, dict) and isinstance(inner.get("arena_id"), str):
             cands[inner["arena_id"]] = inner
@@ -193,19 +187,14 @@ def clear() -> None:
     with _MIRROR_LOCK:
         _MIRROR.clear()
     try:
-        keys = list(_store())
+        keys = [k for k, _rec in _postgres_state.scan(_store(), kind=KIND)]
     except Exception:
         return
     for key in keys:
         try:
-            rec = _store().get(key, None)
+            del _store()[key]
         except Exception:
-            continue
-        if isinstance(rec, dict) and rec.get("kind") == KIND:
-            try:
-                del _store()[key]
-            except Exception:
-                pass
+            pass
 
 
 def reset() -> None:

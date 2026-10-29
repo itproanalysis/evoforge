@@ -25,7 +25,7 @@ if [ "${STATE_BACKEND:-memory}" = "postgres" ]; then
   : "${TENANT_ID:?set TENANT_ID (server-owned tenant UUID) for STATE_BACKEND=postgres}"
   : "${PROJECT_UUID:?set PROJECT_UUID (server-owned project UUID) for STATE_BACKEND=postgres}"
   STATE_SECRETS=",DATABASE_URL=DB_URL:latest"
-  STATE_ENV="|EVO_STATE_BACKEND=postgres|EVO_TENANT_ID=${TENANT_ID}|EVO_PROJECT_ID=${PROJECT_UUID}"
+  STATE_ENV="|EVO_STATE_BACKEND=postgres|EVO_PG_POOL_SIZE=${EVO_PG_POOL_SIZE:-10}|EVO_TENANT_ID=${TENANT_ID}|EVO_PROJECT_ID=${PROJECT_UUID}"
 fi
 
 if [ "${SKIP_BUILD:-0}" != "1" ]; then
