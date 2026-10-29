@@ -1099,3 +1099,100 @@ def run_evolution(run_id: str, app_id: str, feedback: str = "critic",
     with _DOC_LOCK:
         _save(doc)
     return copy.deepcopy(doc)
+
+
+def _wilson95(k: int, n: int) -> list:
+    """Wilson 95% interval for k successes in n trials (z = 1.96)."""
+    if int(n) <= 0:
+        return [0, 0]
+    import math as _math
+    z = 1.96
+    p = float(k) / float(n)
+    den = 1.0 + z * z / float(n)
+    centre = (p + z * z / (2.0 * float(n))) / den
+    half = z * _math.sqrt(p * (1.0 - p) / float(n)
+                          + z * z / (4.0 * float(n) * float(n))) / den
+    return [max(0.0, centre - half), min(1.0, centre + half)]
+
+
+def _all_run_docs() -> list[dict]:
+    """All stored evolution runs (no 20-newest cap), mirror wins on overlap."""
+    cands: dict[str, dict] = {}
+    try:
+        keys = list(_store())
+    except Exception:
+        keys = []
+    for key in keys:
+        try:
+            rec = _store().get(key, None)
+        except Exception:
+            continue
+        if not isinstance(rec, dict) or rec.get("kind") != KIND:
+            continue
+        inner = rec.get("evolution_run")
+        if isinstance(inner, dict) and isinstance(inner.get("run_id"), str):
+            cands[inner["run_id"]] = inner
+    if _is_pg():
+        with _MIRROR_LOCK:
+            for rid, doc in _MIRROR.items():
+                cands[rid] = doc
+    return [copy.deepcopy(d) for d in cands.values()]
+
+
+def _side_stats(docs: list[dict], side: str) -> dict:
+    rounds = 0
+    verified = 0
+    cost = 0
+    for doc in docs:
+        entries = doc.get("rounds")
+        if not isinstance(entries, list):
+            continue
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            sides = entry.get("sides")
+            if not isinstance(sides, dict):
+                continue
+            snap = sides.get(side)
+            if isinstance(snap, str) or snap is None:
+                continue
+            if not isinstance(snap, dict):
+                continue
+            rounds += 1
+            if snap.get("status") == "READY":
+                verified += 1
+            raw_cost = snap.get("cost_cents", 0)
+            if isinstance(raw_cost, bool):
+                raw_cost = 0
+            try:
+                cost += int(raw_cost)
+            except (TypeError, ValueError):
+                pass
+    lo, hi = _wilson95(verified, rounds)
+    cpv = round(cost / verified) if verified else None
+    return {"rounds": int(rounds), "verified": int(verified),
+            "wilson95": [lo, hi], "cost_cents": int(cost),
+            "cost_per_verified_cents": cpv}
+
+
+METHOD_SENTENCE = ("Rounds are counted as independent trials, which is an "
+                   "approximation because rounds within a run are correlated.")
+
+
+def stats(feedback: str | None = None) -> dict:
+    """Aggregate evolution statistics across all stored runs (read-only)."""
+    docs = [d for d in _all_run_docs()
+            if d.get("status") in ("succeeded", "failed")]
+    if feedback is not None:
+        docs = [d for d in docs if d.get("feedback") == feedback]
+    evo = _side_stats(docs, "evoforge")
+    single = _side_stats(docs, "single")
+    if evo["wilson95"][0] > single["wilson95"][1]:
+        comparison = "evoforge_better"
+    elif single["wilson95"][0] > evo["wilson95"][1]:
+        comparison = "single_better"
+    else:
+        comparison = "not_significant"
+    return {"runs": len(docs),
+            "by_side": {"evoforge": evo, "single": single},
+            "comparison": comparison, "method": METHOD_SENTENCE}

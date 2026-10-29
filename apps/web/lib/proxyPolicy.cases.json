@@ -1077,6 +1077,14 @@
     ]
   },
   {
+    "expected": "/v1/evolution/stats",
+    "path_segments": [
+      "v1",
+      "evolution",
+      "stats"
+    ]
+  },
+  {
     "expected": null,
     "path_segments": [
       "v1",

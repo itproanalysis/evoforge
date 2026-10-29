@@ -2177,6 +2177,13 @@ def evolution_runs_get(run_id: str):
     return doc
 
 
+@app.get("/v1/evolution/stats")
+def evolution_stats(feedback: str | None = None):
+    if feedback is not None and feedback not in ("critic", "heldout"):
+        raise HTTPException(422, "feedback must be critic or heldout")
+    return evo_rounds_mod.stats(feedback=feedback)
+
+
 # ---------------------------------------------------------------------------
 # Autonomous Evolution (Autopilot) + Proof Certificates — the new horizon.
 # Goal in, verified PR out. Every generation reuses the same trust-kernel
