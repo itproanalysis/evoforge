@@ -20,7 +20,9 @@
     "autopilot": "Autopilot",
     "leaderboard": "Leaderboard",
     "arena": "Arena",
-    "replay": "Replay"
+    "replay": "Replay",
+    "more": "More",
+    "verify": "Verify"
   },
   "mission-control": {
     "heading": "Mission Control",

@@ -20,7 +20,9 @@
     "autopilot": "오토파일럿",
     "leaderboard": "리더보드",
     "arena": "아레나",
-    "replay": "리플레이"
+    "replay": "리플레이",
+    "more": "더보기",
+    "verify": "검증"
   },
   "mission-control": {
     "heading": "미션 컨트롤",

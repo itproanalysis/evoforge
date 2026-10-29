@@ -1,6 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { FeatureRail } from '../../components/FeatureRail';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import '../../styles/globals.css';
 
@@ -34,7 +35,6 @@ export default async function LocaleLayout({
   }
 
   const messages = await getMessages();
-  const t = await getTranslations('navigation');
   const tCommon = await getTranslations('common');
   const tLayout = await getTranslations('layout');
 
@@ -53,56 +53,6 @@ export default async function LocaleLayout({
             >
               {tCommon('app-name')}
             </a>
-            <nav className="flex gap-4 flex-wrap">
-              <a
-                href={prefix || '/'}
-                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
-              >
-                {t('mission-control')}
-              </a>
-              <a
-                href={`${prefix}/arena`}
-                className="text-emerald-400 no-underline text-sm font-semibold hover:text-emerald-300 flex items-center gap-1"
-              >
-                <span>⚔️</span> {t('arena')}
-              </a>
-              <a
-                href={`${prefix}/replay`}
-                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
-              >
-                {t('replay')}
-              </a>
-              <a
-                href={`${prefix}/lab`}
-                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
-              >
-                {t('improvement-lab')}
-              </a>
-              <a
-                href={`${prefix}/evidence`}
-                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
-              >
-                {t('evidence')}
-              </a>
-              <a
-                href={`${prefix}/performance`}
-                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
-              >
-                {t('performance')}
-              </a>
-              <a
-                href={`${prefix}/evolution`}
-                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
-              >
-                {t('autopilot')}
-              </a>
-              <a
-                href={`${prefix}/leaderboard`}
-                className="text-text-tertiary no-underline text-sm hover:text-text-primary"
-              >
-                {t('leaderboard')}
-              </a>
-            </nav>
             <div className="ml-auto flex items-center gap-4">
               <LanguageSwitcher />
               <span className="text-xs text-text-secondary">
@@ -110,12 +60,18 @@ export default async function LocaleLayout({
               </span>
             </div>
           </header>
-          <div className="max-w-[1080px] mx-auto px-6 py-6">
-            {children}
+          <div className="flex">
+            {/* Primary feature navigation (including /replay) renders here via <FeatureRail/>. */}
+            <FeatureRail />
+            <div className="flex-1 min-w-0">
+              <div className="max-w-[1080px] mx-auto px-6 py-6">
+                {children}
+              </div>
+              <footer className="px-6 py-4 text-xs text-text-secondary">
+                {tLayout('footer')}
+              </footer>
+            </div>
           </div>
-          <footer className="px-6 py-4 text-xs text-text-secondary">
-            {tLayout('footer')}
-          </footer>
         </NextIntlClientProvider>
       </body>
     </html>
