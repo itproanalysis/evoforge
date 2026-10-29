@@ -7,6 +7,7 @@ fixed, hashed, scored on, and never sent to any lane or returned.
 """
 from __future__ import annotations
 
+import ast
 import copy
 import hashlib
 import json
@@ -21,7 +22,7 @@ from evoforge import arena as _arena
 from evoforge import runner_client as _runner_client
 from evoforge import sealed_eval as _sealed
 
-TEMPLATE = ("def render():\n"
+TEMPLATE = ("def render(state=None):\n"
             "    return '<main></main>'\n"
             "\n"
             "\n"
@@ -31,10 +32,12 @@ TEMPLATE = ("def render():\n"
 JUDGE_INSTRUCTION = ("Write pytest acceptance tests for app.render(), which returns "
                      "one well-formed XHTML element for this request; tests import app "
                      "and parse app.render() with xml.etree.ElementTree; "
+                     "when the result depends on user input, tests call "
+                     "app.render(state) with a dict of input values; "
                      "standard library + pytest only.")
 
-TASK_INSTRUCTION = ("Implement render()/preview() in app.py: render() must return one "
-                    "well-formed XHTML element; preview() must return render().")
+TASK_INSTRUCTION = ("Implement render(state=None)/preview() in app.py: render(state=None) "
+                    "must return one well-formed XHTML element; preview() must return render().")
 
 JUDGE_SENTENCE = ("Independent Critic wrote acceptance tests from the prompt "
                   "before either lane ran, hidden from both lanes.")
@@ -146,6 +149,108 @@ def acceptance_hash(suite: list[dict]) -> str:
     return "sha256:" + hashlib.sha256(raw).hexdigest()
 
 
+def acceptance_interface(suite: list[dict]) -> list[dict]:
+    """Sorted ``[{name, arities, keys}]`` for every ``app`` attribute tests use.
+
+    AST only (never regex): each test file is parsed, every attribute of
+    the module ``app`` (``app.<name>``) is collected, along with the
+    sorted distinct counts of positional arguments in direct calls to it
+    and the sorted distinct string keys of dict literals passed to those
+    calls. Unparsable tests are skipped. Nothing else from the tests is
+    returned (no expected values, test names or code).
+    """
+    agg: dict[str, dict] = {}
+    for entry in suite or []:
+        if isinstance(entry, dict):
+            code = entry.get("code", "")
+        elif isinstance(entry, str):
+            code = entry
+        else:
+            continue
+        if not isinstance(code, str) or not code.strip():
+            continue
+        try:
+            tree = ast.parse(code)
+        except (SyntaxError, ValueError, MemoryError, RecursionError):
+            continue
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Attribute):
+                val = node.value
+                if isinstance(val, ast.Name) and val.id == "app":
+                    agg.setdefault(node.attr, {"arities": set(), "keys": set()})
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            func = node.func
+            if not (isinstance(func, ast.Attribute)
+                    and isinstance(func.value, ast.Name)
+                    and func.value.id == "app"):
+                continue
+            info = agg.setdefault(func.attr, {"arities": set(), "keys": set()})
+            try:
+                arity = len(node.args)
+            except Exception:
+                continue
+            info["arities"].add(int(arity))
+            for arg in list(node.args) + [kw.value for kw in node.keywords]:
+                for sub in ast.walk(arg):
+                    if isinstance(sub, ast.Dict):
+                        for key in sub.keys:
+                            if (isinstance(key, ast.Constant)
+                                    and isinstance(key.value, str)):
+                                info["keys"].add(key.value)
+    out = [{"name": name,
+            "arities": sorted(info["arities"]),
+            "keys": sorted(info["keys"])}
+           for name, info in agg.items()]
+    out.sort(key=lambda d: d["name"])
+    return out
+
+
+def interface_text(iface: list[dict]) -> str:
+    """One deterministic sentence naming each function, its argument counts and input keys."""
+    if not iface:
+        return ""
+    clauses: list[str] = []
+    for entry in sorted(iface or [], key=lambda d: d.get("name", "")):
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name", "")
+        if not isinstance(name, str) or not name:
+            continue
+        arities = sorted(a for a in (entry.get("arities") or [])
+                         if isinstance(a, int))
+        keys = sorted(k for k in (entry.get("keys") or [])
+                      if isinstance(k, str))
+        counts = " or ".join(str(a) for a in arities) if arities else "0"
+        singular = len(arities) == 1 and arities[0] == 1
+        noun = "positional argument" if singular else "positional arguments"
+        if keys:
+            tail = "with input keys " + ", ".join(keys)
+        else:
+            tail = "with no input keys"
+        clauses.append(f"app.{name} called with {counts} {noun} {tail}")
+    if not clauses:
+        return ""
+    return "Acceptance interface: " + "; ".join(clauses) + "."
+
+
+def interface_hash(iface: list[dict]) -> str:
+    raw = json.dumps(iface or [], sort_keys=True,
+                     separators=(",", ":")).encode("utf-8")
+    return "sha256:" + hashlib.sha256(raw).hexdigest()
+
+
+def _goal_with_interface(base_goal: str, suite: list[dict]) -> str:
+    try:
+        text = interface_text(acceptance_interface(suite))
+    except Exception:
+        text = ""
+    if text and text not in (base_goal or ""):
+        return f"{base_goal}\n\n{text}"
+    return base_goal
+
+
 def budget_worst_cents(feedback: str = "critic") -> int:
     extra = 1 if feedback == "critic" else 0
     return ((2 + _sealed.PIPELINE_MAX_ATTEMPTS + extra)
@@ -180,6 +285,8 @@ def build_manifest(prompt: str, feedback: str, single_apply: str,
         "comparison_mode": COMPARISON_MODE,
         "prompt_hash": prompt_hash(prompt),
         "acceptance_hash": acceptance_hash([]),
+        "acceptance_interface": [],
+        "interface_hash": interface_hash([]),
         "acceptance_count": 0,
         "acceptance_inherited": 0,
         "acceptance_new": 0,
@@ -205,6 +312,8 @@ def _manifest_with_acceptance(manifest: dict, suite: list[dict],
                               new_count: int | None = None) -> dict:
     out = copy.deepcopy(manifest)
     out["acceptance_hash"] = acceptance_hash(suite)
+    out["acceptance_interface"] = acceptance_interface(suite)
+    out["interface_hash"] = interface_hash(out["acceptance_interface"])
     out["acceptance_count"] = len(suite)
     out["acceptance_dropped"] = int(dropped)
     out["acceptance_inherited"] = int(inherited)
@@ -591,6 +700,7 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
         kept, dropped = _filter_on_template(critic_suite, timeout_s)
         manifest = _manifest_with_acceptance(manifest, kept, dropped, 0,
                                              len(kept))
+        goal = _goal_with_interface(goal, kept)
         task = {"id": "prompt", "goal": goal,
                 "files": {"app.py": TEMPLATE}, "heldout": list(kept)}
         try:
@@ -802,6 +912,7 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
             pass
         manifest = _manifest_with_acceptance(
             manifest, full_suite, dropped, len(parent_suite), len(kept_new))
+        goal = _goal_with_interface(goal, full_suite)
         single_task = {"id": "prompt", "goal": goal,
                        "files": dict(s_start), "heldout": list(full_suite)}
         evo_task = {"id": "prompt", "goal": goal,
