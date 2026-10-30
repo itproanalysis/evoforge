@@ -69,6 +69,8 @@ your module, do not touch it — work on a branch.
   runtime.api_evolutions and runtime.api_evolution_memory.
 - 2026-10-30 23:45 (agy on behalf of owner, `release/2026-10-30-29` @ `447e0ab7`, image tag `370c329`, api `00049` [lxm], web `00047` [67g], runner `00038` [sjj], storage=postgres):
   PR #1 merged (inner page light design unification + web CI fix). Web/API/Runner successfully built via Cloud Build (1e6dbbca-893b-483b-b08e-702a314d1a32) and deployed to Cloud Run. All 9 pages (/, /arena, /replay, /evidence, /performance, /lab, /verify/ev_ab527200a91d, /evolution, /leaderboard) verified at 1440px and 390px (light theme palette #f2f4f6/#fff, API proxy panels loading live data). Live mission through the proxy `msn_f1aea6002f1c` ran CREATED→GENERATED→REVIEWED→RAN on Cloud Run Runner (visible 2/2, held-out 3/3; GH_INTEGRITY=PASS, GC_COMPOSITION=PASS, G2_REQUIRED=PASS).
+- 2026-10-31 00:25 (agy on behalf of owner, `release/2026-10-31-1` @ `73fa7dde`, image tag `73fa7dd`, api `00050` [978], web `00048` [h9f], runner `00039` [vmj], storage=postgres):
+  PR #2 merged (main page structure redesign: lead every main page with its answer, fold the rest). Web/API/Runner successfully built via Cloud Build (f9dc4d19-e089-4a59-83f7-a91c2e5619e5) and deployed to Cloud Run. Verified on production: Arena leads with 3 large scoreboard tiles (3 wins, 0 losses, 30 ties) and hidden-test pass rate bars; Performance leads with pooled rates (EvoForge 97% vs Single AI 86%, 95% Wilson interval band); Evidence, Replay, and Home verified at desktop and mobile widths.
 
 > **Owner, 2026-10-29: we are far from done. Keys/Opus lane and the demo happen at submission time. Until then: make EvoForge
 > itself excellent — pick a row, ship it with tests, keep production green.**
