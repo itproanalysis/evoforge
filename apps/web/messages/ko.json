@@ -43,7 +43,16 @@
     "title": "공유된 결과",
     "try-own": "직접 해보기",
     "not-found": "공유된 결과를 찾을 수 없습니다.",
-    "certificate": "인증서"
+    "certificate": "인증서",
+    "hidden-tests": "숨겨진 테스트",
+    "cost": "모델 비용",
+    "single": "단일 실행",
+    "result": "결과",
+    "winner-evoforge": "EvoForge 승",
+    "winner-single": "단일 실행 승",
+    "winner-tie": "무승부",
+    "winner-unscorable": "판정 불가 (검증된 테스트 부족)",
+    "winner-inconclusive": "추가 확인 필요"
   },
   "studio": {
     "title": "작업실",

@@ -43,7 +43,16 @@
     "title": "Shared result",
     "try-own": "Try your own",
     "not-found": "Shared result not found.",
-    "certificate": "Certificate"
+    "certificate": "Certificate",
+    "hidden-tests": "Hidden tests",
+    "cost": "Model cost",
+    "single": "Single AI call",
+    "result": "Result",
+    "winner-evoforge": "EvoForge wins",
+    "winner-single": "Single AI call wins",
+    "winner-tie": "Tie",
+    "winner-unscorable": "Not scorable (too few checked tests)",
+    "winner-inconclusive": "Needs another check"
   },
   "studio": {
     "title": "Workspace",

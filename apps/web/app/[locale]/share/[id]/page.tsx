@@ -20,7 +20,7 @@ function ShareDetails({ doc, certificateId }: { doc: ArenaDoc; certificateId: st
   const homeHref = locale === "ko" ? "/ko" : "/";
 
   return (
-    <main className="studio-home canvas-workspace" style={{ maxWidth: "100%", overflowWrap: "anywhere" }}>
+    <main className="studio-home canvas-workspace" style={{ maxWidth: "100%", overflowWrap: "anywhere", padding: "24px 16px 48px" }}>
       <h1>{t("title")}</h1>
       <p style={{ maxWidth: "100%", whiteSpace: "pre-wrap" }}>{prompt}</p>
       <div className="canvas-stage is-compare" style={{ maxWidth: "100%", padding: "0 0 24px" }}>
@@ -41,13 +41,13 @@ function ShareDetails({ doc, certificateId }: { doc: ArenaDoc; certificateId: st
             )}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, padding: "12px 20px", fontSize: 12, maxWidth: "100%" }}>
-            <span>heldout {evoLane?.heldout ? `${evoLane.heldout.passed}/${evoLane.heldout.n}` : "—"}</span>
-            <span>cost_cents {Number.isInteger(evoLane?.cost_cents) ? `${evoLane?.cost_cents}¢` : "—"}</span>
+            <span>{t("hidden-tests")} {evoLane?.heldout ? `${evoLane.heldout.passed}/${evoLane.heldout.n}` : "—"}</span>
+            <span>{t("cost")} {Number.isInteger(evoLane?.cost_cents) ? `${evoLane?.cost_cents}¢` : "—"}</span>
           </div>
         </article>
-        <article className="canvas-output" aria-label="single">
+        <article className="canvas-output" aria-label={t("single")}>
           <header className="canvas-output-header">
-            <strong>single</strong>
+            <strong>{t("single")}</strong>
             <div className="canvas-output-numbers">
               <span>{singleLane?.heldout ? `${singleLane.heldout.passed}/${singleLane.heldout.n}` : "—"}</span>
               <span className="canvas-number-divider" aria-hidden="true">·</span>
@@ -62,15 +62,16 @@ function ShareDetails({ doc, certificateId }: { doc: ArenaDoc; certificateId: st
             )}
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 12, padding: "12px 20px", fontSize: 12, maxWidth: "100%" }}>
-            <span>heldout {singleLane?.heldout ? `${singleLane.heldout.passed}/${singleLane.heldout.n}` : "—"}</span>
-            <span>cost_cents {Number.isInteger(singleLane?.cost_cents) ? `${singleLane?.cost_cents}¢` : "—"}</span>
+            <span>{t("hidden-tests")} {singleLane?.heldout ? `${singleLane.heldout.passed}/${singleLane.heldout.n}` : "—"}</span>
+            <span>{t("cost")} {Number.isInteger(singleLane?.cost_cents) ? `${singleLane?.cost_cents}¢` : "—"}</span>
           </div>
         </article>
       </div>
       <section className="canvas-conditions" style={{ maxWidth: "100%" }}>
         <p>
-          verdict {verdict?.winner ?? "—"}
-          {verdict?.reason ? ` · ${verdict.reason}` : ""}
+          <strong>{t("result")}: </strong>
+          {verdict?.winner && t.has(`winner-${verdict.winner}`) ? t(`winner-${verdict.winner}`) : "—"}
+          {evoLane?.heldout && singleLane?.heldout ? ` (EvoForge ${evoLane.heldout.passed} : ${singleLane.heldout.passed} ${t("single")})` : ""}
         </p>
         {manifest?.disclosure && <p>{manifest.disclosure}</p>}
         {certificateId && <p>{t("certificate")}: {certificateId}</p>}
