@@ -66,6 +66,7 @@ const BENCHMARK_TASKS: Record<"v1" | "v2" | "v3" | "v4" | "v5", { id: string; go
 };
 
 function StatusPill({ status, passed, n }: { status: string; passed?: number; n?: number }) {
+  const t = useTranslations("arena");
   if (status === "running") {
     return (
       <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950/60 text-amber-300 border border-amber-500/40">
@@ -87,11 +88,11 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
         FAILED ({passed ?? 0}/{n ?? 0})
       </span>
     );
-    return <span className="text-xs text-text-secondary">결과 미확인</span>;
+    return <span className="text-xs text-text-secondary">{t("result-unconfirmed")}</span>;
   }
   return (
     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
-      {status === "failed" ? "실행 실패" : status === "pending" ? "대기 중" : status === "inconclusive" ? "검증 불확실" : status.toUpperCase()}
+      {status === "failed" ? t("status-failed") : status === "pending" ? t("status-pending") : status === "inconclusive" ? t("status-inconclusive") : status.toUpperCase()}
     </span>
   );
 }
@@ -175,7 +176,7 @@ export default function ArenaPage() {
       } catch {
         if (active) {
           setPollError(true);
-          setError("실행 상태를 불러오지 못했습니다. 같은 작업의 상태를 다시 확인해 주세요.");
+          setError(t("poll-error"));
         }
       } finally {
         inFlight = false;
@@ -255,10 +256,10 @@ export default function ArenaPage() {
       setPendingId(res.arena_id);
     } catch (cause) {
       const status = cause instanceof Error ? /^(\d{3})\b/.exec(cause.message)?.[1] : undefined;
-      const reason = status === "402" ? "예산 부족으로 요청이 거부됐습니다."
-        : status ? `서버가 요청을 처리하지 못했습니다 (HTTP ${status}).`
-          : "서버 응답을 확인할 수 없습니다.";
-      setError(`${reason} 다시 시도하기 전에 서버 작업 이력을 확인해 주세요.`);
+      const reason = status === "402" ? t("error-budget")
+        : status ? t("error-http", { status })
+          : t("error-noresponse");
+      setError(`${reason} ${t("error-hint")}`);
       void refreshRecent();
     } finally {
       setStarting(false);
@@ -452,12 +453,12 @@ export default function ArenaPage() {
       {error && (
         <div role="alert" className="bg-red-950/50 border border-red-500/40 text-red-300 text-xs px-4 py-2.5 rounded-lg">
           {error}
-          {pollError && trackedId && <button type="button" onClick={() => { setPollError(false); setError(null); }} className="ml-3 underline">상태 다시 확인</button>}
+          {pollError && trackedId && <button type="button" onClick={() => { setPollError(false); setError(null); }} className="ml-3 underline">{t("retry-status")}</button>}
         </div>
       )}
-      {starting && <p className="text-sm text-text-secondary">실행 요청 중…</p>}
-      {pendingId && !activeArena && <p className="text-sm text-text-secondary">작업 {pendingId} 상태 확인 중…</p>}
-      {activeArena?.status === "failed" && <p role="alert" className="text-sm text-red-300">실행 실패: {activeArena.error || "서버가 실패 사유를 제공하지 않았습니다."} 입력을 확인한 뒤 다시 실행할 수 있습니다.</p>}
+      {starting && <p className="text-sm text-text-secondary">{t("requesting")}</p>}
+      {pendingId && !activeArena && <p className="text-sm text-text-secondary">{t("checking", { id: pendingId })}</p>}
+      {activeArena?.status === "failed" && <p role="alert" className="text-sm text-red-300">{t("run-failed")}: {activeArena.error || t("run-no-reason")} {t("run-retry-hint")}</p>}
 
       {/* Task Goal Display */}
       {activeArena && (
@@ -525,14 +526,14 @@ export default function ArenaPage() {
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-text-primary">
-                {evoView.score ?? (evoView.outcome === "verification_inconclusive" ? "검증 불확실" : evoView.status === "failed" ? "실행 실패" : "결과 대기")}
+                {evoView.score ?? (evoView.outcome === "verification_inconclusive" ? t("status-inconclusive") : evoView.status === "failed" ? t("status-failed") : t("status-waiting"))}
               </span>
-              {evoView.score && <span className="text-xs text-emerald-300 font-medium">봉인 테스트 통과</span>}
+              {evoView.score && <span className="text-xs text-emerald-300 font-medium">{t("sealed-pass")}</span>}
             </div>
             <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-emerald-500/20 pt-2">
               <span>{costLabel(evoView.costState)}: <strong className="text-text-primary">{evoView.cost === null ? "—" : `${evoView.cost}¢`}</strong></span>
               <span>{t("attempts")}: <strong className="text-text-primary">{evoView.attempts ?? "—"}</strong></span>
-              <span>결과: <strong className="text-text-primary font-mono">{evoView.outcome ?? "미확인"}</strong></span>
+              <span>{t("result-label")}: <strong className="text-text-primary font-mono">{evoView.outcome ?? t("outcome-unknown")}</strong></span>
             </div>
           </Card>
 
@@ -553,7 +554,7 @@ export default function ArenaPage() {
                 <span>{t("running-match")}</span>
               </div>
             ) : !verdict ? (
-              <div className="text-text-secondary text-sm">{verificationInconclusive ? "검증 불확실 · 비교 보류" : activeArena.status === "failed" ? "비교 실패 · 결과 미확인" : "결과 미확인"}</div>
+              <div className="text-text-secondary text-sm">{verificationInconclusive ? t("verdict-inconclusive") : activeArena.status === "failed" ? t("verdict-failed") : t("result-unconfirmed")}</div>
             ) : (
               <div>
                 <span className={`text-base font-extrabold ${
@@ -583,14 +584,14 @@ export default function ArenaPage() {
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-text-primary">
-                {singleView.score ?? (singleView.outcome === "verification_inconclusive" ? "검증 불확실" : singleView.status === "failed" ? "실행 실패" : "결과 대기")}
+                {singleView.score ?? (singleView.outcome === "verification_inconclusive" ? t("status-inconclusive") : singleView.status === "failed" ? t("status-failed") : t("status-waiting"))}
               </span>
-              {singleView.score && <span className="text-xs text-blue-300 font-medium">봉인 테스트 통과</span>}
+              {singleView.score && <span className="text-xs text-blue-300 font-medium">{t("sealed-pass")}</span>}
             </div>
             <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-blue-500/20 pt-2">
               <span>{costLabel(singleView.costState)}: <strong className="text-text-primary">{singleView.cost === null ? "—" : `${singleView.cost}¢`}</strong></span>
               <span>{t("attempts")}: <strong className="text-text-primary">{singleView.attempts ?? "—"}</strong></span>
-              <span>결과: <strong className="text-text-primary font-mono">{singleView.outcome ?? "미확인"}</strong></span>
+              <span>{t("result-label")}: <strong className="text-text-primary font-mono">{singleView.outcome ?? t("outcome-unknown")}</strong></span>
             </div>
           </Card>
         </div>
@@ -704,7 +705,7 @@ export default function ArenaPage() {
                 n={evoView.score ? evoLane?.heldout.n : undefined}
               />
             </div>
-            {evoView.status === "failed" && <p role="alert" className="text-sm text-red-300">실패: {evoView.error || "사유 미제공"}</p>}
+            {evoView.status === "failed" && <p role="alert" className="text-sm text-red-300">{t("lane-failed")}: {evoView.error || t("no-reason")}</p>}
 
             {/* Diff Viewer */}
             <Card className="bg-background-secondary border border-border p-3 space-y-2">
@@ -778,7 +779,7 @@ export default function ArenaPage() {
                 n={singleView.score ? singleLane?.heldout.n : undefined}
               />
             </div>
-            {singleView.status === "failed" && <p role="alert" className="text-sm text-red-300">실패: {singleView.error || "사유 미제공"}</p>}
+            {singleView.status === "failed" && <p role="alert" className="text-sm text-red-300">{t("lane-failed")}: {singleView.error || t("no-reason")}</p>}
 
             {/* Diff Viewer */}
             <Card className="bg-background-secondary border border-border p-3 space-y-2">
@@ -870,17 +871,17 @@ export default function ArenaPage() {
                     result?.winner === "single" ? "bg-blue-950 text-blue-300 border border-blue-500/30" :
                     "bg-slate-800 text-slate-300"
                   }`}>
-                    {result?.winner ?? (ar.status === "running" ? "진행 중" : ar.verdict?.winner === "inconclusive" || evoResult.outcome === "verification_inconclusive" || singleResult.outcome === "verification_inconclusive" ? "검증 불확실 · 비교 보류" : ar.status === "failed" ? "실패" : "결과 미확인")}
+                    {result?.winner ?? (ar.status === "running" ? t("status-running") : ar.verdict?.winner === "inconclusive" || evoResult.outcome === "verification_inconclusive" || singleResult.outcome === "verification_inconclusive" ? t("verdict-inconclusive") : ar.status === "failed" ? t("status-failed") : t("result-unconfirmed"))}
                   </span>
                 </div>
                 <p className="text-xs font-medium text-text-primary mt-1.5 line-clamp-2">
                   [{ar.task_id}] {ar.goal}
                 </p>
                 <div className="flex items-center justify-between text-[11px] text-text-secondary mt-2 pt-2 border-t border-border/50">
-                  <span>Evo: {evoResult.score ?? (evoResult.outcome === "verification_inconclusive" ? "검증 불확실" : "결과 대기")}</span>
-                  <span>Single: {singleResult.score ?? (singleResult.outcome === "verification_inconclusive" ? "검증 불확실" : "결과 대기")}</span>
+                  <span>Evo: {evoResult.score ?? (evoResult.outcome === "verification_inconclusive" ? t("status-inconclusive") : t("status-waiting"))}</span>
+                  <span>Single: {singleResult.score ?? (singleResult.outcome === "verification_inconclusive" ? t("status-inconclusive") : t("status-waiting"))}</span>
                   <span className="font-semibold text-emerald-400">
-                    {cost === null ? "비용 미확인" : `서버 합계 ${cost}¢ · 출처 개별 확인`}
+                    {cost === null ? t("cost-unknown") : t("cost-total", { cost })}
                   </span>
                 </div>
               </div>

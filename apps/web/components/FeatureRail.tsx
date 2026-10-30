@@ -41,7 +41,7 @@ export function FeatureRail() {
     <div className="canvas-rail-items">{ITEMS.map(link)}</div>
     <details ref={more} open={moreOpen} onToggle={event => setMoreOpen(event.currentTarget.open)} className="canvas-rail-more">
       <summary aria-label={t('more')} title={t('more')}><StudioIcon name="more"/><span className="sr-only">{t('more')}</span></summary>
-      <div className="canvas-more-menu">{MORE_ITEMS.map(item => <a href={`${prefix}${item.path}`} key={item.path} aria-current={routePath === item.path ? 'page' : undefined}>{t(item.key)}</a>)}<LanguageSwitcher/></div>
+      <div className="canvas-more-menu">{MORE_ITEMS.map(item => <a href={`${prefix}${item.path}`} key={item.path} aria-current={routePath === item.path ? 'page' : undefined}>{t(item.key)}</a>)}</div>
     </details>
   </>;
   return <>

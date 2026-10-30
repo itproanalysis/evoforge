@@ -39,6 +39,10 @@ export function CanvasWorkspace(props: Props) {
   const tShare = useTranslations('share');
   const locale = useLocale();
   const [view, setView] = useState<View>('preview');
+  // A run with no page on either side (e.g. a library task) opens on its test results instead of two empty screens.
+  const noPreview = !props.previews.evoforge.html && !props.previews.single.html;
+  const shownId = props.doc?.arena_id;
+  useEffect(() => { if (shownId && noPreview) setView('tests'); }, [shownId, noPreview]);
   const [compare, setCompare] = useState(true);
   const [panel, setPanel] = useState<Panel>(null);
   const [copied, setCopied] = useState(false);
@@ -88,7 +92,7 @@ export function CanvasWorkspace(props: Props) {
           {!props.doc && <option value="">{t(props.busy ? 'running' : 'untitled')}</option>}
           {runs.map(run => {
             const date = typeof run.created_at === 'number' ? new Date(run.created_at * 1000) : null;
-            const stamp = date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat('ko-KR', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'Asia/Seoul'}).format(date) : null;
+            const stamp = date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(locale === 'ko' ? 'ko-KR' : 'en-US', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: locale === 'ko' ? 'Asia/Seoul' : 'UTC'}).format(date) + (locale === 'ko' ? '' : ' UTC') : null;
             return <option key={run.arena_id} value={run.arena_id}>{(run.prompt || run.goal || run.task_id || run.arena_id).slice(0, 30)}{stamp ? ` · ${stamp}` : ''}</option>;
           })}
         </select>
@@ -135,7 +139,11 @@ export function CanvasWorkspace(props: Props) {
           <div className="canvas-output-body">
             {view === 'preview' && (preview.html ? props.renderPreview(preview.html, `${props.doc?.arena_id ?? 'empty'}-${side}`) : <div className="canvas-empty">{t(result.status === 'failed' ? 'failed' : props.busy ? 'running' : 'empty')}</div>)}
             {view === 'diff' && (lane?.diff ? <pre className="canvas-source">{lane.diff}</pre> : <div className="canvas-empty">{t('empty')}</div>)}
-            {view === 'tests' && <div className="canvas-test-result"><span>{t('score')}</span><strong>{result.score ?? '—'}</strong><small>{t(result.result === 'passed' ? 'passed' : result.result === 'not_passed' ? 'not-passed' : 'unconfirmed')}</small></div>}
+            {view === 'tests' && (() => {
+              // A lane whose patch never ran was scored 0 by the match; say why instead of "unconfirmed".
+              const noRun = !result.score && (lane?.outcome === 'apply_failed' || lane?.outcome === 'empty_diff') && Number.isInteger(lane?.heldout?.n);
+              return <div className="canvas-test-result"><span>{t('score')}</span><strong>{noRun ? `0/${lane?.heldout?.n}` : result.score ?? '—'}</strong><small>{noRun ? t(lane?.outcome === 'empty_diff' ? 'no-patch' : 'patch-not-applied') : t(result.result === 'passed' ? 'passed' : result.result === 'not_passed' ? 'not-passed' : 'unconfirmed')}</small></div>;
+            })()}
           </div>
         </article>;
       })}

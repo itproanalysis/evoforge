@@ -769,6 +769,16 @@ def _run_core(*, source_repo: str, base_sha: str, diff: str, tests: list,
     return eid, gates, run
 
 
+def _pr_title(prefix: str, text: str, limit: int = 72) -> str:
+    """PR title within GitHub's readable width, cut at a word boundary with an ellipsis (never mid-word)."""
+    text = " ".join(str(text or "").split())
+    room = max(limit - len(prefix), 8)
+    if len(text) <= room:
+        return prefix + text
+    cut = text[:room - 1].rsplit(" ", 1)[0].rstrip(" ,.;:") or text[:room - 1]
+    return prefix + cut + "…"
+
+
 def _pr_core(*, source_evidence_id: str, title: str, body_intro: str,
              branch: str, base: str, store_extra: dict) -> tuple[str, dict]:
     """Shared all-PASS server-run gate -> create_pr -> store -> chain-copy core.
@@ -1913,6 +1923,8 @@ def performance():
                 "baseline": performance_mod.cost_per_solved(baseline),
                 "pipeline": performance_mod.cost_per_solved(pipeline)},
             "history": performance_mod.history(),
+            "pooled": performance_mod.pooled(),
+            "pooled_basis": performance_mod.POOLED_BASIS,
             "production": _production_stats(),
             "storage": "postgres" if postgres_state.backend() else "memory"}
 
@@ -2127,7 +2139,7 @@ def _mission_step_run(mission: dict) -> str:
 def _mission_step_pr(mission: dict) -> str:
     """Mission PR_OPENED step: same core as POST /v1/pr/create."""
     run_eid = mission["stages"]["run"]
-    title = f"evoforge mission: {mission['goal'][:80]}"
+    title = _pr_title("evoforge mission: ", mission["goal"])
     eid, _ = _pr_core(
         source_evidence_id=run_eid, title=title, body_intro=mission["goal"],
         branch=f"evoforge/{uuid.uuid4().hex[:8]}", base="main",
@@ -2933,7 +2945,7 @@ def evolution_promote(evolution_id: str):
     run_eid = best.get("run_evidence_id")
     if not run_eid:
         raise HTTPException(409, "no verified run to promote yet — evolve first")
-    title = f"evoforge autopilot: {evo['goal'][:80]}"
+    title = _pr_title("evoforge autopilot: ", evo["goal"])
     eid, pr = _pr_core(source_evidence_id=run_eid, title=title,
                         body_intro=f"Autopilot {evolution_id} gen {best.get('generation')}: {evo['goal']}",
                         branch=f"evoforge/evo-{uuid.uuid4().hex[:8]}", base="main",

@@ -1,0 +1,38 @@
+{
+  "id": "T86_polish",
+  "planned_by": "Claude (Critic): cloud review 2026-10-30 B7, C8-C11",
+  "goal": "T86 — polish from the cloud review (2026-10-30). Web only; keep Codex's canvas design language and 375px fit.\n1. No hardcoded Korean in apps/web/app/[locale]/**/*.tsx or components/*.tsx (except LanguageSwitcher's \"한국어\"):\n   move every string (24 in app/[locale]/arena/page.tsx, e.g. \"서버 합계 {cost}¢ · 출처 개별 확인\", \"결과 미확인\", error\n   texts) to messages (en + ko) — English pages must show English.\n2. Dates follow the page locale: no toLocaleString()/toLocaleTimeString()/toLocaleDateString() without a locale, no\n   Intl.DateTimeFormat('ko-KR' or undefined) — pass the next-intl locale (CanvasWorkspace run picker too; keep its\n   Asia/Seoul time zone only for ko, UTC labelled for en is fine).\n3. One language switcher per screen: header switcher desktop-only (wrap with \"hidden md:...\" classes); FeatureRail keeps\n   exactly one <LanguageSwitcher> — in the mobile More menu — and drops the one in the desktop more menu.\n4. A title per page: messages \"titles\" namespace (en + ko) with home, arena, replay, evidence, performance, verify,\n   lab, evolution, leaderboard, share (no \"Mission Control\"); the [locale] layout uses titles.home; add\n   app/[locale]/<route>/layout.tsx for each route above with generateMetadata reading titles.<route>\n   (server components; pass children through).\n5. Verify page: label text from messages (no hardcoded \"Ed25519 signed\", once only; no raw <dt>sealed</dt> /\n   \"{cert.sealed_count} (...)\": when sealed_count is 0 show the held-out result the certificate carries, or omit);\n   light theme like the rest (no dark inline backgrounds / bg-black / gray-900 classes).\n6. Plain wording: Performance subtitle without \"GET /api/evoforge/v1/performance\"; replace \"Harness adoption history\"\n   and \"/1 -> /2\" notation with sentences (e.g. \"How the evaluation method was improved\"); replace \"Provider call path\n   recorded · not independently verified\" with an accurate, non-alarming line (e.g. \"Model call recorded with its\n   request receipt\").\nKeep every existing web test, apps/web/scripts/check-studio-render.mjs, tsc and next build green.\nTests: services/api/tests/test_muse_t86.py.",
+  "edit": [
+    "apps/web/app/[locale]/arena/page.tsx",
+    "apps/web/app/[locale]/page.tsx",
+    "apps/web/app/[locale]/layout.tsx",
+    "apps/web/app/[locale]/performance/page.tsx",
+    "apps/web/app/[locale]/verify/[id]/page.tsx",
+    "apps/web/app/[locale]/arena/layout.tsx",
+    "apps/web/app/[locale]/replay/layout.tsx",
+    "apps/web/app/[locale]/evidence/layout.tsx",
+    "apps/web/app/[locale]/performance/layout.tsx",
+    "apps/web/app/[locale]/verify/layout.tsx",
+    "apps/web/app/[locale]/lab/layout.tsx",
+    "apps/web/app/[locale]/evolution/layout.tsx",
+    "apps/web/app/[locale]/leaderboard/layout.tsx",
+    "apps/web/app/[locale]/share/layout.tsx",
+    "apps/web/components/CanvasWorkspace.tsx",
+    "apps/web/components/FeatureRail.tsx",
+    "apps/web/components/AdoptionHistory.tsx",
+    "apps/web/messages/en.json",
+    "apps/web/messages/ko.json",
+    "apps/web/styles/canvas.css",
+    "apps/web/scripts/check-studio-render.mjs",
+    "services/api/tests/test_muse_t86.py"
+  ],
+  "context": [
+    "apps/web/components/LanguageSwitcher.tsx"
+  ],
+  "check": [
+    "python -m pytest services/api/tests/test_muse_t86.py services/api/tests/test_sealed_t86_polish.py services/api/tests/test_arena_status_http_codex.py services/api/tests/test_critic_t11_events.py services/api/tests/test_critic_t14_auth.py services/api/tests/test_critic_t18_missions.py services/api/tests/test_critic_t19_review_chain.py services/api/tests/test_critic_t22a_backend.py services/api/tests/test_critic_t24_eval_jobs.py services/api/tests/test_critic_t28_evolution_timeline.py services/api/tests/test_critic_t31_evolution_run_async_and_verify_ui.py services/api/tests/test_critic_t33_stable_certificates.py services/api/tests/test_critic_t34_timeline_polish.py services/api/tests/test_critic_t36_adoption_history_ui.py services/api/tests/test_critic_t38_home_proof_card.py services/api/tests/test_critic_t40_sse_stream.py services/api/tests/test_critic_t41_mcp_readonly.py services/api/tests/test_critic_t42_evidence_graph.py services/api/tests/test_critic_t49_arena_preview.py services/api/tests/test_critic_t51_evolution_rounds.py services/api/tests/test_critic_t52_round_replay_ui.py services/api/tests/test_critic_t54_live_panel_command_bar.py services/api/tests/test_critic_t55_evolution_stats.py services/api/tests/test_critic_t56_stats_panel.py services/api/tests/test_critic_t58_left_rail.py services/api/tests/test_critic_t59_arena_manifest_preview_ui.py services/api/tests/test_critic_t61_presentation_mode.py services/api/tests/test_critic_t63_strategies_ui.py services/api/tests/test_critic_t64_prompt_arena.py services/api/tests/test_critic_t65_prompt_bar.py services/api/tests/test_critic_t67_prompt_chain_ui.py services/api/tests/test_critic_t70_arena_certificates.py services/api/tests/test_critic_t9_ledger_web.py services/api/tests/test_critic_v36_wvi_honesty.py services/api/tests/test_muse_missions.py services/api/tests/test_muse_review_chain.py services/api/tests/test_muse_t44.py services/api/tests/test_muse_t52.py services/api/tests/test_muse_t54.py services/api/tests/test_muse_t55.py services/api/tests/test_muse_t56.py services/api/tests/test_muse_t58.py services/api/tests/test_muse_t61.py services/api/tests/test_muse_t62.py services/api/tests/test_muse_t63.py services/api/tests/test_muse_t64.py services/api/tests/test_muse_t65.py services/api/tests/test_muse_t66.py services/api/tests/test_muse_t67.py services/api/tests/test_muse_t69.py services/api/tests/test_muse_t71.py services/api/tests/test_muse_t77.py services/api/tests/test_muse_t78.py services/api/tests/test_muse_t79.py services/api/tests/test_muse_t82.py services/api/tests/test_muse_t84.py services/api/tests/test_muse_t85.py services/api/tests/test_replay_selection_http_codex.py services/api/tests/test_sealed_t43_feedback_loop.py services/api/tests/test_sealed_t69_home_workspace.py services/api/tests/test_sealed_t70_arena_certificates.py services/api/tests/test_sealed_t71_plain_first_screen.py services/api/tests/test_sealed_t74_arena_summary.py services/api/tests/test_sealed_t77_arena_v5.py services/api/tests/test_sealed_t78_home_scoreboard.py services/api/tests/test_sealed_t79_equal_tools_summary.py services/api/tests/test_sealed_t81_scoreboard_significance.py services/api/tests/test_sealed_t82_share_link.py services/api/tests/test_sealed_t85_rounds_ui_challenges.py services/api/tests/test_web_live_dashboard_cr.py -q -p no:cacheprovider",
+    "node apps/web/scripts/check-studio-render.mjs",
+    "node apps/web/node_modules/typescript/bin/tsc --noEmit --incremental false -p apps/web",
+    "node apps/web/node_modules/next/dist/bin/next build apps/web"
+  ]
+}

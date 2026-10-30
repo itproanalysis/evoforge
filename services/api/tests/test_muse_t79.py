@@ -59,7 +59,7 @@ def _doc(aid, status, winner, sp=0, sn=0, ep=0, en=0,
 
 def test_equal_tools_empty_zeros_and_existing_fields_kept():
     body = c.get("/v1/arena/summary").json()
-    eq = {k: v for k, v in body["equal_tools"].items() if k != "stats"}  # T81 adds "stats"
+    eq = {k: v for k, v in body["equal_tools"].items() if k not in ("stats", "excluded", "value", "basis", "latest_win")}  # added later (T81, r27)
     assert eq == {
         "scored": 0,
         "wins": {"evoforge": 0, "single": 0, "tie": 0},

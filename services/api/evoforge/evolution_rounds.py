@@ -37,12 +37,35 @@ DISCLOSURE = ("The EvoForge lane may retry using the names of failing tests, "
               "and reported costs cover only model API usage, not Runner compute.")
 
 
-def _disclosure_for(single_apply: str) -> str:
+DISCLOSURE_CRITIC = ("The EvoForge lane gets no held-out signal; it retries using only the independent Critic's own "
+                     "tests, and reported costs cover only model API usage, not Runner compute.")
+
+
+def _disclosure_for(single_apply: str, feedback: str = "heldout") -> str:
+    base = DISCLOSURE_CRITIC if feedback == "critic" else DISCLOSURE
     if single_apply == "tolerant":
-        return (DISCLOSURE + " Both lanes apply diffs with tolerant recounting "
+        return (base + " Both lanes apply diffs with tolerant recounting "
                 "(equal_tools comparison).")
-    return (DISCLOSURE + " The single lane applies diffs with strict hunk counts "
+    return (base + " The single lane applies diffs with strict hunk counts "
             "while the EvoForge lane recounts (chat_vs_system comparison).")
+
+
+def _served(doc: dict) -> dict:
+    """Correct the disclosure of Critic-feedback runs recorded before 2026-10-30.
+
+    Those runs stored the held-out-feedback sentence although EvoForge only saw its own Critic's test failures. Stored
+    documents are immutable, so the correct sentence is served, flagged with disclosure_corrected.
+    """
+    try:
+        m = doc.get("manifest")
+        fb = doc.get("feedback")
+        if (isinstance(m, dict) and fb == "critic" and isinstance(m.get("disclosure"), str)
+                and m["disclosure"].startswith(DISCLOSURE)):
+            m["disclosure"] = _disclosure_for(_doc_single_apply(doc), "critic")
+            m["disclosure_corrected"] = True
+    except Exception:
+        pass
+    return doc
 
 _STORE = None
 _FALLBACK = None
@@ -301,7 +324,7 @@ def get_run(run_id: str) -> dict | None:
         with _MIRROR_LOCK:
             mirror = _MIRROR.get(run_id)
         if isinstance(mirror, dict):
-            return copy.deepcopy(mirror)
+            return _served(copy.deepcopy(mirror))
     try:
         rec = _store().get(run_id, None)
     except Exception:
@@ -309,7 +332,7 @@ def get_run(run_id: str) -> dict | None:
     if not isinstance(rec, dict) or rec.get("kind") != KIND:
         return None
     inner = rec.get("evolution_run")
-    return copy.deepcopy(inner) if isinstance(inner, dict) else None
+    return _served(copy.deepcopy(inner)) if isinstance(inner, dict) else None
 
 
 def list_runs(limit: int = LIST_LIMIT) -> list[dict]:
@@ -339,7 +362,7 @@ def list_runs(limit: int = LIST_LIMIT) -> list[dict]:
         return float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else 0.0
 
     ordered = sorted(cands.values(), key=_ts, reverse=True)
-    return [copy.deepcopy(d) for d in ordered[:n]]
+    return [_served(copy.deepcopy(d)) for d in ordered[:n]]
 
 
 def clear() -> None:
@@ -871,7 +894,7 @@ def build_manifest(app_id: str, title: str, n_rounds: int, base_files: dict,
                        else "chat_vs_system"),
         "cost_basis": "model_api_usage",
         "runner_cost": "not_measured",
-        "disclosure": _disclosure_for(single_apply),
+        "disclosure": _disclosure_for(single_apply, feedback),
         "strategy": dict(strat),
         "strategy_id": sid,
     }
@@ -1610,6 +1633,28 @@ def _side_stats(docs: list[dict], side: str) -> dict:
 
 METHOD_SENTENCE = ("Rounds are counted as independent trials, which is an "
                    "approximation because rounds within a run are correlated.")
+PAIRED_SENTENCE = ("Paired: each round of each run is one pair (same app, same round goal, same hidden tests); the exact "
+                   "two-sided sign test counts the rounds only one side verified.")
+
+
+def _paired(docs: list[dict]) -> dict:
+    """Per-round pairs: verified by EvoForge only / by the single call only / both / neither, plus the sign test."""
+    from math import comb
+    out = {"evoforge_only": 0, "single_only": 0, "both": 0, "neither": 0}
+    for doc in docs:
+        for entry in doc.get("rounds") or []:
+            sides = entry.get("sides") if isinstance(entry, dict) else None
+            if not isinstance(sides, dict):
+                continue
+            e, s_ = sides.get("evoforge"), sides.get("single")
+            if not isinstance(e, dict) or not isinstance(s_, dict):
+                continue
+            ev, sv = e.get("status") == "READY", s_.get("status") == "READY"
+            out["both" if ev and sv else "evoforge_only" if ev else "single_only" if sv else "neither"] += 1
+    m = out["evoforge_only"] + out["single_only"]
+    k = min(out["evoforge_only"], out["single_only"])
+    p = min(1.0, 2 * sum(comb(m, i) for i in range(k + 1)) / 2 ** m) if m else None
+    return {**out, "sign_test_p": p, "significant": p is not None and p < 0.05, "method": PAIRED_SENTENCE}
 
 
 def _doc_single_apply(doc: dict) -> str:
@@ -1647,4 +1692,5 @@ def stats(feedback: str | None = None,
         comparison = "not_significant"
     return {"runs": len(docs),
             "by_side": {"evoforge": evo, "single": single},
-            "comparison": comparison, "method": METHOD_SENTENCE}
+            "comparison": comparison, "method": METHOD_SENTENCE,
+            "paired": _paired(docs)}

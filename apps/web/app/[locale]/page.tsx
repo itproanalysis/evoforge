@@ -69,7 +69,13 @@ function pickWorkspaceArena(list: ArenaDoc[]): ArenaDoc | null {
   const sorted = [...list].sort(
     (a, b) => (b.created_at ?? 0) - (a.created_at ?? 0),
   );
-  return sorted.find((a) => a.mode === "prompt") ?? sorted[0];
+  // First screen: the latest fair comparison EvoForge won (equal tools, no held-out signal), else the latest prompt run.
+  const fairWin = sorted.find((a) => {
+    const lanes = (a.manifest as { lanes?: Record<string, { apply?: string; feedback?: string }> } | undefined)?.lanes;
+    return a.status === "succeeded" && a.verdict?.winner === "evoforge" && lanes?.single?.apply === "tolerant"
+      && lanes?.evoforge?.feedback === "critic";
+  });
+  return fairWin ?? sorted.find((a) => a.mode === "prompt") ?? sorted[0];
 }
 
 export default function MissionControl() {
@@ -162,7 +168,7 @@ export default function MissionControl() {
         }
       }
       setSyncError(failed);
-      if (!failed) setLastUpdated(new Date().toLocaleTimeString());
+      if (!failed) setLastUpdated(new Date().toLocaleTimeString(locale));
     } finally {
       refreshingRef.current = false;
       setInitialLoading(false);
@@ -237,7 +243,18 @@ export default function MissionControl() {
     void getArenaSummary()
       .then((res) => {
         if (cancelled) return;
-        if (res && typeof res === "object") setArenaSummary(res);
+        if (res && typeof res === "object") {
+          setArenaSummary(res);
+          // The newest fair EvoForge win may be older than the 20 runs the list returns: load it directly.
+          const winId = res.equal_tools?.latest_win;
+          if (winId) {
+            void getArena(winId).then((doc) => {
+              if (!cancelled && doc?.arena_id === winId) {
+                setWorkspaceArena((cur) => (cur && cur.verdict?.winner === "evoforge" && cur.status === "succeeded") || cur?.status === "running" ? cur : doc);
+              }
+            }).catch(() => {});
+          }
+        }
       })
       .catch(() => {});
     return () => {
@@ -591,7 +608,7 @@ export default function MissionControl() {
         <div>
           <h1 className="my-1 text-2xl font-bold">{t("heading")}</h1>
           <p className="text-text-secondary text-sm mt-0">
-            {t("description")} · {API_BASE}/v1/missions
+            {t("description")}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -750,7 +767,7 @@ export default function MissionControl() {
             {[...perf.history].sort((a, b) => b.created_at - a.created_at).map((entry) => (
               <div key={entry.measurement_id} className="flex flex-wrap justify-between gap-2 p-2.5 rounded-lg border border-border text-sm">
                 <span>{entry.kind} · {entry.model} · {entry.suite_version} · {t(`provenance.${provenance(entry.provider_stub)}` as any)}</span>
-                <span>{entry.passed}/{entry.n} · {formatRate(entry.pass_rate)} · {new Date(entry.created_at * 1000).toLocaleString()}</span>
+                <span>{entry.passed}/{entry.n} · {formatRate(entry.pass_rate)} · {new Date(entry.created_at * 1000).toLocaleString(locale)}</span>
                 {entry.evidence_id && <a href={`/evidence?id=${encodeURIComponent(entry.evidence_id)}`} className="text-accent-cyan hover:underline">{t("evidence-label")}</a>}
               </div>
             ))}
@@ -1064,7 +1081,7 @@ export default function MissionControl() {
                     </span>
                     {m.updated_at ? (
                       <span>
-                        {new Date(m.updated_at * 1000).toLocaleTimeString()}
+                        {new Date(m.updated_at * 1000).toLocaleTimeString(locale)}
                       </span>
                     ) : null}
                     <span className="text-accent-cyan font-semibold">
@@ -1123,7 +1140,7 @@ export default function MissionControl() {
                   ) : null}
                   {o.recorded_at ? (
                     <span className="text-text-secondary">
-                      {new Date(o.recorded_at * 1000).toLocaleTimeString()}
+                      {new Date(o.recorded_at * 1000).toLocaleTimeString(locale)}
                     </span>
                   ) : null}
                 </div>
@@ -1177,7 +1194,7 @@ export default function MissionControl() {
       participants={participants}
       history={perf?.history ?? null}
       renderPreview={(html, title) => <SandboxedPreview html={html} title={title}/>}
-      overview={<StudioOverview running={wsRunning} runId={displayedArena?.arena_id} measured={arenaSummary?.equal_tools?.scored ?? null} verified={dashboard?.validated_improvements ?? null} participants={participants?.status === 'available' ? participants.participants.length : null} participantsMore={participants?.has_more} heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null} singleHeldout={arenaSummary?.equal_tools?.heldout?.single ?? null} wins={arenaSummary?.equal_tools?.wins ?? null} signP={arenaSummary?.equal_tools?.stats?.sign_test_p ?? null}/>}
+      overview={<StudioOverview running={wsRunning} runId={displayedArena?.arena_id} measured={arenaSummary?.equal_tools?.scored ?? null} verified={dashboard?.validated_improvements ?? null} participants={participants?.status === 'available' ? participants.participants.length : null} participantsMore={participants?.has_more} heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null} singleHeldout={arenaSummary?.equal_tools?.heldout?.single ?? null} wins={arenaSummary?.equal_tools?.wins ?? null} signP={arenaSummary?.equal_tools?.stats?.sign_test_p ?? null} value={arenaSummary?.equal_tools?.value ?? null}/>}
       management={management}
       composer={<PromptBar disabled={wsRunning} followUpArena={wsFollowUp} onStarted={(id) => { setArenaPendingId(id); setArenaPollError(false); }}/>} />
   );

@@ -351,6 +351,24 @@ def _summary_int(value) -> int:
     return 0
 
 
+FAIR_BASIS = ("Fair comparisons only: both lanes apply patches the same way (tolerant recount) and EvoForge gets no "
+              "held-out signal (Critic feedback). Matches run with the original strict single-lane patch rule or with "
+              "held-out failing-test names fed back to EvoForge are counted under excluded, never in these numbers. "
+              "The significance test is the exact two-sided sign test over matches one side won.")
+
+
+def _oracle_feedback(doc: dict) -> bool:
+    """True only when the record says EvoForge was fed held-out failing-test names (an upper-bound oracle)."""
+    try:
+        lanes = (doc.get("manifest") or {}).get("lanes") or {}
+        fb = (lanes.get("evoforge") or {}).get("feedback")
+        if fb is None:
+            fb = doc.get("feedback")
+        return fb in ("heldout", "heldout_failing_test_names")
+    except Exception:
+        return False
+
+
 def _is_equal_tools(doc: dict) -> bool:
     """A match is "equal tools" when manifest.lanes.single.apply == "tolerant".
 
@@ -367,7 +385,7 @@ def _is_equal_tools(doc: dict) -> bool:
         single = lanes.get("single")
         if not isinstance(single, dict):
             return False
-        return single.get("apply") == "tolerant"
+        return single.get("apply") == "tolerant" and not _oracle_feedback(doc)
     except Exception:
         return False
 
@@ -472,6 +490,8 @@ def summary() -> dict:
                   "evoforge": {"passed": 0, "n": 0}}
     eq_cost_cents = {"single": 0, "evoforge": 0, "judge": 0}
     eq_solved = {"single": 0, "evoforge": 0}
+    excluded = {"strict_harness": 0, "oracle_feedback": 0}
+    latest_win: tuple[float, str] | None = None  # newest fair EvoForge win, for the first screen
     for doc in cands.values():
         if not isinstance(doc, dict):
             continue
@@ -504,6 +524,15 @@ def summary() -> dict:
                 cost_cents[side] += _summary_int(lane.get("cost_cents"))
             cost_cents["judge"] += _summary_int(
                 doc.get("judge_cost_cents"))
+            if not _is_equal_tools(doc):
+                excluded["oracle_feedback" if _oracle_feedback(doc) else "strict_harness"] += 1
+            if _is_equal_tools(doc) and winner == "evoforge":
+                try:
+                    ts = float(doc.get("created_at") or 0.0)
+                except (TypeError, ValueError):
+                    ts = 0.0
+                if latest_win is None or ts > latest_win[0]:
+                    latest_win = (ts, doc["arena_id"])
             if _is_equal_tools(doc):
                 eq_scored += 1
                 eq_wins[winner] += 1
@@ -541,6 +570,10 @@ def summary() -> dict:
                 "decisive": eq_decisive,
                 "sign_test_p": eq_p,
                 "significant": bool(eq_p is not None and eq_p < 0.05)}
+    extra_solved = int(eq_solved["evoforge"]) - int(eq_solved["single"])
+    extra_cost = int(eq_cost_cents["evoforge"]) - int(eq_cost_cents["single"])
+    value = {"extra_solved": extra_solved, "extra_cost_cents": extra_cost,
+             "cents_per_extra_solved": (-(-extra_cost // extra_solved) if extra_solved > 0 and extra_cost > 0 else None)}
     return {"total": total, "running": running, "failed": failed,
             "scored": scored, "unscorable": unscorable,
             "inconclusive": inconclusive, "wins": wins,
@@ -548,7 +581,9 @@ def summary() -> dict:
             "equal_tools": {"scored": eq_scored, "wins": eq_wins,
                             "heldout": eq_heldout,
                             "cost_cents": eq_cost_cents,
-                            "stats": eq_stats},
+                            "stats": eq_stats, "excluded": excluded,
+                            "value": value, "basis": FAIR_BASIS,
+                            "latest_win": latest_win[1] if latest_win else None},
             "basis": SUMMARY_BASIS}
 
 

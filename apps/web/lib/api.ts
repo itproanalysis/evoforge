@@ -359,6 +359,14 @@ export interface PerformanceSnapshot {
   history: MeasurementRecord[];
   production: ProductionStats;
   storage: string;
+  pooled?: PooledComparison[];
+  pooled_basis?: string;
+}
+
+export interface PooledSide { runs: number; passed: number; n: number; cost_cents: number; rate: number | null; wilson95: [number, number] }
+export interface PooledComparison {
+  suite_version: string; harness_version: string; single: PooledSide; evoforge: PooledSide;
+  verdict: "evoforge_better" | "single_better" | "not_significant" | "saturated";
 }
 
 export interface BaselineResponse {
@@ -861,6 +869,10 @@ export interface ArenaSummary {
     heldout: { single: { passed: number; n: number }; evoforge: { passed: number; n: number } };
     cost_cents: { single: number; evoforge: number; judge: number };
     stats?: ArenaEqualToolsStats | null;
+    excluded?: { strict_harness: number; oracle_feedback: number };
+    value?: { extra_solved: number; extra_cost_cents: number; cents_per_extra_solved: number | null };
+    basis?: string;
+    latest_win?: string | null;
   };
   basis: string;
 }
@@ -989,6 +1001,8 @@ export interface EvolutionStatsResponse {
   comparison: EvolutionStatsComparison;
   method: string;
   by_side: { evoforge: EvolutionStatsSide; single: EvolutionStatsSide };
+  paired?: { evoforge_only: number; single_only: number; both: number; neither: number;
+             sign_test_p: number | null; significant: boolean; method: string };
   [key: string]: unknown;
 }
 
