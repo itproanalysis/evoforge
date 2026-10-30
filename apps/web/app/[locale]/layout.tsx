@@ -62,7 +62,7 @@ export default async function LocaleLayout({
                 </div>
               </header>
               <div id="workspace-content" className="studio-content">{children}</div>
-              <footer className="studio-footer"><span>EvoForge</span><p>{tLayout('footer')}</p></footer>
+              <footer className="studio-footer"><span>EvoForge</span><p>{tLayout('footer')}</p><details className="studio-footer-costs"><summary>{tLayout('footer-costs-title')}</summary><p>{tLayout('footer-costs')}</p></details></footer>
             </div>
           </div>
         </NextIntlClientProvider>

@@ -44,10 +44,33 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
   const sealedKinds = (cert.sealed_kinds ?? []).join(", ");
   const heldoutGate = (cert.gates ?? []).find((g) => /heldout|sealed/i.test(g.gate));
 
+  const verified = cert.verdict === "VERIFIED";
+  const gates = cert.gates ?? [];
+  const gatesPassed = gates.filter((g) => g.result === "PASS").length;
+  const checks: { ok: boolean | null; label: string }[] = [
+    { ok: cert.verify ? !!cert.verify.ok : null, label: t("check-signature") },
+    { ok: keyMatches, label: t("check-key") },
+    { ok: gates.length > 0 ? gatesPassed === gates.length : null, label: t("check-gates", { passed: gatesPassed, total: gates.length }) },
+  ];
+
   return (
-    <div className="studio-light max-w-3xl space-y-4">
-      <h1 className="text-2xl font-bold text-text-primary">{t("heading")} <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${cert.verdict === "VERIFIED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>{cert.verdict}</span></h1>
-      <p className="text-sm text-text-secondary">{t("description")}</p>
+    <div className="studio-light verify-page max-w-3xl space-y-4">
+      <section className={`verify-hero${verified ? " is-verified" : " is-failed"}`}>
+        <span className="verify-badge" aria-hidden="true">{verified ? "✓" : "!"}</span>
+        <p className="verify-kicker">{t("heading")} · {cert.verdict}</p>
+        <h1>{verified ? t("hero-verified") : t("hero-failed")}</h1>
+        <p className="verify-sub">{t("description")}</p>
+        <ul className="verify-checks">
+          {checks.map((c) => (
+            <li key={c.label} className={c.ok === null ? "is-unknown" : c.ok ? "is-ok" : "is-bad"}>
+              <span aria-hidden="true">{c.ok === null ? "–" : c.ok ? "✓" : "✕"}</span>
+              {c.label}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <details className="perf-section verify-details">
+      <summary>{t("details")}</summary>
       <Card className="bg-background-secondary border border-border">
         {cert.signed ? (
           <p className="text-sm text-text-primary">
@@ -88,6 +111,9 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
           ) : null}
         </dl>
       </Card>
+      </details>
+      <details className="perf-section verify-details">
+      <summary>{t("gates")} · {t("chain")}</summary>
       <Card className="bg-background-secondary border border-border">
         <h3 className="text-base font-semibold m-0 text-text-primary">{t("gates")}</h3>
         {(cert.gates ?? []).map((g) => (
@@ -98,6 +124,7 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
           <div key={c.stage} className="text-sm text-text-primary">{c.stage}: {c.event_id ?? "—"}</div>
         ))}
       </Card>
+      </details>
     </div>
   );
 }

@@ -37,7 +37,8 @@
     "readonly": "Run access required",
     "readonly-short": "Read only",
     "no-patch": "No patch produced — scored 0",
-    "patch-not-applied": "Patch did not apply — scored 0"
+    "patch-not-applied": "Patch did not apply — scored 0",
+    "about": "What is EvoForge?"
   },
   "share": {
     "button": "Share",
@@ -567,7 +568,13 @@
     "verify-label": "Verify",
     "diff-label": "Diff SHA256",
     "sealed-label": "Sealed tests",
-    "sealed-value": "{count} ({kinds})"
+    "sealed-value": "{count} ({kinds})",
+    "hero-verified": "This result is verified",
+    "hero-failed": "This result could not be verified",
+    "check-signature": "The signature over this result is valid",
+    "check-key": "It was signed with this server's published key",
+    "check-gates": "{passed} of {total} release gates passed",
+    "details": "Certificate details"
   },
   "leaderboard": {
     "heading": "Trust leaderboard",
@@ -591,7 +598,9 @@
   "layout": {
     "title": "EvoForge — Mission Control",
     "description": "Verified code improvement service: generate → gate → review → PR → evidence.",
-    "footer": "Builder: Muse Spark 1.3 via Meta Model API · Gates: integrity gate (oracle_ast + provisional test-strength check) · costs are provider_billed actuals in cents from GET /v1/ledger; UNKNOWN holds listed separately"
+    "footer": "Built with Muse Spark 1.3 on the Meta Model API. Hidden tests decide every result, each result is signed with Ed25519, and costs come from the provider-billed ledger.",
+    "footer-costs-title": "How costs are counted",
+    "footer-costs": "Costs are provider_billed actuals in cents from GET /v1/ledger; UNKNOWN holds are listed separately."
   },
   "errors": {
     "budget-exhausted": "Budget exhausted: mission step refused with 402",
@@ -808,5 +817,21 @@
     "evolution": "Autopilot",
     "leaderboard": "Trust leaderboard",
     "share": "Shared result"
+  },
+  "welcome": {
+    "eyebrow": "Built on Muse Spark 1.3 · Meta Model API",
+    "title": "AI code you can verify, not just trust.",
+    "step-1": "You ask",
+    "step-2": "Same model, built twice",
+    "step-3": "Hidden tests decide",
+    "stat-record": "Fair matches ({n} scored)",
+    "stat-wins": "won",
+    "stat-losses": "lost",
+    "stat-hidden": "Hidden tests passed",
+    "stat-signed": "Every result is signed",
+    "cta-try": "Try it yourself",
+    "cta-watch": "See a recorded match",
+    "cta-scoreboard": "Full scoreboard",
+    "close": "Close"
   }
 }

@@ -37,7 +37,7 @@ export function FeatureRail() {
     document.addEventListener('keydown', close);
     return () => document.removeEventListener('keydown', close);
   }, [moreOpen, mobileOpen]);
-  const link = ({path, key, icon}: {path: string; key: string; icon: string}) => <a key={path} href={`${prefix}${path}`} title={t(key)} aria-label={t(key)} data-tooltip={t(key)} aria-current={routePath === path ? 'page' : undefined} className={`canvas-rail-link${routePath === path ? ' is-active' : ''}`}><StudioIcon name={icon}/><span className="sr-only">{t(key)}</span></a>;
+  const link = ({path, key, icon}: {path: string; key: string; icon: string}) => <a key={path} href={`${prefix}${path}`} title={t(key)} aria-label={t(key)} data-tooltip={t(key)} aria-current={routePath === path ? 'page' : undefined} className={`canvas-rail-link${routePath === path ? ' is-active' : ''}`}><StudioIcon name={icon}/><span className="canvas-rail-label">{t(key)}</span></a>;
   const content = <>
     <a href={prefix || '/'} className="canvas-rail-brand" title="EvoForge" aria-label="EvoForge"><StudioMark/></a>
     <div className="canvas-rail-items">{ITEMS.map(link)}</div>

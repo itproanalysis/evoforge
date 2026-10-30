@@ -31,7 +31,11 @@ type Props = {
   management: ReactNode;
   composer: ReactNode;
   renderPreview: (html: string, title: string) => ReactNode;
+  // First-visit introduction; shown until dismissed once, reopened from the toolbar.
+  welcome?: (close: () => void) => ReactNode;
 };
+
+const WELCOME_KEY = 'evoforge.welcome.seen';
 
 export function CanvasWorkspace(props: Props) {
   const t = useTranslations('canvas');
@@ -46,6 +50,14 @@ export function CanvasWorkspace(props: Props) {
   const [compare, setCompare] = useState(true);
   const [panel, setPanel] = useState<Panel>(null);
   const [copied, setCopied] = useState(false);
+  const [welcome, setWelcome] = useState(false);
+  useEffect(() => {
+    try { if (!window.localStorage.getItem(WELCOME_KEY)) setWelcome(true); } catch { setWelcome(true); }
+  }, []);
+  const closeWelcome = () => {
+    setWelcome(false);
+    try { window.localStorage.setItem(WELCOME_KEY, '1'); } catch {}
+  };
   const dialog = useRef<HTMLDialogElement>(null);
   const mobileMenu = useRef<HTMLDetailsElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -101,6 +113,7 @@ export function CanvasWorkspace(props: Props) {
         <span className={`canvas-record${props.busy ? ' is-running' : ''}`} role="status">{t(props.busy ? props.doc ? 'running' : 'received' : props.doc ? 'recorded' : 'waiting')}</span>
       </div>
       <div className="canvas-toolbar-actions">
+        {props.welcome && iconButton('spark', t('about'), () => setWelcome(true))}
         {iconButton('users', t('activity'), () => setPanel('activity'))}
         {iconButton('history', t('history'), () => setPanel('history'))}
         <div className="canvas-desktop-actions">{iconButton('performance', t('metrics'), () => setPanel('metrics'))}{iconButton('settings', t('settings'), () => setPanel('admin'))}</div>
@@ -148,6 +161,7 @@ export function CanvasWorkspace(props: Props) {
         </article>;
       })}
     </section>
+    {welcome && props.welcome?.(closeWelcome)}
     {props.pollError && <div className="canvas-feedback" role="alert"><span>{t('load-failed')}</span><button type="button" onClick={props.onRetry}>{t('retry')}</button></div>}
     {props.composer}
     <dialog ref={dialog} className="canvas-inspector" aria-labelledby="canvas-inspector-title" onCancel={event => {event.preventDefault(); setPanel(null);}} onClick={event => {
