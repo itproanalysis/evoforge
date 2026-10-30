@@ -1,38 +1,182 @@
-# Submission — EvoForge (Indie, Push the Frontier)
+# EvoForge — submission (Meta Global AI Developer Hackathon · Indie · Push the Frontier)
 
-## 60초 요약
-여러 AI를 묶는 게 아니라, **검증된 PR 1건**을 만드는 기계. Builder(Muse Spark 1.3) → 독립 Critic(명세-선행 봉인) → 결정적 게이트(GH_INTEGRITY/GC_COMPOSITION + authorize_merge) → Evidence. 약한 테스트·보상 해킹은 병합 차단.
+Updated 2026-10-30 (release 26). Every number below is a stored production measurement or ledger entry; IDs are given so a judge can
+re-check them.
 
-## Live (실측됨 2026-10-27)
-- Web: https://evoforge-web-230852112787.asia-northeast3.run.app
-- API: https://evoforge-api-230852112787.asia-northeast3.run.app (private IAM, 웹 same-origin 프록시 경유)
-- **PASS 체인 → 실제 PR**: Mission `msn_5af789b9a5a4` ("calc.py add 수정") CREATED→GENERATED→REVIEWED→RAN→PR_OPENED
-  - Builder 실측 1줄 패치 (`a - b` → `a + b`), Critic PASS (sealed 3종), 위생 샌드박스 visible 3/3 + held-out 3/3
-  - GH_INTEGRITY/GC_COMPOSITION/G2 전부 PASS → https://github.com/itproanalysis/evoforge-target/pull/4 (MERGED, 07c19dde)
-- **CLOSED LOOP (WVI=1)**: Mission `msn_a3b777e1cfcf` ("calc.py mul 수정") 전 체인 → https://github.com/itproanalysis/evoforge-target/pull/6 → MERGED (2816260d) → `POST /v1/outcomes` → `outcome_status: VALIDATED`, dashboard `validated_improvements: 1`
-  - 재현 중 blind diff(`hunk does not apply`)·테스트 파일명 충돌을 잡아 `target_paths` 컨텍스트 주입·증거 기반 고유 파일명으로 수정 (둘 다 테스트 추가)
-  - Outcome은 postgres evidence에서 복구되므로 재배포 후에도 WVI 유지 (복구 경로 테스트 포함)
-- **FAIL 체인 (차단 증명)**: Mission `msn_f74933cc7eda` ("webhook 403") — Critic FAIL + held-out 0/3 → gap +1.000 → GH_INTEGRITY FAIL → PR 차단, Dashboard blocked_merges 1
-- **X_SINGLE 베이스라인 (실측)**: `bl_a42d827d2917`, muse-spark-1.3 원샷, n=12, pass 2/12 (0.167), 비용 1440¢, 위생 7/7 전부 clean, 봉인 해시만 노출
-  - 가족별: algorithmic_optimization 1/2, parallel_multi_file 1/2, 나머지 0 — 원샷의 한계가 정직하게 드러남. X_ADAPTIVE(크리틱+실행 루프) 비교의 분모
-- Ledger: spent 360¢·unknown 0 · base == target main HEAD (실제 repo 실행)
+## One line
 
-## 3분 데모 스크립트
-1. Mission Control에 목표 입력 → Generate: Builder 실측 패치+테스트 (0:30)
-2. Review: Critic 봉인 3종 + FAIL 근거 (라우트 미연결 등) — 남이 쓴 테스트로 막는다 (1:00)
-3. Run: 샌드박스 실행 visible 3/3 vs held-out 0/3, gap 수치로 GH_INTEGRITY FAIL → PR 버튼 비활성 (1:00)
-4. Dashboard: spent/reserved/unknown_holds, 증거 체인 드릴다운 (0:30)
+**A code-improvement service that only ships what it can prove, and proves it is getting better.** Muse Spark writes the
+patch; an independent Muse Spark Critic writes sealed tests from the spec before it sees the patch; a server-side runner
+executes them; integrity gates block anything unproven; every result carries an Ed25519-signed certificate anyone can
+verify. The service measures its own harness on a sealed benchmark and adopts a change only when the 95% intervals do
+not overlap.
 
-## 아키텍처 1p
-`Next.js (Run, same-origin 프록시) → FastAPI (Run, private IAM) → Meta Model API (muse-spark-1.3) / GitHub / Cloud SQL PG15 (core+context_plane+001~010, RLS 강제, `EVO_STATE_BACKEND=postgres`) / Secret Manager`. 모든 모델 호출: allowlist → reserve_cost → side_effect_intents → 호출 → receipt → settle. 금액 정수 cents. LiteLLM 없음, BYOK 없음.
-- 영속성 실측: 동일 이미지 재배포 후 evidence 조회 성공 (메모리 시대에는 매 배포 초기화됐음). 마이그레이션은 `infra/gcp/migrate_once.py` (ops.applied_files 추적, 1회성), 빌드 내 psql은 green-skip.
+## Proof (production, muse-spark-1.3, Cloud Run + Cloud SQL)
 
-## 재현
+Sealed suite v2 — 36 tasks, 6 families, held-out tests never shown to the Builder. Same suite, same model; only the
+harness differs.
+
+| Measurement | Harness | Result | Wilson 95% |
+|---|---|---|---|
+| X_SINGLE (one Builder attempt) | api-sealed-eval/1 — strict diff apply | 21/36 = 58.3% | 42.2–72.9% |
+| X_SINGLE | api-sealed-eval/2 — hunk-count recount | **35/36 = 97.2%** | **85.8–99.5%** |
+| PIPELINE (≤3 attempts, held-out failure names + assertion lines as feedback — see note) | api-sealed-eval/2 | **36/36 = 100%** | 90.4–100% |
+
+- Verdict computed by the service: **improved** — the /2 lower bound (85.8%) is above the /1 upper bound (72.9%).
+- **Replicated by the service's own A/B** (`POST /v1/eval/abtest`, decision `dec_9eccf43b2401`, both runs re-measured in one
+  job): /1 22/36 (44.9–75.2%) vs /2 35/36 (85.8–99.5%) → **adopt** ("improved: lo 0.86 > hi 0.75"). Both runs now use
+  provider-usage cost: 96¢ per 36 tasks (≈2.7¢ per task); the earlier 4320¢ figure was the fixed reservation rate.
+- **Pipeline caveat (found in review):** retries receive the failing held-out test names and assertion lines, which can reveal
+  expected values; treat the pipeline number as an upper bound. The harness proof above is single-attempt with no feedback and is
+  unaffected. The Critic-feedback pipeline (T47: feedback only from the independent Critic's tests, held-out used only for the
+  final score) has since shipped; the v5 results below use it.
+- Pipeline cost from provider usage: **88¢ for 36 tasks (≈2.4¢ per solved task)**; every task passed on its first
+  attempt.
+- How we got there, honestly: the first baseline (sealed v0, 12 tasks) was 2/12. Diagnosis with the real Builder showed
+  the tests checked behaviour the task goals never stated (v1 fixes the goals, tests unchanged → 7/12), and 7 of the
+  remaining failures were diffs rejected only because the model miscounted `@@` hunk lengths (harness /2 → 11/12). On 12
+  tasks that gain was **not** statistically clear and the service said so ("no clear difference"); v2 with 36 tasks
+  separates it. See `docs/EVAL_V1_GOALS.md`, `docs/ROADMAP_EVOLUTION.md`.
+
+## Harder tasks and equal tools (2026-10-29 evening)
+
+The v2 gain above is a harness gain. To ask the harder question — does EvoForge beat a single AI **with the same tools**? —
+we gave the single shot the same tolerant patch application (harness /2) and a 32k output budget:
+
+- **Sealed v3 (48 tasks) is saturated:** single shot 48/48 (`m_2237cf978add`), Critic pipeline 48/48 (`m_3035d3cb1682`).
+  No orchestration effect can show on it, so we said so and built a harder suite.
+- **Sealed v5 (12 rule-dense tasks, calibrated against the real model first):** every single-shot miss was a large rewrite
+  whose diff did not apply, not a logic error. EvoForge's response was to evolve the harness again: **api-sealed-eval/3**
+  recovers a whole-file rewrite when the hunk's old side is exactly the file.
+
+| v5, production | Passed | Wilson 95% | Model cost |
+|---|---|---|---|
+| Single shot, harness /2 | 9/12 | 47–91% | 115¢ |
+| Single shot, harness /3 | 10/12 | 55–95% | 140¢ |
+| Single shot /3, three runs pooled | 31/36 | 71–94% | 417¢ |
+| **EvoForge /3 + Critic feedback (no held-out signal), three runs pooled** | **35/36** | 86–99.5% | 840¢ |
+
+EvoForge led in every run (12–10, 12–12, 11–9) and never lost a task the single shot passed, at about **twice the model
+cost**. The intervals still overlap, so we do **not** claim significance yet. IDs: `m_d475978dabed`, `m_f43769eae727`,
+`m_34a9a98e50bb` and the two repeat runs on `/performance`.
+
+**The same comparison in the Arena (2026-10-30, release 22, equal tools — both sides recount hunks; EvoForge gets
+only its own Critic's tests, never a held-out signal):** EvoForge solved **12/12** v5 tasks, the single shot **9/12**;
+paired 3 wins, 0 losses, 9 ties; hidden tests 36/36 vs 27/36; model cost 264¢ vs 135¢. Not significant at n = 12 (sign
+test p = 0.25). Every match is on `/arena` with its fairness manifest; the scoreboard is on the home page. We first ran
+these matches with the original strict single-lane harness, saw a "win" that came only from that rule, stopped, fixed
+the harness and re-ran — the strict-harness matches are not counted here.
+
+**What EvoForge changed about how it builds today, each found from its own production evidence** (`docs/V38_EVOLUTION_ARENA_PLAN.md`):
+the Builder ran out of output tokens on larger rounds (8k -> 32k); a Critic test that a later round legitimately breaks
+kept burning retries (stale tests are retired); Critic tests that cannot run in the sandbox made every attempt look failed
+(sandbox-runnable filter); large rewrites failed to apply (harness /3); a round goal omitted a rule its test checked (goal
+fixed). That is the claim the data supports: **AI that evolves how AI builds**, with every change measured.
+
+## Evolution Arena (v3.8) and the user-prompt Arena
+
+- `/replay`: one app evolves R1-R5 in two lanes (EvoForge vs single AI) from the same start; every round x lane is an
+  immutable snapshot (source hash, cumulative held-out score, rendered preview, cost, status READY / UNVERIFIED /
+  FAILED); replay never calls a model; a 16:9 presentation mode plays a recorded run; stats with Wilson intervals; the
+  EvoCore panel shows build strategies, the champion and promotion decisions (a challenger is promoted only on
+  non-overlapping intervals).
+- `/arena`: the user types what they want at the bottom. Before either side runs, an independent judge Critic writes
+  acceptance tests from the prompt only (tests already passing on the empty template are dropped; the suite is hashed
+  and never shown to either side). Both sides build from the same template with the same patch tolerance, are scored on
+  that suite and shown side by side; with fewer than 3 meaningful tests the round is "unscorable" and no winner is shown.
+  Follow-up requests continue each side from its own result on the cumulative suite, so a lost feature shows.
+
+## Live verified PR with a signed proof (2026-10-29)
+
+Mission `msn_87b0a3b13fb1` ("add div(a, b), ValueError on b == 0") ran CREATED → GENERATED → REVIEWED → RAN → PR_OPENED in
+production: GH_INTEGRITY, GC_COMPOSITION and G2_REQUIRED all PASS (visible 2/2, held-out 3/3) →
+[itproanalysis/evoforge-target#7](https://github.com/itproanalysis/evoforge-target/pull/7). The PR body carries certificate
+`cert_fdb4cf3cf564` (Ed25519, verdict VERIFIED) and a `/verify/ev_0b8f99df27e9` link. Fetched by id and checked offline with
+only `GET /v1/proof/key`, the signature is valid; changing one field makes it fail. The same goal was blocked twice before
+— once by GH_INTEGRITY for a tautological Builder test, once by a Runner that still used the strict diff parser — and both
+causes were fixed (strong-oracle prompts T25, shared patch module in the Runner).
+
+## Why it pushes the frontier
+
+1. **Verification is the product.** PRs open only when the server run passes the Critic's sealed tests and the
+   integrity gates (GH_INTEGRITY oracle strength / held-out gap, GC_COMPOSITION, G2_REQUIRED). A live mission that passed
+   every test was still blocked because a Builder test was a tautology under the frozen oracle classifier — the gate
+   chose "inconclusive" over a false success.
+2. **Signed, re-checkable results.** `GET /v1/proof/{evidence_id}` returns a certificate signed with Ed25519 (key in
+   Secret Manager); `GET /v1/proof/key` publishes the public key; certificates are stored and retrievable by id; an
+   edited certificate fails verification offline. Verified PRs quote the certificate and link `/verify/<id>`.
+3. **It improves itself, under statistics.** Harness versions are selectable per measurement; `POST /v1/eval/abtest`
+   runs champion vs challenger as one background job and records "adopt" only on non-overlapping intervals. The
+   Performance page shows the measured timeline (intervals, harness markers, per-family heatmap) and the adoption
+   history.
+4. **Honest by construction.** Missing data is shown as "not measured"; X_SINGLE fixed-rate cost is labelled as such
+   until usage-derived accounting ships; budgets refuse worst-case runs before any model call (402).
+5. **Built by Muse Spark under the same discipline.** Tasks T24–T67 of this service (async eval jobs, hunk recount,
+   signed proofs, evolution persistence, timeline UI, champion/challenger, …) were implemented by Muse Spark through
+   OpenCode against sealed tests written by an independent Critic agent; out-of-scope edits were reverted
+   automatically; nothing merged without the full suite passing. (T29's last piece was finished by the Critic after
+   the loop stalled; the commit says so.)
+
+## Check it yourself
+
 ```bash
-python -I docs/evoforge-v4.2/tools/validate_package.py  # PASS
-pytest -q services/api/tests                              # 450 passed
-curl https://evoforge-web-230852112787.asia-northeast3.run.app/api/evoforge/v1/dashboard
+WEB=https://evoforge-web-230852112787.asia-northeast3.run.app
+curl -s $WEB/api/evoforge/v1/arena/summary      # all matches + equal-tools block with solved counts, Wilson 95%, sign test p
+curl -s $WEB/api/evoforge/v1/arena              # every Arena match with its fairness manifest (lane events, costs)
+curl -s $WEB/api/evoforge/v1/performance        # measurements, verdict, history (storage: postgres)
+curl -s $WEB/api/evoforge/v1/proof/key          # Ed25519 public key
+curl -s "$WEB/api/evoforge/v1/eval/suites?suite_version=v5"   # sealed suite: hashes and lengths only, never code
 ```
 
-## 사용 모델
-- muse-spark-1.3 (Builder/Critic), Base https://api.meta.ai/v1
+Pages (English at `/`, Korean at `/ko`): `/` is the workspace canvas — both sides' output side by side (Screen / Code /
+Tests), the run picker, the input at the bottom, and Measurements (EvoForge vs single hidden tests, wins/ties and the
+significance sentence) one click away; `/arena` (scoreboard, sealed v5 by default, every match with its manifest),
+`/replay` (round-by-round evolution, presentation mode), `/verify/<id>` (signed certificate), `/performance`,
+`/evidence`, `/lab`, `/evolution`, `/leaderboard`. Every page fits a 375 px phone.
+
+**Try it yourself (release 26).** Anyone can start a comparison from the input at the bottom — no login — within a
+daily limit of 20 runs for the whole site (`GET /v1/arena/limits`; one round = one run; a 429 tells you when it is
+used up). Choose **New run**, write a different mission for each round (up to 5: round 2 continues from round 1's
+code, and so on) or pick a **Challenge** (bakery site, tip calculator, password meter, to-do list, unit converter)
+that fills the rounds for you. Every finished match has a public **Share** link (`/share/<id>`) with both outputs,
+hidden-test scores, costs, the verdict, the fairness disclosure and its certificate id.
+
+## Architecture
+
+Next.js web (Cloud Run, same-origin proxy with a path allowlist) → FastAPI API (Cloud Run, private IAM: only the web
+service account may invoke) → Meta Model API (`muse-spark-1.3`) for Builder and Critic, GitHub for PRs, a separate
+Runner service (no secrets, no roles) for candidate execution, Cloud SQL PostgreSQL 15 with forced row-level security,
+Secret Manager for every key. Integer cents ledger with reservation before every model call.
+
+## Measured against our own 50-page blueprint
+
+`docs/SPEC_GAP_REVIEW.md` grades all 185 blueprint requirements against the running service: **65 live, 43 partial,
+27 implemented as tested modules not yet wired into the service, 50 not started.** The verification core (blueprint
+§32, §35–38, §42) is live; collaboration surfaces (MCP, Folder Bridge, A2A, Collective Graph), billing and multi-tenant
+onboarding are not.
+
+## Known limits
+
+- Single tenant, no login (owner decision); all visitors share one project and one public run history.
+- The cost ledger is durable since release 9 (T39); earlier spend from before that release is not in it. Live updates use
+  SSE (T40) with polling as fallback.
+- Candidate code (pipeline scoring, Arena lanes, previews) runs in the secret-free Runner since release 18 (T68,
+  fail closed); the Runner's metadata-server egress is still open (SEC-02 remainder) — a precondition for public or
+  bring-your-own-key use.
+- Prompt Arena: the judge is the same model family as the Builders; since release 21 its hidden tests are kept only if
+  they pass on a judge reference build (T76), and both sides get the interface those tests call (T73). Prompt-Arena
+  matches so far are ties or unscorable — no prompt-Arena win is claimed.
+- Paid runs are public within one site-wide daily limit (20 runs, owner decision 2026-10-30); there is no per-user
+  account or quota yet, so one visitor can use the whole day's runs.
+- The oracle-strength classifier uses a 20-item human-labelled holdout; the blueprint's M0 bar is 200.
+- One model in production (muse-spark-1.3). The Critic can run on a second Meta open-weight model through any
+  OpenAI-compatible endpoint (T72, env-only, refuses without owner-set prices); it is switched on at submission.
+- Runner reports are produced in the same process as candidate code. Our Codex agent showed a candidate can forge a passing
+  JUnit report (`atexit`); layered defences (diff screen, parent-side cross-checks, fresh interpreter per held-out file)
+  are being added, and an independent observer with signed receipts is the long-term boundary. Until then, verification
+  holds against a model that writes ordinary code, not against an adversary that targets the harness.
+
+## Team
+
+Owner: itproanalysis. Builder agent: Muse Spark (via OpenCode). Critic / release agent: Claude. Supporting agents:
+Codex (runner, persistence, and the owner-requested workspace canvas redesign of release 25), agy (web). Coordination rules: `AGENTS.md`, `docs/COORDINATION.md`.
