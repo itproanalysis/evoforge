@@ -99,9 +99,10 @@ causes were fixed (strong-oracle prompts T25, shared patch module in the Runner)
 
 **Merged and recorded (2026-10-30):** the owner merged PR #7 (merge commit `8dbb8f56`), and `POST /v1/outcomes` recorded
 it as a VALIDATED outcome: the dashboard's validated improvements went from 0 to 1 (`GET /v1/outcomes` lists it). An
-opened PR alone never counts. Known gap: the live release stores the outcome without linking the evidence chain's
-Outcome stage, so the Evidence page still shows that stage empty; the fix is on branch `release/2026-10-30-28`, not
-deployed.
+opened PR alone never counts. Release 28 links the evidence chain's Outcome stage when an outcome is recorded; the
+PR #7 outcome, stored before that, was repaired once with the same mission and merge sha, so its chain now runs
+ObjectiveVersion → … → PR → Outcome (event `ev_138160a46fca`), a repeat is refused (409), and the original certificate
+`cert_fdb4cf3cf564` still verifies offline.
 
 **A fresh PR after the PR-quality fixes:** mission `msn_f93c2cb43d98` (the target's demo bug: `stats.median` returns the
 upper middle item for an even-length list) ran end to end in production (Builder 11 s, Critic review 26 s, run 7 s; all

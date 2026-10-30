@@ -2,7 +2,7 @@
 
 마감: **11/4 9pm ET = 한국 시간 11/5(목) 오전 11:00**.
 라이브: https://evoforge-web-230852112787.asia-northeast3.run.app (영어 `/`, 한국어 `/ko`, 로그인 없음)
-프로덕션: release 27 (API `evoforge-api-00047`, Web `evoforge-web-00045`, Runner `evoforge-runner-00036`, 2026-10-30 배포)
+프로덕션: release 28 (API `evoforge-api-00048-pkb`, Web `evoforge-web-00046-mdk`, Runner `evoforge-runner-00037-mzt`, 2026-10-30 밤 배포, Cloud Build 게이트 1328 passed / 65 skipped)
 
 ## 2026-10-30 저녁에 끝난 일
 
@@ -12,10 +12,10 @@
 - **PR #7 병합 + 결과 기록:** "검증된 개선" 0 → 1 (`/v1/outcomes`). **PR #8 병합**(CI, README, median 데모 미션).
 - **D14 새 PR 확인:** median 미션을 프로덕션에서 끝까지 돌려 PR #9 생성. 제목 단어 단위로 자름, 커밋 3개 각자 설명,
   파일 끝 줄바꿈, verify 링크, target CI 통과 — 4/4 확인. PR #9는 영상에서 같은 미션을 다시 돌릴 수 있게 열어 둠.
-- **남은 결함 1개:** 결과를 기록해도 Evidence 화면의 증거 체인 Outcome 칸이 비어 있음(기록은 되지만 체인 연결이
-  빠짐). 수정은 `release/2026-10-30-28` 브랜치에 커밋됨(관련 테스트 17개 통과). 전체 게이트는 끝내지 못해
-  **배포하지 않았습니다.** 배포하려면 게이트를 다시 돌린 뒤 배포하고, 같은 내용으로 `POST /v1/outcomes`를 한 번 더
-  보내면(미션 `msn_87b0a3b13fb1`, sha `8dbb8f562a71ed7e58d871776e6ae6a80ed83057`) 기존 기록에 Outcome이 연결됩니다.
+- **증거 체인 Outcome 칸 (release 28로 해결):** 결과 기록 시 체인의 Outcome 단계를 연결하도록 고쳐 배포했고,
+  PR #7 기록은 같은 미션·sha로 한 번 복구했습니다(Outcome 이벤트 `ev_138160a46fca`, 재요청은 409, 원래 인증서
+  `cert_fdb4cf3cf564` 오프라인 서명 검증 통과). Codex의 두 수정도 검토 후 포함: PR URL이 문자열로 저장된 경우에도
+  결과에 남김, 새 실행 선택 시 버튼 문구가 실제 요청 경로를 따름.
 
 ## owner만 할 수 있는 일
 

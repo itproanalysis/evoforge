@@ -179,3 +179,7 @@ Read with `docs/NORTH_STAR.md` and `docs/V36_EXECUTION_PLAN.md` (its rules still
   clean) and https://github.com/itproanalysis/evoforge-target.
 - **Open gap, not deployed:** recording an outcome does not link the evidence chain's Outcome stage, so the Evidence
   page shows it empty. Fix + test on `release/2026-10-30-28` (680b7289); its full gate did not finish.
+- **Release 28 (deployed the same night):** source `2d7787ee` = Outcome-stage link (680b7289) + Codex's PromptBar
+  caption fix (f5b06c6a) + Codex's PR-URL-string fix (3757a949, API part). Cloud Build gate 1328 passed / 65 skipped;
+  local PostgreSQL subset 197 passed. Revisions API 00048-pkb, Web 00046-mdk, Runner 00037-mzt. PR #7's outcome was
+  repaired once → Outcome event `ev_138160a46fca`; certificate `cert_fdb4cf3cf564` still verifies offline.
