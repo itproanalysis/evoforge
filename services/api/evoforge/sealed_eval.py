@@ -893,6 +893,9 @@ def _pipeline_prices() -> tuple[float, float, float]:
 def _pipeline_usage_cost(usage) -> int | None:
     from evoforge import performance as _perf
 
+    from evoforge import collaboration, platform_models
+    if collaboration.enabled():
+        return platform_models.model_cost_cents(usage, collaboration.BUILDER)
     return _perf.usage_cost_cents(usage)
 
 
@@ -1184,6 +1187,9 @@ def _call_critic_suite(critic_goal: str) -> tuple[str, object, int, bool]:
     the reservation settles at its real value. Not-accepted refunds,
     unknown outcomes are held for reconciliation.
     """
+    from evoforge import collaboration
+    if collaboration.enabled():
+        return collaboration.call_critic_accounted(critic_goal)
     rsv = _ledger.reserve(PIPELINE_PER_ATTEMPT_MAX_CENTS, "default")
     try:
         out = _broker.call_critic(critic_goal, "", "")

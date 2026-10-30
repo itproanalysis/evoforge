@@ -45,13 +45,18 @@ def critic_endpoint() -> dict:
     otherwise today's MODEL_API_BASE + MODEL_API_KEY. The key never appears
     in the returned dict. Read at call time.
     """
-    model = os.getenv("MODEL_CRITIC", DEFAULT_MODEL)
+    from evoforge import collaboration
+    model = os.getenv("MODEL_CRITIC", collaboration.CRITIC if collaboration.enabled() else DEFAULT_MODEL)
     second_base = os.getenv("CRITIC_API_BASE")
     second_key = os.getenv("CRITIC_API_KEY")
     if second_base and second_key:
         return {"base_url": second_base, "model": model,
                 "provider": _host_of(second_base), "second": True}
     base_url = os.getenv("MODEL_API_BASE", DEFAULT_BASE_URL)
+    from evoforge import platform_models
+    if platform_models.is_platform_model(model) and model != DEFAULT_MODEL:
+        return {"base_url": None, "model": model,
+                "provider": platform_models.model_spec(model).provider, "second": False}
     return {"base_url": base_url, "model": model,
             "provider": _host_of(base_url), "second": False}
 
@@ -132,6 +137,9 @@ def _json(resp) -> dict:
 
 def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=None) -> dict:
     """Phase A input = goal_contract only; Phase B adds diff+ci. Stub without key."""
+    from evoforge import collaboration
+    if collaboration.enabled():
+        collaboration.require_ready()
     if not os.getenv("MODEL_API_KEY"):
         spec = json.dumps(goal_contract[:60])
         sealed = [
@@ -165,7 +173,11 @@ def call_critic(goal_contract: str, diff: str = "", ci: str = "", *, dispatch=No
 
     model = endpoint["model"]
     provider = endpoint["provider"]
-    client = openai.OpenAI(base_url=endpoint["base_url"],
+    from evoforge import platform_models
+    if not endpoint["second"] and model != DEFAULT_MODEL and platform_models.is_platform_model(model):
+        client = platform_models.client_for(model)
+    else:
+        client = openai.OpenAI(base_url=endpoint["base_url"],
                            # A provider's key goes only to that provider: CRITIC_API_KEY never reaches the Meta
                            # endpoint when CRITIC_API_BASE is unset.
                            api_key=(os.environ["CRITIC_API_KEY"] if endpoint["second"]

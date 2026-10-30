@@ -13,6 +13,7 @@ const EXACT_ALLOW = new Set([
   "/v1/outcomes",
   "/v1/performance",
   "/v1/participants",
+  "/v1/models/defaults",
   "/v1/eval/suites",
   "/v1/eval/baseline",
   "/v1/eval/pipeline",
@@ -37,6 +38,10 @@ const EXACT_ALLOW = new Set([
 
 const SEGMENT_RE = /^[A-Za-z0-9._~-]+$/;
 const CONTROL_RE = /[\x00-\x1f\x7f]/;
+
+export function isApiMethodAllowed(apiPath: string, method: string): boolean {
+  return apiPath !== '/v1/models/defaults' || method === 'GET' || method === 'HEAD';
+}
 
 export function resolveApiPath(segments: string[]): string | null {
   if (!Array.isArray(segments) || segments.length === 0) return null;

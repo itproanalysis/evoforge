@@ -1,5 +1,20 @@
 # Coordination — ownership, release flow, comm rules
 
+## W36 — judging defaults, owner authorized 2026-10-31
+
+Owner explicitly requested platform-funded keyless judging and chose GPT,
+Gemini and Claude in the default collaboration path. Codex owns this scoped
+API/Web/infra exception on `codex/judge-defaults`, production release29 base
+`265fe399`, with provider, UI and independent acceptance-test agents. The
+Builder stays Muse Spark 1.3; GPT-6.1 Sol and Gemini 4 Argon advise it; Claude
+Opus 5.5 is the independent spec-first Critic. No silent model substitution.
+Other agents' main-tree WIP is untouched. New native keys are server-only
+Secret Manager versions, API-SA-only per-secret grants, never browser/Runner.
+Only a pristine owned release worktree after all gates may deploy. W36's
+single release actor is Codex; no other ongoing production build was found.
+Public daily-run and POST limits, reservations/receipts, Runner and merge
+authorization remain enforced. Final hackathon Submit remains prohibited.
+
 ## 1. Module ownership (exclusive write access)
 
 | Module | Owner | Paths |

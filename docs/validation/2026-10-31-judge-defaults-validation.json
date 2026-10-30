@@ -1,0 +1,55 @@
+{
+  "web": {
+    "scope": "judge defaults web UI only",
+    "npm_ci": "passed; 131 packages",
+    "typecheck": "tsc --noEmit passed",
+    "build": "next build passed; 14/14 static pages",
+    "proxy": "147 path cases plus GET/HEAD-only method/readiness/sanitization checks passed",
+    "ssr": "144 actual-component English/Korean assertions passed",
+    "browser_qa": "not performed",
+    "deployment": "not performed",
+    "sha256": {
+      "apps/web/app/api/evoforge/[...path]/route.ts": "24a3561b3a83a81b2b088a62f702790600af1958dd5bdf92aac5154fa01e0a17",
+      "apps/web/components/CanvasWorkspace.tsx": "35bb2d606e4c50bf620c3252c1b7ab10d83818866f95308b1f4d8bfc79132d1e",
+      "apps/web/components/DefaultModelsCard.tsx": "60ad1c3566ee5c197eb02bc98be1a48266fa001dda5badaff0696654e5de0e7b",
+      "apps/web/lib/api.ts": "c85b52bb4b4d2ac11046ed96c5c15d86cfb5c307106568abbf7d94c773f24106",
+      "apps/web/lib/modelDefaults.ts": "6c984490fd1d9eea21c261bef7bd1659fc7e2731abf4d125926a37fc329e47c7",
+      "apps/web/lib/proxyPolicy.cases.json": "fee5b9d19ba5b2e2f8b36e60cab008cc43500c467105571933ede067c4067f3f",
+      "apps/web/lib/proxyPolicy.ts": "805902469d13e937987b183fd2bcdf930cf1414a9d888a5947328b1ad22eb50a",
+      "apps/web/messages/en.json": "fe49c755963c889bc65d65c9378f517ec0cc4fd885670eac6fb9a15b8e91e783",
+      "apps/web/messages/ko.json": "47f62f665170f03ee6377f77f3bb05d3ad48e71a3a3e66c4f5d816836a74fb91",
+      "apps/web/scripts/check-admin-policy.mjs": "3df7534d1708a16166b2348ef07d64ed37c467f7bd9d18507d3989bcf75db2d3",
+      "apps/web/scripts/check-studio-render.mjs": "f427e2d237907f3c2a2d23078941b6102508a33027cf95f2a35d59ec4f970b76",
+      "apps/web/styles/canvas.css": "0e9b60e5781e58b86d54f6da0176404d34ce2e6ca411206532fee12e87119b43"
+    }
+  },
+  "native_and_acceptance": "94 passed",
+  "actual_pg_kernel": "169 passed",
+  "package": "0 failures; 96 SQL + 112 reference checks",
+  "real_models": "all four observed, Runner passed, 8 cents settled, 0 reserved",
+  "full_api": "running locally; final full gate required in Cloud Build before deploy",
+  "secret_provisioning": {
+    "project": "evoforge-prod-4ff3",
+    "secrets": [
+      {
+        "secret": "OPENAI_API_KEY",
+        "version": "1",
+        "api_only_binding_added": true,
+        "value_printed": false
+      },
+      {
+        "secret": "ANTHROPIC_API_KEY",
+        "version": "1",
+        "api_only_binding_added": true,
+        "value_printed": false
+      },
+      {
+        "secret": "GEMINI_API_KEY",
+        "version": "1",
+        "api_only_binding_added": true,
+        "value_printed": false
+      }
+    ]
+  },
+  "production_deploy": "pending clean release gate"
+}

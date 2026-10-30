@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { resolveApiPath } from "@/lib/proxyPolicy";
+import { isApiMethodAllowed, resolveApiPath } from "@/lib/proxyPolicy";
 
 const COOKIE_NAME = "__Host-evoforge-session";
 const METADATA_BASE = "http://metadata.google.internal";
@@ -116,6 +116,9 @@ async function handle(req: NextRequest, params: { path?: string[] }) {
   const apiPath = resolveApiPath(segs);
   if (apiPath === null) {
     return NextResponse.json({ error: "not found" }, { status: 404 });
+  }
+  if (!isApiMethodAllowed(apiPath, req.method)) {
+    return NextResponse.json({ error: "method not allowed" }, { status: 405, headers: { Allow: "GET, HEAD" } });
   }
 
   if (noAuth && req.method === "POST") {

@@ -18,6 +18,8 @@ code or the reference fix.
 """
 from __future__ import annotations
 
+from evoforge import collaboration as _collaboration
+
 import copy
 import hashlib
 import json
@@ -643,7 +645,8 @@ def find_task(suite_version: str, task_id: str) -> dict:
 
 def budget_worst_cents(feedback: str = "heldout") -> int:
     """Worst-case provider cost for both lanes together, in integer cents."""
-    extra = 1 if feedback == "critic" else 0
+    extra = (2 if _collaboration.enabled() else 1) if feedback == "critic" else 0
+    extra += _collaboration.extra_budget_calls()
     return ((1 + _sealed.PIPELINE_MAX_ATTEMPTS + extra)
             * _sealed.BASELINE_COST_CENTS)
 
@@ -651,8 +654,11 @@ def budget_worst_cents(feedback: str = "heldout") -> int:
 def check_budget(feedback: str = "heldout") -> int:
     """Refuse with BudgetExceeded before any provider call is made."""
     from evoforge import performance as _perf
+    if _collaboration.enabled():
+        _collaboration.require_ready()
 
-    extra = 1 if feedback == "critic" else 0
+    extra = (2 if _collaboration.enabled() else 1) if feedback == "critic" else 0
+    extra += _collaboration.extra_budget_calls()
     return _perf.check_budget(1, 1 + _sealed.PIPELINE_MAX_ATTEMPTS + extra,
                               _sealed.BASELINE_COST_CENTS)
 
@@ -960,6 +966,8 @@ def build_manifest(suite_version: str, task_id: str,
     critic = feedback == "critic"
     critic_model, critic_provider = _critic_fairness()
     return {
+        **({"collaboration": _collaboration.public_defaults(),
+            "comparison_scope": "multi_model_system_vs_single_model"} if _collaboration.enabled() else {}),
         "comparison_mode": "same_task_same_tests_concurrent",
         "suite_version": suite_version,
         "task_id": task_id,
@@ -1241,6 +1249,7 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
     max_attempts = max(1, min(int(max_attempts),
                               _sealed.PIPELINE_MAX_ATTEMPTS))
     cost = 0
+    peer_info = None
     usage_missing = False
     attempts = 0
     diff = ""
@@ -1259,7 +1268,15 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
         base_tree_sha = _lane_tree_sha(source, base)
         file_context = [{"path": p, "content": task["files"][p]}
                         for p in sorted(task["files"])]
-        goal = task["goal"]
+        base_goal = task["goal"]
+        if _collaboration.enabled():
+            prepared = _collaboration.prepare_advice(
+                base_goal, file_context, progress=lambda role, message: _emit(events, role, message))
+            peer_info = _collaboration.public_result(prepared)
+            cost += prepared["cost_cents"]
+            usage_missing = usage_missing or prepared["usage_missing"]
+            base_goal = _collaboration.builder_goal(base_goal, prepared)
+        goal = base_goal
         failures: list[dict] = []
         score = 0.0
         for _attempt in range(max_attempts):
@@ -1330,13 +1347,17 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} diff did not apply")
             goal = _sealed._pipeline_feedback(
-                task["goal"],
+                base_goal,
                 failures or [{"test": "held-out",
                               "message": "assertion failed"}],
                 len(task["heldout"]), int(score >= 1.0) * len(task["heldout"]))
         _emit(events, "gate",
               f"evoforge: {outcome} after {attempts} attempt(s)")
     except Exception as e:
+        if isinstance(e, _collaboration.CollaborationFailure):
+            cost += e.cost_cents
+            usage_missing = usage_missing or e.usage_missing
+            peer_info = e.public_result
         error = _short_error(e)
         status = "failed"
         _emit(events, "gate", f"evoforge: lane failed ({type(e).__name__})")
@@ -1351,6 +1372,8 @@ def _run_evoforge_lane(task: dict, model: str, timeout_s: int,
                             "estimated" if usage_missing else "usage_reported"),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
+    if peer_info is not None:
+        lane["collaboration"] = peer_info
     if base_tree_sha is not None:
         lane["base_tree_sha"] = base_tree_sha
     if failing:
@@ -1378,6 +1401,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
     max_attempts = max(1, min(int(max_attempts),
                               _sealed.PIPELINE_MAX_ATTEMPTS))
     cost = 0
+    peer_info = None
     usage_missing = False
     attempts = 0
     diff = ""
@@ -1399,6 +1423,10 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
             _rsv, cout, cactual, _cmissing = _sealed._call_critic_suite(
                 _sealed._critic_goal_for_task(task, file_context))
         except Exception as e:
+            if isinstance(e, _collaboration.CollaborationFailure):
+                cost += e.cost_cents
+                usage_missing = usage_missing or e.usage_missing
+                peer_info = e.public_result
             error = _short_error(e)
             status = "failed"
             _emit(events, "critic",
@@ -1411,7 +1439,15 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
             cout, [os.path.splitext(os.path.basename(p))[0] for p in task["files"]])
         total = len(critic_suite)
         _emit(events, "critic", f"Critic wrote {total} tests")
-        goal = task["goal"]
+        base_goal = task["goal"]
+        if _collaboration.enabled():
+            prepared = _collaboration.prepare_advice(
+                base_goal, file_context, progress=lambda role, message: _emit(events, role, message))
+            peer_info = _collaboration.public_result(prepared)
+            cost += prepared["cost_cents"]
+            usage_missing = usage_missing or prepared["usage_missing"]
+            base_goal = _collaboration.builder_goal(base_goal, prepared)
+        goal = base_goal
         judged = False
         last_dest: str | None = None
         last_diff = ""
@@ -1445,14 +1481,14 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                 last_diff = diff
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} empty diff")
-                goal = _sealed._critic_empty_feedback(task["goal"])
+                goal = _sealed._critic_empty_feedback(base_goal)
                 continue
             if _sealed._candidate_verification_failures(diff):
                 applied = False
                 passed, n = 0, n_total
                 failing, last_dest, last_diff = [], None, diff
                 last_outcome = outcome = "verification_inconclusive"
-                goal = task["goal"] + "\nPrevious candidate could not be independently verified."
+                goal = base_goal + "\nPrevious candidate could not be independently verified."
                 continue
             if not _sealed._apply_candidate(dest, diff, recount=True):
                 applied = False
@@ -1463,7 +1499,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                 last_diff = diff
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} diff did not apply")
-                goal = _sealed._critic_apply_failed_feedback(task["goal"])
+                goal = _sealed._critic_apply_failed_feedback(base_goal)
                 continue
             if critic_suite:
                 c_passed, c_n, c_failures = _score_heldout_counted(
@@ -1480,7 +1516,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                 failing, last_dest, last_diff = [], None, diff
                 applied = False
                 last_outcome = outcome = "verification_inconclusive"
-                goal = task["goal"] + "\nPrevious candidate could not be independently verified."
+                goal = base_goal + "\nPrevious candidate could not be independently verified."
                 continue
             if not critic_suite or (c_n >= total and c_passed == c_n):
                 h_passed, h_n, h_failures = _score_heldout_counted(
@@ -1512,7 +1548,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
             passed, n = 0, n_total
             failing = []
             goal = _sealed._critic_feedback(
-                task["goal"],
+                base_goal,
                 c_failures or [{"test": "critic",
                                 "message": "assertion failed"}],
                 total, int(c_passed))
@@ -1541,6 +1577,10 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
     except _DoneCriticLane:
         pass
     except Exception as e:
+        if isinstance(e, _collaboration.CollaborationFailure):
+            cost += e.cost_cents
+            usage_missing = usage_missing or e.usage_missing
+            peer_info = e.public_result
         error = _short_error(e)
         status = "failed"
         _emit(events, "gate", f"evoforge: lane failed ({type(e).__name__})")
@@ -1555,6 +1595,8 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                             "estimated" if usage_missing else "usage_reported"),
             "elapsed_ms": int((time.perf_counter() - t0) * 1000),
             "diff": diff, "events": events}
+    if peer_info is not None:
+        lane["collaboration"] = peer_info
     if base_tree_sha is not None:
         lane["base_tree_sha"] = base_tree_sha
     if failing:

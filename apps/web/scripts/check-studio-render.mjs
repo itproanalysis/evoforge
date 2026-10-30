@@ -49,6 +49,8 @@ const {FeatureRail} = load(path.join(web, 'components/FeatureRail.tsx'));
 const {LanguageSwitcher} = load(path.join(web, 'components/LanguageSwitcher.tsx'));
 const {StudioTabs, StudioPeople, StudioHistory} = load(path.join(web, 'components/StudioViews.tsx'));
 const {CanvasWorkspace} = load(path.join(web, 'components/CanvasWorkspace.tsx'));
+const {DefaultModelsStatus} = load(path.join(web, 'components/DefaultModelsCard.tsx'));
+const {modelDefaultsView} = load(path.join(web, 'lib/modelDefaults.ts'));
 const {previewView, arenaAgentPanel} = load(path.join(web, 'lib/arenaStatus.ts'));
 const {default: Home} = load(path.join(web, 'app/[locale]/page.tsx'));
 const render = (Component, props = {}) => renderToStaticMarkup(React.createElement(Component, props));
@@ -97,6 +99,25 @@ for (const lang of ['en', 'ko']) {
   assert.ok(home.includes('studio-composer'));
   assert.ok(!home.includes('recorded_fixture') && !home.includes('active_fixture'));
   checks += 4;
+  const readyModels = modelDefaultsView({profile: 'collaborative', ready: true, requires_api_key: false,
+    default_builder: 'muse-spark-1.3', default_critic: 'claude-opus-5-5', participants: [
+      {role: 'builder', provider: 'meta', model: 'muse-spark-1.3', configured: true},
+      {role: 'planner', provider: 'openai', model: 'gpt-6.1-sol', configured: true},
+      {role: 'planner', provider: 'google', model: 'gemini-4-argon', configured: true},
+      {role: 'critic', provider: 'anthropic', model: 'claude-opus-5-5', configured: true},
+    ]});
+  const defaults = render(DefaultModelsStatus, {view: readyModels, loading: false, onRetry() {}});
+  assert.ok(defaults.includes(messages[lang].models.keyless));
+  for (const name of ['Muse Spark 1.3', 'GPT-6.1 Sol', 'Gemini 4 Argon', 'Claude Opus 5.5']) assert.ok(defaults.includes(name));
+  assert.ok(!defaults.includes('<input') && !defaults.includes('<form') && !defaults.includes('api_key'));
+  const checkingModels = render(DefaultModelsStatus, {view: {status: 'unknown', profile: null, participants: []}, loading: true, onRetry() {}});
+  assert.ok(checkingModels.includes(messages[lang].models.loading));
+  assert.ok(!checkingModels.includes(messages[lang].models.keyless));
+  const unavailableModels = render(DefaultModelsStatus, {view: {status: 'unknown', profile: null, participants: []}, loading: false, onRetry() {}});
+  assert.ok(unavailableModels.includes(messages[lang].models.unavailable.replaceAll("'", '&#x27;')));
+  assert.ok(unavailableModels.includes('<button'));
+  assert.ok(!unavailableModels.includes(messages[lang].models.keyless));
+  checks += 11;
   for (const active of ['work', 'people', 'history']) {
     const tabs = render(StudioTabs, {active, onChange: () => { throw new Error('SSR cannot change tabs'); }});
     assert.equal((tabs.match(/aria-selected="true"/g) ?? []).length, 1);

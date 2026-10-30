@@ -3,6 +3,25 @@
 // to the client at runtime.
 export const API_BASE = "/api/evoforge";
 
+export interface ModelDefaults {
+  profile: "collaborative" | "legacy";
+  ready: boolean;
+  requires_api_key: false;
+  default_builder: string;
+  default_critic: string;
+  participants: Array<{
+    role: "builder" | "planner" | "critic";
+    provider: "meta" | "openai" | "google" | "anthropic";
+    model: string;
+    configured: boolean;
+  }>;
+  blocked_reason: string | null;
+}
+
+export function getModelDefaults() {
+  return req<ModelDefaults>("/v1/models/defaults", { cache: "no-store" });
+}
+
 export type GateResult = "PASS" | "FAIL" | "INCONCLUSIVE";
 
 export interface GateVerdict {

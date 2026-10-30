@@ -7,6 +7,8 @@ fixed, hashed, scored on, and never sent to any lane or returned.
 """
 from __future__ import annotations
 
+from evoforge import collaboration as _collaboration
+
 import ast
 import copy
 import hashlib
@@ -258,15 +260,27 @@ def _goal_with_interface(base_goal: str, suite: list[dict]) -> str:
 
 
 def budget_worst_cents(feedback: str = "critic") -> int:
-    extra = 1 if feedback == "critic" else 0
+    if _collaboration.enabled():
+        # Two native judge phases + reference build + single build + EvoForge
+        # Builder attempts + two independent Critic phases + two planners.
+        return (4 + _sealed.PIPELINE_MAX_ATTEMPTS +
+                (2 if feedback == "critic" else 0) +
+                _collaboration.extra_budget_calls()) * _sealed.BASELINE_COST_CENTS
+    extra = (2 if _collaboration.enabled() else 1) if feedback == "critic" else 0
+    extra += _collaboration.extra_budget_calls()
     return ((2 + _sealed.PIPELINE_MAX_ATTEMPTS + extra)
             * _sealed.BASELINE_COST_CENTS)
 
 
 def check_budget(feedback: str = "critic") -> int:
     from evoforge import performance as _perf
+    if _collaboration.enabled():
+        _collaboration.require_ready()
+        return _perf.check_budget(1, budget_worst_cents(feedback) // _sealed.BASELINE_COST_CENTS,
+                                  _sealed.BASELINE_COST_CENTS)
 
-    extra = 1 if feedback == "critic" else 0
+    extra = (2 if _collaboration.enabled() else 1) if feedback == "critic" else 0
+    extra += _collaboration.extra_budget_calls()
     return _perf.check_budget(1, 2 + _sealed.PIPELINE_MAX_ATTEMPTS + extra,
                               _sealed.BASELINE_COST_CENTS)
 
@@ -306,6 +320,8 @@ def build_manifest(prompt: str, feedback: str, single_apply: str,
                       else "api-sealed-eval/1")
     critic_model, critic_provider = _critic_fairness()
     return {
+        **({"collaboration": _collaboration.public_defaults(),
+            "comparison_scope": "multi_model_system_vs_single_model"} if _collaboration.enabled() else {}),
         "comparison_mode": COMPARISON_MODE,
         "prompt_hash": prompt_hash(prompt),
         "acceptance_hash": acceptance_hash([]),
@@ -822,6 +838,7 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
     manifest = build_manifest(prompt, feedback, single_apply, model)
     goal = build_task_goal(prompt)
     judge_cost = 0
+    judge_collaboration = None
     try:
         if model != BASELINE_MODEL:
             raise ValueError(f"unknown model: {model!r}")
@@ -831,6 +848,9 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
                 judge_goal)
             judge_cost = int(actual)
         except Exception as e:
+            if isinstance(e, _collaboration.CollaborationFailure):
+                judge_cost += e.cost_cents
+                judge_collaboration = e.public_result
             raise _sealed.SealedEvalError(
                 f"judge Critic failed: {type(e).__name__}")
         # Only tests that can run in the stdlib-only sandbox count: a judge test importing another package would fail
@@ -936,6 +956,9 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
            else _arena._live_snapshot(arena_id)}
     if _plan is not None:
         doc["plan"] = list(_plan)
+    if judge_collaboration is not None:
+        doc["judge_collaboration"] = judge_collaboration
+        doc["judge_cost_status"] = "incomplete"
     _arena._save(doc)
     try:
         start = {"app.py": TEMPLATE}
@@ -1037,6 +1060,7 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
     judge_goal = build_followup_judge_goal(pals, prompt)
     manifest = build_manifest(prompt, feedback, single_apply, model)
     judge_cost = 0
+    judge_collaboration = None
     try:
         if model != BASELINE_MODEL:
             raise ValueError(f"unknown model: {model!r}")
@@ -1067,6 +1091,9 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
                 judge_goal)
             judge_cost = int(actual)
         except Exception as e:
+            if isinstance(e, _collaboration.CollaborationFailure):
+                judge_cost += e.cost_cents
+                judge_collaboration = e.public_result
             raise _sealed.SealedEvalError(
                 f"judge Critic failed: {type(e).__name__}")
         critic_suite = _sealed._critic_suite_from_output(cout, ["app"])
@@ -1178,6 +1205,9 @@ def run_followup_arena(arena_id: str, parent_id: str, prompt: str,
            "verdict": verdict, "error": error,
            "events": list(judge_events) if "judge_events" in locals()
            else _arena._live_snapshot(arena_id)}
+    if judge_collaboration is not None:
+        doc["judge_collaboration"] = judge_collaboration
+        doc["judge_cost_status"] = "incomplete"
     _arena._save(doc)
     try:
         s_files = _final_files(s_start, single.get("diff", "")

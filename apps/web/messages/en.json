@@ -1,4 +1,21 @@
 {
+  "models": {
+    "title": "Default collaboration",
+    "setup": "Default setup",
+    "loading": "Checking",
+    "ready": "Ready to run",
+    "blocked": "Setup incomplete",
+    "unknown": "Connection unconfirmed",
+    "keyless": "Ready to use. No API key needed.",
+    "builder": "Build",
+    "planner": "Plan",
+    "critic": "Independent verification",
+    "connected": "Configured",
+    "missing": "Not configured",
+    "unavailable": "Couldn't load the default setup.",
+    "incomplete": "The server setup needs attention.",
+    "retry": "Check again"
+  },
   "canvas": {
     "runs": "Select run",
     "untitled": "Untitled",

@@ -39,6 +39,7 @@ from evoforge.patch import PatchError
 from evoforge.kernel_api import router as kernel_router
 from evoforge.commands import NeedsConfirmation, TransitionError, advance, create, get as get_cmd
 from evoforge import missions as missions_store
+from evoforge import collaboration
 from evoforge import feedback as feedback_mod
 from evoforge import mcp_server as _mcp_server
 from evoforge.missions import NeedsConfirmation as MissionNeedsConfirmation
@@ -47,6 +48,28 @@ from evoforge.missions import TransitionError as MissionTransitionError
 ledger.configure({"default": int(os.getenv("EVO_PROJECT_BUDGET_CENTS", "50000"))})
 
 app = FastAPI(title="EvoForge API", version="0.2.0-hackathon")
+
+
+@app.exception_handler(collaboration.ConfigurationError)
+async def model_configuration_unavailable(request: Request, exc):
+    return JSONResponse({"detail": "server model configuration incomplete"}, status_code=503)
+
+
+@app.exception_handler(collaboration.CollaborationFailure)
+async def collaboration_unavailable(request: Request, exc):
+    return JSONResponse({"detail": "required collaboration provider failed",
+                         "cost_cents": exc.cost_cents,
+                         "usage_missing": exc.usage_missing}, status_code=502)
+
+
+@app.exception_handler(ledger.Overdraft)
+async def model_budget_unavailable(request: Request, exc):
+    return JSONResponse({"detail": "budget exhausted (reserve_cost refused)"}, status_code=402)
+
+
+@app.api_route("/v1/models/defaults", methods=["GET", "HEAD"])
+def default_models():
+    return collaboration.public_defaults()
 
 
 @app.on_event("startup")
@@ -80,6 +103,7 @@ app.add_middleware(
     allow_headers=["Content-Type", "Authorization"],
 )
 _evidence = postgres_state.ScopedRecords("records")  # postgres when configured, memory in dev
+collaboration.configure(_evidence)
 decisions_mod.configure(_evidence)
 arena_mod.configure(_evidence)
 feedback_mod.configure(_evidence)
@@ -456,7 +480,19 @@ def _call_provider(rsv: str, fn, *args):
         ledger.mark_unknown(rsv, type(e).__name__)
         raise HTTPException(502, f"provider outcome unknown ({type(e).__name__}); "
                                  f"reservation {rsv} held for reconciliation")
-    ledger.settle(rsv, COST_CENTS)  # the call happened, whatever the gates say next
+    actual = COST_CENTS
+    if collaboration.enabled():
+        from evoforge import platform_models
+        if isinstance(out, dict):
+            actual = platform_models.model_cost_cents(out.get("usage"), out.get("model", collaboration.BUILDER))
+        else:
+            usage = getattr(out, "usage", None)
+            model = getattr(out, "requested_model", None) or getattr(out, "model", None)
+            actual = platform_models.model_cost_cents(usage.model_dump() if usage else None, model)
+        if actual is None:
+            ledger.mark_unknown(rsv, "provider usage missing or invalid")
+            raise HTTPException(502, "provider usage requires reconciliation; reservation held")
+    ledger.settle(rsv, actual)  # billed calls remain accounted even when gates fail
     return out
 
 
@@ -652,15 +688,22 @@ def _generate_core(*, goal: str, base_sha: str, file_context: list[dict] | None,
     ONE implementation backs POST /v1/commands/generate and the mission
     GENERATED step; idempotency/response shaping lives in the callers.
     """
+    prepared = None
+    builder_goal = goal
+    if collaboration.enabled():
+        prepared = collaboration.prepare_advice(goal, file_context)
+        builder_goal = collaboration.builder_goal(goal, prepared)
     rsv = _reserve_or_402()
     from evoforge.gates import evaluate_integrity
 
     if file_context:
-        candidate = _call_provider(rsv, broker_meta.call_builder, goal,
+        candidate = _call_provider(rsv, broker_meta.call_builder, builder_goal,
                                    base_sha, file_context)
     else:
-        candidate = _call_provider(rsv, broker_meta.call_builder, goal,
+        candidate = _call_provider(rsv, broker_meta.call_builder, builder_goal,
                                    base_sha)
+    if prepared is not None:
+        candidate["collaboration"] = collaboration.public_result(prepared)
     verdicts = evaluate_integrity(candidate.get("diff", ""), candidate.get("tests", []))
     eid = _store_evidence({"candidate": candidate, "reservation_id": rsv,
                            "gates": [v.__dict__ for v in verdicts], **store_extra})
@@ -676,6 +719,8 @@ def _review_core(*, goal_contract: str, diff: str, ci: str,
     REVIEWED step; HTTP shaping / mission attach live in the callers.
     Returns (evidence_id, raw_critic_output, phase_evidence_ids).
     """
+    if collaboration.enabled():
+        collaboration.require_ready()
     if os.getenv("MODEL_API_KEY"):
         # Real Critic calls have independent reservations and outcomes per phase.
         phase_evidence_ids = []
