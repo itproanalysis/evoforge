@@ -57,7 +57,11 @@ def public_defaults():
     configured = (profile == "collaborative" and all(p["configured"] for p in participants)
                   and os.getenv("MODEL_BUILDER", BUILDER) == BUILDER
                   and os.getenv("MODEL_CRITIC", CRITIC) == CRITIC
-                  and not os.getenv("CRITIC_API_BASE"))
+                  and not os.getenv("CRITIC_API_BASE")
+                  and os.getenv("MODEL_API_BASE", "https://api.meta.ai/v1").rstrip("/") == "https://api.meta.ai/v1"
+                  # Production credentials must not accompany local candidate execution.
+                  and (not os.getenv("K_SERVICE") and os.getenv("EVO_STATE_BACKEND", "memory") != "postgres"
+                       or bool(os.getenv("EVO_RUNNER_URL", "").strip())))
     return {"profile": profile, "ready": bool(configured),
             "requires_api_key": False, "default_builder": BUILDER,
             "default_critic": CRITIC, "participants": participants,

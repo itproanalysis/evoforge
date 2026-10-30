@@ -23,7 +23,7 @@
       "apps/web/scripts/check-studio-render.mjs": "c2a064180d5f204362f5ee051bf86675462512b8528ad320a805165ad3bb392c"
     }
   },
-  "native_and_acceptance": "94 passed",
+  "native_and_acceptance": "99 passed (52 native adapters,24 collaboration,23 provider accounting)",
   "actual_pg_kernel": "169 passed",
   "package": "0 failures; 96 SQL + 112 reference checks",
   "real_models": "all four observed, Runner passed, 8 cents settled, 0 reserved",
@@ -53,5 +53,6 @@
   },
   "production_deploy": "pending clean release gate",
   "legacy_critic_regressions": "30 passed",
-  "production_base": "release/2026-10-31-2 bad33e24; PR1-4 UI preserved by merge"
+  "production_base": "release/2026-10-31-2 bad33e24; PR1-4 UI preserved by merge",
+  "ci_diagnostics": "all checks retained; API names/durations/120s stacks +75minjob/60mintest bound, 7day artifacts; Cloud Build3600s bound"
 }

@@ -14,6 +14,27 @@ from types import SimpleNamespace
 
 import pytest
 
+
+def test_postgres_judging_profile_requires_remote_runner(monkeypatch):
+    from evoforge import collaboration
+    with monkeypatch.context() as configured_env:
+        configured_env.setenv("EVO_MODEL_PROFILE", "collaborative")
+        configured_env.setenv("EVO_STATE_BACKEND", "postgres")
+        configured_env.delenv("EVO_RUNNER_URL", raising=False)
+        assert collaboration.public_defaults()["ready"] is False
+        with pytest.raises(collaboration.ConfigurationError):
+            collaboration.require_ready()
+
+
+def test_cloud_judging_cannot_fall_back_to_local_execution(monkeypatch):
+    monkeypatch.setenv("K_SERVICE", "evoforge-api")
+    assert collaboration.public_defaults()["ready"] is False
+
+
+def test_default_meta_key_cannot_route_to_another_endpoint(monkeypatch):
+    monkeypatch.setenv("MODEL_API_BASE", "https://unrelated.invalid/v1")
+    assert collaboration.public_defaults()["ready"] is False
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from evoforge import arena, arena_prompt, broker_meta, ledger, platform_models, sealed_eval
@@ -381,3 +402,89 @@ def test_single_lane_stays_one_model_call_without_planners(monkeypatch):
     arena._run_single_lane(task, "muse-spark-1.3", 30, recount=True)
     assert len(builder_calls) == 1
     assert calls == []
+
+
+def test_mission_generate_core_uses_both_plans_and_preserves_execution_gate(monkeypatch):
+    import main
+    planner_calls, builder_goals = [], []
+    clients(monkeypatch, planner_calls)
+    collaboration.configure(main._evidence)
+    original = "def inc(x):\n    return x\n"
+    fixed = "def inc(x):\n    return x + 1\n"
+    diff = "".join(difflib.unified_diff(original.splitlines(True), fixed.splitlines(True),
+                                       "a/app.py", "b/app.py"))
+    tests = [{"code": "def test_inc():\n    import app\n    assert app.inc(1) == 2\n"}]
+    def builder(goal, base, file_context=None):
+        builder_goals.append(goal)
+        assert base == "a" * 40
+        assert file_context == [{"path": "app.py", "content": original}]
+        return {"diff": diff, "tests": tests, "rationale": "unverified proposal", "stub": False,
+                "model": "muse-spark-1.3", "usage": {"prompt_tokens": 100, "completion_tokens": 100}}
+    monkeypatch.setattr(broker_meta, "call_builder", builder)
+    monkeypatch.setattr(main, "_run_core", lambda **kwargs: pytest.fail("generation cannot fabricate a Runner run"))
+    eid, candidate, gates = main._generate_core(
+        goal="Implement inc(x) as x plus one.", base_sha="a" * 40,
+        file_context=[{"path": "app.py", "content": original}], store_extra={"kind": "judge-generation-test"})
+    assert {c["model"] for c in planner_calls} == PEERS
+    assert len(planner_calls) == 2 and len(builder_goals) == 1
+    assert all(model in builder_goals[0] for model in PEERS)
+    peers = candidate["collaboration"]
+    assert "advice" not in peers
+    assert "Unverified advice" not in json.dumps(peers)
+    assert {c["model"] for c in peers["provider_calls"]} == PEERS
+    stored = main._evidence[eid]
+    reservations = peers["reservation_ids"] + [stored["reservation_id"]]
+    assert len(set(reservations)) == 3
+    assert all(ledger.reservation(r)["state"] == "SETTLED" for r in reservations)
+    assert ledger.snapshot()["spent_cents"] == 3
+    assert ledger.snapshot()["reserved_cents"] == 0
+    assert peers["cost_cents"] == 2
+    assert set(peers["evidence_ids"]).issubset(set(main._evidence))
+    integrity = next(g for g in gates if g.gate == "GH_INTEGRITY")
+    assert integrity.result != "PASS", "Planning and generation cannot replace sealed execution evidence"
+    chain = {item["stage"]: item["event_id"] for item in main.evidence_chain.chain(eid)}
+    assert all(chain[stage] for stage in ["Task", "Candidate", "Gate"])
+    assert not chain["PR"] and not chain["Outcome"]
+    for value in KEYS.values():
+        assert value not in json.dumps(main._redact_value(stored))
+
+
+def test_mission_review_core_stores_two_native_claude_receipts_at_usage_cost(monkeypatch):
+    import main
+    import openai
+    calls = []
+    suite = [{"kind": kind, "code": f"def test_{kind}():\n    import app\n    assert app.inc(1) == 2\n"}
+             for kind in ["compositional", "negative", "boundary"]]
+    diff = "--- a/app.py\n+++ b/app.py\n@@ -1,2 +1,2 @@\n def inc(x):\n-    return x\n+    return x + 1\n"
+    def factory(model):
+        assert model == "claude-opus-5-5"
+        def create(**kwargs):
+            calls.append(kwargs)
+            text = json.dumps({"sealed_tests": suite, "review": {"result": "PASS", "findings": []}})
+            return response(model, text=text)
+        return SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    monkeypatch.setattr(platform_models, "client_for", factory)
+    monkeypatch.setattr(openai, "OpenAI", lambda **kwargs: pytest.fail("native review cannot route to Meta"))
+    monkeypatch.setattr(main, "_run_core", lambda **kwargs: pytest.fail("review cannot fabricate a Runner run"))
+    eid, output, phases = main._review_core(
+        goal_contract="In app.py implement inc(x) as x plus one.", diff=diff, ci="not executed",
+        store_extra={"kind": "judge-review-test"})
+    assert len(calls) == len(phases) == len(set(phases)) == 2
+    assert diff not in calls[0]["messages"][1]["content"]
+    assert diff in calls[1]["messages"][1]["content"]
+    assert output["model"] == "claude-opus-5-5" and output["stub"] is False
+    assert output["execution_verified"] is False
+    records = [main._evidence[p] for p in phases]
+    assert {r["phase"] for r in records} == {"critic_spec", "critic_review"}
+    assert {r["metadata"]["provider"] for r in records} == {"anthropic"}
+    reservations = [r["reservation"] for r in records]
+    assert len({r["id"] for r in reservations}) == 2
+    assert all(r["state"] == "SETTLED" for r in reservations)
+    assert ledger.snapshot()["spent_cents"] == 2, "Native usage must not be billed as two fixed 120-cent calls"
+    assert ledger.snapshot()["reserved_cents"] == 0
+    assert main._evidence[eid]["provider_evidence_ids"] == phases
+    chain = {item["stage"]: item["event_id"] for item in main.evidence_chain.chain(eid)}
+    assert chain["Review"] and not chain["PR"] and not chain["Outcome"]
+    public = json.dumps(main._redact_value(main._evidence[eid]))
+    for value in KEYS.values():
+        assert value not in public
