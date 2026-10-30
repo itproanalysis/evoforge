@@ -3,7 +3,6 @@ import { PooledComparison } from "../../../components/PooledComparison";
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
-  API_BASE,
   getEvalJob,
   getEvalSuites,
   getPerformance,
@@ -141,7 +140,7 @@ export default function PerformancePage() {
     try {
       setPerf(await getPerformance());
       setSyncError(false);
-      setLastUpdated(new Date().toLocaleTimeString());
+      setLastUpdated(new Date().toLocaleTimeString(locale));
     } catch {
       // Keep the last good snapshot visible but never claim it is fresh.
       setSyncError(true);
@@ -275,7 +274,7 @@ export default function PerformancePage() {
         <div>
           <h1 className="my-1 text-2xl font-bold">{t("heading")}</h1>
           <p className="text-text-secondary text-sm mt-0">
-            GET {API_BASE}/v1/performance · {t("subtitle")}
+            {t("subtitle")}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -484,7 +483,7 @@ export default function PerformancePage() {
                   <div className="text-xs text-text-secondary mt-1">
                     {m.measurement_id} · {m.suite_version} · {m.model} ·{" "}
                     {t(`provenance.${provenance(m.provider_stub)}` as any)} ·{" "}
-                    {new Date(m.created_at * 1000).toLocaleString()}
+                    {new Date(m.created_at * 1000).toLocaleString(locale)}
                   </div>
                 </div>
               );

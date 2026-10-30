@@ -156,7 +156,7 @@
   },
   "mission-control": {
     "heading": "Mission Control",
-    "description": "POST /api/evoforge/v1/missions · single-command lifecycle & live server status",
+    "description": "Single-command lifecycle and live server status",
     "objective-label": "Objective",
     "objective-placeholder": "Fix flaky login retry",
     "repo-ref-label": "repo_ref",
@@ -195,7 +195,7 @@
     "performance-unavailable": "Performance data is unavailable.",
     "provenance": {
       "simulated": "Simulated provider evaluation",
-      "recorded": "Provider call path recorded · not independently verified",
+      "recorded": "Model call recorded with its request receipt",
       "unknown": "Provider provenance unknown"
     },
     "comparison": "Performance comparison",
@@ -426,7 +426,7 @@
     "evidence": "Evidence",
     "provenance": {
       "simulated": "Simulated provider evaluation",
-      "recorded": "Provider call path recorded · not independently verified",
+      "recorded": "Model call recorded with its request receipt",
       "unknown": "Provider provenance unknown"
     },
     "verdicts": {
@@ -482,7 +482,7 @@
       "failed": "Failed"
     },
     "adoption": {
-      "heading": "Harness adoption history",
+      "heading": "How the evaluation method was improved",
       "empty": "No adoption decisions yet.",
       "suite-label": "Suite",
       "kind-label": "Kind",
@@ -493,7 +493,8 @@
       "job-status": "Decision job",
       "job-failed": "Decision job failed",
       "adopted": "Adopted",
-      "kept": "Kept"
+      "kept": "Kept",
+      "comparison": "Compared {champion} with {challenger}"
     },
     "pooled-title": "Pooled results under the same conditions",
     "pooled-suite": "Suite · method",
@@ -550,9 +551,17 @@
     "server-key-label": "server key",
     "server-key-unavailable": "server key unavailable (signing not configured)",
     "key-match-label": "key match",
-    "key-match": "certificate public key matches the server key (Ed25519)",
+    "key-match": "certificate public key matches the server key",
     "key-mismatch": "certificate public key does not match the server key",
-    "key-match-unknown": "key match unknown"
+    "key-match-unknown": "key match unknown",
+    "certificate-label": "Certificate",
+    "evidence-label": "Evidence",
+    "issued-label": "Issued",
+    "signature-label": "Signature",
+    "verify-label": "Verify",
+    "diff-label": "Diff SHA256",
+    "sealed-label": "Sealed tests",
+    "sealed-value": "{count} ({kinds})"
   },
   "leaderboard": {
     "heading": "Trust leaderboard",
@@ -614,9 +623,9 @@
     "running-match": "Running match in parallel…",
     "winner-label": "Verdict",
     "evoforge-lane": "EvoForge Pipeline",
-    "evoforge-sub": "Harness /2 · Critic · Auto-feedback retries",
+    "evoforge-sub": "Improved harness · Critic · Auto-feedback retries",
     "single-lane": "Single AI (Direct chat)",
-    "single-sub": "Harness /1 · Strict apply · No retries",
+    "single-sub": "Initial harness · Strict apply · No retries",
     "cost": "Cost",
     "attempts": "Attempts",
     "hidden-tests": "Hidden tests",
@@ -664,7 +673,34 @@
     "summary-unscorable": "Too few tests to score",
     "summary-inconclusive": "Needs another check",
     "summary-significant": "Statistically significant (p = {p})",
-    "summary-not-significant": "Not statistically significant yet (p = {p}); more matches needed"
+    "summary-not-significant": "Not statistically significant yet (p = {p}); more matches needed",
+    "status-unconfirmed": "Result unconfirmed",
+    "status-failed": "Run failed",
+    "status-pending": "Pending",
+    "status-inconclusive": "Verification inconclusive",
+    "status-running": "Running",
+    "status-waiting": "Waiting for result",
+    "poll-error": "Could not load the run status. Please check the status of the same job again.",
+    "error-budget": "Budget refused (402).",
+    "error-http": "The server could not process the request (HTTP {status}).",
+    "error-noresponse": "Could not get a server response.",
+    "error-hint": "Please check the server job history before retrying.",
+    "retry-status": "Check status again",
+    "requesting": "Requesting run…",
+    "checking": "Checking job {id}…",
+    "run-failed": "Run failed",
+    "run-no-reason": "the server gave no reason",
+    "run-retry-hint": "Check the input and run again.",
+    "sealed-pass": "sealed tests passed",
+    "result-label": "Result",
+    "outcome-unknown": "unconfirmed",
+    "verdict-inconclusive": "Verification inconclusive · comparison on hold",
+    "verdict-failed": "Comparison failed · result unconfirmed",
+    "result-unconfirmed": "Result unconfirmed",
+    "lane-failed": "Failed",
+    "no-reason": "no reason given",
+    "cost-unknown": "Cost unconfirmed",
+    "cost-total": "Server total {cost}¢ · see each source"
   },
   "plan": {
     "add-round": "Add round",
@@ -745,5 +781,17 @@
     "stats-paired-significant": "statistically significant (p = {p})",
     "stats-paired-not-significant": "not statistically significant yet (p = {p})",
     "stats-paired-none": "no round was won by only one side"
+  },
+  "titles": {
+    "home": "EvoForge — Workspace",
+    "arena": "EvoForge Arena",
+    "replay": "Round Replay",
+    "evidence": "Evidence Timeline",
+    "performance": "Performance",
+    "verify": "Proof certificate",
+    "lab": "Improvement Lab",
+    "evolution": "Autopilot",
+    "leaderboard": "Trust leaderboard",
+    "share": "Shared result"
   }
 }
