@@ -988,6 +988,14 @@
     ]
   },
   {
+    "expected": "/v1/arena/limits",
+    "path_segments": [
+      "v1",
+      "arena",
+      "limits"
+    ]
+  },
+  {
     "expected": "/v1/arena/arena_abc123",
     "path_segments": [
       "v1",

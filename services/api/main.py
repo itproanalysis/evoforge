@@ -1504,6 +1504,104 @@ def _arena_budget_or_402(feedback: str = "heldout") -> None:
         raise HTTPException(402, "budget exhausted (reserve_cost refused)")
 
 
+def _public_daily_limit() -> int:
+    try:
+        return int(str(os.getenv("EVO_PUBLIC_DAILY_RUNS", "20")).strip())
+    except Exception:
+        return 20
+
+
+def _public_arena_docs() -> list[dict]:
+    cands: dict[str, dict] = {}
+    try:
+        pairs = postgres_state.scan(_evidence, kind=arena_mod.KIND)
+    except Exception:
+        pairs = []
+    for _k, rec in pairs:
+        inner = rec.get("arena") if isinstance(rec, dict) else None
+        if isinstance(inner, dict) and isinstance(inner.get("arena_id"), str):
+            cands[inner["arena_id"]] = inner
+    try:
+        if arena_mod._is_pg():
+            with arena_mod._MIRROR_LOCK:
+                for aid, doc in arena_mod._MIRROR.items():
+                    if isinstance(doc, dict) and isinstance(
+                            doc.get("arena_id"), str):
+                        cands[aid] = doc
+    except Exception:
+        pass
+    return list(cands.values())
+
+
+def _public_used_today() -> int:
+    import datetime as _dt
+
+    docs = _public_arena_docs()
+    try:
+        today = _dt.datetime.now(_dt.timezone.utc).date()
+    except Exception:
+        today = None
+    used = 0
+    if today is not None:
+        for d in docs:
+            try:
+                ts = float(d.get("created_at"))
+            except Exception:
+                continue
+            try:
+                day = _dt.datetime.fromtimestamp(
+                    ts, tz=_dt.timezone.utc).date()
+            except Exception:
+                continue
+            if day == today:
+                used += 1
+    plans: dict[str, list] = {}
+    for d in docs:
+        pl = d.get("plan")
+        aid = d.get("arena_id")
+        if isinstance(pl, list) and isinstance(aid, str) and aid:
+            rid = d.get("root_id")
+            root = rid if isinstance(rid, str) and rid else aid
+            if aid == root:
+                plans[root] = pl
+            elif root not in plans:
+                plans[root] = pl
+    for root, pl in plans.items():
+        try:
+            need = len(pl)
+        except Exception:
+            continue
+        if not isinstance(need, int) or need <= 0:
+            continue
+        chain = [x for x in docs
+                 if x.get("arena_id") == root or x.get("root_id") == root]
+        started = len(chain)
+        if started >= need:
+            continue
+
+        def _ri(x):
+            try:
+                return int(x.get("round_index", 1))
+            except Exception:
+                return 1
+
+        chain.sort(key=_ri)
+        last = chain[-1] if chain else None
+        if isinstance(last, dict) and last.get("status") == "failed":
+            continue
+        pending = need - started
+        if pending > 0:
+            used += pending
+    return used
+
+
+def _check_public_daily_or_429(need: int) -> None:
+    limit = _public_daily_limit()
+    used = _public_used_today()
+    if used + int(need) > limit:
+        raise HTTPException(429, "daily run limit reached")
+
+
 @app.post("/v1/arena", status_code=202)
 def arena_create(req: ArenaRequest):
     """Run one sealed task in two lanes at once (EvoForge vs single AI).
@@ -1522,6 +1620,7 @@ def arena_create(req: ArenaRequest):
         raise HTTPException(404, f"unknown task: {tid!r}")
     except sealed_eval_mod.SealedEvalError as e:
         raise HTTPException(502, _rs_arena.redact(str(e) or "sealed arena failed"))
+    _check_public_daily_or_429(1)
     _arena_budget_or_402(req.feedback)
     box: dict = {}
     ready = threading.Event()
@@ -1550,6 +1649,7 @@ class ArenaPromptRequest(BaseModel):
     prompt: str
     feedback: Literal["heldout", "critic"] = "critic"
     single_apply: Literal["strict", "tolerant"] = "tolerant"
+    rounds: list | None = None
 
 
 def _arena_prompt_budget_or_402(feedback: str = "critic") -> None:
@@ -1568,15 +1668,63 @@ def arena_prompt_create(req: ArenaPromptRequest):
     stripped = raw.strip()
     if not stripped or len(stripped) > 2000:
         raise HTTPException(422, "prompt must be 1..2000 chars")
+    rounds_raw = req.rounds
+    rounds: list[str] = []
+    if rounds_raw is not None:
+        if not isinstance(rounds_raw, list):
+            raise HTTPException(
+                422, "rounds must be a list of 1..2000 char missions")
+        if len(rounds_raw) > 4:
+            raise HTTPException(
+                422, "rounds must be a list of 1..2000 char missions")
+        for m in rounds_raw:
+            if not isinstance(m, str):
+                raise HTTPException(
+                    422, "rounds must be a list of 1..2000 char missions")
+            s = m.strip()
+            if not s or len(s) > 2000:
+                raise HTTPException(
+                    422, "rounds must be a list of 1..2000 char missions")
+            rounds.append(s)
+    _check_public_daily_or_429(1 + len(rounds))
     _arena_prompt_budget_or_402(req.feedback)
+    plan: list[str] | None = [stripped, *rounds] if rounds else None
     box: dict = {}
     ready = threading.Event()
 
-    def _runner(p=stripped, fb=req.feedback, sa=req.single_apply):
+    def _runner(p=stripped, fb=req.feedback, sa=req.single_apply,
+                rounds_seq=list(rounds), plan_seq=plan):
         if not ready.wait(timeout=60):
             raise RuntimeError("arena start sync failed")
-        return arena_prompt_mod.run_prompt_arena(
-            box["arena_id"], p, feedback=fb, single_apply=sa)
+        doc = arena_prompt_mod.run_prompt_arena(
+            box["arena_id"], p, feedback=fb, single_apply=sa,
+            plan=plan_seq)
+        if not rounds_seq:
+            return doc
+        try:
+            ok = isinstance(doc, dict) and doc.get("status") == "succeeded"
+        except Exception:
+            ok = False
+        if not ok:
+            return doc
+        prev = box["arena_id"]
+        last = doc
+        for idx, mission in enumerate(rounds_seq, start=2):
+            fid = f"{box['arena_id']}-r{idx}"
+            arena_prompt_mod.seed_running(
+                fid, mission, fb, sa, parent_id=prev,
+                root_id=box["arena_id"], round_index=idx)
+            last = arena_prompt_mod.run_followup_arena(
+                fid, prev, mission, feedback=fb, single_apply=sa)
+            try:
+                cont = (isinstance(last, dict)
+                        and last.get("status") == "succeeded")
+            except Exception:
+                cont = False
+            if not cont:
+                break
+            prev = fid
+        return last
 
     try:
         job = eval_jobs_mod.create_job(kind="ARENA", runner=_runner)
@@ -1584,7 +1732,7 @@ def arena_prompt_create(req: ArenaPromptRequest):
         raise HTTPException(409, f"another eval job is active: {e.job_id}")
     box["arena_id"] = job["job_id"]
     arena_prompt_mod.seed_running(job["job_id"], stripped, req.feedback,
-                                  req.single_apply)
+                                  req.single_apply, plan=plan)
     ready.set()
     return {"arena_id": job["job_id"], "status": "running"}
 
@@ -1598,6 +1746,15 @@ def arena_list():
 def arena_summary():
     """Scoreboard over every stored arena (sealed and prompt alike)."""
     return arena_mod.summary()
+
+
+@app.get("/v1/arena/limits")
+def arena_limits():
+    """Daily public run budget: one round (root, follow-up, sealed) is one run."""
+    limit = _public_daily_limit()
+    used = _public_used_today()
+    return {"daily_limit": limit, "used_today": used,
+            "remaining": max(0, limit - used)}
 
 
 @app.get("/v1/arena/{arena_id}")
@@ -1635,6 +1792,7 @@ def arena_followup(arena_id: str, req: ArenaFollowupRequest):
                     else parent.get("single_apply", "tolerant"))
     if single_apply not in ("strict", "tolerant"):
         single_apply = "tolerant"
+    _check_public_daily_or_429(1)
     _arena_prompt_budget_or_402(feedback)
     root_id = parent.get("root_id") or parent.get("arena_id") or arena_id
     try:

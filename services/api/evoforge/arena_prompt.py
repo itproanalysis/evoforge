@@ -354,7 +354,8 @@ def seed_running(arena_id: str, prompt: str, feedback: str = "critic",
                  single_apply: str = "tolerant",
                  model: str = BASELINE_MODEL, parent_id: str | None = None,
                  root_id: str | None = None,
-                 round_index: int = 1) -> dict:
+                 round_index: int = 1,
+                 plan: list[str] | None = None) -> dict:
     now = time.time()
     manifest = build_manifest(prompt, feedback, single_apply, model)
     goal = build_task_goal(prompt)
@@ -378,6 +379,11 @@ def seed_running(arena_id: str, prompt: str, feedback: str = "critic",
                       "evoforge": _arena._lane_skeleton("running", 0)},
            "verdict": {"winner": "tie", "reason": "arena running"},
            "error": None, "events": []}
+    if plan is not None:
+        try:
+            doc["plan"] = list(plan)
+        except Exception:
+            pass
     _arena._live_init(arena_id)
     _arena._save_if_absent(doc)
     return copy.deepcopy(doc)
@@ -788,7 +794,8 @@ def _run_lanes(task: dict, model: str, timeout_s: int, feedback: str,
 def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
                      single_apply: str = "tolerant",
                      model: str = BASELINE_MODEL,
-                     timeout_s: int | None = None) -> dict:
+                     timeout_s: int | None = None,
+                     plan: list[str] | None = None) -> dict:
     """Background worker: judge Critic first, then both lanes on the task."""
     started = time.time()
     if timeout_s is None:
@@ -798,11 +805,18 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
     if single_apply not in ("strict", "tolerant"):
         single_apply = "tolerant"
     created_at = started
+    _plan: list[str] | None = list(plan) if isinstance(plan, list) else None
     try:
         prev = _arena.get_arena(arena_id)
         if isinstance(prev, dict) and isinstance(prev.get("created_at"),
                                                  (int, float)):
             created_at = float(prev["created_at"])
+        if _plan is None and isinstance(prev, dict) and isinstance(
+                prev.get("plan"), list):
+            try:
+                _plan = list(prev["plan"])
+            except Exception:
+                _plan = None
     except Exception:
         pass
     manifest = build_manifest(prompt, feedback, single_apply, model)
@@ -920,6 +934,8 @@ def run_prompt_arena(arena_id: str, prompt: str, feedback: str = "critic",
            "verdict": verdict, "error": error,
            "events": list(judge_events) if "judge_events" in locals()
            else _arena._live_snapshot(arena_id)}
+    if _plan is not None:
+        doc["plan"] = list(_plan)
     _arena._save(doc)
     try:
         start = {"app.py": TEMPLATE}
