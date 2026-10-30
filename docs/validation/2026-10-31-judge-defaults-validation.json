@@ -1,33 +1,33 @@
 {
   "web": {
-    "scope": "judge defaults web UI only",
-    "npm_ci": "passed; 131 packages",
-    "typecheck": "tsc --noEmit passed",
-    "build": "next build passed; 14/14 static pages",
-    "proxy": "147 path cases plus GET/HEAD-only method/readiness/sanitization checks passed",
-    "ssr": "144 actual-component English/Korean assertions passed",
+    "scope": "release31-2 CSS merge preservation and comparison truth labels",
+    "source": "MERGE_HEAD release/2026-10-31-2 into 08830169, merge not committed by UI agent",
+    "checks": {
+      "proxy": "147 cases + readiness/method/redaction checks passed",
+      "SSR": "162 actual-component ko/en assertions passed",
+      "tsc": "passed",
+      "build": "Next build passed, 14/14 static pages plus dynamic share OG route",
+      "git_diff": "clean"
+    },
+    "css": "preserved default model card and all latest welcome/quick-start styles; staged CSS only",
+    "paid_model_calls": 0,
     "browser_qa": "not performed",
-    "deployment": "not performed",
     "sha256": {
-      "apps/web/app/api/evoforge/[...path]/route.ts": "24a3561b3a83a81b2b088a62f702790600af1958dd5bdf92aac5154fa01e0a17",
-      "apps/web/components/CanvasWorkspace.tsx": "35bb2d606e4c50bf620c3252c1b7ab10d83818866f95308b1f4d8bfc79132d1e",
-      "apps/web/components/DefaultModelsCard.tsx": "60ad1c3566ee5c197eb02bc98be1a48266fa001dda5badaff0696654e5de0e7b",
-      "apps/web/lib/api.ts": "c85b52bb4b4d2ac11046ed96c5c15d86cfb5c307106568abbf7d94c773f24106",
-      "apps/web/lib/modelDefaults.ts": "6c984490fd1d9eea21c261bef7bd1659fc7e2731abf4d125926a37fc329e47c7",
-      "apps/web/lib/proxyPolicy.cases.json": "fee5b9d19ba5b2e2f8b36e60cab008cc43500c467105571933ede067c4067f3f",
-      "apps/web/lib/proxyPolicy.ts": "805902469d13e937987b183fd2bcdf930cf1414a9d888a5947328b1ad22eb50a",
-      "apps/web/messages/en.json": "fe49c755963c889bc65d65c9378f517ec0cc4fd885670eac6fb9a15b8e91e783",
-      "apps/web/messages/ko.json": "47f62f665170f03ee6377f77f3bb05d3ad48e71a3a3e66c4f5d816836a74fb91",
-      "apps/web/scripts/check-admin-policy.mjs": "3df7534d1708a16166b2348ef07d64ed37c467f7bd9d18507d3989bcf75db2d3",
-      "apps/web/scripts/check-studio-render.mjs": "f427e2d237907f3c2a2d23078941b6102508a33027cf95f2a35d59ec4f970b76",
-      "apps/web/styles/canvas.css": "0e9b60e5781e58b86d54f6da0176404d34ce2e6ca411206532fee12e87119b43"
+      "apps/web/styles/canvas.css": "f73e9813528ba00c95ea8757549724c8755c61962e5dee87c8f6c21d597fa246",
+      "apps/web/app/[locale]/share/[id]/page.tsx": "d83c83857e0ce13c2d501737cc1564b02ad6bec07e3eda2d2cef2c45d85eb74f",
+      "apps/web/components/ShareComparisonBadge.tsx": "631999f83cde2e8482ee6c1ce812cffc5d1239198e82b90df9a8a7e5c94b48b8",
+      "apps/web/lib/share.ts": "2f9718df2c8ce2f4e6270d79f86c7158ef7a0e84f720157fa1a697a969b40300",
+      "apps/web/lib/api.ts": "185196f302e5f2d97da68f6e0e34682a51868f948be75502c7c03adc1a973bdc",
+      "apps/web/messages/en.json": "0247b99b3f7272f9b4d3203e1bc10d8ef1da053acbccc7382c9f09324fa1bb03",
+      "apps/web/messages/ko.json": "7e782feddcb4fd2cb794689d8604830d86ec08977ff535bfb4c99efeb11c94cb",
+      "apps/web/scripts/check-studio-render.mjs": "c2a064180d5f204362f5ee051bf86675462512b8528ad320a805165ad3bb392c"
     }
   },
   "native_and_acceptance": "94 passed",
   "actual_pg_kernel": "169 passed",
   "package": "0 failures; 96 SQL + 112 reference checks",
   "real_models": "all four observed, Runner passed, 8 cents settled, 0 reserved",
-  "full_api": "running locally; final full gate required in Cloud Build before deploy",
+  "full_api": "local old in-memory snapshot:1453 passed/10 skipped/1 partial-Judge-cost failure; corrected start+followup and rerun19 acceptance checks passed. Final complete source must pass Cloud Build.",
   "secret_provisioning": {
     "project": "evoforge-prod-4ff3",
     "secrets": [
@@ -51,5 +51,7 @@
       }
     ]
   },
-  "production_deploy": "pending clean release gate"
+  "production_deploy": "pending clean release gate",
+  "legacy_critic_regressions": "30 passed",
+  "production_base": "release/2026-10-31-2 bad33e24; PR1-4 UI preserved by merge"
 }

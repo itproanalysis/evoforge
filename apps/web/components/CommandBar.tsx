@@ -104,6 +104,11 @@ export function CommandBar({ onStarted }: Props) {
     }
   };
 
+  // Visitors cannot start paid runs, so they get one quiet line instead of a fixed bar of disabled controls.
+  if (!operator) {
+    return <p className="studio-command-note">{t("operator-only")}</p>;
+  }
+
   return (
     <div className="studio-command-bar" data-placement="fixed-bottom">
       <div className="flex items-center gap-3 flex-wrap">

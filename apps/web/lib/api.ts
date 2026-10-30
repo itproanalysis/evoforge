@@ -707,6 +707,8 @@ export interface ArenaLaneManifest {
 
 export interface ArenaManifest {
   comparison_mode?: string;
+  comparison_scope?: string;
+  collaboration?: ModelDefaults | null;
   suite_version?: string;
   task_id?: string;
   task_spec_hash?: string;

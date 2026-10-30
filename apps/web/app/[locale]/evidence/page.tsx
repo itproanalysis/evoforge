@@ -198,7 +198,7 @@ export default function EvidencePage() {
   };
 
   return (
-    <main>
+    <main className="evidence-page">
       <h1 className="text-2xl font-bold">{t("heading")}</h1>
       <p className="text-text-secondary text-sm">{t("description")}</p>
 
@@ -229,7 +229,7 @@ export default function EvidencePage() {
             </div>
           ) : (
             <div className="flex gap-1.5 flex-wrap">
-              {recentIds.slice(0, 12).map((item) => (
+              {recentIds.slice(0, 6).map((item) => (
                 <button
                   key={item.eid}
                   onClick={() => void fetchById(item.eid)}
@@ -315,9 +315,12 @@ export default function EvidencePage() {
             </div>
           )}
           {raw && (
-            <pre className="bg-background-primary border border-border rounded-lg p-3 text-xs overflow-auto mt-3">
-              {raw}
-            </pre>
+            <details className="perf-basis evidence-raw">
+              <summary>{t("raw-heading")}</summary>
+              <pre className="bg-background-primary border border-border rounded-lg p-3 text-xs overflow-auto mt-3">
+                {raw}
+              </pre>
+            </details>
           )}
         </Card>
       )}

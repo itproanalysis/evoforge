@@ -50,6 +50,8 @@ const {LanguageSwitcher} = load(path.join(web, 'components/LanguageSwitcher.tsx'
 const {StudioTabs, StudioPeople, StudioHistory} = load(path.join(web, 'components/StudioViews.tsx'));
 const {CanvasWorkspace} = load(path.join(web, 'components/CanvasWorkspace.tsx'));
 const {DefaultModelsStatus} = load(path.join(web, 'components/DefaultModelsCard.tsx'));
+const {ShareComparisonBadge} = load(path.join(web, 'components/ShareComparisonBadge.tsx'));
+const {shareComparison} = load(path.join(web, 'lib/share.ts'));
 const {modelDefaultsView} = load(path.join(web, 'lib/modelDefaults.ts'));
 const {previewView, arenaAgentPanel} = load(path.join(web, 'lib/arenaStatus.ts'));
 const {default: Home} = load(path.join(web, 'app/[locale]/page.tsx'));
@@ -99,6 +101,20 @@ for (const lang of ['en', 'ko']) {
   assert.ok(home.includes('studio-composer'));
   assert.ok(!home.includes('recorded_fixture') && !home.includes('active_fixture'));
   checks += 4;
+  const comparisonDoc = {model: 'muse-spark-1.3'};
+  const legacyBadge = render(ShareComparisonBadge, {doc: comparisonDoc});
+  assert.ok(legacyBadge.includes(messages[lang].share['same-model'].replace('{model}', 'muse-spark-1.3')));
+  assert.ok(!legacyBadge.includes(messages[lang].share['multi-model']));
+  for (const manifest of [{comparison_scope: 'multi_model_system_vs_single_model'}, {collaboration: {profile: 'collaborative'}}]) {
+    const badge = render(ShareComparisonBadge, {doc: {...comparisonDoc, manifest}});
+    assert.ok(badge.includes(messages[lang].share['multi-model']));
+    assert.ok(!badge.includes(messages[lang].share['same-model'].split('(')[0]));
+  }
+  const different = {manifest: {lanes: {single: {model: 'gpt-6.1-sol'}, evoforge: {model: 'muse-spark-1.3'}}}};
+  assert.ok(render(ShareComparisonBadge, {doc: different}).includes(messages[lang].share['model-unconfirmed']));
+  assert.ok(render(ShareComparisonBadge, {doc: {}}).includes(messages[lang].share['model-unconfirmed']));
+  assert.equal(shareComparison({manifest: {lanes: {single: {model: 'historical-model'}, evoforge: {model: 'historical-model'}}}}).model, 'historical-model');
+  checks += 9;
   const readyModels = modelDefaultsView({profile: 'collaborative', ready: true, requires_api_key: false,
     default_builder: 'muse-spark-1.3', default_critic: 'claude-opus-5-5', participants: [
       {role: 'builder', provider: 'meta', model: 'muse-spark-1.3', configured: true},

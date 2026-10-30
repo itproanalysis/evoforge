@@ -54,7 +54,8 @@
     "readonly": "실행 권한 필요",
     "readonly-short": "보기 전용",
     "no-patch": "패치를 만들지 못함 — 0점 처리",
-    "patch-not-applied": "패치가 적용되지 않음 — 0점 처리"
+    "patch-not-applied": "패치가 적용되지 않음 — 0점 처리",
+    "about": "EvoForge란?"
   },
   "share": {
     "button": "공유",
@@ -71,7 +72,19 @@
     "winner-single": "단일 실행 승",
     "winner-tie": "무승부",
     "winner-unscorable": "판정 불가 (검증된 테스트 부족)",
-    "winner-inconclusive": "추가 확인 필요"
+    "winner-inconclusive": "추가 확인 필요",
+    "result-pending": "아직 판정 전이에요",
+    "same-model": "같은 구현 모델 ({model})",
+    "multi-model": "여러 모델의 협업 시스템 vs 단일 모델",
+    "model-unconfirmed": "모델 구성 미확인",
+    "same-tests": "양쪽이 만들기 전에 작성된 같은 숨은 테스트",
+    "signed": "Ed25519로 서명된 결과",
+    "share-this": "이 결과 공유하기",
+    "open-proof": "서명된 증명 열기",
+    "what-built": "양쪽이 만든 결과물",
+    "no-preview": "보여 줄 화면이 없어요 — 이 과제는 테스트로 판정해요",
+    "fine-print": "판정 방식",
+    "loading": "결과를 불러오는 중…"
   },
   "studio": {
     "title": "작업실",
@@ -324,7 +337,7 @@
     "no-prompt": "프롬프트 없음",
     "intro": "원하는 결과물을 입력하면 EvoForge와 단일 AI 호출을 비교합니다. 둘 다 같은 Meta 모델을 쓰고, 심판이 미리 작성한 숨은 테스트가 더 나은 결과를 판정합니다.",
     "intro-step-1": "만들고 싶은 것을 입력합니다.",
-    "intro-step-2": "같은 모델이 두 번 만듭니다: single AI 호출 한 번, Critic이 test를 쓰고 Builder가 재시도하는 EvoForge로 한 번.",
+    "intro-step-2": "같은 목표를 두 방식으로 만듭니다. 단일 호출과 EvoForge의 검증·수정 과정을 비교하세요.",
     "intro-step-3": "숨겨진 acceptance test가 더 좋은 결과를 고르고 양쪽 비용을 보여줍니다.",
     "scoreboard-heading": "측정된 아레나 결과",
     "scoreboard-empty": "아직 판정된 아레나 대결이 없습니다. 대결을 실행하면 측정 결과가 여기에 표시됩니다."
@@ -381,7 +394,7 @@
     "event-label": "이벤트 {id}",
     "loading-event": "이벤트 로딩 중…",
     "review-summary-hint": "검토 봉인 요약 조회:",
-    "recent-evidence-heading": "서버 최근 증거 ID 빠른 선택",
+    "recent-evidence-heading": "최근 증거",
     "recent-evidence-empty": "서버에 기록된 미션/결과 증거 ID가 없습니다.",
     "stages": {
       "ObjectiveVersion": "목표 버전",
@@ -401,7 +414,8 @@
       "legend-blocked": "차단됨",
       "legend-missing": "없음",
       "empty": "증거 체인이 아직 없습니다."
-    }
+    },
+    "raw-heading": "원본 기록 보기"
   },
   "feedback": {
     "heading": "미션 피드백",
@@ -523,7 +537,10 @@
     "pooled-evoforge_better": "EvoForge가 더 나음 (신뢰구간 안 겹침)",
     "pooled-single_better": "단일 실행이 더 나음",
     "pooled-not_significant": "아직 유의하지 않음",
-    "pooled-saturated": "너무 쉬움: 둘 다 100%"
+    "pooled-saturated": "너무 쉬움: 둘 다 100%",
+    "pooled-interval": "95% 구간",
+    "pooled-how": "합산 방식",
+    "latest-heading": "가장 최근 측정 1회"
   },
   "evolution": {
     "heading": "오토파일럿 — 목표 입력, 검증된 PR 출력",
@@ -580,7 +597,14 @@
     "verify-label": "검증",
     "diff-label": "Diff SHA256",
     "sealed-label": "봉인 테스트",
-    "sealed-value": "{count} ({kinds})"
+    "sealed-value": "{count} ({kinds})",
+    "hero-verified": "검증된 결과예요",
+    "hero-failed": "검증하지 못한 결과예요",
+    "check-signature": "이 결과에 대한 서명이 유효해요",
+    "check-key": "이 서버가 공개한 키로 서명했어요",
+    "check-gates": "출시 게이트 {total}개 중 {passed}개 통과",
+    "details": "인증서 세부 정보",
+    "check-arena": "숨은 테스트: EvoForge {evoforge} · 단일 AI 호출 {single}"
   },
   "leaderboard": {
     "heading": "신뢰 리더보드",
@@ -604,7 +628,9 @@
   "layout": {
     "title": "EvoForge — 미션 컨트롤",
     "description": "검증된 코드 개선 서비스: 생성 → 게이트 → 리뷰 → PR → 증거.",
-    "footer": "빌더: Muse Spark 1.3 (Meta Model API 사용) · 게이트: 무결성 게이트 (oracle_ast + 임시 테스트 강도 검사) · 비용은 GET /v1/ledger에서 센트 단위의 provider_billed 실제 값; UNKNOWN 보류는 별도로 나열"
+    "footer": "Meta Model API의 Muse Spark 1.3으로 만들었어요. 모든 결과는 숨은 테스트가 판정하고 Ed25519로 서명하며, 비용은 실제 청구된 원장 기준이에요.",
+    "footer-costs-title": "비용 계산 방식",
+    "footer-costs": "비용은 GET /v1/ledger의 provider_billed 실제 값(센트)이며, UNKNOWN 보류는 따로 표시해요."
   },
   "errors": {
     "budget-exhausted": "예산 소진: 미션 단계가 402로 거부됨",
@@ -647,7 +673,7 @@
     "single-sub": "기존 하네스 · 엄격 diff 적용 · 피드백 없음",
     "cost": "비용",
     "attempts": "시도 횟수",
-    "hidden-tests": "비공개 검증 테스트",
+    "hidden-tests": "숨은 테스트 통과율",
     "patch": "생성된 패치",
     "events": "실시간 이벤트 스트림",
     "recent-matches": "최근 아레나 대결 기록",
@@ -719,7 +745,16 @@
     "lane-failed": "실패",
     "no-reason": "사유 미제공",
     "cost-unknown": "비용 미확인",
-    "cost-total": "서버 합계 {cost}¢ · 출처 개별 확인"
+    "cost-total": "서버 합계 {cost}¢ · 출처 개별 확인",
+    "board-sub": "같은 도구와 같은 숨은 테스트로 {n}판을 판정했어요.",
+    "bench-title": "봉인된 벤치마크로 대결하기",
+    "bench-sub": "양쪽 모두 처음 보는 과제를 고르세요. 대결마다 모델 비용이 들어요.",
+    "winner-evoforge": "EvoForge 승",
+    "winner-single": "단일 AI 승",
+    "winner-tie": "무승부",
+    "row-prompt": "직접 요청",
+    "row-single": "단일",
+    "open-result": "결과 공유하기"
   },
   "plan": {
     "add-round": "라운드 추가",
@@ -799,7 +834,8 @@
     "stats-paired": "라운드별 짝 비교: EvoForge만 검증 {evo} · 단일 실행만 {single} · 둘 다 {both}",
     "stats-paired-significant": "통계적으로 유의함 (p = {p})",
     "stats-paired-not-significant": "아직 통계적으로 유의하지 않음 (p = {p})",
-    "stats-paired-none": "한쪽만 검증한 라운드가 없음"
+    "stats-paired-none": "한쪽만 검증한 라운드가 없음",
+    "strategies-heading": "EvoForge가 빌드 전략을 고르는 방식"
   },
   "titles": {
     "home": "EvoForge — 작업실",
@@ -812,5 +848,21 @@
     "evolution": "오토파일럿",
     "leaderboard": "신뢰 리더보드",
     "share": "공유된 결과"
+  },
+  "welcome": {
+    "eyebrow": "Muse Spark 1.3 · Meta Model API 기반",
+    "title": "믿는 대신, 검증된 AI 코드만 받으세요.",
+    "step-1": "요청해요",
+    "step-2": "같은 목표, 두 가지 방식",
+    "step-3": "숨은 테스트가 판정해요",
+    "stat-record": "공정 대결 ({n}판 판정)",
+    "stat-wins": "승",
+    "stat-losses": "패",
+    "stat-hidden": "숨은 테스트 통과율",
+    "stat-signed": "모든 결과에 서명",
+    "cta-try": "직접 해 보기",
+    "cta-watch": "녹화된 대결 보기",
+    "cta-scoreboard": "전체 점수판",
+    "close": "닫기"
   }
 }

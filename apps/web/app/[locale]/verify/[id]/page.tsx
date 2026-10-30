@@ -1,7 +1,7 @@
 "use client";
 import { use, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { type ProofCertificate, getProof, getProofKey } from "../../../../lib/api";
+import { type ProofCertificate, getArenaProof, getProof, getProofKey } from "../../../../lib/api";
 import { Card } from "../../../../components/ui";
 import { getErrorMessageKey } from "../../../../lib/apiErrors";
 
@@ -17,7 +17,10 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
   useEffect(() => {
     (async () => {
       try {
-        setCert(await getProof(id));
+        // Match results (job_…) have their own certificate; everything else is an evidence certificate.
+        const c = id.startsWith("job_") ? ((await getArenaProof(id)) as unknown as ProofCertificate | null) : await getProof(id);
+        if (!c) throw new Error("404 certificate not found");
+        setCert(c);
       } catch (e) {
         setErr(tErrors(getErrorMessageKey(e)));
       }
@@ -44,10 +47,40 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
   const sealedKinds = (cert.sealed_kinds ?? []).join(", ");
   const heldoutGate = (cert.gates ?? []).find((g) => /heldout|sealed/i.test(g.gate));
 
+  // A match certificate (kind "arena") carries the match winner as its verdict; it is verified when its
+  // signature checks out.
+  const isArena = (cert as unknown as { kind?: string }).kind === "arena";
+  const verified = isArena ? cert.verify?.ok === true && keyMatches !== false : cert.verdict === "VERIFIED";
+  const gates = cert.gates ?? [];
+  const lanes = (cert as unknown as { lanes?: Record<string, { heldout?: { passed?: number; n?: number } }> }).lanes;
+  const score = (side: string) => { const h = lanes?.[side]?.heldout; return h && Number.isInteger(h.passed) && Number.isInteger(h.n) ? `${h.passed}/${h.n}` : "—"; };
+  const arenaScores = isArena && lanes ? { evoforge: score("evoforge"), single: score("single") } : null;
+  const gatesPassed = gates.filter((g) => g.result === "PASS").length;
+  const checks: { ok: boolean | null; label: string }[] = [
+    { ok: cert.verify ? !!cert.verify.ok : null, label: t("check-signature") },
+    { ok: keyMatches, label: t("check-key") },
+    ...(gates.length > 0 ? [{ ok: gatesPassed === gates.length, label: t("check-gates", { passed: gatesPassed, total: gates.length }) }] : []),
+    ...(arenaScores ? [{ ok: true, label: t("check-arena", arenaScores) }] : []),
+  ];
+
   return (
-    <div className="studio-light max-w-3xl space-y-4">
-      <h1 className="text-2xl font-bold text-text-primary">{t("heading")} <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${cert.verdict === "VERIFIED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>{cert.verdict}</span></h1>
-      <p className="text-sm text-text-secondary">{t("description")}</p>
+    <div className="studio-light verify-page max-w-3xl space-y-4">
+      <section className={`verify-hero${verified ? " is-verified" : " is-failed"}`}>
+        <span className="verify-badge" aria-hidden="true">{verified ? "✓" : "!"}</span>
+        <p className="verify-kicker">{t("heading")}{isArena ? "" : ` · ${cert.verdict}`}</p>
+        <h1>{verified ? t("hero-verified") : t("hero-failed")}</h1>
+        <p className="verify-sub">{t("description")}</p>
+        <ul className="verify-checks">
+          {checks.map((c) => (
+            <li key={c.label} className={c.ok === null ? "is-unknown" : c.ok ? "is-ok" : "is-bad"}>
+              <span aria-hidden="true">{c.ok === null ? "–" : c.ok ? "✓" : "✕"}</span>
+              {c.label}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <details className="perf-section verify-details">
+      <summary>{t("details")}</summary>
       <Card className="bg-background-secondary border border-border">
         {cert.signed ? (
           <p className="text-sm text-text-primary">
@@ -88,6 +121,9 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
           ) : null}
         </dl>
       </Card>
+      </details>
+      {(gates.length > 0 || (cert.chain ?? []).length > 0) && <details className="perf-section verify-details">
+      <summary>{t("gates")} · {t("chain")}</summary>
       <Card className="bg-background-secondary border border-border">
         <h3 className="text-base font-semibold m-0 text-text-primary">{t("gates")}</h3>
         {(cert.gates ?? []).map((g) => (
@@ -98,6 +134,7 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
           <div key={c.stage} className="text-sm text-text-primary">{c.stage}: {c.event_id ?? "—"}</div>
         ))}
       </Card>
+      </details>}
     </div>
   );
 }
