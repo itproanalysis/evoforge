@@ -45,7 +45,7 @@ export default function VerifyPage({ params }: { params: Promise<{ id: string }>
   const heldoutGate = (cert.gates ?? []).find((g) => /heldout|sealed/i.test(g.gate));
 
   return (
-    <div className="max-w-3xl space-y-4">
+    <div className="studio-light max-w-3xl space-y-4">
       <h1 className="text-2xl font-bold text-text-primary">{t("heading")} <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${cert.verdict === "VERIFIED" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-red-50 text-red-700 border-red-200"}`}>{cert.verdict}</span></h1>
       <p className="text-sm text-text-secondary">{t("description")}</p>
       <Card className="bg-background-secondary border border-border">
