@@ -34,9 +34,10 @@ def record(mission: dict, run_evidence: dict, pr_evidence: dict,
         raise ValueError("no stored PR evidence")
     if not isinstance(merged_sha, str) or not _HEX40.match(merged_sha):
         raise ValueError("merged_sha must be a 40-hex commit sha")
-    stored_url = ""
-    if isinstance(pr_evidence.get("pr"), dict):
-        stored_url = pr_evidence["pr"].get("html_url") or ""
+    stored_pr = pr_evidence.get("pr")
+    stored_url = stored_pr if isinstance(stored_pr, str) else ""
+    if isinstance(stored_pr, dict):
+        stored_url = stored_pr.get("html_url") or ""
     out = {
         "mission_id": mid,
         "goal": mission.get("goal"),
