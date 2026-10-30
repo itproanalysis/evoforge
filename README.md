@@ -1,4 +1,31 @@
-# EvoForge — Verifiable AI Engineering Collective
+# EvoForge — AI that measures, and evolves, how AI builds
+
+> Meta Global AI Developer Hackathon · Indie · Push the Frontier
+> **Live:** https://evoforge-web-230852112787.asia-northeast3.run.app (English at `/`, Korean at `/ko`, no login)
+> **Read first:** [`docs/SUBMISSION.md`](docs/SUBMISSION.md) — every number there is a stored production measurement.
+
+Type what you want built. The same Meta model (Muse Spark 1.3) builds it twice — once as a single AI call, once as
+EvoForge (an independent Critic writes tests from the spec, the Builder retries against them) — with the same tools.
+Before either side runs, a judge writes hidden acceptance tests and checks them against its own reference build; both
+sides get the same interface; the hidden tests decide, and each side's model cost is shown. Results are signed
+(Ed25519) and can be shared with one link.
+
+**What the evidence supports (production, equal tools):** on 12 hard sealed tasks EvoForge solved 12/12, the single
+call 9/12 (3 wins, 0 losses, 9 ties) at about twice the model cost — not yet statistically significant (p = 0.25), and
+the site says so. Easy requests tie.
+
+Try it: on the home page choose **New run**, pick a **Challenge** or write a mission per round (up to 5), start (20
+runs per day for the whole site), then **Share** the result.
+
+Stack: Next.js (Cloud Run, same-origin proxy) → FastAPI (private IAM) → Meta Model API · secret-free Runner for all
+candidate code · Cloud SQL PostgreSQL with forced row-level security · Secret Manager · integer-cent cost ledger.
+Built by agents: Muse Spark (Builder, via OpenCode), Claude (Critic and releases), Codex (runner, persistence, canvas
+design). Coordination: `AGENTS.md`, `docs/COORDINATION.md`; production log: `docs/V38_EVOLUTION_ARENA_PLAN.md`.
+
+---
+
+## Design history (original README, 2026-10-27)
+
 
 > Meta Global AI Developer Hackathon (Indie track) · Theme: Push the Frontier
 > Stack: Muse Spark 1.3 / Muse Wonder via Meta Model API (`https://api.meta.ai/v1`) · FastAPI (Cloud Run) · Next.js (Cloud Run) · Cloud SQL Postgres · GCS + KMS · Secret Manager
