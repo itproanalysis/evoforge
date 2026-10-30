@@ -551,6 +551,9 @@ def _stage_summary(eid: str, stage: str) -> dict:
             "title": stored.get("title"),
             "source_evidence_id": stored.get("source_evidence_id"),
         }
+    if stage == "Outcome" and isinstance(stored.get("outcome"), dict):
+        out = stored["outcome"]
+        return {k: out.get(k) for k in ("mission_id", "outcome_status", "merged_sha", "pr_url")}
     if stage == "Outcome":
         xs = stored.get("X_SINGLE") if isinstance(stored.get("X_SINGLE"), dict) else {}
         return {
@@ -2350,10 +2353,22 @@ class OutcomeRequest(BaseModel):
 
 
 @app.post("/v1/outcomes", status_code=201)
-def outcome_record(req: OutcomeRequest):
+def outcome_record(req: OutcomeRequest, response: Response):
     mission = missions_store.get(req.mission_id)
     if mission is None:
         raise HTTPException(404, "unknown mission")
+    # One outcome per mission, also across restarts (the in-memory registry starts empty). Release 27 stored the
+    # outcome without linking the chain's Outcome stage; repeating the same merge links it (200) instead of a 409.
+    for prior in mission.get("evidence_ids") or []:
+        doc = _evidence.get(prior)
+        if not (isinstance(doc, dict) and isinstance(doc.get("outcome"), dict)):
+            continue
+        linked = any(e["stage"] == "Outcome" and e["event_id"] for e in evidence_chain.chain(prior))
+        if linked or doc["outcome"].get("merged_sha") != req.merged_sha:
+            raise HTTPException(409, f"outcome already recorded: {req.mission_id}")
+        _link_stages(prior, ("Outcome",))
+        response.status_code = 200
+        return {**doc["outcome"], "evidence_id": prior}
     run_eid = (mission.get("stages") or {}).get("run")
     pr_eid = (mission.get("stages") or {}).get("pr")
     run_ev = _evidence.get(run_eid, {}) if run_eid else {}
@@ -2366,6 +2381,7 @@ def outcome_record(req: OutcomeRequest):
         raise HTTPException(409, str(e))
     eid = _store_evidence({"outcome": out, "mission_id": req.mission_id})
     missions_store.attach_evidence(req.mission_id, eid)
+    _link_stages(eid, ("Outcome",))
     return {**out, "evidence_id": eid}
 
 
