@@ -171,3 +171,6 @@
 .studio-composer-mode { display: flex; gap: 4px; width: 100%; }
 .studio-composer-mode button { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #d7dccf; background: transparent; color: #5b6452; cursor: pointer; }
 .studio-composer-mode button[aria-pressed="true"] { background: #2563eb; border-color: #2563eb; color: #fff; }
+.canvas-share-button { flex-shrink: 0; padding: 8px 12px; border: 1px solid #e5e8eb; border-radius: 12px; background: #fff; color: #4e5968; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.canvas-share-button:hover { background: #e8f3ff; color: #3182f6; }
+.canvas-share-copied { font-size: 11px; color: #12a66e; white-space: nowrap; }

@@ -37,6 +37,14 @@
     "readonly": "실행 권한 필요",
     "readonly-short": "보기 전용"
   },
+  "share": {
+    "button": "공유",
+    "copied": "링크 복사됨",
+    "title": "공유된 결과",
+    "try-own": "직접 해보기",
+    "not-found": "공유된 결과를 찾을 수 없습니다.",
+    "certificate": "인증서"
+  },
   "studio": {
     "title": "작업실",
     "description": "같은 요청의 구현 결과와 검증을 나란히 확인합니다.",

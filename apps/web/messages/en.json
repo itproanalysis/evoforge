@@ -37,6 +37,14 @@
     "readonly": "Run access required",
     "readonly-short": "Read only"
   },
+  "share": {
+    "button": "Share",
+    "copied": "Link copied",
+    "title": "Shared result",
+    "try-own": "Try your own",
+    "not-found": "Shared result not found.",
+    "certificate": "Certificate"
+  },
   "studio": {
     "title": "Workspace",
     "description": "Review what each approach built and how it was verified.",

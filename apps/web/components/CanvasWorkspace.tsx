@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import type { ArenaDoc, MeasurementRecord, Participant } from '../lib/api';
+import { shareText, shareUrl } from '../lib/share';
 import { laneView, manifestView, type ArenaAgentRow, type PreviewSource } from '../lib/arenaStatus';
 import { StudioIcon } from './StudioIcon';
 import { StudioHistory, StudioPeople } from './StudioViews';
@@ -35,9 +36,12 @@ type Props = {
 export function CanvasWorkspace(props: Props) {
   const t = useTranslations('canvas');
   const ts = useTranslations('studio');
+  const tShare = useTranslations('share');
+  const locale = useLocale();
   const [view, setView] = useState<View>('preview');
   const [compare, setCompare] = useState(true);
   const [panel, setPanel] = useState<Panel>(null);
+  const [copied, setCopied] = useState(false);
   const dialog = useRef<HTMLDialogElement>(null);
   const mobileMenu = useRef<HTMLDetailsElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -53,6 +57,25 @@ export function CanvasWorkspace(props: Props) {
   const manifest = manifestView(props.doc);
   const views: View[] = ['preview', 'diff', 'tests'];
   const iconButton = (icon: string, label: string, action: () => void, rememberFocus = true) => <button type="button" className="canvas-icon-button" aria-label={label} title={label} onClick={event => {if (rememberFocus) returnFocus.current = event.currentTarget; action();}}><StudioIcon name={icon} width="18" height="18"/></button>;
+  const onShare = async () => {
+    if (!props.doc) return;
+    const url = shareUrl(typeof window !== 'undefined' ? window.location.origin : '', locale, props.doc.arena_id);
+    const text = shareText(props.doc, locale);
+    const nav = navigator as Navigator & { share?: (data: { url?: string; text?: string }) => Promise<void> };
+    // navigator.share({ url, text }) when available, otherwise clipboard fallback.
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ url, text });
+      } catch {}
+      return;
+    }
+    void nav;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {}
+  };
   const selectPanel = (next: 'metrics' | 'admin') => {
     returnFocus.current = mobileMenu.current?.querySelector('summary') ?? null;
     setPanel(next);
@@ -69,6 +92,8 @@ export function CanvasWorkspace(props: Props) {
             return <option key={run.arena_id} value={run.arena_id}>{(run.prompt || run.goal || run.task_id || run.arena_id).slice(0, 30)}{stamp ? ` · ${stamp}` : ''}</option>;
           })}
         </select>
+        {props.doc && <button type="button" className="canvas-share-button" onClick={() => void onShare()}>{tShare('button')}</button>}
+        {copied && <span role="status" className="canvas-share-copied">{tShare('copied')}</span>}
         <span className={`canvas-record${props.busy ? ' is-running' : ''}`} role="status">{t(props.busy ? props.doc ? 'running' : 'received' : props.doc ? 'recorded' : 'waiting')}</span>
       </div>
       <div className="canvas-toolbar-actions">
