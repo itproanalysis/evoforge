@@ -221,7 +221,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
             )}
           </div>
         )}
-        {!followUp && (
+        {!followUpId && (
           <details className="studio-composer-settings" onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.open = false; event.currentTarget.querySelector('summary')?.focus(); } }}>
           <summary aria-label={ts('settings')} title={ts('settings')}><StudioIcon name="settings" width="17" height="17"/><span className="sr-only">{ts('settings')}</span></summary>
           <div>
@@ -245,16 +245,16 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           type="button"
           onClick={onStart}
           disabled={busy || disabled || !canStart || limited}
-          title={limited ? tp("limit-reached") : t("prompt-start")}
-          aria-label={t(followUp ? "prompt-followup-start" : "prompt-start")}
+          title={limited ? tp("limit-reached") : t(followUpId ? "prompt-followup-start" : "prompt-start")}
+          aria-label={t(followUpId ? "prompt-followup-start" : "prompt-start")}
           className="studio-submit px-3 py-1 rounded text-xs border border-border cursor-pointer font-semibold"
         >
           <StudioIcon name="arrow" width="17" height="17" className="canvas-send-arrow"/>
-          <span className="sr-only">{t(followUp ? "prompt-followup-start" : "prompt-start")}</span>
+          <span className="sr-only">{t(followUpId ? "prompt-followup-start" : "prompt-start")}</span>
         </button>
         {error && <span style={{ color: "#a2352e", fontSize: 12 }}>{error}</span>}
       </div>
-      {followUp && <p className="sr-only">{t("prompt-equal-tools")}</p>}
+      {followUpId && <p className="sr-only">{t("prompt-equal-tools")}</p>}
     </div>
   );
 }
