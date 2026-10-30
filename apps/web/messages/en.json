@@ -639,6 +639,17 @@
     "summary-significant": "Statistically significant (p = {p})",
     "summary-not-significant": "Not statistically significant yet (p = {p}); more matches needed"
   },
+  "plan": {
+    "add-round": "Add round",
+    "remove-round": "Remove",
+    "round-label": "Round {n}",
+    "remaining-today": "Today {remaining} of {total} runs left",
+    "limit-reached": "Daily run limit reached — try again tomorrow.",
+    "challenges": "Challenges",
+    "mode": "What to start",
+    "continue": "Continue this run",
+    "new-run": "New run"
+  },
   "replay": {
     "title": "Round Replay",
     "first": "First",

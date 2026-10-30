@@ -165,4 +165,9 @@
  .studio-footer { padding-bottom: 70px; }
  .studio-review-notice { left: 15px; bottom: calc(61px + env(safe-area-inset-bottom)); }
 }
+.canvas-workspace .studio-composer-inner > div { min-width: 0; flex: 1; max-width: 100%; }
+.canvas-workspace .studio-composer textarea, .canvas-workspace .studio-composer select { max-width: 100%; }
 .canvas-inspector .studio-result-line, .studio-result-line { margin: -4px 0 16px; font-size: 13px; line-height: 1.6; color: #313b2a; overflow-wrap: anywhere; }
+.studio-composer-mode { display: flex; gap: 4px; width: 100%; }
+.studio-composer-mode button { font-size: 12px; padding: 4px 10px; border-radius: 999px; border: 1px solid #d7dccf; background: transparent; color: #5b6452; cursor: pointer; }
+.studio-composer-mode button[aria-pressed="true"] { background: #2563eb; border-color: #2563eb; color: #fff; }

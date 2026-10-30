@@ -84,7 +84,8 @@ def test_chain_wiring():
     assert "/v1/arena/" in api and "followup" in api and "chain" in api
     assert "postPromptFollowup" in bar and "canFollowUp" in bar
     assert "prompt-followup-placeholder" in bar and "prompt-followup-start" in bar
-    assert "NEXT_PUBLIC_EVO_OPERATOR_CONTROLS" in bar and "confirm(" in bar
+    assert "getArenaLimits" in bar and "confirm(" in bar
+    assert "planFits" in bar and "rounds" in bar
     assert "promptChainView" in page and "getPromptChain" in page
     assert "canFollowUp" in page and "SandboxedPreview" in page
     assert "prompt-chain-title" in page and "setInterval" in page

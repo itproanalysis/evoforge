@@ -639,6 +639,17 @@
     "summary-significant": "통계적으로 유의미함 (p = {p})",
     "summary-not-significant": "아직 통계적으로 유의미하지 않음 (p = {p}); 더 많은 대결이 필요함"
   },
+  "plan": {
+    "add-round": "라운드 추가",
+    "remove-round": "삭제",
+    "round-label": "라운드 {n}",
+    "remaining-today": "오늘 {remaining}/{total}회 남음",
+    "limit-reached": "일일 실행 한도에 도달했습니다. 내일 다시 시도하세요.",
+    "challenges": "도전 과제",
+    "mode": "시작 방식",
+    "continue": "이어서 바꾸기",
+    "new-run": "새 대결"
+  },
   "replay": {
     "title": "라운드 리플레이",
     "first": "처음",

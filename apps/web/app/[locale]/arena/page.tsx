@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   getArena,
+  getArenaLimits,
   getArenaSummary,
   getPromptChain,
   listArenas,
@@ -11,6 +12,7 @@ import {
   type ArenaDoc,
   type ArenaSummary,
 } from "../../../lib/api";
+import { planFits } from "../../../lib/challenges";
 import { Button, Card } from "../../../components/ui";
 import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView, promptArenaView, canFollowUp, promptChainView } from "../../../lib/arenaStatus";
 import { SandboxedPreview } from "../../../components/SandboxedPreview";
@@ -96,6 +98,7 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
 
 export default function ArenaPage() {
   const t = useTranslations("arena");
+  const tp = useTranslations("plan");
   const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2" | "v3" | "v4" | "v5">("v5");
   const [selectedTaskId, setSelectedTaskId] = useState<string>("SV5-AO-01");
   const [customTaskId, setCustomTaskId] = useState<string>("");
@@ -109,6 +112,7 @@ export default function ArenaPage() {
   const [error, setError] = useState<string | null>(null);
   const [chainRounds, setChainRounds] = useState<ArenaDoc[] | null>(null);
   const [selectedRoundId, setSelectedRoundId] = useState<string | null>(null);
+  const [limits, setLimits] = useState<{ daily_limit: number; used_today: number; remaining: number } | null>(null);
 
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -137,11 +141,18 @@ export default function ArenaPage() {
     } catch (e) {
       console.warn("Failed to list arenas", e);
     }
+    try {
+      const lim = await getArenaLimits();
+      if (lim && typeof lim === "object") setLimits(lim);
+    } catch {}
     void refreshSummary();
   };
 
   useEffect(() => {
     refreshRecent();
+    void getArenaLimits().then((lim) => {
+      if (lim && typeof lim === "object") setLimits(lim);
+    }).catch(() => {});
   }, []);
 
   // Poll the returned server ID. A failed lookup pauses polling so the user
@@ -222,9 +233,17 @@ export default function ArenaPage() {
 
   const handleStartMatch = async () => {
     if (!activeTaskId || running) return;
-    // Starting an arena spends model credits: operator-only, with a cost
-    // warning confirmed up front.
-    if (process.env.NEXT_PUBLIC_EVO_OPERATOR_CONTROLS !== "1") return;
+    // Starting an arena spends model credits: anyone may start within the
+    // server's daily limit, with a cost warning confirmed up front.
+    let remaining: number | null = limits ? limits.remaining : null;
+    try {
+      const lim = await getArenaLimits();
+      if (lim && typeof lim === "object") {
+        setLimits(lim);
+        remaining = lim.remaining;
+      }
+    } catch {}
+    if (!planFits(remaining, 1)) return;
     if (typeof window !== "undefined" && !window.confirm(t("cost-confirm"))) return;
     setError(null);
     setPollError(false);
@@ -255,7 +274,7 @@ export default function ArenaPage() {
   const evoPreview = previewView(evoLane);
   const singlePreview = previewView(singleLane);
   const verdict = arenaVerdict(activeArena);
-  const operator = process.env.NEXT_PUBLIC_EVO_OPERATOR_CONTROLS === "1";
+  const limitBlocked = limits !== null && !planFits(limits.remaining, 1);
   const verificationInconclusive = activeArena?.verdict?.winner === "inconclusive"
     || evoView.outcome === "verification_inconclusive" || singleView.outcome === "verification_inconclusive";
   const chainView = isPromptArena
@@ -334,17 +353,22 @@ export default function ArenaPage() {
 
           <Button
             onClick={handleStartMatch}
-            disabled={running || !activeTaskId || !operator}
+            disabled={running || !activeTaskId || limitBlocked}
             variant="primary"
             className="text-xs font-semibold px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white"
-            title={operator ? undefined : t("operator-only")}
+            title={limitBlocked ? tp("limit-reached") : undefined}
           >
             {running ? t("running-match") : t("run-match")}
           </Button>
+          <span className="text-xs text-text-secondary" role="status">
+            {limits
+              ? tp("remaining-today", { remaining: limits.remaining, total: limits.daily_limit })
+              : tp("remaining-today", { remaining: "—", total: "—" })}
+          </span>
         </div>
       </div>
-      {!operator && (
-        <p className="text-xs text-text-secondary">{t("operator-only")}</p>
+      {limitBlocked && (
+        <p role="alert" className="text-xs text-text-secondary">{tp("limit-reached")}</p>
       )}
 
       {/* Scoreboard over every stored arena match */}

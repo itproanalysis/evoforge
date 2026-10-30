@@ -775,11 +775,30 @@ export function postPromptArena(
   prompt: string,
   feedback: "critic" | "heldout" = "critic",
   single_apply: "tolerant" | "strict" = "tolerant",
+  rounds?: string[],
 ) {
+  const body: { prompt: string; feedback: string; single_apply: string; rounds?: string[] } = {
+    prompt,
+    feedback,
+    single_apply,
+  };
+  if (Array.isArray(rounds) && rounds.length > 0) {
+    body.rounds = rounds;
+  }
   return req<{ arena_id: string; status: string }>("/v1/arena/prompt", {
     method: "POST",
-    body: JSON.stringify({ prompt, feedback, single_apply }),
+    body: JSON.stringify(body),
   });
+}
+
+export interface ArenaLimits {
+  daily_limit: number;
+  used_today: number;
+  remaining: number;
+}
+
+export function getArenaLimits() {
+  return req<ArenaLimits>("/v1/arena/limits");
 }
 
 export function postPromptFollowup(arenaId: string, prompt: string) {

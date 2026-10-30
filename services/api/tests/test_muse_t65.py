@@ -87,8 +87,9 @@ def test_prompt_api_and_bar():
     assert "prompt-placeholder" in bar and "prompt-start" in bar
     assert '"critic"' in bar and "postPromptArena" in bar
     assert "fixed" in bar and "bottom" in bar
-    assert "NEXT_PUBLIC_EVO_OPERATOR_CONTROLS" in bar and "confirm(" in bar
-    assert "operator-only" in bar and "arena_id" in bar
+    assert "getArenaLimits" in bar and "confirm(" in bar
+    assert "planFits" in bar and "rounds" in bar
+    assert "limit-reached" in bar and "arena_id" in bar
 
 
 def test_prompt_page_and_i18n():
