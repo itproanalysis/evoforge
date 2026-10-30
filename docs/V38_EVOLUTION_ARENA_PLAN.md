@@ -155,3 +155,17 @@ Read with `docs/NORTH_STAR.md` and `docs/V36_EXECUTION_PLAN.md` (its rules still
 - **Production check:** a 2-round plan (bakery page → add prices) ran as one job: round 1 tie 3/3 vs 3/3 (single 2¢,
   EvoForge 8¢, judge 7¢), round 2 continued from round 1 on 6 tests (3 inherited + 3 new), tie 6/6 vs 6/6 (2¢ / 6¢,
   judge 10¢); the plan reserved both runs at start (2 of 20).
+
+### Cloud review 2026-10-30 — statistics on one fair basis; a second v5 run (no deploy yet; release 27 awaits the owner)
+- **One basis:** headline numbers count only fair comparisons — equal tools AND no held-out signal to EvoForge.
+  Excluded and counted: 2 strict-harness v5 matches (one "win" came only from the strict patch rule) and 1 older
+  oracle-feedback match. The review's "6-0-19, p = 0.031" mixed those in; we do not claim it.
+- **Second v5 run, same conditions (12 matches):** all 12 ties — both sides 11/12 (both failed SV5-AO-01). Model cost
+  EvoForge 347¢, single 132¢. More data did not separate them this time.
+- **Fair total after it (33 matches):** EvoForge 3 wins, single 0, ties 30; tasks solved 30 vs 27; cost 822¢ vs 333¢
+  → EvoForge solved 3 more tasks at 163¢ extra per extra task; sign test p = 0.25 (not significant).
+- **Replay (paired per round, 30 pairs):** EvoForge alone verified 6 rounds, single alone 2, both 16, neither 6;
+  p = 0.29. The Replay disclosure wrongly said EvoForge saw failing held-out test names; every run used Critic
+  feedback. Corrected when served (flagged), and new runs store the right sentence.
+- **Performance pooled:** v5 harness /3, single 31/36 vs EvoForge (Critic feedback) 35/36, intervals overlap; v3
+  saturated (48/48 both) — a harder suite is needed to separate them.

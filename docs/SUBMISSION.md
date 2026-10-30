@@ -62,8 +62,9 @@ cost**. The intervals still overlap, so we do **not** claim significance yet. ID
 
 **The same comparison in the Arena (2026-10-30, release 22, equal tools — both sides recount hunks; EvoForge gets
 only its own Critic's tests, never a held-out signal):** EvoForge solved **12/12** v5 tasks, the single shot **9/12**;
-paired 3 wins, 0 losses, 9 ties; hidden tests 36/36 vs 27/36; model cost 264¢ vs 135¢. Not significant at n = 12 (sign
-test p = 0.25). Every match is on `/arena` with its fairness manifest; the scoreboard is on the home page. We first ran
+paired 3 wins, 0 losses, 9 ties; hidden tests 36/36 vs 27/36; model cost 264¢ vs 135¢. A second run under the same
+conditions was 12 ties (both 11/12). All fair Arena matches together (33): EvoForge 3 wins, 0 losses, 30 ties; solved
+30 vs 27; 163¢ extra per extra task solved; sign test p = 0.25 — not significant, and the site says so. Every match is on `/arena` with its fairness manifest; the scoreboard is on the home page. We first ran
 these matches with the original strict single-lane harness, saw a "win" that came only from that rule, stopped, fixed
 the harness and re-ran — the strict-harness matches are not counted here.
 
