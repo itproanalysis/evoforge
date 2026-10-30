@@ -124,8 +124,6 @@ export default function ReplayPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold mb-5">{t("title")}</h1>
-      <EvolutionStats />
-      <StrategiesPanel />
       {listError && <p role="alert" style={{ color: "#f04452" }}>
         {t("load-failed")} <button type="button" onClick={() => setListAttempt((n) => n + 1)}>{t("retry")}</button>
       </p>}
@@ -167,6 +165,13 @@ export default function ReplayPage() {
           </div>
         </div>
       )}
+      <section className="replay-stats">
+        <EvolutionStats />
+      </section>
+      <details className="perf-section">
+        <summary>{t("strategies-heading")}</summary>
+        <StrategiesPanel />
+      </details>
       <CommandBar onStarted={handleStarted} />
     </div>
   );

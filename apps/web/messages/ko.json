@@ -364,7 +364,7 @@
     "event-label": "이벤트 {id}",
     "loading-event": "이벤트 로딩 중…",
     "review-summary-hint": "검토 봉인 요약 조회:",
-    "recent-evidence-heading": "서버 최근 증거 ID 빠른 선택",
+    "recent-evidence-heading": "최근 증거",
     "recent-evidence-empty": "서버에 기록된 미션/결과 증거 ID가 없습니다.",
     "stages": {
       "ObjectiveVersion": "목표 버전",
@@ -384,7 +384,8 @@
       "legend-blocked": "차단됨",
       "legend-missing": "없음",
       "empty": "증거 체인이 아직 없습니다."
-    }
+    },
+    "raw-heading": "원본 기록 보기"
   },
   "feedback": {
     "heading": "미션 피드백",
@@ -506,7 +507,10 @@
     "pooled-evoforge_better": "EvoForge가 더 나음 (신뢰구간 안 겹침)",
     "pooled-single_better": "단일 실행이 더 나음",
     "pooled-not_significant": "아직 유의하지 않음",
-    "pooled-saturated": "너무 쉬움: 둘 다 100%"
+    "pooled-saturated": "너무 쉬움: 둘 다 100%",
+    "pooled-interval": "95% 구간",
+    "pooled-how": "합산 방식",
+    "latest-heading": "가장 최근 측정 1회"
   },
   "evolution": {
     "heading": "오토파일럿 — 목표 입력, 검증된 PR 출력",
@@ -630,7 +634,7 @@
     "single-sub": "기존 하네스 · 엄격 diff 적용 · 피드백 없음",
     "cost": "비용",
     "attempts": "시도 횟수",
-    "hidden-tests": "비공개 검증 테스트",
+    "hidden-tests": "숨은 테스트 통과율",
     "patch": "생성된 패치",
     "events": "실시간 이벤트 스트림",
     "recent-matches": "최근 아레나 대결 기록",
@@ -702,7 +706,15 @@
     "lane-failed": "실패",
     "no-reason": "사유 미제공",
     "cost-unknown": "비용 미확인",
-    "cost-total": "서버 합계 {cost}¢ · 출처 개별 확인"
+    "cost-total": "서버 합계 {cost}¢ · 출처 개별 확인",
+    "board-sub": "같은 모델, 같은 도구, 같은 숨은 테스트로 {n}판을 판정했어요.",
+    "bench-title": "봉인된 벤치마크로 대결하기",
+    "bench-sub": "양쪽 모두 처음 보는 과제를 고르세요. 대결마다 모델 비용이 들어요.",
+    "winner-evoforge": "EvoForge 승",
+    "winner-single": "단일 AI 승",
+    "winner-tie": "무승부",
+    "row-prompt": "직접 요청",
+    "row-single": "단일"
   },
   "plan": {
     "add-round": "라운드 추가",
@@ -782,7 +794,8 @@
     "stats-paired": "라운드별 짝 비교: EvoForge만 검증 {evo} · 단일 실행만 {single} · 둘 다 {both}",
     "stats-paired-significant": "통계적으로 유의함 (p = {p})",
     "stats-paired-not-significant": "아직 통계적으로 유의하지 않음 (p = {p})",
-    "stats-paired-none": "한쪽만 검증한 라운드가 없음"
+    "stats-paired-none": "한쪽만 검증한 라운드가 없음",
+    "strategies-heading": "EvoForge가 빌드 전략을 고르는 방식"
   },
   "titles": {
     "home": "EvoForge — 작업실",
