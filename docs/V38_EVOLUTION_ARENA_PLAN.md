@@ -169,3 +169,13 @@ Read with `docs/NORTH_STAR.md` and `docs/V36_EXECUTION_PLAN.md` (its rules still
   feedback. Corrected when served (flagged), and new runs store the right sentence.
 - **Performance pooled:** v5 harness /3, single 31/36 vs EvoForge (Critic feedback) 35/36, intervals overlap; v3
   saturated (48/48 both) — a harder suite is needed to separate them.
+
+### Wrap-up 2026-10-30 evening — merged PRs, a fresh PR, public repositories
+- **Outcome:** the owner merged evoforge-target PR #7 (`8dbb8f56`); `POST /v1/outcomes` recorded it VALIDATED →
+  validated improvements 0 → 1. PR #8 (CI, README, median demo mission) merged; the target's CI passes on `main`.
+- **D14 checked on a new PR:** mission `msn_f93c2cb43d98` (median, even length) → PR #9: word-boundary title, one
+  descriptive commit per file, trailing newlines, verify link, target CI passes. Left open for the live demo.
+- **Public:** source https://github.com/itproanalysis/evoforge (the submission branch only; full-history secret scan
+  clean) and https://github.com/itproanalysis/evoforge-target.
+- **Open gap, not deployed:** recording an outcome does not link the evidence chain's Outcome stage, so the Evidence
+  page shows it empty. Fix + test on `release/2026-10-30-28` (680b7289); its full gate did not finish.

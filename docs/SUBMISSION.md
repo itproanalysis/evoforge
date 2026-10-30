@@ -97,6 +97,21 @@ only `GET /v1/proof/key`, the signature is valid; changing one field makes it fa
 — once by GH_INTEGRITY for a tautological Builder test, once by a Runner that still used the strict diff parser — and both
 causes were fixed (strong-oracle prompts T25, shared patch module in the Runner).
 
+**Merged and recorded (2026-10-30):** the owner merged PR #7 (merge commit `8dbb8f56`), and `POST /v1/outcomes` recorded
+it as a VALIDATED outcome: the dashboard's validated improvements went from 0 to 1 (`GET /v1/outcomes` lists it). An
+opened PR alone never counts. Known gap: the live release stores the outcome without linking the evidence chain's
+Outcome stage, so the Evidence page still shows that stage empty; the fix is on branch `release/2026-10-30-28`, not
+deployed.
+
+**A fresh PR after the PR-quality fixes:** mission `msn_f93c2cb43d98` (the target's demo bug: `stats.median` returns the
+upper middle item for an even-length list) ran end to end in production (Builder 11 s, Critic review 26 s, run 7 s; all
+three gates PASS, visible 2/2, held-out 3/3) →
+[itproanalysis/evoforge-target#9](https://github.com/itproanalysis/evoforge-target/pull/9). Its title is cut at a word
+boundary, each commit says what it does ("Update stats.py", "Add test …_1.py", "Add test …_2.py"), every file ends with
+a newline, the body links `/verify/ev_ab527200a91d` (certificate `cert_bc70834c9902`, VERIFIED), and the target's own
+GitHub Actions CI passes on it. PR #9 stays open so
+the same demo mission can be run live.
+
 ## Why it pushes the frontier
 
 1. **Verification is the product.** PRs open only when the server run passes the Critic's sealed tests and the

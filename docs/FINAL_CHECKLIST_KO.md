@@ -4,14 +4,22 @@
 라이브: https://evoforge-web-230852112787.asia-northeast3.run.app (영어 `/`, 한국어 `/ko`, 로그인 없음)
 프로덕션: release 27 (API `evoforge-api-00047`, Web `evoforge-web-00045`, Runner `evoforge-runner-00036`, 2026-10-30 배포)
 
+## 2026-10-30 저녁에 끝난 일
+
+- **공개 저장소:** 소스 https://github.com/itproanalysis/evoforge (브랜치 `submission/2026-10-30`을 `main`으로 올림,
+  이력 전체 비밀값 검사 깨끗함), 데모 대상 https://github.com/itproanalysis/evoforge-target (공개로 전환).
+  로컬 `main`은 프로덕션에 없는 다른 에이전트 작업이 섞여 있어 올리지 않았습니다.
+- **PR #7 병합 + 결과 기록:** "검증된 개선" 0 → 1 (`/v1/outcomes`). **PR #8 병합**(CI, README, median 데모 미션).
+- **D14 새 PR 확인:** median 미션을 프로덕션에서 끝까지 돌려 PR #9 생성. 제목 단어 단위로 자름, 커밋 3개 각자 설명,
+  파일 끝 줄바꿈, verify 링크, target CI 통과 — 4/4 확인. PR #9는 영상에서 같은 미션을 다시 돌릴 수 있게 열어 둠.
+- **남은 결함 1개:** 결과를 기록해도 Evidence 화면의 증거 체인 Outcome 칸이 비어 있음(기록은 되지만 체인 연결이
+  빠짐). 수정은 `release/2026-10-30-28` 브랜치에 커밋됨(관련 테스트 17개 통과). 전체 게이트는 끝내지 못해
+  **배포하지 않았습니다.** 배포하려면 게이트를 다시 돌린 뒤 배포하고, 같은 내용으로 `POST /v1/outcomes`를 한 번 더
+  보내면(미션 `msn_87b0a3b13fb1`, sha `8dbb8f562a71ed7e58d871776e6ae6a80ed83057`) 기존 기록에 Outcome이 연결됩니다.
+
 ## owner만 할 수 있는 일
 
-1. **소스 공개 여부 결정.** 지금 이 저장소에는 원격(GitHub)이 없습니다. 심사용 코드는 로컬 브랜치
-   `submission/2026-10-30`(프로덕션 코드 + 최종 문서 + 새 README)에 준비돼 있습니다. 비밀값 스캔 결과는 깨끗합니다
-   (테스트용 가짜 토큰과 `.env.example` 자리표시자만 있음). 공개하려면 GitHub 저장소를 만들어 알려 주세요.
-   그 브랜치를 기본 브랜치로 올리는 건 제가 하겠습니다.
-   - `main`에는 프로덕션에 들어가지 않은 다른 에이전트 작업 78커밋이 섞여 있어서, 그대로 공개하면 화면과 코드가
-     어긋납니다.
+1. **(완료) 소스 공개.** 위 "끝난 일" 참고.
 2. **(선택) Critic을 두 번째 Meta 모델로 켜기 (T72, 코드 배포 완료).** 필요한 것:
    - OpenAI 호환 엔드포인트 주소 (예: Fireworks/Baseten의 Llama)
    - 그 API 키 (Secret Manager에 넣기만 하면 되고, 키를 채팅에 붙여 넣지 마세요)
