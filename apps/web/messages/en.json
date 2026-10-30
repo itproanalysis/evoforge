@@ -55,7 +55,17 @@
     "winner-single": "Single AI call wins",
     "winner-tie": "Tie",
     "winner-unscorable": "Not scorable (too few checked tests)",
-    "winner-inconclusive": "Needs another check"
+    "winner-inconclusive": "Needs another check",
+    "result-pending": "Result not decided yet",
+    "same-model": "Same model on both sides ({model})",
+    "same-tests": "Same hidden tests, written before either side built",
+    "signed": "Result signed with Ed25519",
+    "share-this": "Share this result",
+    "open-proof": "Open the signed proof",
+    "what-built": "What each side built",
+    "no-preview": "No screen to show — this task is judged by its tests",
+    "fine-print": "How this was judged",
+    "loading": "Loading result…"
   },
   "studio": {
     "title": "Workspace",
@@ -574,7 +584,8 @@
     "check-signature": "The signature over this result is valid",
     "check-key": "It was signed with this server's published key",
     "check-gates": "{passed} of {total} release gates passed",
-    "details": "Certificate details"
+    "details": "Certificate details",
+    "check-arena": "Hidden tests: EvoForge {evoforge} · single AI call {single}"
   },
   "leaderboard": {
     "heading": "Trust leaderboard",
@@ -723,7 +734,8 @@
     "winner-single": "Single AI won",
     "winner-tie": "Tie",
     "row-prompt": "Your request",
-    "row-single": "Single"
+    "row-single": "Single",
+    "open-result": "Share this result"
   },
   "plan": {
     "add-round": "Add round",

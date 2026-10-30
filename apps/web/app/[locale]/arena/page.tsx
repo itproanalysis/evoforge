@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   getArena,
   getArenaLimits,
@@ -17,6 +17,7 @@ import { Button, Card } from "../../../components/ui";
 import { laneView, arenaVerdict, arenaCost, costLabel, manifestView, previewView, promptArenaView, canFollowUp, promptChainView } from "../../../lib/arenaStatus";
 import { SandboxedPreview } from "../../../components/SandboxedPreview";
 import { PromptBar } from "../../../components/PromptBar";
+import { shareUrl } from "../../../lib/share";
 
 const BENCHMARK_TASKS: Record<"v1" | "v2" | "v3" | "v4" | "v5", { id: string; goal: string }[]> = {
   v5: [
@@ -99,6 +100,7 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
 
 export default function ArenaPage() {
   const t = useTranslations("arena");
+  const locale = useLocale();
   const tp = useTranslations("plan");
   const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2" | "v3" | "v4" | "v5">("v5");
   const [selectedTaskId, setSelectedTaskId] = useState<string>("SV5-AO-01");
@@ -473,6 +475,9 @@ export default function ArenaPage() {
               <span className="text-xs text-text-tertiary">
                 Model: <span className="text-text-secondary font-mono">{activeArena.model}</span>
               </span>
+              {(activeArena.status === "succeeded" || activeArena.status === "failed") && (
+                <a className="arena-share-link" href={shareUrl("", locale, activeArena.arena_id)}>{t("open-result")} →</a>
+              )}
             </div>
           </div>
         </Card>

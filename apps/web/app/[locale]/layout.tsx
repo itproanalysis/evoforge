@@ -1,6 +1,7 @@
 import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import { headers } from 'next/headers';
 import { FeatureRail } from '../../components/FeatureRail';
 import { LanguageSwitcher } from '../../components/LanguageSwitcher';
 import { StudioBreadcrumb } from '../../components/StudioBreadcrumb';
@@ -20,9 +21,16 @@ export async function generateMetadata({
   const t = await getTranslations({ locale, namespace: 'titles' });
   const tLayout = await getTranslations({ locale, namespace: 'layout' });
 
+  // Absolute URLs for link previews (og:image) come from the host that served the page, so a shared
+  // link shows its card on any deployment without a configured site URL.
+  const h = await headers();
+  const host = h.get('x-forwarded-host') ?? h.get('host');
+  const proto = h.get('x-forwarded-proto') ?? (host && /^(localhost|127\.0\.0\.1)(:|$)/.test(host) ? 'http' : 'https');
   return {
+    ...(host ? { metadataBase: new URL(`${proto}://${host}`) } : {}),
     title: t('home'),
     description: tLayout('description'),
+    openGraph: { siteName: 'EvoForge', title: t('home'), description: tLayout('description') },
   };
 }
 

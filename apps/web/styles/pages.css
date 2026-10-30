@@ -242,3 +242,66 @@ select.studio-chip { padding-right: 8px; }
 .studio-footer { flex-wrap: wrap; align-items: baseline; }
 .studio-footer-costs > summary { cursor: pointer; color: #8b95a1; font-weight: 600; }
 .studio-footer-costs p { margin: 6px 0 0; }
+
+/* Shared result: the verdict and both scores read at a glance; what each side built follows. */
+.share-page { max-width: 960px; margin: 0 auto; display: grid; gap: 16px; }
+.share-status { padding: 40px 0; color: #6b7684; }
+.share-hero { padding: 36px; background: #fff; border: 1px solid #e5e8eb; border-radius: 28px; box-shadow: 0 8px 32px #18283c08; }
+.share-kicker { margin: 0; font-size: 13px; font-weight: 650; color: #8b95a1; }
+.share-hero h1 { margin: 10px 0 0; font-size: 40px; line-height: 1.15; font-weight: 800; letter-spacing: -1.4px; color: #191f28; }
+.share-hero.is-evoforge h1 { color: #0a8a5a; }
+.share-hero.is-single h1 { color: #1b64da; }
+.share-prompt { margin: 16px 0 0; padding: 14px 18px; border-left: 3px solid #e5e8eb; background: #f9fafb; border-radius: 0 14px 14px 0; font-size: 15px; line-height: 1.6; color: #4e5968; overflow-wrap: anywhere; }
+.share-prompt > span { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.share-versus { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: 14px; margin-top: 24px; }
+.share-vs { align-self: center; font-size: 14px; font-weight: 800; color: #b0b8c1; text-transform: uppercase; }
+.share-lane { display: grid; gap: 8px; padding: 20px; border-radius: 20px; background: #f9fafb; border: 2px solid transparent; }
+.share-lane.is-leading.is-evoforge { background: #ebf9f2; border-color: #12a66e33; }
+.share-lane.is-leading.is-single { background: #eef5ff; border-color: #3182f633; }
+.share-lane-name { font-size: 14px; font-weight: 700; color: #4e5968; }
+.share-lane-score { font-size: 44px; line-height: 1; font-weight: 800; letter-spacing: -1.5px; color: #333d4b; font-variant-numeric: tabular-nums; }
+.share-lane.is-evoforge .share-lane-score { color: #0a8a5a; }
+.share-lane.is-single .share-lane-score { color: #1b64da; }
+.share-lane-bar { height: 10px; border-radius: 999px; background: #e5e8eb; overflow: hidden; }
+.share-lane-bar > span { display: block; height: 100%; border-radius: inherit; background: #b0b8c1; }
+.share-lane.is-evoforge .share-lane-bar > span { background: #12a66e; }
+.share-lane.is-single .share-lane-bar > span { background: #3182f6; }
+.share-lane-meta { font-size: 13px; color: #6b7684; font-variant-numeric: tabular-nums; }
+.share-lane-note { font-size: 12px; font-weight: 600; color: #d22030; }
+.share-trust { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0 0; padding: 0; }
+.share-trust li { padding: 6px 12px; border-radius: 999px; background: #f2f4f6; font-size: 12px; font-weight: 600; color: #4e5968; }
+.share-trust li::before { content: "✓ "; color: #12a66e; }
+.share-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 24px; }
+.share-primary { height: 52px; padding: 0 24px; border: 0; border-radius: 16px !important; background: #3182f6; color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
+.share-primary:hover { background: #1b64da; }
+.share-secondary { display: inline-flex; align-items: center; height: 52px; padding: 0 20px; border-radius: 16px; background: #f2f4f6; color: #333d4b; font-size: 15px; font-weight: 650; text-decoration: none; }
+.share-secondary:hover { background: #e5e8eb; }
+.share-link { margin-left: auto; color: #4e5968; font-size: 14px; font-weight: 600; text-decoration: none; }
+.share-link:hover { color: #3182f6; }
+.share-built h2 { margin: 8px 0 12px; font-size: 18px; font-weight: 700; color: #191f28; }
+.share-previews { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.share-preview { min-width: 0; background: #fff; border: 1px solid #e5e8eb; border-radius: 20px; overflow: hidden; }
+.share-preview > header { padding: 12px 18px; border-bottom: 1px solid #f2f4f6; font-size: 13px; font-weight: 700; color: #4e5968; }
+.share-preview iframe { border: 0 !important; border-radius: 0 !important; }
+.share-preview-empty { display: grid; place-items: center; min-height: 180px; padding: 20px; text-align: center; font-size: 13px; color: #8b95a1; }
+.share-fine p { font-size: 13px; line-height: 1.7; color: #6b7684; overflow-wrap: anywhere; }
+@media (max-width: 767px) {
+ .share-hero { padding: 24px 20px; border-radius: 24px; }
+ .share-hero h1 { font-size: 30px; }
+ .share-versus { grid-template-columns: minmax(0, 1fr); }
+ .share-vs { justify-self: center; }
+ .share-lane-score { font-size: 36px; }
+ .share-previews { grid-template-columns: minmax(0, 1fr); }
+ .share-actions > * { flex: 1 1 100%; justify-content: center; text-align: center; }
+ .share-link { margin: 4px 0 0; }
+}
+
+.arena-share-link {
+  display: inline-block;
+  white-space: nowrap;
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #3182f6;
+}
+.arena-share-link:hover { text-decoration: underline; }
