@@ -29,7 +29,7 @@
 .studio-footer > span { color: #6b7684; }
 
 /* The prompt composer outside the canvas (arena) floats like the canvas one. */
-.studio-composer { left: calc(50% + 32px); right: auto; bottom: 24px; width: min(760px, calc(100vw - 120px)); transform: translateX(-50%); padding: 12px 16px; border: 1px solid #e5e8eb; border-radius: 22px; background: #fff; color: #333d4b; box-shadow: 0 8px 32px #18283c12; }
+.studio-composer { left: calc(50% + 38px); right: auto; bottom: 24px; width: min(760px, calc(100vw - 120px)); transform: translateX(-50%); padding: 12px 16px; border: 1px solid #e5e8eb; border-radius: 22px; background: #fff; color: #333d4b; box-shadow: 0 8px 32px #18283c12; }
 .studio-composer:focus-within { border-color: #3182f6; }
 .studio-composer textarea { color: #333d4b; font-size: 14px; resize: none; }
 .studio-composer textarea::placeholder { color: #8b95a1; }
@@ -57,7 +57,7 @@
 .studio-run-list span { font-size: 11px; color: #8b95a1; }
 .studio-secondary-button { margin-bottom: 12px; padding: 8px 14px; border: 1px solid #e5e8eb; background: #fff; color: #4e5968; font-size: 12px; font-weight: 600; cursor: pointer; }
 .studio-secondary-button:hover { background: #e8f3ff; color: #3182f6; border-color: #e8f3ff; }
-.studio-command-bar { position: fixed; z-index: 40; left: calc(50% + 32px); bottom: 24px; transform: translateX(-50%); width: min(760px, calc(100vw - 120px)); padding: 12px 16px; border: 1px solid #e5e8eb; border-radius: 22px; background: #fff; color: #4e5968; box-shadow: 0 8px 32px #18283c12; }
+.studio-command-bar { position: fixed; z-index: 40; left: calc(50% + 38px); bottom: 24px; transform: translateX(-50%); width: min(760px, calc(100vw - 120px)); padding: 12px 16px; border: 1px solid #e5e8eb; border-radius: 22px; background: #fff; color: #4e5968; box-shadow: 0 8px 32px #18283c12; }
 .studio-content:has(.studio-command-bar) { padding-bottom: 200px; }
 @media (max-width: 767px) {
  .studio-command-bar { left: 50%; width: calc(100vw - 24px); bottom: calc(72px + env(safe-area-inset-bottom)); }
@@ -224,3 +224,21 @@ select.studio-chip { padding-right: 8px; }
 .replay-stats { margin-top: 28px; }
 .studio-command-note { margin: 24px 0 0; font-size: 12px; color: #8b95a1; }
 .studio-chip[aria-pressed="true"] { background: #e8f3ff; border-color: #e8f3ff; color: #1b64da; }
+
+/* Verify: the answer (verified or not) and three plain checks; the certificate itself folds below. */
+.verify-hero { position: relative; padding: 32px; background: #fff; border: 1px solid #e5e8eb; border-radius: 24px; box-shadow: 0 4px 18px #18283c05; }
+.verify-badge { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 50%; font-size: 28px; font-weight: 800; color: #fff; background: #12a66e; box-shadow: 0 8px 20px #12a66e40; }
+.verify-hero.is-failed .verify-badge { background: #f04452; box-shadow: 0 8px 20px #f0445240; }
+.verify-kicker { margin: 18px 0 0; font-size: 12px; font-weight: 650; letter-spacing: .4px; color: #8b95a1; text-transform: uppercase; }
+.verify-hero h1 { margin: 6px 0 0; font-size: 28px; font-weight: 750; letter-spacing: -.8px; color: #191f28; }
+.verify-sub { margin: 10px 0 0; font-size: 14px; line-height: 1.7; color: #6b7684; }
+.verify-checks { list-style: none; display: grid; gap: 8px; margin: 22px 0 0; padding: 0; }
+.verify-checks li { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 14px; background: #f9fafb; font-size: 14px; font-weight: 600; color: #333d4b; }
+.verify-checks li > span { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; font-size: 13px; font-weight: 800; background: #e5e8eb; color: #6b7684; flex-shrink: 0; }
+.verify-checks li.is-ok > span { background: #ebf9f2; color: #0a8a5a; }
+.verify-checks li.is-bad > span { background: #fff0f1; color: #d22030; }
+.verify-details .studio-card { border: 0 !important; box-shadow: none; }
+@media (max-width: 767px) { .verify-hero { padding: 22px; } .verify-hero h1 { font-size: 23px; } }
+.studio-footer { flex-wrap: wrap; align-items: baseline; }
+.studio-footer-costs > summary { cursor: pointer; color: #8b95a1; font-weight: 600; }
+.studio-footer-costs p { margin: 6px 0 0; }
