@@ -5,7 +5,7 @@ import { getArena, getArenaProof, type ArenaDoc } from "../../../../lib/api";
 import { manifestView, previewView } from "../../../../lib/arenaStatus";
 import { SandboxedPreview } from "../../../../components/SandboxedPreview";
 
-export function ShareDetails({ doc, certificateId }: { doc: ArenaDoc; certificateId: string | null }) {
+function ShareDetails({ doc, certificateId }: { doc: ArenaDoc; certificateId: string | null }) {
   const t = useTranslations("share");
   const locale = useLocale();
   const manifest = manifestView(doc);
