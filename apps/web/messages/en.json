@@ -50,8 +50,8 @@
     "verified-note": "Merged and validated changes",
     "matches": "Equal-tools comparisons",
     "matches-note": "Measured comparison runs",
-    "heldout": "EvoForge tests passed",
-    "heldout-note": "Equal tools · held-out tests",
+    "heldout": "Hidden tests · EvoForge vs single",
+    "heldout-note": "Equal tools, same hidden tests for both",
     "participants": "Registered participants",
     "participants-note": "Registered, not currently online",
     "workspace": "Workspace",
@@ -107,7 +107,9 @@
     "cost-reservation-cap": "Model cost · reservation cap (usage not reported)",
     "cost-usage_reported": "Model cost · usage based",
     "cost-legacy": "Server-reported cost · source unconfirmed",
-    "cost-unavailable": "Cost source unconfirmed"
+    "cost-unavailable": "Cost source unconfirmed",
+    "result-line": "EvoForge {evoforge} wins · single {single} wins · {tie} ties",
+    "no-decisive": "no decisive match yet"
   },
   "common": {
     "app-name": "EvoForge",

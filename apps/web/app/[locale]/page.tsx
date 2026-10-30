@@ -1177,7 +1177,7 @@ export default function MissionControl() {
       participants={participants}
       history={perf?.history ?? null}
       renderPreview={(html, title) => <SandboxedPreview html={html} title={title}/>}
-      overview={<StudioOverview running={wsRunning} runId={displayedArena?.arena_id} measured={arenaSummary?.equal_tools?.scored ?? null} verified={dashboard?.validated_improvements ?? null} participants={participants?.status === 'available' ? participants.participants.length : null} participantsMore={participants?.has_more} heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null}/>}
+      overview={<StudioOverview running={wsRunning} runId={displayedArena?.arena_id} measured={arenaSummary?.equal_tools?.scored ?? null} verified={dashboard?.validated_improvements ?? null} participants={participants?.status === 'available' ? participants.participants.length : null} participantsMore={participants?.has_more} heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null} singleHeldout={arenaSummary?.equal_tools?.heldout?.single ?? null} wins={arenaSummary?.equal_tools?.wins ?? null} signP={arenaSummary?.equal_tools?.stats?.sign_test_p ?? null}/>}
       management={management}
       composer={<PromptBar disabled={wsRunning} followUpArena={wsFollowUp} onStarted={(id) => { setArenaPendingId(id); setArenaPollError(false); }}/>} />
   );

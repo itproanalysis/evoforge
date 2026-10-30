@@ -50,8 +50,8 @@
     "verified-note": "병합 후 검증을 마친 변경",
     "matches": "동일 도구 비교",
     "matches-note": "측정이 완료된 비교 실행",
-    "heldout": "EvoForge 검증 통과",
-    "heldout-note": "동일 도구 조건 · 숨겨진 테스트",
+    "heldout": "숨겨진 테스트 · EvoForge vs 단일",
+    "heldout-note": "동일 도구, 양쪽 같은 숨겨진 테스트",
     "participants": "등록 참여자",
     "participants-note": "등록 현황 · 현재 접속 수와 다름",
     "workspace": "작업 공간",
@@ -107,7 +107,9 @@
     "cost-reservation-cap": "모델 비용 · 예약 상한(사용량 미보고)",
     "cost-usage_reported": "모델 비용 · 사용량 기준",
     "cost-legacy": "서버 비용 집계 · 출처 미확인",
-    "cost-unavailable": "비용 출처 미확인"
+    "cost-unavailable": "비용 출처 미확인",
+    "result-line": "EvoForge {evoforge}승 · 단일 {single}승 · 무승부 {tie}",
+    "no-decisive": "아직 승부가 난 비교 없음"
   },
   "common": {
     "app-name": "EvoForge",

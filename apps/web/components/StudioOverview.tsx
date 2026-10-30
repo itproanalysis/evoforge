@@ -10,17 +10,24 @@ type Props = {
   participants: number | null;
   participantsMore?: boolean;
   heldout: { passed: number; n: number } | null;
+  // Same-tools comparison: the single AI's hidden-test result, wins/ties and the sign-test p (never one side alone).
+  singleHeldout?: { passed: number; n: number } | null;
+  wins?: { evoforge: number; single: number; tie: number } | null;
+  signP?: number | null;
 };
 
 // All values are supplied by the existing API state. Missing evidence remains —.
-export function StudioOverview({ running, runId, measured, verified, participants, participantsMore = false, heldout }: Props) {
+export function StudioOverview({ running, runId, measured, verified, participants, participantsMore = false, heldout, singleHeldout = null, wins = null, signP = null }: Props) {
   const t = useTranslations('studio');
+  const ta = useTranslations('arena');
+  const frac = (h: { passed: number; n: number } | null) => h && h.n > 0 ? `${h.passed} / ${h.n}` : null;
+  const both = frac(heldout) && frac(singleHeldout) ? `${frac(heldout)} vs ${frac(singleHeldout)}` : frac(heldout);
   const locale = useLocale();
   const prefix = locale === 'en' ? '' : `/${locale}`;
   const metrics = [
     { label: t('verified'), value: verified, note: t('verified-note') },
     { label: t('matches'), value: measured, note: t('matches-note') },
-    { label: t('heldout'), value: heldout && heldout.n > 0 ? `${heldout.passed} / ${heldout.n}` : null, note: t('heldout-note') },
+    { label: t('heldout'), value: both, note: t('heldout-note') },
     { label: t('participants'), value: participants === null ? null : `${participants}${participantsMore ? '+' : ''}`, note: t('participants-note') },
   ];
   return <>
@@ -37,5 +44,11 @@ export function StudioOverview({ running, runId, measured, verified, participant
     <section className="studio-metrics" aria-label={t('metrics')}>
       {metrics.map(metric => <div className="studio-metric" key={metric.label}><div className="studio-metric-label">{metric.label}</div><div className="studio-metric-value">{metric.value ?? '—'}</div><p>{metric.note}</p></div>)}
     </section>
+    {wins && <p className="studio-result-line">
+      {t('result-line', { evoforge: wins.evoforge, single: wins.single, tie: wins.tie })}
+      {signP !== null
+        ? <>{' — '}{ta(signP < 0.05 ? 'summary-significant' : 'summary-not-significant', { p: signP.toFixed(2) })}</>
+        : wins.evoforge + wins.single === 0 ? <>{' — '}{t('no-decisive')}</> : null}
+    </p>}
   </>;
 }

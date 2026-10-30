@@ -165,3 +165,4 @@
  .studio-footer { padding-bottom: 70px; }
  .studio-review-notice { left: 15px; bottom: calc(61px + env(safe-area-inset-bottom)); }
 }
+.canvas-inspector .studio-result-line, .studio-result-line { margin: -4px 0 16px; font-size: 13px; line-height: 1.6; color: #313b2a; overflow-wrap: anywhere; }
