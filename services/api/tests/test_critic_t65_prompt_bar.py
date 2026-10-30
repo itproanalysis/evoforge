@@ -62,7 +62,8 @@ def test_prompt_bar_wiring():
     assert "PromptBar" in page and "promptArenaView" in page
     assert "<textarea" in bar and "maxLength={2000}" in bar.replace(" ", "")
     assert "fixed" in bar or "sticky" in bar  # always visible at the bottom
-    assert "NEXT_PUBLIC_EVO_OPERATOR_CONTROLS" in bar and "confirm(" in bar
+    # Owner decision 2026-10-30 (T84/T85): anyone may start, bounded by the server's daily run limit; spend confirm stays.
+    assert "getArenaLimits" in bar and "confirm(" in bar
     assert "postPromptArena" in api and "/v1/arena/prompt" in api
     for lang in ("en", "ko"):
         a = json.loads((WEB / "messages" / f"{lang}.json").read_text(encoding="utf-8"))

@@ -71,6 +71,7 @@ def test_page_wiring_and_operator_gate():
     page = (WEB / "app" / "[locale]" / "arena" / "page.tsx").read_text(encoding="utf-8")
     api = (WEB / "lib" / "api.ts").read_text(encoding="utf-8")
     assert "SandboxedPreview" in page and "manifestView" in page and "previewView" in page
-    assert "NEXT_PUBLIC_EVO_OPERATOR_CONTROLS" in page and "confirm(" in page
+    # Owner decision 2026-10-30 (T84/T85): the daily run limit replaces the operator-only start; spend confirm stays.
+    assert "getArenaLimits" in page and "confirm(" in page
     assert '"critic"' in page
     assert '"v4"' in api and "feedback" in api.split("export function postArena", 1)[1].split("}", 1)[0]
