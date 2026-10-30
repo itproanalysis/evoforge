@@ -1,4 +1,5 @@
 "use client";
+import { PooledComparison } from "../../../components/PooledComparison";
 import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
@@ -303,6 +304,7 @@ export default function PerformancePage() {
         </div>
       </div>
 
+      <PooledComparison rows={perf?.pooled} basis={perf?.pooled_basis} />
       <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("timeline.heading")}</div>
         {loading && !perf ? (

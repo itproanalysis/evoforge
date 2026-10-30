@@ -149,7 +149,12 @@ export default function EvidencePage() {
       const seen = new Set<string>();
       try {
         const mRes = await listMissions();
-        for (const m of mRes.missions ?? []) {
+        // Most complete missions first; probes and missions that never left CREATED have no chain to show.
+        const rank: Record<string, number> = { PR_OPENED: 0, RAN: 1, REVIEWED: 2, GENERATED: 3 };
+        const shown = (mRes.missions ?? [])
+          .filter((m) => m.state !== "CREATED" && !/probe/i.test(m.goal ?? ""))
+          .sort((a, b) => (rank[a.state] ?? 9) - (rank[b.state] ?? 9));
+        for (const m of shown) {
           for (const eid of [...(m.evidence_ids ?? [])].reverse()) {
             if (eid && !seen.has(eid)) {
               seen.add(eid);

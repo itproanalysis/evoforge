@@ -126,7 +126,8 @@
     "cost-legacy": "Server-reported cost · source unconfirmed",
     "cost-unavailable": "Cost source unconfirmed",
     "result-line": "EvoForge {evoforge} wins · single {single} wins · {tie} ties",
-    "no-decisive": "no decisive match yet"
+    "no-decisive": "no decisive match yet",
+    "value-line": "EvoForge solved {solved} more tasks than the single call · extra model cost {cents}¢ per extra task solved"
   },
   "common": {
     "app-name": "EvoForge",
@@ -493,7 +494,16 @@
       "job-failed": "Decision job failed",
       "adopted": "Adopted",
       "kept": "Kept"
-    }
+    },
+    "pooled-title": "Pooled results under the same conditions",
+    "pooled-suite": "Suite · method",
+    "pooled-single": "Single call",
+    "pooled-verdict": "Verdict",
+    "pooled-runs": "{n} runs",
+    "pooled-evoforge_better": "EvoForge better (intervals do not overlap)",
+    "pooled-single_better": "Single call better",
+    "pooled-not_significant": "Not significant yet",
+    "pooled-saturated": "Too easy: both at 100%"
   },
   "evolution": {
     "heading": "Autopilot — goal in, verified PR out",
@@ -730,6 +740,10 @@
     "exit": "Exit",
     "summary": "Summary",
     "verified": "Verified",
-    "comparison-mode": "Comparison mode"
+    "comparison-mode": "Comparison mode",
+    "stats-paired": "Paired by round: EvoForge alone verified {evo}, the single call alone {single}, both {both}",
+    "stats-paired-significant": "statistically significant (p = {p})",
+    "stats-paired-not-significant": "not statistically significant yet (p = {p})",
+    "stats-paired-none": "no round was won by only one side"
   }
 }

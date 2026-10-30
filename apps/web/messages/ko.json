@@ -126,7 +126,8 @@
     "cost-legacy": "서버 비용 집계 · 출처 미확인",
     "cost-unavailable": "비용 출처 미확인",
     "result-line": "EvoForge {evoforge}승 · 단일 {single}승 · 무승부 {tie}",
-    "no-decisive": "아직 승부가 난 비교 없음"
+    "no-decisive": "아직 승부가 난 비교 없음",
+    "value-line": "EvoForge가 단일 실행보다 과제 {solved}개를 더 해결 · 더 푼 과제당 추가 비용 {cents}¢"
   },
   "common": {
     "app-name": "EvoForge",
@@ -493,7 +494,16 @@
       "job-failed": "판정 작업 실패",
       "adopted": "채택",
       "kept": "유지"
-    }
+    },
+    "pooled-title": "같은 조건 반복 측정 합산",
+    "pooled-suite": "과제 묶음 · 방식",
+    "pooled-single": "단일 실행",
+    "pooled-verdict": "판정",
+    "pooled-runs": "{n}회",
+    "pooled-evoforge_better": "EvoForge가 더 나음 (신뢰구간 안 겹침)",
+    "pooled-single_better": "단일 실행이 더 나음",
+    "pooled-not_significant": "아직 유의하지 않음",
+    "pooled-saturated": "너무 쉬움: 둘 다 100%"
   },
   "evolution": {
     "heading": "오토파일럿 — 목표 입력, 검증된 PR 출력",
@@ -730,6 +740,10 @@
     "exit": "종료",
     "summary": "요약",
     "verified": "검증됨",
-    "comparison-mode": "비교 모드"
+    "comparison-mode": "비교 모드",
+    "stats-paired": "라운드별 짝 비교: EvoForge만 검증 {evo} · 단일 실행만 {single} · 둘 다 {both}",
+    "stats-paired-significant": "통계적으로 유의함 (p = {p})",
+    "stats-paired-not-significant": "아직 통계적으로 유의하지 않음 (p = {p})",
+    "stats-paired-none": "한쪽만 검증한 라운드가 없음"
   }
 }

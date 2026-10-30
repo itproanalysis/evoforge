@@ -383,3 +383,61 @@ def cost_per_solved(measurement: dict | None):
 
 
 cost_per_solved_cents = cost_per_solved
+
+
+POOLED_BASIS = ("Repeated measurements of the same suite and harness are pooled (total passed / total tasks); only "
+                "pipeline runs with Critic feedback count, because pipeline runs fed held-out failing-test names are "
+                "an upper bound the single call never gets. Better = the 95% Wilson intervals of the pooled rates do "
+                "not overlap; both at 100% = saturated (the suite is too easy to separate the two).")
+
+
+def _wilson(k: int, n: int) -> list:
+    if n <= 0:
+        return [0.0, 1.0]
+    z = 1.96
+    p = k / n
+    den = 1 + z * z / n
+    c = (p + z * z / (2 * n)) / den
+    h = z * math.sqrt(p * (1 - p) / n + z * z / (4 * n * n)) / den
+    return [round(max(0.0, c - h), 3), round(min(1.0, c + h), 3)]
+
+
+def pooled(records: list[dict] | None = None) -> list[dict]:
+    """Single call vs EvoForge pipeline per (suite, harness), each side pooled over its repeated runs."""
+    recs = history() if records is None else records
+    groups: dict = {}
+    for r in recs:
+        if not isinstance(r, dict) or r.get("provider_stub"):
+            continue
+        kind = r.get("kind")
+        if kind == "PIPELINE" and r.get("feedback_source") != "critic":
+            continue  # held-out feedback: upper bound, not a fair comparison
+        if kind not in ("X_SINGLE", "PIPELINE"):
+            continue
+        key = (r.get("suite_version"), r.get("harness_version"))
+        side = groups.setdefault(key, {}).setdefault(kind, {"runs": 0, "passed": 0, "n": 0, "cost_cents": 0})
+        try:
+            side["passed"] += int(r.get("passed", 0))
+            side["n"] += int(r.get("n", 0))
+            side["cost_cents"] += int(r.get("cost_cents", 0) or 0)
+            side["runs"] += 1
+        except (TypeError, ValueError):
+            continue
+    out = []
+    for (suite, harness), sides in sorted(groups.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1]))):
+        if "X_SINGLE" not in sides or "PIPELINE" not in sides:
+            continue
+        view = {}
+        for kind, name in (("X_SINGLE", "single"), ("PIPELINE", "evoforge")):
+            s = sides[kind]
+            view[name] = {**s, "rate": (s["passed"] / s["n"]) if s["n"] else None, "wilson95": _wilson(s["passed"], s["n"])}
+        if view["single"]["rate"] == 1.0 and view["evoforge"]["rate"] == 1.0:
+            verdict = "saturated"
+        elif view["evoforge"]["wilson95"][0] > view["single"]["wilson95"][1]:
+            verdict = "evoforge_better"
+        elif view["single"]["wilson95"][0] > view["evoforge"]["wilson95"][1]:
+            verdict = "single_better"
+        else:
+            verdict = "not_significant"
+        out.append({"suite_version": suite, "harness_version": harness, **view, "verdict": verdict})
+    return out

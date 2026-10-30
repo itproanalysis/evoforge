@@ -14,10 +14,11 @@ type Props = {
   singleHeldout?: { passed: number; n: number } | null;
   wins?: { evoforge: number; single: number; tie: number } | null;
   signP?: number | null;
+  value?: { extra_solved: number; extra_cost_cents: number; cents_per_extra_solved: number | null } | null;
 };
 
 // All values are supplied by the existing API state. Missing evidence remains —.
-export function StudioOverview({ running, runId, measured, verified, participants, participantsMore = false, heldout, singleHeldout = null, wins = null, signP = null }: Props) {
+export function StudioOverview({ running, runId, measured, verified, participants, participantsMore = false, heldout, singleHeldout = null, wins = null, signP = null, value = null }: Props) {
   const t = useTranslations('studio');
   const ta = useTranslations('arena');
   const frac = (h: { passed: number; n: number } | null) => h && h.n > 0 ? `${h.passed} / ${h.n}` : null;
@@ -49,6 +50,9 @@ export function StudioOverview({ running, runId, measured, verified, participant
       {signP !== null
         ? <>{' — '}{ta(signP < 0.05 ? 'summary-significant' : 'summary-not-significant', { p: signP.toFixed(2) })}</>
         : wins.evoforge + wins.single === 0 ? <>{' — '}{t('no-decisive')}</> : null}
+    </p>}
+    {value && value.extra_solved > 0 && value.cents_per_extra_solved !== null && <p className="studio-result-line">
+      {t('value-line', { solved: value.extra_solved, cents: value.cents_per_extra_solved })}
     </p>}
   </>;
 }

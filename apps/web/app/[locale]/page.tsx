@@ -69,7 +69,13 @@ function pickWorkspaceArena(list: ArenaDoc[]): ArenaDoc | null {
   const sorted = [...list].sort(
     (a, b) => (b.created_at ?? 0) - (a.created_at ?? 0),
   );
-  return sorted.find((a) => a.mode === "prompt") ?? sorted[0];
+  // First screen: the latest fair comparison EvoForge won (equal tools, no held-out signal), else the latest prompt run.
+  const fairWin = sorted.find((a) => {
+    const lanes = (a.manifest as { lanes?: Record<string, { apply?: string; feedback?: string }> } | undefined)?.lanes;
+    return a.status === "succeeded" && a.verdict?.winner === "evoforge" && lanes?.single?.apply === "tolerant"
+      && lanes?.evoforge?.feedback === "critic";
+  });
+  return fairWin ?? sorted.find((a) => a.mode === "prompt") ?? sorted[0];
 }
 
 export default function MissionControl() {
@@ -1177,7 +1183,7 @@ export default function MissionControl() {
       participants={participants}
       history={perf?.history ?? null}
       renderPreview={(html, title) => <SandboxedPreview html={html} title={title}/>}
-      overview={<StudioOverview running={wsRunning} runId={displayedArena?.arena_id} measured={arenaSummary?.equal_tools?.scored ?? null} verified={dashboard?.validated_improvements ?? null} participants={participants?.status === 'available' ? participants.participants.length : null} participantsMore={participants?.has_more} heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null} singleHeldout={arenaSummary?.equal_tools?.heldout?.single ?? null} wins={arenaSummary?.equal_tools?.wins ?? null} signP={arenaSummary?.equal_tools?.stats?.sign_test_p ?? null}/>}
+      overview={<StudioOverview running={wsRunning} runId={displayedArena?.arena_id} measured={arenaSummary?.equal_tools?.scored ?? null} verified={dashboard?.validated_improvements ?? null} participants={participants?.status === 'available' ? participants.participants.length : null} participantsMore={participants?.has_more} heldout={arenaSummary?.equal_tools?.heldout?.evoforge ?? null} singleHeldout={arenaSummary?.equal_tools?.heldout?.single ?? null} wins={arenaSummary?.equal_tools?.wins ?? null} signP={arenaSummary?.equal_tools?.stats?.sign_test_p ?? null} value={arenaSummary?.equal_tools?.value ?? null}/>}
       management={management}
       composer={<PromptBar disabled={wsRunning} followUpArena={wsFollowUp} onStarted={(id) => { setArenaPendingId(id); setArenaPollError(false); }}/>} />
   );

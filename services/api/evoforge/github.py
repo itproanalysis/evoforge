@@ -132,9 +132,10 @@ def create_pr(diff: str, title: str, body: str, branch: str, base: str = "main",
             url = f"{API}/repos/{repo}/contents/{quote(path)}"
             if text is None:
                 u = c.request("DELETE", url, headers=_h(tok),
-                              json={"message": title, "sha": shas[path], "branch": branch})
+                              json={"message": f"Delete {path}", "sha": shas[path], "branch": branch})
             else:
-                payload = {"message": title, "content": base64.b64encode(text.encode("utf-8")).decode(),
+                payload = {"message": f"{'Update' if path in shas else 'Add'} {path}",
+                           "content": base64.b64encode(text.encode("utf-8")).decode(),
                            "branch": branch}
                 if path in shas:
                     payload["sha"] = shas[path]
@@ -143,8 +144,11 @@ def create_pr(diff: str, title: str, body: str, branch: str, base: str = "main",
                 raise RuntimeError(f"write {path} failed: {u.status_code} {u.text[:200]}")
         for path in sorted(extra):
             url = f"{API}/repos/{repo}/contents/{quote(path)}"
-            payload = {"message": title,
-                       "content": base64.b64encode(extra[path].encode("utf-8")).decode(),
+            # One commit per file, each saying what it does (the PR title carries the mission); text files end
+            # with a newline.
+            body_text = extra[path] if extra[path].endswith("\n") else extra[path] + "\n"
+            payload = {"message": f"Add test {path}",
+                       "content": base64.b64encode(body_text.encode("utf-8")).decode(),
                        "branch": branch}
             u = c.put(url, headers=_h(tok), json=payload)
             if u.status_code not in (200, 201):

@@ -39,6 +39,10 @@ export function CanvasWorkspace(props: Props) {
   const tShare = useTranslations('share');
   const locale = useLocale();
   const [view, setView] = useState<View>('preview');
+  // A run with no page on either side (e.g. a library task) opens on its test results instead of two empty screens.
+  const noPreview = !props.previews.evoforge.html && !props.previews.single.html;
+  const shownId = props.doc?.arena_id;
+  useEffect(() => { if (shownId && noPreview) setView('tests'); }, [shownId, noPreview]);
   const [compare, setCompare] = useState(true);
   const [panel, setPanel] = useState<Panel>(null);
   const [copied, setCopied] = useState(false);

@@ -117,6 +117,14 @@ export function EvolutionStats({ stats: initial }: Props) {
               );
             })}
           </div>
+          {stats?.paired && (
+            <p className="mt-2 text-sm text-text-primary" data-testid="stats-paired">
+              {t("stats-paired", { evo: stats.paired.evoforge_only, single: stats.paired.single_only, both: stats.paired.both })}
+              {" — "}
+              {stats.paired.sign_test_p === null ? t("stats-paired-none")
+                : t(stats.paired.significant ? "stats-paired-significant" : "stats-paired-not-significant", { p: stats.paired.sign_test_p.toFixed(2) })}
+            </p>
+          )}
           {method && (
             <p className="mt-2 text-xs text-text-secondary">
               {t("stats-method")}: {method}
