@@ -475,3 +475,33 @@ task lease holder·candidate 작성자·review 작성자로 실제 연결된 age
 전체 API 671 passed·4 skipped, 격리 PostgreSQL에서 실제 011 실행 및 잘못된 표시 차단과 정본 검사,
 집중 회귀 4개 통과. 웹 tree는 기존 빌드 검증본과 같다. 운영 DB는 조회·변경하지 않았다.
 SQL 실행과 ledger 표시가 별도 트랜잭션인 한계와 복구 설정은 `docs/MIGRATION_RECOVERY_CODEX.md`에 기록했다.
+
+## 2026-10-31 운영 검증 완료 — 심사용 네 모델 기본값
+
+깨끗한 `release/2026-10-31-judge`의 `b832086f`를 Cloud Build
+`1c5aba8d-923e-4b1c-aea9-57858af1dd8a`에서 검증 후 배포했다. Linux 전체 API
+1404 passed / 65 skipped, 실제 PostgreSQL kernel169, 정본 검사0 failures,
+웹 npm ci·TypeScript·Next build·프록시147·SSR162 검사를 통과했다.
+최신 release31-2 UI를 포함하며 다른 작업의 main 미커밋 파일은 보존했다.
+
+API `evoforge-api-00052-qlh`, Web `evoforge-web-00050-rhw`, Runner
+`evoforge-runner-00041-pcc`가 각각100% 트래픽을 받는다. GPT·Gemini·Claude
+키는 Secret Manager 버전1에서 API에만 전달한다. 기존 일일20회·POST 분당20회를 유지했다.
+
+키·로그인 없는 웹 요청 `job_306819b0b688`에서 Spark 구현, GPT·Gemini 계획,
+Opus 검증이 실제 참여했다. 두 차선 모두 held-out13/13 통과; 모델 API 비용은
+단일3¢ + 협업10¢ + 공통 Judge13¢ =26¢다. Runner 비용과 공급사 청구서 대사는 포함하지 않는다.
+PostgreSQL의 Planner 영수증 두 건은 SETTLED, 원격 Runner HTTP200 요청13건,
+공유·검증 페이지 HTTP200과 Ed25519 서명 유효를 확인했다. 한 번의 실행은 우위나 지능 순위의 증거가 아니다.
+기존 Critic 진행 이벤트의11/4는 snippet그룹 분모 문제이며 최종 held-out 판정13/13과 구분한다.
+
+- 사이트: https://evoforge-web-230852112787.asia-northeast3.run.app/ko
+- 실행: https://evoforge-web-230852112787.asia-northeast3.run.app/ko/share/job_306819b0b688
+- 검증: https://evoforge-web-230852112787.asia-northeast3.run.app/ko/verify/job_306819b0b688
+- 근거: `docs/validation/2026-10-31-judge-live-defaults.json`
+
+첨부 개선제안서는 참고 자료다. Meta 오픈웨이트 Critic 제안은 최신 사용자의 Opus 선택보다 우선하지 않는다.
+방문자별 쿼터, SEC02 추가 격리, 외부 OSS PR, 영상은 별도 남은 작업이며 완료로 표시하지 않는다.
+영상은 사용자가 나중에 추가 결제 없이 녹화하기로 했고 최종 제출은 하지 않았다.
+서버 오류 이메일은 과거 GitHub CI 실패·취소 알림이었다. npm11 수정과 이번 Linux 전체 검증은 통과했으며
+과거6시간 hang의 정확한 원인은 확정하지 않았다. 새 CI는 시간 제한·스택·로그 수집을 추가했다.

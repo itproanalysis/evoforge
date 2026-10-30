@@ -27,7 +27,7 @@
   "actual_pg_kernel": "169 passed",
   "package": "0 failures; 96 SQL + 112 reference checks",
   "real_models": "all four observed, Runner passed, 8 cents settled, 0 reserved",
-  "full_api": "local old in-memory snapshot:1453 passed/10 skipped/1 partial-Judge-cost failure; corrected start+followup and rerun19 acceptance checks passed. Final complete source must pass Cloud Build.",
+  "full_api": "Final exact-source Linux Cloud Build SUCCESS:1404 passed,65 skipped,435.55s",
   "secret_provisioning": {
     "project": "evoforge-prod-4ff3",
     "secrets": [
@@ -51,8 +51,11 @@
       }
     ]
   },
-  "production_deploy": "pending clean release gate",
+  "production_deploy": "Completed: API00052-qlh,Web00050-rhw,Runner00041-pcc; each100%",
   "legacy_critic_regressions": "30 passed",
   "production_base": "release/2026-10-31-2 bad33e24; PR1-4 UI preserved by merge",
-  "ci_diagnostics": "all checks retained; API names/durations/120s stacks +75minjob/60mintest bound, 7day artifacts; Cloud Build3600s bound"
+  "ci_diagnostics": "all checks retained; API names/durations/120s stacks +75minjob/60mintest bound, 7day artifacts; Cloud Build3600s bound",
+  "runtime_commit": "b832086f",
+  "real_cloud_run": "job_306819b0b688 keyless POST202; four models participated; both lanes13/13; PG planner reservations SETTLED; remote Runner13 HTTP200; Ed25519valid;26 cents model API usage",
+  "live_evidence": "docs/validation/2026-10-31-judge-live-defaults.json"
 }

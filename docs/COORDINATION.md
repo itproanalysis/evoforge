@@ -15,6 +15,12 @@ single release actor is Codex; no other ongoing production build was found.
 Public daily-run and POST limits, reservations/receipts, Runner and merge
 authorization remain enforced. Final hackathon Submit remains prohibited.
 
+W36 completed on production `b832086f`: Cloud Build SUCCESS (1404 passed/65 skipped),
+API00052/Web00050/Runner00041 at100%. Keyless real run `job_306819b0b688` used all
+four models, PG settled planner receipts, remote Runner and valid signed proof.
+26 cents model API usage; both lanes13/13 (smoke, no superiority claim).
+Evidence: `docs/validation/2026-10-31-judge-live-defaults.json`.
+
 ## 1. Module ownership (exclusive write access)
 
 | Module | Owner | Paths |
