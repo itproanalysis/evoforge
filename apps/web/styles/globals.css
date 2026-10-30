@@ -45,8 +45,9 @@ button, a, input, textarea, select { -webkit-tap-highlight-color: transparent; }
 .studio-content { max-width: 1640px; margin: auto; padding: 28px 32px 22px; }
 /* Existing charts, code and verification tools retain their dark surface.
    Scope their tokens here so the new paper workspace does not reduce contrast
-   in components that still contain explicit dark backgrounds. */
-.studio-content:not(:has(.studio-home)) {
+   in components that still contain explicit dark backgrounds. Pages rebuilt on the light tokens opt out with
+   .studio-light (the verify certificate since T86). */
+.studio-content:not(:has(.studio-home)):not(:has(.studio-light)) {
  --surface-base: 13 16 20; --surface-panel: 22 27 34; --surface-muted: 17 22 28; --surface-raised: 19 25 32;
  --line: 42 51 61; --line-strong: 59 71 85; --ink: 237 241 245; --ink-muted: 160 172 186; --ink-soft: 196 205 215;
  --accent-action: 49 98 79; --accent-success: 169 217 121; --accent-error: 239 68 68; --accent-warning: 245 158 11;

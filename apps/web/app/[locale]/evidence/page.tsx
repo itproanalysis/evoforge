@@ -268,21 +268,21 @@ export default function EvidencePage() {
             {links.map((l) => (
               <li
                 key={l.stage}
-                className="flex items-center gap-2.5 border border-border rounded-lg p-2.5 bg-background-elevated text-sm"
+                className="flex flex-wrap items-center gap-2.5 min-w-0 border border-border rounded-lg p-2.5 bg-background-elevated text-sm"
               >
-                <strong className="min-w-[150px]">
+                <strong className="basis-full sm:basis-auto sm:min-w-[150px]">
                   {t(`stages.${l.stage}` as any)}
                 </strong>
                 {l.event_id ? (
                   <>
                     <button
                       onClick={() => fetchEvent(l.event_id as string)}
-                      className="bg-transparent border border-border-secondary rounded-md px-2 py-0.5 cursor-pointer text-blue-300 hover:bg-background-secondary"
+                      className="bg-transparent border border-border-secondary rounded-md px-2 py-0.5 cursor-pointer text-blue-300 hover:bg-background-secondary max-w-full"
                     >
-                      <code>{l.event_id}</code>
+                      <code className="break-all">{l.event_id}</code>
                     </button>
                     {l.stage === "Review" && (
-                      <span className="text-xs text-text-secondary">
+                      <span className="text-xs text-text-secondary break-all">
                         {t("review-summary-hint")} GET /v1/events/{l.event_id}
                       </span>
                     )}

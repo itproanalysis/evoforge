@@ -175,3 +175,4 @@
 .canvas-share-button:hover { background: #e8f3ff; color: #3182f6; }
 .canvas-share-copied { font-size: 11px; color: #12a66e; white-space: nowrap; }
 .canvas-workspace .studio-composer { max-height: 70vh; overflow-y: auto; overscroll-behavior: contain; }
+.canvas-mobile-nav .canvas-more-menu { left: auto; right: 0; bottom: 52px; max-width: calc(100vw - 16px); }
