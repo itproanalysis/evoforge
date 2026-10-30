@@ -146,8 +146,8 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
         ) : (
           <div className="flex-1 min-w-52 flex flex-col gap-2">
             {rounds.map((value, i) => (
-              <label key={i} className="text-xs flex flex-col gap-1">
-                <span className="text-text-tertiary tabular-nums">
+              <label key={i} className="studio-round text-xs flex flex-col gap-1">
+                <span className={rounds.length > 1 ? "studio-round-label tabular-nums" : "sr-only"}>
                   {tp("round-label", { n: i + 1 })}
                 </span>
                 <span className="flex items-start gap-2">
@@ -173,52 +173,19 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
                       onClick={() => removeRound(i)}
                       aria-label={tp("remove-round")}
                       title={tp("remove-round")}
-                      className="px-2 py-1 rounded text-xs border border-border cursor-pointer whitespace-nowrap shrink-0"
+                      className="studio-chip shrink-0"
                     >
                       {tp("remove-round")}
                     </button>
                   )}
                 </span>
-                <span className="text-text-tertiary tabular-nums">
-                  {value.length}/2000
-                </span>
+                {value.length > 1500 && (
+                  <span className="text-text-tertiary tabular-nums">
+                    {value.length}/2000
+                  </span>
+                )}
               </label>
             ))}
-            {rounds.length < 5 && (
-              <button
-                type="button"
-                onClick={addRound}
-                className="px-2 py-1 rounded text-xs border border-border cursor-pointer self-start"
-              >
-                {tp("add-round")}
-              </button>
-            )}
-            <label className="text-xs flex items-center gap-1.5">
-              <span className="text-text-tertiary">{tp("challenges")}</span>
-              <select
-                value=""
-                onChange={(e) => applyChallenge(e.target.value)}
-                aria-label={tp("challenges")}
-                className="px-2 py-1 rounded text-xs border border-border bg-background-secondary cursor-pointer max-w-full"
-              >
-                <option value="">{tp("challenges")}</option>
-                {CHALLENGES.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {locale === "ko" ? c.title.ko : c.title.en}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <span className="text-text-tertiary tabular-nums text-xs" role="status">
-              {limits
-                ? tp("remaining-today", { remaining: limits.remaining, total: limits.daily_limit })
-                : tp("remaining-today", { remaining: "—", total: "—" })}
-            </span>
-            {limited && (
-              <span role="alert" className="text-xs" style={{ color: "#f04452" }}>
-                {tp("limit-reached")}
-              </span>
-            )}
           </div>
         )}
         {!followUpId && (
@@ -254,6 +221,38 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
         </button>
         {error && <span style={{ color: "#f04452", fontSize: 12 }}>{error}</span>}
       </div>
+      {!followUpId && (
+        <div className="studio-composer-tools">
+          {rounds.length < 5 && (
+            <button type="button" onClick={addRound} className="studio-chip">
+              + {tp("add-round")}
+            </button>
+          )}
+          <select
+            value=""
+            onChange={(e) => applyChallenge(e.target.value)}
+            aria-label={tp("challenges")}
+            className="studio-chip"
+          >
+            <option value="">{tp("challenges")}</option>
+            {CHALLENGES.map((c) => (
+              <option key={c.id} value={c.id}>
+                {locale === "ko" ? c.title.ko : c.title.en}
+              </option>
+            ))}
+          </select>
+          <span className="studio-composer-quota tabular-nums" role="status">
+            {limits
+              ? tp("remaining-today", { remaining: limits.remaining, total: limits.daily_limit })
+              : tp("remaining-today", { remaining: "—", total: "—" })}
+          </span>
+          {limited && (
+            <span role="alert" className="studio-composer-alert">
+              {tp("limit-reached")}
+            </span>
+          )}
+        </div>
+      )}
       {followUpId && <p className="sr-only">{t("prompt-equal-tools")}</p>}
     </div>
   );

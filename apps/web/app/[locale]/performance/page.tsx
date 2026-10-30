@@ -289,22 +289,21 @@ export default function PerformancePage() {
           </span>
           <button
             onClick={() => setAutoPoll((v) => !v)}
-            className={`px-2.5 py-1 rounded text-xs border transition-colors cursor-pointer ${
-              autoPoll
-                ? "bg-accent-blue text-white border-accent-blue"
-                : "bg-background-secondary text-text-secondary border-border"
-            }`}
+            aria-pressed={autoPoll}
+            className="studio-chip"
           >
             {autoPoll ? t("auto-on") : t("auto-off")}
           </button>
-          <Button onClick={() => void refresh()} variant="secondary" disabled={syncing}>
+          <button type="button" onClick={() => void refresh()} disabled={syncing} className="studio-chip">
             {t("refresh")}
-          </Button>
+          </button>
         </div>
       </div>
 
       <PooledComparison rows={perf?.pooled} basis={perf?.pooled_basis} />
-      <Card className="mt-4">
+      <details className="perf-section">
+        <summary>{t("timeline.heading")}</summary>
+        <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("timeline.heading")}</div>
         {loading && !perf ? (
           <div className="text-sm text-text-secondary mt-1">{t("loading")}</div>
@@ -316,10 +315,13 @@ export default function PerformancePage() {
           </div>
         )}
       </Card>
+      </details>
 
       <AdoptionHistory />
 
-      <section className="flex gap-3 flex-wrap mt-4">
+      <details className="perf-section">
+        <summary>{t("latest-heading")}</summary>
+        <section className="flex gap-3 flex-wrap mt-4">
         <MeasureCard
           t={t}
           title={t("baseline-title")}
@@ -363,8 +365,11 @@ export default function PerformancePage() {
           )}
         </Card>
       </section>
+      </details>
 
-      <Card className="mt-4">
+      <details className="perf-section">
+        <summary>{t("run-heading")}</summary>
+        <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("run-heading")}</div>
         <div className="flex gap-2 mt-2 flex-wrap">
           <Button
@@ -409,8 +414,11 @@ export default function PerformancePage() {
         ) : null}
         {loading ? <p className="text-sm text-text-secondary">{t("loading")}</p> : null}
       </Card>
+      </details>
 
-      <Card className="mt-4">
+      <details className="perf-section">
+        <summary>{t("families-heading", { version: suiteVersion })}</summary>
+        <Card className="mt-4">
         <div className="text-xs text-text-secondary">
           {t("families-heading", { version: suiteVersion })}
         </div>
@@ -445,8 +453,11 @@ export default function PerformancePage() {
           </div>
         ) : null}
       </Card>
+      </details>
 
-      <Card className="mt-4">
+      <details className="perf-section">
+        <summary>{t("history-heading")}</summary>
+        <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("history-heading")}</div>
         {loading && !perf ? (
           <div className="text-sm text-text-secondary mt-1">{t("loading")}</div>
@@ -491,8 +502,11 @@ export default function PerformancePage() {
           </div>
         )}
       </Card>
+      </details>
 
-      <Card className="mt-4">
+      <details className="perf-section">
+        <summary>{t("production-heading")}</summary>
+        <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("production-heading")}</div>
         {loading && !perf ? (
           <div className="text-sm text-text-secondary mt-1">{t("loading")}</div>
@@ -514,8 +528,11 @@ export default function PerformancePage() {
           </div>
         )}
       </Card>
+      </details>
 
-      <Card className="mt-4">
+      <details className="perf-section">
+        <summary>{t("how-heading")}</summary>
+        <Card className="mt-4">
         <div className="text-xs text-text-secondary">{t("how-heading")}</div>
         <ul className="text-sm pl-5 mt-2 mb-0 list-disc break-words">
           <li>
@@ -552,6 +569,7 @@ export default function PerformancePage() {
           <li>{t("how-storage", { storage: perf?.storage ?? "—" })}</li>
         </ul>
       </Card>
+      </details>
     </main>
   );
 }

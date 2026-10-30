@@ -286,18 +286,96 @@ export default function ArenaPage() {
   const followUpArena = canFollowUp(activeArena) ? activeArena : null;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8 pb-40 space-y-6">
+    <div className="mx-auto pb-40 space-y-8">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
+      <header className="arena-header">
         <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold text-text-primary">{t("heading")}</h1>
-          </div>
+          <h1 className="text-2xl font-bold text-text-primary">{t("heading")}</h1>
           <p className="text-sm text-text-secondary mt-1">{t("description")}</p>
         </div>
+        <span className="arena-quota" role="status">
+          {limits
+            ? tp("remaining-today", { remaining: limits.remaining, total: limits.daily_limit })
+            : tp("remaining-today", { remaining: "—", total: "—" })}
+        </span>
+      </header>
+      {limitBlocked && (
+        <p role="alert" className="text-xs text-text-secondary">{tp("limit-reached")}</p>
+      )}
 
+      {/* Scoreboard over every stored arena match */}
+      {summary && (() => {
+        const eq = summary.equal_tools;
+        const wins = eq?.wins ?? { evoforge: 0, single: 0, tie: 0 };
+        const share = (h: { passed: number; n: number } | undefined) => (h && h.n > 0 ? Math.round((100 * h.passed) / h.n) : 0);
+        const stats = eq?.stats;
+        const p = stats?.sign_test_p;
+        const pText = typeof p === "number" && Number.isFinite(p) ? String(p) : "—";
+        const significant = typeof p === "number" && Number.isFinite(p) ? p < 0.05 : !!stats?.significant;
+        const lanes = [
+          { key: "evoforge", label: t("summary-heldout-evoforge"), h: eq?.heldout?.evoforge, cost: eq?.cost_cents?.evoforge ?? 0 },
+          { key: "single", label: t("summary-heldout-single"), h: eq?.heldout?.single, cost: eq?.cost_cents?.single ?? 0 },
+        ];
+        return (
+          <section className="arena-board" aria-labelledby="arena-board-title">
+            <div className="arena-board-head">
+              <div>
+                <h2 id="arena-board-title">{t("summary-heading")}</h2>
+                <p>{t("board-sub", { n: eq?.scored ?? 0 })}</p>
+              </div>
+              <span className="arena-chip">{t("summary-equal-tools")}</span>
+            </div>
+            <div className="arena-tiles">
+              <div className="arena-tile is-evoforge"><span>{t("summary-evoforge-wins")}</span><strong>{wins.evoforge ?? 0}</strong></div>
+              <div className="arena-tile is-single"><span>{t("summary-single-wins")}</span><strong>{wins.single ?? 0}</strong></div>
+              <div className="arena-tile"><span>{t("summary-ties")}</span><strong>{wins.tie ?? 0}</strong></div>
+            </div>
+            <div className="arena-bars">
+              <p className="arena-bars-title">{t("hidden-tests")}</p>
+              {lanes.map((lane) => (
+                <div key={lane.key} className={`arena-bar is-${lane.key}`}>
+                  <span className="arena-bar-label">{lane.label}</span>
+                  <span className="arena-bar-track"><span style={{ width: `${share(lane.h)}%` }} /></span>
+                  <span className="arena-bar-value">{share(lane.h)}% <small>{lane.h?.passed ?? 0}/{lane.h?.n ?? 0} · {lane.cost}¢</small></span>
+                </div>
+              ))}
+            </div>
+            <p className={`arena-verdict${significant ? " is-significant" : ""}`}>
+              {significant ? t("summary-significant", { p: pText }) : t("summary-not-significant", { p: pText })}
+            </p>
+            <details className="arena-more">
+              <summary>{t("summary-all-matches")}</summary>
+              <dl className="arena-more-grid">
+                <div><dt>{t("summary-total")}</dt><dd>{summary.total ?? 0}</dd></div>
+                <div><dt>{t("summary-scored")}</dt><dd>{summary.scored ?? 0}</dd></div>
+                <div><dt>{t("summary-evoforge-wins")}</dt><dd>{summary.wins?.evoforge ?? 0}</dd></div>
+                <div><dt>{t("summary-single-wins")}</dt><dd>{summary.wins?.single ?? 0}</dd></div>
+                <div><dt>{t("summary-ties")}</dt><dd>{summary.wins?.tie ?? 0}</dd></div>
+                <div><dt>{t("summary-running")}</dt><dd>{summary.running ?? 0}</dd></div>
+                <div><dt>{t("summary-failed")}</dt><dd>{summary.failed ?? 0}</dd></div>
+                <div><dt>{t("summary-unscorable")}</dt><dd>{summary.unscorable ?? 0}</dd></div>
+                <div><dt>{t("summary-inconclusive")}</dt><dd>{summary.inconclusive ?? 0}</dd></div>
+                <div><dt>{t("summary-heldout-evoforge")}</dt><dd>{summary.heldout?.evoforge?.passed ?? 0}/{summary.heldout?.evoforge?.n ?? 0}</dd></div>
+                <div><dt>{t("summary-heldout-single")}</dt><dd>{summary.heldout?.single?.passed ?? 0}/{summary.heldout?.single?.n ?? 0}</dd></div>
+                <div><dt>{t("summary-cost-judge")}</dt><dd>{summary.cost_cents?.judge ?? 0}¢</dd></div>
+              </dl>
+              {typeof summary.basis === "string" && summary.basis.length > 0 && (
+                <p className="arena-basis">{summary.basis}</p>
+              )}
+            </details>
+          </section>
+        );
+      })()}
+
+      <details className="arena-bench">
+        <summary>
+          <span>
+            <strong>{t("bench-title")}</strong>
+            <small>{t("bench-sub")}</small>
+          </span>
+        </summary>
         {/* Task Selection & Run Action */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="arena-bench-controls">
           <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
             <label className="text-xs text-text-secondary font-medium shrink-0">{t("suite-version")}:</label>
             <select
@@ -355,7 +433,7 @@ export default function ArenaPage() {
             onClick={handleStartMatch}
             disabled={running || !activeTaskId || limitBlocked}
             variant="primary"
-            className="text-xs font-semibold px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white"
+            className="text-sm font-semibold px-4 py-2"
             title={limitBlocked ? tp("limit-reached") : undefined}
           >
             {running ? t("running-match") : t("run-match")}
@@ -366,88 +444,7 @@ export default function ArenaPage() {
               : tp("remaining-today", { remaining: "—", total: "—" })}
           </span>
         </div>
-      </div>
-      {limitBlocked && (
-        <p role="alert" className="text-xs text-text-secondary">{tp("limit-reached")}</p>
-      )}
-
-      {/* Scoreboard over every stored arena match */}
-      {summary && (
-        <Card className="bg-background-secondary border border-border p-4">
-          <span className="text-xs font-semibold text-text-tertiary uppercase tracking-wider block">
-            {t("summary-heading")}
-          </span>
-          <div className="mt-2 text-xs font-semibold text-text-primary break-words">
-            {t("summary-equal-tools")}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
-            <span>{t("summary-evoforge-wins")}: <strong className="text-text-primary">{summary.equal_tools?.wins?.evoforge ?? 0}</strong></span>
-            <span>{t("summary-single-wins")}: <strong className="text-text-primary">{summary.equal_tools?.wins?.single ?? 0}</strong></span>
-            <span>{t("summary-ties")}: <strong className="text-text-primary">{summary.equal_tools?.wins?.tie ?? 0}</strong></span>
-            <span>{t("summary-scored")}: <strong className="text-text-primary">{summary.equal_tools?.scored ?? 0}</strong></span>
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
-            <span>{t("summary-heldout-evoforge")}: <strong className="text-text-primary">{summary.equal_tools?.heldout?.evoforge?.passed ?? 0}/{summary.equal_tools?.heldout?.evoforge?.n ?? 0}</strong></span>
-            <span>{t("summary-heldout-single")}: <strong className="text-text-primary">{summary.equal_tools?.heldout?.single?.passed ?? 0}/{summary.equal_tools?.heldout?.single?.n ?? 0}</strong></span>
-            <span>{t("summary-cost-evoforge")}: <strong className="text-text-primary">{summary.equal_tools?.cost_cents?.evoforge ?? 0}¢</strong></span>
-            <span>{t("summary-cost-single")}: <strong className="text-text-primary">{summary.equal_tools?.cost_cents?.single ?? 0}¢</strong></span>
-            <span>{t("summary-cost-judge")}: <strong className="text-text-primary">{summary.equal_tools?.cost_cents?.judge ?? 0}¢</strong></span>
-          </div>
-          {(() => {
-            const stats = summary.equal_tools?.stats;
-            if (!stats) return null;
-            const p = stats.sign_test_p;
-            const pText = typeof p === "number" && Number.isFinite(p) ? String(p) : "—";
-            const fmtIv = (iv: [number, number] | null | undefined) =>
-              Array.isArray(iv) ? `[${iv[0]}, ${iv[1]}]` : "—";
-            const tasks = stats.tasks ?? summary.equal_tools?.scored ?? 0;
-            const solvedE = stats.solved?.evoforge ?? 0;
-            const solvedS = stats.solved?.single ?? 0;
-            const ivE = fmtIv(stats.wilson95?.evoforge);
-            const ivS = fmtIv(stats.wilson95?.single);
-            const significant = typeof p === "number" && Number.isFinite(p) ? p < 0.05 : !!stats.significant;
-            return (
-              <>
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words max-w-full">
-                  <span>Solved EvoForge {solvedE}/{tasks} {ivE}</span>
-                  <span>Solved Single {solvedS}/{tasks} {ivS}</span>
-                </div>
-                <p className="mt-1 text-xs text-text-secondary break-words max-w-full">
-                  {significant
-                    ? t("summary-significant", { p: pText })
-                    : t("summary-not-significant", { p: pText })}
-                </p>
-              </>
-            );
-          })()}
-          <div className="mt-2 text-xs font-semibold text-text-primary break-words">
-            {t("summary-all-matches")}
-          </div>
-          <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary break-words">
-            <span>{t("summary-evoforge-wins")}: <strong className="text-text-primary">{summary.wins?.evoforge ?? 0}</strong></span>
-            <span>{t("summary-single-wins")}: <strong className="text-text-primary">{summary.wins?.single ?? 0}</strong></span>
-            <span>{t("summary-ties")}: <strong className="text-text-primary">{summary.wins?.tie ?? 0}</strong></span>
-            <span>{t("summary-total")}: <strong className="text-text-primary">{summary.total ?? 0}</strong></span>
-            <span>{t("summary-scored")}: <strong className="text-text-primary">{summary.scored ?? 0}</strong></span>
-            <span>{t("summary-running")}: <strong className="text-text-primary">{summary.running ?? 0}</strong></span>
-            <span>{t("summary-failed")}: <strong className="text-text-primary">{summary.failed ?? 0}</strong></span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
-            <span>{t("summary-heldout-evoforge")}: <strong className="text-text-primary">{summary.heldout?.evoforge?.passed ?? 0}/{summary.heldout?.evoforge?.n ?? 0}</strong></span>
-            <span>{t("summary-heldout-single")}: <strong className="text-text-primary">{summary.heldout?.single?.passed ?? 0}/{summary.heldout?.single?.n ?? 0}</strong></span>
-            <span>{t("summary-cost-evoforge")}: <strong className="text-text-primary">{summary.cost_cents?.evoforge ?? 0}¢</strong></span>
-            <span>{t("summary-cost-single")}: <strong className="text-text-primary">{summary.cost_cents?.single ?? 0}¢</strong></span>
-            <span>{t("summary-cost-judge")}: <strong className="text-text-primary">{summary.cost_cents?.judge ?? 0}¢</strong></span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
-            <span>{t("summary-unscorable")}: <strong className="text-text-primary">{summary.unscorable ?? 0}</strong></span>
-            <span>{t("summary-inconclusive")}: <strong className="text-text-primary">{summary.inconclusive ?? 0}</strong></span>
-          </div>
-          {typeof summary.basis === "string" && summary.basis.length > 0 && (
-            <p className="mt-2 text-xs text-text-tertiary">{summary.basis}</p>
-          )}
-        </Card>
-      )}
+      </details>
 
       {error && (
         <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-2.5 rounded-lg">
@@ -464,8 +461,8 @@ export default function ArenaPage() {
         <Card className="bg-background-secondary border border-border p-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <span className="text-xs font-mono uppercase tracking-wider text-text-tertiary">
-                Task ID: {activeArena.task_id} ({activeArena.suite_version})
+              <span className="arena-chip">
+                {activeArena.task_id} · {activeArena.suite_version}
               </span>
               <p className="text-sm font-medium text-text-primary mt-1">{activeArena.goal}</p>
             </div>
@@ -840,54 +837,52 @@ export default function ArenaPage() {
       )}
 
       {/* Recent Matches List */}
-      <div className="mt-12 pt-8 border-t border-border">
-        <h3 className="text-base font-bold text-text-primary mb-4 flex items-center gap-2">
-          {t("recent-matches")}
-        </h3>
+      <section className="arena-recent" aria-labelledby="arena-recent-title">
+        <h2 id="arena-recent-title">{t("recent-matches")}</h2>
         {recentArenas.length === 0 ? (
-          <p className="text-xs text-text-tertiary">{t("empty-matches")}</p>
+          <p className="text-sm text-text-tertiary">{t("empty-matches")}</p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <ul className="arena-list">
             {recentArenas.map((ar) => {
               const result = arenaVerdict(ar);
               const evoResult = laneView(ar.lanes?.evoforge);
               const singleResult = laneView(ar.lanes?.single);
               const cost = arenaCost(ar);
+              const inconclusive = ar.verdict?.winner === "inconclusive" || evoResult.outcome === "verification_inconclusive" || singleResult.outcome === "verification_inconclusive";
+              const label = result?.winner === "evoforge" ? t("winner-evoforge")
+                : result?.winner === "single" ? t("winner-single")
+                : result?.winner === "tie" ? t("winner-tie")
+                : ar.status === "running" ? t("status-running")
+                : inconclusive ? t("verdict-inconclusive")
+                : ar.status === "failed" ? t("status-failed")
+                : t("result-unconfirmed");
+              const score = (v: typeof evoResult) => v.score ?? "—";
               return (
-              <div
-                key={ar.arena_id}
-                onClick={() => { if (!running) { setActiveArena(ar); setPollError(false); setError(null); } }}
-                className={`p-3 rounded-lg cursor-pointer transition border hover:border-emerald-200 ${
-                  activeArena?.arena_id === ar.arena_id
-                    ? "border-emerald-500 bg-emerald-50"
-                    : "border-border bg-background-secondary"
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs font-mono text-text-tertiary">
-                  <span>{ar.arena_id}</span>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    result?.winner === "evoforge" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
-                    result?.winner === "single" ? "bg-blue-50 text-blue-700 border border-blue-200" :
-                    "bg-slate-100 text-slate-600"
-                  }`}>
-                    {result?.winner ?? (ar.status === "running" ? t("status-running") : ar.verdict?.winner === "inconclusive" || evoResult.outcome === "verification_inconclusive" || singleResult.outcome === "verification_inconclusive" ? t("verdict-inconclusive") : ar.status === "failed" ? t("status-failed") : t("result-unconfirmed"))}
-                  </span>
-                </div>
-                <p className="text-xs font-medium text-text-primary mt-1.5 line-clamp-2">
-                  [{ar.task_id}] {ar.goal}
-                </p>
-                <div className="flex items-center justify-between text-[11px] text-text-secondary mt-2 pt-2 border-t border-border/50">
-                  <span>Evo: {evoResult.score ?? (evoResult.outcome === "verification_inconclusive" ? t("status-inconclusive") : t("status-waiting"))}</span>
-                  <span>Single: {singleResult.score ?? (singleResult.outcome === "verification_inconclusive" ? t("status-inconclusive") : t("status-waiting"))}</span>
-                  <span className="font-semibold text-emerald-700">
-                    {cost === null ? t("cost-unknown") : t("cost-total", { cost })}
-                  </span>
-                </div>
-              </div>
-            )})}
-          </div>
+                <li key={ar.arena_id}>
+                  <button
+                    type="button"
+                    title={ar.arena_id}
+                    aria-pressed={activeArena?.arena_id === ar.arena_id}
+                    onClick={() => { if (!running) { setActiveArena(ar); setPollError(false); setError(null); } }}
+                    className="arena-row"
+                  >
+                    <span className={`arena-pill is-${result?.winner ?? (ar.status === "running" ? "running" : "none")}`}>{label}</span>
+                    <span className="arena-row-main">
+                      <strong>{ar.goal}</strong>
+                      <small>{ar.mode === "prompt" ? t("row-prompt") : ar.task_id}</small>
+                    </span>
+                    <span className="arena-row-score">
+                      <span><em>EvoForge</em> {score(evoResult)}</span>
+                      <span><em>{t("row-single")}</em> {score(singleResult)}</span>
+                    </span>
+                    <span className="arena-row-cost">{cost === null ? "—" : `${cost}¢`}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
         )}
-      </div>
+      </section>
 
       <PromptBar
         disabled={running}
