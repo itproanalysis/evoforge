@@ -29,12 +29,14 @@ export function FeatureRail() {
   const [moreOpen, setMoreOpen] = useState(() => MORE_ITEMS.some(item => item.path === routePath));
   const more = useRef<HTMLDetailsElement>(null);
   const mobileMore = useRef<HTMLDetailsElement>(null);
+  // On phones the More menu would cover the page, so it never opens by itself (desktop reveals the current section).
+  const [mobileOpen, setMobileOpen] = useState(false);
   useEffect(() => {
-    if (!moreOpen) return;
-    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') { setMoreOpen(false); (window.innerWidth < 768 ? mobileMore.current : more.current)?.querySelector('summary')?.focus(); } };
+    if (!moreOpen && !mobileOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') { setMoreOpen(false); setMobileOpen(false); (window.innerWidth < 768 ? mobileMore.current : more.current)?.querySelector('summary')?.focus(); } };
     document.addEventListener('keydown', close);
     return () => document.removeEventListener('keydown', close);
-  }, [moreOpen]);
+  }, [moreOpen, mobileOpen]);
   const link = ({path, key, icon}: {path: string; key: string; icon: string}) => <a key={path} href={`${prefix}${path}`} title={t(key)} aria-label={t(key)} data-tooltip={t(key)} aria-current={routePath === path ? 'page' : undefined} className={`canvas-rail-link${routePath === path ? ' is-active' : ''}`}><StudioIcon name={icon}/><span className="sr-only">{t(key)}</span></a>;
   const content = <>
     <a href={prefix || '/'} className="canvas-rail-brand" title="EvoForge" aria-label="EvoForge"><StudioMark/></a>
@@ -46,6 +48,6 @@ export function FeatureRail() {
   </>;
   return <>
     <nav aria-label={ts('navigation')} className="canvas-rail hidden md:flex">{content}</nav>
-    <nav aria-label={ts('navigation')} className="canvas-mobile-nav flex md:hidden fixed">{ITEMS.map(link)}<details ref={mobileMore} open={moreOpen} onToggle={event => setMoreOpen(event.currentTarget.open)} className="canvas-rail-more"><summary aria-label={t('more')} title={t('more')}><StudioIcon name="more"/></summary><div className="canvas-more-menu">{MORE_ITEMS.map(item => <a href={`${prefix}${item.path}`} key={item.path}>{t(item.key)}</a>)}<LanguageSwitcher/></div></details></nav>
+    <nav aria-label={ts('navigation')} className="canvas-mobile-nav flex md:hidden fixed">{ITEMS.map(link)}<details ref={mobileMore} open={mobileOpen} onToggle={event => setMobileOpen(event.currentTarget.open)} className="canvas-rail-more"><summary aria-label={t('more')} title={t('more')}><StudioIcon name="more"/></summary><div className="canvas-more-menu">{MORE_ITEMS.map(item => <a href={`${prefix}${item.path}`} key={item.path}>{t(item.key)}</a>)}<LanguageSwitcher/></div></details></nav>
   </>;
 }
