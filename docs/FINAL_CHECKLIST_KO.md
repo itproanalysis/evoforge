@@ -1,6 +1,6 @@
 # 최종 제출 체크리스트 (owner용, 2026-10-30 기준)
 
-마감: **11/4 9pm ET = 한국 시간 11/5(수) 오전 11:00**.
+마감: **11/4 9pm ET = 한국 시간 11/5(목) 오전 11:00**.
 라이브: https://evoforge-web-230852112787.asia-northeast3.run.app (영어 `/`, 한국어 `/ko`, 로그인 없음)
 프로덕션: release 26 (API `evoforge-api-00043`, Web `evoforge-web-00041`, Runner `evoforge-runner-00032`, 2026-10-30 배포)
 
