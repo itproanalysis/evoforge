@@ -771,6 +771,24 @@ export function getArena(arena_id: string) {
   return req<ArenaDoc>(`/v1/arena/${encodeURIComponent(arena_id)}`);
 }
 
+export interface ArenaProof {
+  certificate_id: string;
+  arena_id?: string;
+  [key: string]: unknown;
+}
+
+export function getArenaProof(arena_id: string): Promise<ArenaProof | null> {
+  return (async (): Promise<ArenaProof | null> => {
+    const r = await fetch(`${API_BASE}/v1/arena/${encodeURIComponent(arena_id)}/proof`);
+    if (r.status === 404 || r.status === 409) return null;
+    if (!r.ok) {
+      const text = await r.text().catch(() => "");
+      throw new Error(`${r.status} /v1/arena/${encodeURIComponent(arena_id)}/proof: ${text.slice(0, 200)}`);
+    }
+    return (await r.json()) as ArenaProof;
+  })();
+}
+
 export function postPromptArena(
   prompt: string,
   feedback: "critic" | "heldout" = "critic",
