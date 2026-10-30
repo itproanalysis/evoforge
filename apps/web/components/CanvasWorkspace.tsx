@@ -139,7 +139,11 @@ export function CanvasWorkspace(props: Props) {
           <div className="canvas-output-body">
             {view === 'preview' && (preview.html ? props.renderPreview(preview.html, `${props.doc?.arena_id ?? 'empty'}-${side}`) : <div className="canvas-empty">{t(result.status === 'failed' ? 'failed' : props.busy ? 'running' : 'empty')}</div>)}
             {view === 'diff' && (lane?.diff ? <pre className="canvas-source">{lane.diff}</pre> : <div className="canvas-empty">{t('empty')}</div>)}
-            {view === 'tests' && <div className="canvas-test-result"><span>{t('score')}</span><strong>{result.score ?? '—'}</strong><small>{t(result.result === 'passed' ? 'passed' : result.result === 'not_passed' ? 'not-passed' : 'unconfirmed')}</small></div>}
+            {view === 'tests' && (() => {
+              // A lane whose patch never ran was scored 0 by the match; say why instead of "unconfirmed".
+              const noRun = !result.score && (lane?.outcome === 'apply_failed' || lane?.outcome === 'empty_diff') && Number.isInteger(lane?.heldout?.n);
+              return <div className="canvas-test-result"><span>{t('score')}</span><strong>{noRun ? `0/${lane?.heldout?.n}` : result.score ?? '—'}</strong><small>{noRun ? t(lane?.outcome === 'empty_diff' ? 'no-patch' : 'patch-not-applied') : t(result.result === 'passed' ? 'passed' : result.result === 'not_passed' ? 'not-passed' : 'unconfirmed')}</small></div>;
+            })()}
           </div>
         </article>;
       })}

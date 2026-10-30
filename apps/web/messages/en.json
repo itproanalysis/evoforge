@@ -35,7 +35,9 @@
     "prompt": "What shall we build?",
     "followup": "What should change?",
     "readonly": "Run access required",
-    "readonly-short": "Read only"
+    "readonly-short": "Read only",
+    "no-patch": "No patch produced — scored 0",
+    "patch-not-applied": "Patch did not apply — scored 0"
   },
   "share": {
     "button": "Share",

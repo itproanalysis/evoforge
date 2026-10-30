@@ -35,7 +35,9 @@
     "prompt": "무엇을 만들까요?",
     "followup": "어떻게 바꿀까요?",
     "readonly": "실행 권한 필요",
-    "readonly-short": "보기 전용"
+    "readonly-short": "보기 전용",
+    "no-patch": "패치를 만들지 못함 — 0점 처리",
+    "patch-not-applied": "패치가 적용되지 않음 — 0점 처리"
   },
   "share": {
     "button": "공유",
