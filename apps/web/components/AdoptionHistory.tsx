@@ -325,7 +325,7 @@ export function AdoptionHistory() {
                         lo={champ.wilson95?.[0] ?? 0}
                         hi={champ.wilson95?.[1] ?? 0}
                         rate={champ.pass_rate}
-                        color="#38bdf8"
+                        color="#3182f6"
                         label={d.champion}
                       />
                     </div>
@@ -338,7 +338,7 @@ export function AdoptionHistory() {
                         lo={chall.wilson95?.[0] ?? 0}
                         hi={chall.wilson95?.[1] ?? 0}
                         rate={chall.pass_rate}
-                        color="#22c55e"
+                        color="#12a66e"
                         label={d.challenger}
                       />
                     </div>

@@ -100,12 +100,7 @@
 .canvas-conditions { margin-top: 24px; font-size: 11px; line-height: 1.9; color: #6b7684; }
 .canvas-conditions code { font-size: 10px; }
 .canvas-conditions dl { display: grid; grid-template-columns: 70px 1fr; margin: 14px 0; }
-.canvas-management { padding: 16px; background: #13151c; color: #d9dbe6; border-radius: 6px;
- --surface-base: 13 16 20; --surface-panel: 22 27 34; --surface-muted: 17 22 28; --surface-raised: 19 25 32;
- --line: 42 51 61; --line-strong: 59 71 85; --ink: 237 241 245; --ink-muted: 160 172 186; --ink-soft: 196 205 215;
- --accent-action: 49 98 79; --accent-success: 169 217 121; --accent-error: 239 68 68; --accent-warning: 245 158 11;
- --accent-info: 157 217 196; --accent-info-deep: 53 105 87; color-scheme: dark;
-}
+.canvas-management { padding: 16px; background: #f9fafb; color: #333d4b; border: 1px solid #e5e8eb; border-radius: 16px; }
 .studio-button.bg-accent-blue { background: #3182f6; }
 .studio-review-notice { position: fixed; left: 84px; bottom: 6px; z-index: 44; font-size: 9px; color: #aaaab4; margin: 0; }
 .canvas-desktop-actions { display: flex; gap: 3px; }

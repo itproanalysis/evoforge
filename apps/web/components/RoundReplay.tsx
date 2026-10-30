@@ -15,17 +15,17 @@ import type { EvolutionRun } from "../lib/api";
 type Props = { run: EvolutionRun };
 
 const DOT_COLORS: Record<string, string> = {
-  READY: "#34d399",
-  UNVERIFIED: "#fbbf24",
-  FAILED: "#fb7185",
-  PENDING: "#64748b",
+  READY: "#12a66e",
+  UNVERIFIED: "#e88400",
+  FAILED: "#f04452",
+  PENDING: "#b0b8c1",
 };
 
 const BADGE_CLASSES: Record<string, string> = {
-  READY: "bg-emerald-950/60 text-emerald-300 border-emerald-500/40",
-  UNVERIFIED: "bg-amber-950/60 text-amber-300 border-amber-500/40",
-  FAILED: "bg-rose-950/60 text-rose-300 border-rose-500/40",
-  PENDING: "bg-slate-800 text-slate-300 border-slate-700",
+  READY: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  UNVERIFIED: "bg-amber-50 text-amber-700 border-amber-200",
+  FAILED: "bg-rose-50 text-rose-700 border-rose-200",
+  PENDING: "bg-slate-100 text-slate-600 border-slate-200",
 };
 
 function StatusBadge({ status }: { status: string }) {
@@ -83,7 +83,7 @@ export function RoundReplay({ run }: Props) {
     <div>
       <style>{`@media (max-width: 768px) { .replay-columns { grid-template-columns: 1fr !important; } }`}</style>
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
           {t("recorded-run")}
         </span>
         <span className="text-sm font-semibold">{run.title ?? run.run_id}</span>

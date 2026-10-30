@@ -105,18 +105,7 @@ export function CommandBar({ onStarted }: Props) {
   };
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 40,
-        borderTop: "1px solid var(--border, #1e293b)",
-        background: "var(--background, #0f172a)",
-        padding: "10px 16px",
-      }}
-    >
+    <div className="studio-command-bar">
       <div className="flex items-center gap-3 flex-wrap">
         <label className="text-xs flex items-center gap-1.5">
           {t("app-label")}
@@ -150,7 +139,7 @@ export function CommandBar({ onStarted }: Props) {
           onClick={onStart}
           disabled={busy || !appId || !operator}
           title={operator ? undefined : t("operator-only")}
-          className="px-3 py-1 rounded text-xs border border-border bg-background-secondary cursor-pointer font-semibold"
+          className="px-3.5 py-1.5 text-xs font-semibold text-white bg-accent-blue hover:bg-[#1b64da] disabled:bg-background-tertiary disabled:text-text-tertiary disabled:cursor-not-allowed cursor-pointer"
         >
           {t("start")}
         </button>
@@ -161,7 +150,7 @@ export function CommandBar({ onStarted }: Props) {
           {t(STATE_KEY[cmd.state] ?? "state-received")}
           {cmd.reason ? ` · ${cmd.reason}` : ""}
         </span>
-        {error && <span style={{ color: "#f87171", fontSize: 12 }}>{error}</span>}
+        {error && <span style={{ color: "#f04452", fontSize: 12 }}>{error}</span>}
       </div>
       <p className="mt-1 text-xs text-text-secondary">{t("cost-warning")}</p>
       {!operator && <p className="mt-1 text-xs text-text-secondary">{t("operator-only")}</p>}

@@ -57,15 +57,15 @@ export function EvolutionStats({ stats: initial }: Props) {
             data-verdict={verdict}
             className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
               verdict === "not_significant"
-                ? "bg-amber-950/60 text-amber-300 border-amber-500/40"
-                : "bg-emerald-950/60 text-emerald-300 border-emerald-500/40"
+                ? "bg-amber-50 text-amber-700 border-amber-200"
+                : "bg-emerald-50 text-emerald-700 border-emerald-200"
             }`}
           >
             {t(verdictKey)}
           </span>
         )}
       </div>
-      {error && <p style={{ color: "#f87171", fontSize: 12 }}>{error}</p>}
+      {error && <p style={{ color: "#f04452", fontSize: 12 }}>{error}</p>}
       {!view ? (
         <p className="mt-2 text-xs text-text-secondary">{t("stats-runs", { count: 0 })}</p>
       ) : (
@@ -103,7 +103,7 @@ export function EvolutionStats({ stats: initial }: Props) {
                     </span>
                   </div>
                   <div
-                    className="mt-2 h-2 rounded bg-slate-800 relative overflow-hidden"
+                    className="mt-2 h-2 rounded bg-slate-100 relative overflow-hidden"
                     role="img"
                     aria-label={`${label} ${v.interval}`}
                     data-interval-bar={side}

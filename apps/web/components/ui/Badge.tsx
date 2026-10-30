@@ -53,7 +53,7 @@ export function Badge({ state, children }: BadgeProps) {
   
   return (
     <span
-      className={`inline-block px-2.5 py-0.5 rounded-badge text-xs font-bold text-background-primary ${colorClasses[state]}`}
+      className={`inline-block px-2.5 py-0.5 rounded-badge text-xs font-bold text-white ${colorClasses[state]}`}
       aria-label={`Mission state: ${children}`}
     >
       {children}

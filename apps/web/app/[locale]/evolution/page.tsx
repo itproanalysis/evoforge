@@ -16,13 +16,13 @@ import { getErrorMessageKey } from "../../../lib/apiErrors";
 function fitnessBar(score: number) {
   const pct = Math.max(0, Math.min(130, score));
   return (
-    <div style={{ background: "#0b0e14", borderRadius: 6, height: 8, minWidth: 120 }}>
+    <div style={{ background: "#e5e8eb", borderRadius: 6, height: 8, minWidth: 120 }}>
       <div
         style={{
           width: `${Math.min(100, (pct / 130) * 100)}%`,
           height: 8,
           borderRadius: 6,
-          background: score >= 100 ? "#34d399" : score >= 30 ? "#fbbf24" : "#f87171",
+          background: score >= 100 ? "#12a66e" : score >= 30 ? "#e88400" : "#f04452",
         }}
       />
     </div>
@@ -84,7 +84,7 @@ export default function Evolution() {
   return (
     <div>
       <h1>{t("heading")}</h1>
-      <p style={{ color: "#8b93a7" }}>{t("description")}</p>
+      <p style={{ color: "#6b7684" }}>{t("description")}</p>
 
       <Card>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -92,21 +92,21 @@ export default function Evolution() {
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             placeholder={t("goal-placeholder")}
-            style={{ flex: "2 1 260px" }}
+            className="flex-[2_1_260px]"
           />
           <Input
             value={repo}
             onChange={(e) => setRepo(e.target.value)}
             placeholder={t("repo-placeholder")}
-            style={{ flex: "1 1 160px" }}
+            className="flex-[1_1_160px]"
           />
-          <label>
+          <label className="flex items-center gap-2 text-sm text-text-secondary">
             {t("max-gen")} <Input type="number" value={maxGen} min={1} max={10}
-              onChange={(e) => setMaxGen(Number(e.target.value) || 3)} style={{ width: 64 }} />
+              onChange={(e) => setMaxGen(Number(e.target.value) || 3)} className="w-20" />
           </label>
-          <label>
+          <label className="flex items-center gap-2 text-sm text-text-secondary">
             {t("population")} <Input type="number" value={pop} min={1} max={5}
-              onChange={(e) => setPop(Number(e.target.value) || 2)} style={{ width: 64 }} />
+              onChange={(e) => setPop(Number(e.target.value) || 2)} className="w-20" />
           </label>
           <label style={{ fontSize: 13 }}>
             <input type="checkbox" checked={useMem} onChange={(e) => setUseMem(e.target.checked)} /> {t("use-memory")}
@@ -120,13 +120,13 @@ export default function Evolution() {
             {busy === "start" ? t("starting") : t("start")}
           </Button>
         </div>
-        {err && <p style={{ color: "#f87171" }}>{err}</p>}
+        {err && <p style={{ color: "#f04452" }}>{err}</p>}
       </Card>
 
       <div style={{ display: "flex", gap: 16, marginTop: 16, flexWrap: "wrap" }}>
         <div style={{ flex: "1 1 220px" }}>
         <Card>
-          <h3>{t("runs-heading")}</h3>          {evos.length === 0 && <p style={{ color: "#8b93a7" }}>{t("empty")}</p>}
+          <h3>{t("runs-heading")}</h3>          {evos.length === 0 && <p style={{ color: "#6b7684" }}>{t("empty")}</p>}
           {evos.map((e) => (
             <div key={e.evolution_id} style={{ marginBottom: 8 }}>
               <Button variant={selected?.evolution_id === e.evolution_id ? "primary" : "ghost"}
@@ -140,13 +140,13 @@ export default function Evolution() {
 
         <div style={{ flex: "3 1 420px" }}>
         <Card>
-          {!selected && <p style={{ color: "#8b93a7" }}>{t("select-hint")}</p>}
+          {!selected && <p style={{ color: "#6b7684" }}>{t("select-hint")}</p>}
           {selected && (
             <div>
-              <h3>{selected.evolution_id} <span style={{ fontSize: 12, background: "#263048", padding: "2px 8px", borderRadius: 12 }}>{selected.status}</span></h3>
+              <h3>{selected.evolution_id} <span style={{ fontSize: 12, background: "#e5e8eb", padding: "2px 8px", borderRadius: 12 }}>{selected.status}</span></h3>
               <p>{selected.goal}</p>
-              {selected.run_active && <p style={{ color: "#fbbf24", fontSize: 13 }}>{t("run-active")}</p>}
-              {selected.run_error && <p style={{ color: "#f87171", fontSize: 13 }}>{t("run-error")}: {selected.run_error}</p>}
+              {selected.run_active && <p style={{ color: "#e88400", fontSize: 13 }}>{t("run-active")}</p>}
+              {selected.run_error && <p style={{ color: "#f04452", fontSize: 13 }}>{t("run-error")}: {selected.run_error}</p>}
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
                 <Button disabled={busy !== null || selected.status !== "RUNNING"}
                   onClick={() => void act("step", () => stepEvolution(selected.evolution_id), selected.evolution_id)}>
@@ -173,14 +173,14 @@ export default function Evolution() {
                 )}
               </div>
               {selected.generations.map((g) => (
-                <div key={g.index} style={{ borderTop: "1px solid #263048", paddingTop: 8, marginTop: 8 }}>
+                <div key={g.index} style={{ borderTop: "1px solid #e5e8eb", paddingTop: 8, marginTop: 8 }}>
                   <strong>Gen {g.index}</strong> {g.converged ? "✅ CONVERGED" : "…"}
                   {g.candidates.map((c, i) => (
                     <div key={i} style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 4, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 12 }}>cand {i}</span>
                       {fitnessBar(c.fitness?.score ?? 0)}
                       <span style={{ fontSize: 12 }}>{(c.fitness?.score ?? 0).toFixed(1)} pts</span>
-                      <span style={{ fontSize: 12, color: "#8b93a7" }}>
+                      <span style={{ fontSize: 12, color: "#6b7684" }}>
                         {(c.gates ?? []).map((gg) => `${gg.gate}=${gg.result}`).join(" ")}
                         {c.candidate_error ? ` · ${c.candidate_error.slice(0, 120)}` : ""}
                       </span>

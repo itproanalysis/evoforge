@@ -13,7 +13,7 @@ export function SandboxedPreview({ html, title }: SandboxedPreviewProps) {
       srcDoc={html}
       title={title}
       referrerPolicy="no-referrer"
-      style={{ width: "100%", height: 320, border: "1px solid #263048", borderRadius: 8 }}
+      style={{ width: "100%", height: 320, border: "1px solid #e5e8eb", borderRadius: 8 }}
     />
   );
 }
