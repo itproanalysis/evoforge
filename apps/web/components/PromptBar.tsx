@@ -114,13 +114,13 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
 
   return (
     <div className="studio-composer fixed bottom-4">
+      {followUp && (
+        <div className="studio-composer-mode" role="group" aria-label={tp("mode")}>
+          <button type="button" aria-pressed={!newRun} onClick={() => setNewRun(false)}>{tp("continue")}</button>
+          <button type="button" aria-pressed={newRun} onClick={() => setNewRun(true)}>{tp("new-run")}</button>
+        </div>
+      )}
       <div className="studio-composer-inner flex items-end gap-3 flex-wrap">
-        {followUp && (
-          <div className="studio-composer-mode" role="group" aria-label={tp("mode")}>
-            <button type="button" aria-pressed={!newRun} onClick={() => setNewRun(false)}>{tp("continue")}</button>
-            <button type="button" aria-pressed={newRun} onClick={() => setNewRun(true)}>{tp("new-run")}</button>
-          </div>
-        )}
         {followUpId ? (
           <label className="flex-1 min-w-52 text-xs flex flex-col gap-1">
             <textarea
@@ -148,7 +148,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
             {rounds.map((value, i) => (
               <label key={i} className="text-xs flex flex-col gap-1">
                 <span className="text-text-tertiary font-mono">
-                  {tp("round-label", { n: i + 1 })} R{i + 1}
+                  {tp("round-label", { n: i + 1 })}
                 </span>
                 <span className="flex items-start gap-2">
                   <textarea
@@ -173,7 +173,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
                       onClick={() => removeRound(i)}
                       aria-label={tp("remove-round")}
                       title={tp("remove-round")}
-                      className="px-2 py-1 rounded text-xs border border-border cursor-pointer"
+                      className="px-2 py-1 rounded text-xs border border-border cursor-pointer whitespace-nowrap shrink-0"
                     >
                       {tp("remove-round")}
                     </button>

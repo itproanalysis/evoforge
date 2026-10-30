@@ -54,7 +54,7 @@ def test_prompt_bar_rounds_challenges_limits():
     for key in ("add-round", "remove-round", "round-label",
                 "remaining-today", "limit-reached", "challenges"):
         assert key in bar, key
-    assert "R1" in bar
+    assert "round-label" in bar  # rounds are labelled (Round 1, 2, ...)
     assert "5" in bar
     assert "maxLength={2000}" in bar
     assert "prompt-placeholder" in bar and "prompt-start" in bar
