@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   getEvalJob,
   listDecisions,
@@ -12,11 +12,6 @@ import { Button, Card } from "./ui";
 const HARNESS_OPTIONS = ["api-sealed-eval/1", "api-sealed-eval/2"];
 const SUITE_OPTIONS = ["v0", "v1", "v2"];
 const KIND_OPTIONS = ["X_SINGLE", "PIPELINE"];
-
-function shortHarness(version: string): string {
-  const i = version.lastIndexOf("/");
-  return i >= 0 ? version.slice(i) : version;
-}
 
 function clamp01(v: number): number {
   if (typeof v !== "number" || Number.isNaN(v)) return 0;
@@ -79,6 +74,7 @@ function IntervalBar({
 
 export function AdoptionHistory() {
   const t = useTranslations("performance");
+  const locale = useLocale();
   const [decisions, setDecisions] = useState<Decision[] | null>(null);
   const [loadError, setLoadError] = useState("");
   const [suite, setSuite] = useState("v2");
@@ -303,7 +299,7 @@ export function AdoptionHistory() {
                 >
                   <div className="flex justify-between items-start gap-2 flex-wrap min-w-0">
                     <div className="text-xs text-text-secondary min-w-0">
-                      {new Date(d.created_at * 1000).toLocaleString()} · {d.suite_version} · {d.kind}
+                      {new Date(d.created_at * 1000).toLocaleString(locale)} · {d.suite_version} · {d.kind}
                     </div>
                     <span
                       data-testid={adopted ? "adoption-badge-adopt" : "adoption-badge-keep"}
@@ -317,15 +313,12 @@ export function AdoptionHistory() {
                     </span>
                   </div>
                   <div className="text-sm font-semibold mt-1 break-words">
-                    {shortHarness(d.champion)} → {shortHarness(d.challenger)}
-                    <span className="text-xs font-normal text-text-secondary ml-1.5">
-                      {d.champion} → {d.challenger}
-                    </span>
+                    {t("adoption.comparison", { champion: d.champion, challenger: d.challenger })}
                   </div>
                   <div className="grid gap-1.5 mt-2 min-w-0">
                     <div className="min-w-0">
                       <div className="text-xs text-text-secondary break-words">
-                        {shortHarness(d.champion)} · {fmtPct(champ.pass_rate)} · {champ.passed}/{champ.n} ·{" "}
+                        {d.champion} · {fmtPct(champ.pass_rate)} · {champ.passed}/{champ.n} ·{" "}
                         {t("interval")} {fmtInterval(champ.wilson95)}
                       </div>
                       <IntervalBar
@@ -333,12 +326,12 @@ export function AdoptionHistory() {
                         hi={champ.wilson95?.[1] ?? 0}
                         rate={champ.pass_rate}
                         color="#38bdf8"
-                        label={shortHarness(d.champion)}
+                        label={d.champion}
                       />
                     </div>
                     <div className="min-w-0">
                       <div className="text-xs text-text-secondary break-words">
-                        {shortHarness(d.challenger)} · {fmtPct(chall.pass_rate)} · {chall.passed}/{chall.n}{" "}
+                        {d.challenger} · {fmtPct(chall.pass_rate)} · {chall.passed}/{chall.n}{" "}
                         · {t("interval")} {fmtInterval(chall.wilson95)}
                       </div>
                       <IntervalBar
@@ -346,7 +339,7 @@ export function AdoptionHistory() {
                         hi={chall.wilson95?.[1] ?? 0}
                         rate={chall.pass_rate}
                         color="#22c55e"
-                        label={shortHarness(d.challenger)}
+                        label={d.challenger}
                       />
                     </div>
                   </div>

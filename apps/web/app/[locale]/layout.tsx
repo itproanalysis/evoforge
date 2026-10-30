@@ -16,11 +16,12 @@ export async function generateMetadata({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const t = await getTranslations({ locale, namespace: 'layout' });
-  
+  const t = await getTranslations({ locale, namespace: 'titles' });
+  const tLayout = await getTranslations({ locale, namespace: 'layout' });
+
   return {
-    title: t('title'),
-    description: t('description'),
+    title: t('home'),
+    description: tLayout('description'),
   };
 }
 
@@ -54,7 +55,9 @@ export default async function LocaleLayout({
                 <StudioBreadcrumb />
                 <div className="flex items-center gap-5">
                   <a href={`${prefix}/replay`} className="studio-action-link hidden lg:inline-flex">{ts('replay')}<StudioIcon name="arrow" width="14" height="14"/></a>
-                  <LanguageSwitcher />
+                  <div className="hidden md:block">
+                    <LanguageSwitcher />
+                  </div>
                 </div>
               </header>
               <div id="workspace-content" className="studio-content">{children}</div>

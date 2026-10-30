@@ -162,7 +162,7 @@ export default function MissionControl() {
         }
       }
       setSyncError(failed);
-      if (!failed) setLastUpdated(new Date().toLocaleTimeString());
+      if (!failed) setLastUpdated(new Date().toLocaleTimeString(locale));
     } finally {
       refreshingRef.current = false;
       setInitialLoading(false);
@@ -591,7 +591,7 @@ export default function MissionControl() {
         <div>
           <h1 className="my-1 text-2xl font-bold">{t("heading")}</h1>
           <p className="text-text-secondary text-sm mt-0">
-            {t("description")} · {API_BASE}/v1/missions
+            {t("description")}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -750,7 +750,7 @@ export default function MissionControl() {
             {[...perf.history].sort((a, b) => b.created_at - a.created_at).map((entry) => (
               <div key={entry.measurement_id} className="flex flex-wrap justify-between gap-2 p-2.5 rounded-lg border border-border text-sm">
                 <span>{entry.kind} · {entry.model} · {entry.suite_version} · {t(`provenance.${provenance(entry.provider_stub)}` as any)}</span>
-                <span>{entry.passed}/{entry.n} · {formatRate(entry.pass_rate)} · {new Date(entry.created_at * 1000).toLocaleString()}</span>
+                <span>{entry.passed}/{entry.n} · {formatRate(entry.pass_rate)} · {new Date(entry.created_at * 1000).toLocaleString(locale)}</span>
                 {entry.evidence_id && <a href={`/evidence?id=${encodeURIComponent(entry.evidence_id)}`} className="text-accent-cyan hover:underline">{t("evidence-label")}</a>}
               </div>
             ))}
@@ -1064,7 +1064,7 @@ export default function MissionControl() {
                     </span>
                     {m.updated_at ? (
                       <span>
-                        {new Date(m.updated_at * 1000).toLocaleTimeString()}
+                        {new Date(m.updated_at * 1000).toLocaleTimeString(locale)}
                       </span>
                     ) : null}
                     <span className="text-accent-cyan font-semibold">
@@ -1123,7 +1123,7 @@ export default function MissionControl() {
                   ) : null}
                   {o.recorded_at ? (
                     <span className="text-text-secondary">
-                      {new Date(o.recorded_at * 1000).toLocaleTimeString()}
+                      {new Date(o.recorded_at * 1000).toLocaleTimeString(locale)}
                     </span>
                   ) : null}
                 </div>

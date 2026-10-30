@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import {
   listFeedback,
   postFeedback,
@@ -18,6 +18,7 @@ export interface FeedbackPanelProps {
 
 export function FeedbackPanel({ missionId }: FeedbackPanelProps) {
   const t = useTranslations("feedback");
+  const locale = useLocale();
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [kind, setKind] = useState<FeedbackKind>("bug");
   const [text, setText] = useState("");
@@ -128,7 +129,7 @@ export function FeedbackPanel({ missionId }: FeedbackPanelProps) {
                 <span className="text-text-primary break-words">{f.text}</span>
                 {f.created_at ? (
                   <span className="text-xs text-text-secondary">
-                    {new Date(f.created_at * 1000).toLocaleString()}
+                    {new Date(f.created_at * 1000).toLocaleString(locale)}
                   </span>
                 ) : null}
               </div>

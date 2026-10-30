@@ -155,7 +155,7 @@
   },
   "mission-control": {
     "heading": "미션 컨트롤",
-    "description": "POST /api/evoforge/v1/missions · 단일 명령 수명 주기 및 실시간 서버 현황",
+    "description": "단일 명령 수명 주기 및 실시간 서버 현황",
     "objective-label": "새 미션 목표 (Objective)",
     "objective-placeholder": "불안정한 로그인 재시도 수정",
     "repo-ref-label": "repo_ref",
@@ -194,7 +194,7 @@
     "performance-unavailable": "성능 정보를 불러올 수 없습니다.",
     "provenance": {
       "simulated": "모의 공급사 평가",
-      "recorded": "공급사 호출 경로 기록 · 독립 검증 전",
+      "recorded": "모델 호출 기록 · 요청 영수증과 함께 저장",
       "unknown": "공급사 출처 미확인"
     },
     "comparison": "성능 비교",
@@ -425,7 +425,7 @@
     "evidence": "증거",
     "provenance": {
       "simulated": "모의 공급사 평가",
-      "recorded": "공급사 호출 경로 기록 · 독립 검증 전",
+      "recorded": "모델 호출 기록 · 요청 영수증과 함께 저장",
       "unknown": "공급사 출처 미확인"
     },
     "verdicts": {
@@ -481,7 +481,8 @@
       "failed": "실패함"
     },
     "adoption": {
-      "heading": "하네스 채택 이력",
+      "heading": "평가 방법을 어떻게 개선했는지",
+      "comparison": "{champion} 대 {challenger} 비교",
       "empty": "아직 채택 판정 기록이 없습니다.",
       "suite-label": "스위트",
       "kind-label": "종류",
@@ -540,9 +541,17 @@
     "server-key-label": "서버 키",
     "server-key-unavailable": "서버 키 없음 (서명 미설정)",
     "key-match-label": "키 일치",
-    "key-match": "증명서 공개 키가 서버 키와 일치합니다 (Ed25519)",
+    "key-match": "증명서 공개 키가 서버 키와 일치합니다",
     "key-mismatch": "증명서 공개 키가 서버 키와 일치하지 않습니다",
-    "key-match-unknown": "키 일치 여부 알 수 없음"
+    "key-match-unknown": "키 일치 여부 알 수 없음",
+    "certificate-label": "인증서",
+    "evidence-label": "증거",
+    "issued-label": "발급 시각",
+    "signature-label": "서명",
+    "verify-label": "검증",
+    "diff-label": "Diff SHA256",
+    "sealed-label": "봉인 테스트",
+    "sealed-value": "{count} ({kinds})"
   },
   "leaderboard": {
     "heading": "신뢰 리더보드",
@@ -604,9 +613,9 @@
     "running-match": "양측 동시 실행 중…",
     "winner-label": "최종 판정",
     "evoforge-lane": "EvoForge 파이프라인",
-    "evoforge-sub": "하네스 /2 · 독립 Critic · 자동 피드백 재시도",
+    "evoforge-sub": "개선된 하네스 · 독립 Critic · 자동 피드백 재시도",
     "single-lane": "단일 AI (일반 챗)",
-    "single-sub": "하네스 /1 · 엄격 diff 적용 · 피드백 없음",
+    "single-sub": "기존 하네스 · 엄격 diff 적용 · 피드백 없음",
     "cost": "비용",
     "attempts": "시도 횟수",
     "hidden-tests": "비공개 검증 테스트",
@@ -654,7 +663,34 @@
     "summary-unscorable": "점수 낼 테스트 부족",
     "summary-inconclusive": "추가 확인 필요",
     "summary-significant": "통계적으로 유의미함 (p = {p})",
-    "summary-not-significant": "아직 통계적으로 유의미하지 않음 (p = {p}); 더 많은 대결이 필요함"
+    "summary-not-significant": "아직 통계적으로 유의미하지 않음 (p = {p}); 더 많은 대결이 필요함",
+    "status-unconfirmed": "결과 미확인",
+    "status-failed": "실행 실패",
+    "status-pending": "대기 중",
+    "status-inconclusive": "검증 불확실",
+    "status-running": "진행 중",
+    "status-waiting": "결과 대기",
+    "poll-error": "실행 상태를 불러오지 못했습니다. 같은 작업의 상태를 다시 확인해 주세요.",
+    "error-budget": "예산 부족으로 요청이 거부됐습니다.",
+    "error-http": "서버가 요청을 처리하지 못했습니다 (HTTP {status}).",
+    "error-noresponse": "서버 응답을 확인할 수 없습니다.",
+    "error-hint": "다시 시도하기 전에 서버 작업 이력을 확인해 주세요.",
+    "retry-status": "상태 다시 확인",
+    "requesting": "실행 요청 중…",
+    "checking": "작업 {id} 상태 확인 중…",
+    "run-failed": "실행 실패",
+    "run-no-reason": "서버가 실패 사유를 제공하지 않았습니다.",
+    "run-retry-hint": "입력을 확인한 뒤 다시 실행할 수 있습니다.",
+    "sealed-pass": "봉인 테스트 통과",
+    "result-label": "결과",
+    "outcome-unknown": "미확인",
+    "verdict-inconclusive": "검증 불확실 · 비교 보류",
+    "verdict-failed": "비교 실패 · 결과 미확인",
+    "result-unconfirmed": "결과 미확인",
+    "lane-failed": "실패",
+    "no-reason": "사유 미제공",
+    "cost-unknown": "비용 미확인",
+    "cost-total": "서버 합계 {cost}¢ · 출처 개별 확인"
   },
   "plan": {
     "add-round": "라운드 추가",
@@ -731,5 +767,17 @@
     "summary": "요약",
     "verified": "검증됨",
     "comparison-mode": "비교 모드"
+  },
+  "titles": {
+    "home": "EvoForge — 작업실",
+    "arena": "EvoForge 아레나",
+    "replay": "라운드 리플레이",
+    "evidence": "증거 타임라인",
+    "performance": "성과 분석",
+    "verify": "증명서",
+    "lab": "개선 랩",
+    "evolution": "오토파일럿",
+    "leaderboard": "신뢰 리더보드",
+    "share": "공유된 결과"
   }
 }
