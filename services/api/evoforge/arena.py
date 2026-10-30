@@ -491,6 +491,7 @@ def summary() -> dict:
     eq_cost_cents = {"single": 0, "evoforge": 0, "judge": 0}
     eq_solved = {"single": 0, "evoforge": 0}
     excluded = {"strict_harness": 0, "oracle_feedback": 0}
+    latest_win: tuple[float, str] | None = None  # newest fair EvoForge win, for the first screen
     for doc in cands.values():
         if not isinstance(doc, dict):
             continue
@@ -525,6 +526,13 @@ def summary() -> dict:
                 doc.get("judge_cost_cents"))
             if not _is_equal_tools(doc):
                 excluded["oracle_feedback" if _oracle_feedback(doc) else "strict_harness"] += 1
+            if _is_equal_tools(doc) and winner == "evoforge":
+                try:
+                    ts = float(doc.get("created_at") or 0.0)
+                except (TypeError, ValueError):
+                    ts = 0.0
+                if latest_win is None or ts > latest_win[0]:
+                    latest_win = (ts, doc["arena_id"])
             if _is_equal_tools(doc):
                 eq_scored += 1
                 eq_wins[winner] += 1
@@ -574,7 +582,8 @@ def summary() -> dict:
                             "heldout": eq_heldout,
                             "cost_cents": eq_cost_cents,
                             "stats": eq_stats, "excluded": excluded,
-                            "value": value, "basis": FAIR_BASIS},
+                            "value": value, "basis": FAIR_BASIS,
+                            "latest_win": latest_win[1] if latest_win else None},
             "basis": SUMMARY_BASIS}
 
 
