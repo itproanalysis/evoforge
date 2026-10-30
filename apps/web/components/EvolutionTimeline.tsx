@@ -55,9 +55,9 @@ function clamp01(v: number): number {
 }
 
 function colorForKind(kind: string): string {
-  if (kind === "PIPELINE") return "#22c55e";
-  if (kind === "X_SINGLE") return "#38bdf8";
-  return "#a78bfa";
+  if (kind === "PIPELINE") return "#12a66e";
+  if (kind === "X_SINGLE") return "#3182f6";
+  return "#8b5cf6";
 }
 
 function SegmentPanel({
@@ -161,11 +161,11 @@ function SegmentPanel({
                   x2={VB_W - RIGHT}
                   y1={gy}
                   y2={gy}
-                  stroke="#263048"
+                  stroke="#e5e8eb"
                   strokeWidth={1}
                   opacity={0.9}
                 />
-                <text x={LEFT - 6} y={gy + 4} textAnchor="end" fontSize={10} fill="#8b96ad">
+                <text x={LEFT - 6} y={gy + 4} textAnchor="end" fontSize={10} fill="#8b95a1">
                   {g}%
                 </text>
               </g>
@@ -184,12 +184,12 @@ function SegmentPanel({
                   x2={hx}
                   y1={TOP}
                   y2={TOP + CHART_H}
-                  stroke="#f59e0b"
+                  stroke="#e88400"
                   strokeWidth={1.5}
                   strokeDasharray="4 4"
                   opacity={0.9}
                 />
-                <text x={tx} y={TOP + 2} fontSize={10} fill="#f59e0b" textAnchor={anchor}>
+                <text x={tx} y={TOP + 2} fontSize={10} fill="#e88400" textAnchor={anchor}>
                   {shortHarness(hc.to)}
                 </text>
               </g>
@@ -237,7 +237,7 @@ function SegmentPanel({
                     cy={y(p.pass_rate)}
                     r={6}
                     fill={c}
-                    stroke="#0b0e14"
+                    stroke="#ffffff"
                     strokeWidth={2}
                     className="evo-anim motion-reduce:animate-none"
                   />
@@ -247,7 +247,7 @@ function SegmentPanel({
                   y={TOP + CHART_H + 18}
                   textAnchor="middle"
                   fontSize={10}
-                  fill="#8b96ad"
+                  fill="#8b95a1"
                 >
                   {date}
                 </text>
@@ -303,12 +303,12 @@ function SegmentPanel({
                             empty
                               ? {
                                   background:
-                                    "repeating-linear-gradient(45deg, #141b2d, #141b2d 4px, #1a2340 4px, #1a2340 8px)",
-                                  color: "#5b6b8c",
+                                    "repeating-linear-gradient(45deg, #f2f4f6, #f2f4f6 4px, #e5e8eb 4px, #e5e8eb 8px)",
+                                  color: "#8b95a1",
                                 }
                               : {
-                                  backgroundColor: `rgba(34, 197, 94, ${(0.12 + 0.68 * clamp01(rate)).toFixed(3)})`,
-                                  color: "#e8edf5",
+                                  backgroundColor: `rgba(18, 166, 110, ${(0.12 + 0.68 * clamp01(rate)).toFixed(3)})`,
+                                  color: 0.12 + 0.68 * clamp01(rate) >= 0.5 ? "#ffffff" : "#191f28",
                                 }
                           }
                         >

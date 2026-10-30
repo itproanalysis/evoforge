@@ -64,7 +64,7 @@ export function PresentationView({ run, onExit }: Props) {
       aria-label={`Recorded run ${run.run_id}`}
     >
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
+        <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-100 text-slate-600 border border-slate-200">
           {t("recorded-run")}
         </span>
         <span className="text-sm font-semibold">Recorded run {run.run_id}</span>

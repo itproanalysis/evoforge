@@ -8,9 +8,9 @@ import type { EvolutionRun } from "../lib/api";
 type Props = { run: EvolutionRun };
 
 const DOT_COLORS: Record<string, string> = {
-  active: "#34d399",
-  done: "#94a3b8",
-  idle: "#64748b",
+  active: "#12a66e",
+  done: "#8b95a1",
+  idle: "#b0b8c1",
 };
 
 const SIDES: ReplaySideKey[] = ["evoforge", "single"];

@@ -7,6 +7,7 @@ import { StudioBreadcrumb } from '../../components/StudioBreadcrumb';
 import { StudioIcon } from '../../components/StudioIcon';
 import '../../styles/globals.css';
 import '../../styles/canvas.css';
+import '../../styles/pages.css';
 
 const locales = ['en', 'ko'];
 

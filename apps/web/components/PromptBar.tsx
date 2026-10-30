@@ -139,7 +139,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
               aria-label={t("prompt-followup-placeholder")}
               className="w-full px-2 py-1 rounded text-xs border border-border bg-background-secondary text-text-primary"
             />
-            <span className="text-text-tertiary font-mono">
+            <span className="text-text-tertiary tabular-nums">
               {firstRound.length}/2000
             </span>
           </label>
@@ -147,7 +147,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           <div className="flex-1 min-w-52 flex flex-col gap-2">
             {rounds.map((value, i) => (
               <label key={i} className="text-xs flex flex-col gap-1">
-                <span className="text-text-tertiary font-mono">
+                <span className="text-text-tertiary tabular-nums">
                   {tp("round-label", { n: i + 1 })}
                 </span>
                 <span className="flex items-start gap-2">
@@ -179,7 +179,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
                     </button>
                   )}
                 </span>
-                <span className="text-text-tertiary font-mono">
+                <span className="text-text-tertiary tabular-nums">
                   {value.length}/2000
                 </span>
               </label>
@@ -209,13 +209,13 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
                 ))}
               </select>
             </label>
-            <span className="text-text-tertiary font-mono text-xs" role="status">
+            <span className="text-text-tertiary tabular-nums text-xs" role="status">
               {limits
                 ? tp("remaining-today", { remaining: limits.remaining, total: limits.daily_limit })
                 : tp("remaining-today", { remaining: "—", total: "—" })}
             </span>
             {limited && (
-              <span role="alert" className="text-xs" style={{ color: "#a2352e" }}>
+              <span role="alert" className="text-xs" style={{ color: "#f04452" }}>
                 {tp("limit-reached")}
               </span>
             )}
@@ -252,7 +252,7 @@ export function PromptBar({ onStarted, disabled, followUpArena }: Props) {
           <StudioIcon name="arrow" width="17" height="17" className="canvas-send-arrow"/>
           <span className="sr-only">{t(followUpId ? "prompt-followup-start" : "prompt-start")}</span>
         </button>
-        {error && <span style={{ color: "#a2352e", fontSize: 12 }}>{error}</span>}
+        {error && <span style={{ color: "#f04452", fontSize: 12 }}>{error}</span>}
       </div>
       {followUpId && <p className="sr-only">{t("prompt-equal-tools")}</p>}
     </div>

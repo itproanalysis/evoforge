@@ -69,7 +69,7 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
   const t = useTranslations("arena");
   if (status === "running") {
     return (
-      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-950/60 text-amber-300 border border-amber-500/40">
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
         RUNNING
       </span>
@@ -78,20 +78,20 @@ function StatusPill({ status, passed, n }: { status: string; passed?: number; n?
   if (status === "succeeded") {
     if (passed !== undefined && n !== undefined && n > 0 && passed >= n) {
       return (
-        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-950/60 text-emerald-300 border border-emerald-500/40">
+        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
           ALL PASS ({passed}/{n})
         </span>
       );
     }
     if (passed !== undefined && n !== undefined && n > 0 && passed >= 0 && passed < n) return (
-      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-950/60 text-rose-300 border border-rose-500/40">
+      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
         FAILED ({passed ?? 0}/{n ?? 0})
       </span>
     );
     return <span className="text-xs text-text-secondary">{t("result-unconfirmed")}</span>;
   }
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-800 text-slate-300 border border-slate-700">
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200">
       {status === "failed" ? t("status-failed") : status === "pending" ? t("status-pending") : status === "inconclusive" ? t("status-inconclusive") : status.toUpperCase()}
     </span>
   );
@@ -291,7 +291,6 @@ export default function ArenaPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border pb-6">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-3xl">⚔️</span>
             <h1 className="text-2xl font-bold text-text-primary">{t("heading")}</h1>
           </div>
           <p className="text-sm text-text-secondary mt-1">{t("description")}</p>
@@ -451,14 +450,14 @@ export default function ArenaPage() {
       )}
 
       {error && (
-        <div role="alert" className="bg-red-950/50 border border-red-500/40 text-red-300 text-xs px-4 py-2.5 rounded-lg">
+        <div role="alert" className="bg-red-50 border border-red-200 text-red-700 text-xs px-4 py-2.5 rounded-lg">
           {error}
           {pollError && trackedId && <button type="button" onClick={() => { setPollError(false); setError(null); }} className="ml-3 underline">{t("retry-status")}</button>}
         </div>
       )}
       {starting && <p className="text-sm text-text-secondary">{t("requesting")}</p>}
       {pendingId && !activeArena && <p className="text-sm text-text-secondary">{t("checking", { id: pendingId })}</p>}
-      {activeArena?.status === "failed" && <p role="alert" className="text-sm text-red-300">{t("run-failed")}: {activeArena.error || t("run-no-reason")} {t("run-retry-hint")}</p>}
+      {activeArena?.status === "failed" && <p role="alert" className="text-sm text-red-700">{t("run-failed")}: {activeArena.error || t("run-no-reason")} {t("run-retry-hint")}</p>}
 
       {/* Task Goal Display */}
       {activeArena && (
@@ -506,7 +505,7 @@ export default function ArenaPage() {
             </span>
           </div>
           {manifest.upperBound && (
-            <p role="note" className="mt-2 text-xs font-semibold text-amber-300">
+            <p role="note" className="mt-2 text-xs font-semibold text-amber-700">
               {t("manifest-upper-bound")}
             </p>
           )}
@@ -520,17 +519,17 @@ export default function ArenaPage() {
       {activeArena && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Left Stats */}
-          <Card className="p-4 bg-emerald-950/20 border border-emerald-500/30">
-            <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">
+          <Card className="p-4 bg-emerald-50 border border-emerald-200">
+            <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">
               {t("evoforge-lane")}
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-text-primary">
                 {evoView.score ?? (evoView.outcome === "verification_inconclusive" ? t("status-inconclusive") : evoView.status === "failed" ? t("status-failed") : t("status-waiting"))}
               </span>
-              {evoView.score && <span className="text-xs text-emerald-300 font-medium">{t("sealed-pass")}</span>}
+              {evoView.score && <span className="text-xs text-emerald-700 font-medium">{t("sealed-pass")}</span>}
             </div>
-            <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-emerald-500/20 pt-2">
+            <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-emerald-200 pt-2">
               <span>{costLabel(evoView.costState)}: <strong className="text-text-primary">{evoView.cost === null ? "—" : `${evoView.cost}¢`}</strong></span>
               <span>{t("attempts")}: <strong className="text-text-primary">{evoView.attempts ?? "—"}</strong></span>
               <span>{t("result-label")}: <strong className="text-text-primary font-mono">{evoView.outcome ?? t("outcome-unknown")}</strong></span>
@@ -540,17 +539,17 @@ export default function ArenaPage() {
           {/* Verdict Banner (Center) */}
           <Card className={`p-4 border flex flex-col justify-center items-center text-center ${
             verdict?.winner === "evoforge"
-              ? "bg-emerald-950/40 border-emerald-500/50"
+              ? "bg-emerald-50 border-emerald-200"
               : verdict?.winner === "single"
-              ? "bg-blue-950/40 border-blue-500/50"
+              ? "bg-blue-50 border-blue-200"
               : "bg-background-tertiary border-border"
           }`}>
             <span className="text-xs uppercase tracking-wider text-text-tertiary font-bold mb-1">
               {t("winner-label")}
             </span>
             {activeArena.status === "running" ? (
-              <div className="flex items-center gap-2 text-amber-400 font-semibold text-sm">
-                <span className="animate-spin text-base">⚙️</span>
+              <div className="flex items-center gap-2 text-amber-700 font-semibold text-sm">
+                <span aria-hidden="true" className="inline-block h-3.5 w-3.5 rounded-full border-2 border-amber-200 border-t-amber-600 animate-spin"></span>
                 <span>{t("running-match")}</span>
               </div>
             ) : !verdict ? (
@@ -559,16 +558,16 @@ export default function ArenaPage() {
               <div>
                 <span className={`text-base font-extrabold ${
                   verdict.winner === "evoforge"
-                    ? "text-emerald-400"
+                    ? "text-emerald-700"
                     : verdict.winner === "single"
-                    ? "text-blue-400"
+                    ? "text-blue-700"
                     : "text-text-secondary"
                 }`}>
                   {verdict.winner === "evoforge"
-                    ? "🏆 " + t("winner-evoforge")
+                    ? t("winner-evoforge")
                     : verdict.winner === "single"
-                    ? "🤖 " + t("winner-single")
-                    : "🤝 " + t("winner-tie")}
+                    ? t("winner-single")
+                    : t("winner-tie")}
                 </span>
                 <p className="text-xs text-text-tertiary mt-1 max-w-sm">
                   {verdict.reason}
@@ -578,17 +577,17 @@ export default function ArenaPage() {
           </Card>
 
           {/* Right Stats */}
-          <Card className="p-4 bg-blue-950/20 border border-blue-500/30">
-            <span className="text-xs font-semibold text-blue-400 uppercase tracking-wider">
+          <Card className="p-4 bg-blue-50 border border-blue-200">
+            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">
               {t("single-lane")}
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-bold text-text-primary">
                 {singleView.score ?? (singleView.outcome === "verification_inconclusive" ? t("status-inconclusive") : singleView.status === "failed" ? t("status-failed") : t("status-waiting"))}
               </span>
-              {singleView.score && <span className="text-xs text-blue-300 font-medium">{t("sealed-pass")}</span>}
+              {singleView.score && <span className="text-xs text-blue-700 font-medium">{t("sealed-pass")}</span>}
             </div>
-            <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-blue-500/20 pt-2">
+            <div className="mt-2 text-xs text-text-secondary flex justify-between border-t border-blue-200 pt-2">
               <span>{costLabel(singleView.costState)}: <strong className="text-text-primary">{singleView.cost === null ? "—" : `${singleView.cost}¢`}</strong></span>
               <span>{t("attempts")}: <strong className="text-text-primary">{singleView.attempts ?? "—"}</strong></span>
               <span>{t("result-label")}: <strong className="text-text-primary font-mono">{singleView.outcome ?? t("outcome-unknown")}</strong></span>
@@ -608,7 +607,7 @@ export default function ArenaPage() {
             {t("prompt-acceptance", { count: promptView.acceptanceCount, dropped: promptView.dropped })}
           </p>
           {promptView.scorable === false && (
-            <p role="alert" className="mt-2 text-xs font-semibold text-amber-300">
+            <p role="alert" className="mt-2 text-xs font-semibold text-amber-700">
               {t("prompt-unscorable")}
             </p>
           )}
@@ -643,7 +642,7 @@ export default function ArenaPage() {
                   type="button"
                   onClick={() => setSelectedRoundId(row.arenaId)}
                   aria-pressed={selected}
-                  className={`px-2.5 py-1.5 rounded text-xs border text-left ${selected ? "border-emerald-500 bg-emerald-950/20" : "border-border bg-background-tertiary/40"}`}
+                  className={`px-2.5 py-1.5 rounded text-xs border text-left ${selected ? "border-emerald-500 bg-emerald-50" : "border-border bg-background-tertiary/40"}`}
                 >
                   <span className="font-bold font-mono">R{row.round}</span>
                   <span className="block max-w-56 truncate text-text-secondary">{row.prompt}</span>
@@ -692,10 +691,10 @@ export default function ArenaPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* LEFT LANE: EvoForge */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b-2 border-emerald-500/60 pb-2">
+            <div className="flex items-center justify-between border-b-2 border-emerald-200 pb-2">
               <div>
-                <h2 className="text-base font-bold text-emerald-400 flex items-center gap-2">
-                  <span>⚡</span> {t("evoforge-lane")}
+                <h2 className="text-base font-bold text-emerald-700 flex items-center gap-2">
+                  {t("evoforge-lane")}
                 </h2>
                 <span className="text-xs text-text-tertiary">{t("evoforge-sub")}</span>
               </div>
@@ -705,7 +704,7 @@ export default function ArenaPage() {
                 n={evoView.score ? evoLane?.heldout.n : undefined}
               />
             </div>
-            {evoView.status === "failed" && <p role="alert" className="text-sm text-red-300">{t("lane-failed")}: {evoView.error || t("no-reason")}</p>}
+            {evoView.status === "failed" && <p role="alert" className="text-sm text-red-700">{t("lane-failed")}: {evoView.error || t("no-reason")}</p>}
 
             {/* Diff Viewer */}
             <Card className="bg-background-secondary border border-border p-3 space-y-2">
@@ -713,7 +712,7 @@ export default function ArenaPage() {
                 <span>{t("patch")}</span>
                 <span>{evoLane?.diff ? `${evoLane.diff.length} chars` : "No patch"}</span>
               </div>
-              <pre className="text-xs font-mono bg-black/60 p-3 rounded overflow-x-auto max-h-64 text-emerald-300 whitespace-pre">
+              <pre className="text-xs font-mono bg-slate-50 border border-slate-200 p-3 rounded overflow-x-auto max-h-64 text-emerald-700 whitespace-pre">
                 {evoLane?.diff || "// Waiting for candidate patch generation…"}
               </pre>
             </Card>
@@ -750,10 +749,10 @@ export default function ArenaPage() {
                   <div key={i} className="flex items-start gap-2 text-text-secondary bg-background-tertiary/40 px-2 py-1 rounded">
                     <span className="text-text-tertiary text-[10px] w-8">#{ev.seq}</span>
                     <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                      ev.role === "builder" ? "bg-purple-900/40 text-purple-300" :
-                      ev.role === "critic" ? "bg-blue-900/40 text-blue-300" :
-                      ev.role === "runner" ? "bg-emerald-900/40 text-emerald-300" :
-                      "bg-amber-900/40 text-amber-300"
+                      ev.role === "builder" ? "bg-purple-50 text-purple-700" :
+                      ev.role === "critic" ? "bg-blue-50 text-blue-700" :
+                      ev.role === "runner" ? "bg-emerald-50 text-emerald-700" :
+                      "bg-amber-50 text-amber-700"
                     }`}>
                       {ev.role}
                     </span>
@@ -766,10 +765,10 @@ export default function ArenaPage() {
 
           {/* RIGHT LANE: Single AI */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b-2 border-blue-500/60 pb-2">
+            <div className="flex items-center justify-between border-b-2 border-blue-200 pb-2">
               <div>
-                <h2 className="text-base font-bold text-blue-400 flex items-center gap-2">
-                  <span>🤖</span> {t("single-lane")}
+                <h2 className="text-base font-bold text-blue-700 flex items-center gap-2">
+                  {t("single-lane")}
                 </h2>
                 <span className="text-xs text-text-tertiary">{t("single-sub")}</span>
               </div>
@@ -779,7 +778,7 @@ export default function ArenaPage() {
                 n={singleView.score ? singleLane?.heldout.n : undefined}
               />
             </div>
-            {singleView.status === "failed" && <p role="alert" className="text-sm text-red-300">{t("lane-failed")}: {singleView.error || t("no-reason")}</p>}
+            {singleView.status === "failed" && <p role="alert" className="text-sm text-red-700">{t("lane-failed")}: {singleView.error || t("no-reason")}</p>}
 
             {/* Diff Viewer */}
             <Card className="bg-background-secondary border border-border p-3 space-y-2">
@@ -787,7 +786,7 @@ export default function ArenaPage() {
                 <span>{t("patch")}</span>
                 <span>{singleLane?.diff ? `${singleLane.diff.length} chars` : "No patch"}</span>
               </div>
-              <pre className="text-xs font-mono bg-black/60 p-3 rounded overflow-x-auto max-h-64 text-blue-300 whitespace-pre">
+              <pre className="text-xs font-mono bg-slate-50 border border-slate-200 p-3 rounded overflow-x-auto max-h-64 text-blue-700 whitespace-pre">
                 {singleLane?.diff || "// Waiting for candidate patch generation…"}
               </pre>
             </Card>
@@ -824,10 +823,10 @@ export default function ArenaPage() {
                   <div key={i} className="flex items-start gap-2 text-text-secondary bg-background-tertiary/40 px-2 py-1 rounded">
                     <span className="text-text-tertiary text-[10px] w-8">#{ev.seq}</span>
                     <span className={`text-[10px] uppercase font-bold px-1.5 py-0.5 rounded ${
-                      ev.role === "builder" ? "bg-purple-900/40 text-purple-300" :
-                      ev.role === "critic" ? "bg-blue-900/40 text-blue-300" :
-                      ev.role === "runner" ? "bg-emerald-900/40 text-emerald-300" :
-                      "bg-amber-900/40 text-amber-300"
+                      ev.role === "builder" ? "bg-purple-50 text-purple-700" :
+                      ev.role === "critic" ? "bg-blue-50 text-blue-700" :
+                      ev.role === "runner" ? "bg-emerald-50 text-emerald-700" :
+                      "bg-amber-50 text-amber-700"
                     }`}>
                       {ev.role}
                     </span>
@@ -843,7 +842,7 @@ export default function ArenaPage() {
       {/* Recent Matches List */}
       <div className="mt-12 pt-8 border-t border-border">
         <h3 className="text-base font-bold text-text-primary mb-4 flex items-center gap-2">
-          <span>📜</span> {t("recent-matches")}
+          {t("recent-matches")}
         </h3>
         {recentArenas.length === 0 ? (
           <p className="text-xs text-text-tertiary">{t("empty-matches")}</p>
@@ -858,18 +857,18 @@ export default function ArenaPage() {
               <div
                 key={ar.arena_id}
                 onClick={() => { if (!running) { setActiveArena(ar); setPollError(false); setError(null); } }}
-                className={`p-3 rounded-lg cursor-pointer transition border hover:border-emerald-500/60 ${
+                className={`p-3 rounded-lg cursor-pointer transition border hover:border-emerald-200 ${
                   activeArena?.arena_id === ar.arena_id
-                    ? "border-emerald-500 bg-emerald-950/20"
+                    ? "border-emerald-500 bg-emerald-50"
                     : "border-border bg-background-secondary"
                 }`}
               >
                 <div className="flex items-center justify-between text-xs font-mono text-text-tertiary">
                   <span>{ar.arena_id}</span>
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                    result?.winner === "evoforge" ? "bg-emerald-950 text-emerald-300 border border-emerald-500/30" :
-                    result?.winner === "single" ? "bg-blue-950 text-blue-300 border border-blue-500/30" :
-                    "bg-slate-800 text-slate-300"
+                    result?.winner === "evoforge" ? "bg-emerald-50 text-emerald-700 border border-emerald-200" :
+                    result?.winner === "single" ? "bg-blue-50 text-blue-700 border border-blue-200" :
+                    "bg-slate-100 text-slate-600"
                   }`}>
                     {result?.winner ?? (ar.status === "running" ? t("status-running") : ar.verdict?.winner === "inconclusive" || evoResult.outcome === "verification_inconclusive" || singleResult.outcome === "verification_inconclusive" ? t("verdict-inconclusive") : ar.status === "failed" ? t("status-failed") : t("result-unconfirmed"))}
                   </span>
@@ -880,7 +879,7 @@ export default function ArenaPage() {
                 <div className="flex items-center justify-between text-[11px] text-text-secondary mt-2 pt-2 border-t border-border/50">
                   <span>Evo: {evoResult.score ?? (evoResult.outcome === "verification_inconclusive" ? t("status-inconclusive") : t("status-waiting"))}</span>
                   <span>Single: {singleResult.score ?? (singleResult.outcome === "verification_inconclusive" ? t("status-inconclusive") : t("status-waiting"))}</span>
-                  <span className="font-semibold text-emerald-400">
+                  <span className="font-semibold text-emerald-700">
                     {cost === null ? t("cost-unknown") : t("cost-total", { cost })}
                   </span>
                 </div>

@@ -31,12 +31,12 @@ const FALLBACK: Record<string, string> = {
 };
 
 /* Theme tokens (see tailwind.config.ts):
-   done -> accent.green #22c55e, blocked -> accent.red #ef4444,
-   missing -> text.secondary #8b96ad (dashed). */
+   done -> accent.green #12a66e, blocked -> accent.red #f04452,
+   missing -> text.secondary #8b95a1 (dashed). */
 const COLORS: Record<string, { stroke: string; fill: string }> = {
-  done: { stroke: "#22c55e", fill: "#10241a" },
-  blocked: { stroke: "#ef4444", fill: "#2a1215" },
-  missing: { stroke: "#8b96ad", fill: "#141b2d" },
+  done: { stroke: "#12a66e", fill: "#effaf5" },
+  blocked: { stroke: "#f04452", fill: "#fff0f1" },
+  missing: { stroke: "#8b95a1", fill: "#f2f4f6" },
 };
 
 const NODE_W = 148;
@@ -233,7 +233,7 @@ export function EvidenceGraph(props: EvidenceGraphProps) {
               markerHeight="7"
               orient="auto-start-reverse"
             >
-              <path d="M 0 1 L 9 5 L 0 9 z" fill="#8b96ad" />
+              <path d="M 0 1 L 9 5 L 0 9 z" fill="#8b95a1" />
             </marker>
           </defs>
           {edgeLines.map(({ e, i, x1, y1, x2, y2 }) => (
@@ -244,7 +244,7 @@ export function EvidenceGraph(props: EvidenceGraphProps) {
               y1={y1}
               x2={x2 === x1 ? x2 : x2 - 3}
               y2={y2}
-              stroke="#8b96ad"
+              stroke="#8b95a1"
               strokeWidth={1.5}
               markerEnd="url(#ev-arrow)"
               className="ev-edge-anim motion-reduce:animate-none"
@@ -279,7 +279,7 @@ export function EvidenceGraph(props: EvidenceGraphProps) {
                   textAnchor="middle"
                   fontSize={12}
                   fontWeight={600}
-                  fill="#e8edf5"
+                  fill="#333d4b"
                   className="ev-node-text"
                 >
                   {n.label}

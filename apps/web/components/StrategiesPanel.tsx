@@ -125,8 +125,8 @@ export function StrategiesPanel({ strategies: initialStrategies, overview: initi
   return (
     <section aria-label={t("strategies-title")} className="mb-4 p-3 rounded-lg border border-border bg-background-secondary">
       <h2 className="text-sm font-semibold">{t("strategies-title")}</h2>
-      {error && <p style={{ color: "#f87171", fontSize: 12 }}>{error}</p>}
-      {notice && <p role="alert" style={{ color: "#fbbf24", fontSize: 12 }}>{notice}</p>}
+      {error && <p style={{ color: "#f04452", fontSize: 12 }}>{error}</p>}
+      {notice && <p role="alert" style={{ color: "#e88400", fontSize: 12 }}>{notice}</p>}
       {!view ? (
         <p className="mt-2 text-xs text-text-secondary">{t("strategies-title")}</p>
       ) : (
@@ -176,7 +176,7 @@ export function StrategiesPanel({ strategies: initialStrategies, overview: initi
                     <td className="py-1 pr-2">
                       <span>{row.interval}</span>
                       <div
-                        className="mt-1 h-2 rounded bg-slate-800 relative overflow-hidden"
+                        className="mt-1 h-2 rounded bg-slate-100 relative overflow-hidden"
                         role="img"
                         aria-label={`${row.id} ${row.interval}`}
                         data-interval-bar={row.id}
@@ -189,7 +189,7 @@ export function StrategiesPanel({ strategies: initialStrategies, overview: initi
                     </td>
                     <td className="py-1 pr-2">
                       {row.promotable && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-emerald-500/40 bg-emerald-950/60 text-emerald-300">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border border-emerald-200 bg-emerald-50 text-emerald-700">
                           {t("strategies-promotable")}
                         </span>
                       )}{" "}

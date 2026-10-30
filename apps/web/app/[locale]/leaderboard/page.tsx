@@ -21,13 +21,13 @@ export default function Leaderboard() {
   return (
     <div>
       <h1>{t("heading")}</h1>
-      <p style={{ color: "#8b93a7" }}>{t("description")}</p>
-      {err && <p style={{ color: "#f87171" }}>{err}</p>}
+      <p style={{ color: "#6b7684" }}>{t("description")}</p>
+      {err && <p style={{ color: "#f04452" }}>{err}</p>}
       <Card>
         <h3>{t("wins-heading", { count: leaders.length })}</h3>
-        {leaders.length === 0 && <p style={{ color: "#8b93a7" }}>{t("empty")}</p>}
+        {leaders.length === 0 && <p style={{ color: "#6b7684" }}>{t("empty")}</p>}
         {leaders.map((l, i) => (
-          <div key={l.evolution_id} style={{ borderTop: "1px solid #263048", padding: "8px 0", fontSize: 13 }}>
+          <div key={l.evolution_id} style={{ borderTop: "1px solid #e5e8eb", padding: "8px 0", fontSize: 13 }}>
             <strong>#{i + 1}</strong> {l.goal.slice(0, 90)} · {t("score")}: {l.best_score.toFixed(1)} · {l.generations_used} gen
             {l.proof_evidence_id && <span> · <a href={`/verify/${l.proof_evidence_id}`}>{t("proof-link")}</a></span>}
           </div>
@@ -37,7 +37,7 @@ export default function Leaderboard() {
         <Card>
           <h3>{t("memory-heading", { count: patterns.length })}</h3>
           {patterns.map((p) => (
-            <div key={p.pattern_id} style={{ fontSize: 12, color: "#8b93a7", marginTop: 4 }}>
+            <div key={p.pattern_id} style={{ fontSize: 12, color: "#6b7684", marginTop: 4 }}>
               {p.pattern_id.slice(0, 12)} · {(p.keywords ?? []).slice(0, 8).join(", ")} · {t("score")}: {p.fitness_score.toFixed(1)}
               {p.proof_evidence_id && <span> · <a href={`/verify/${p.proof_evidence_id}`}>{t("proof-link")}</a></span>}
             </div>

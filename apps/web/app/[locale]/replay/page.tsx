@@ -115,7 +115,7 @@ export default function ReplayPage() {
         {presentRun ? (
           <PresentationView run={presentRun} onExit={handleExitPresent} />
         ) : (
-          <p role="status" style={{ color: "#8b93a7" }}>{tCommon("loading")}</p>
+          <p role="status" style={{ color: "#6b7684" }}>{tCommon("loading")}</p>
         )}
       </div>
     );
@@ -123,49 +123,46 @@ export default function ReplayPage() {
 
   return (
     <div>
-      <h1>{t("title")}</h1>
+      <h1 className="text-2xl font-bold mb-5">{t("title")}</h1>
       <EvolutionStats />
       <StrategiesPanel />
-      {listError && <p role="alert" style={{ color: "#f87171" }}>
+      {listError && <p role="alert" style={{ color: "#f04452" }}>
         {t("load-failed")} <button type="button" onClick={() => setListAttempt((n) => n + 1)}>{t("retry")}</button>
       </p>}
       {listLoading ? <p role="status">{tCommon("loading")}</p> : !listError && runs.length === 0 ? (
-        <p style={{ color: "#8b93a7" }}>{t("empty")}</p>
+        <p style={{ color: "#6b7684" }}>{t("empty")}</p>
       ) : (
-        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 12 }}>
-          <div style={{ flex: "1 1 200px" }}>
+        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", marginTop: 20 }}>
+          <div style={{ flex: "1 1 200px" }} className="studio-run-list">
             {runs.map((r) => (
-              <div key={r.run_id} style={{ marginBottom: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(r.run_id)}
-                  style={{
-                    fontWeight: selectedId === r.run_id ? 700 : 400,
-                    cursor: "pointer",
-                  }}
-                >
-                  {(r.title ?? r.run_id).slice(0, 48)} · {r.status ?? "—"}
-                </button>
-              </div>
+              <button
+                key={r.run_id}
+                type="button"
+                onClick={() => setSelectedId(r.run_id)}
+                aria-pressed={selectedId === r.run_id}
+              >
+                <strong>{(r.title ?? r.run_id).slice(0, 48)}</strong>
+                <span>{r.status ?? "—"}</span>
+              </button>
             ))}
           </div>
           <div style={{ flex: "3 1 420px" }}>
-            {current?.status === "error" && <p role="alert" style={{ color: "#f87171" }}>
+            {current?.status === "error" && <p role="alert" style={{ color: "#f04452" }}>
               {t("load-failed")} <button type="button" onClick={() => setLoadAttempt((n) => n + 1)}>{t("retry")}</button>
             </p>}
-            {current?.status === "ready" && current.refreshError !== undefined && <p role="alert" style={{ color: "#fbbf24" }}>
+            {current?.status === "ready" && current.refreshError !== undefined && <p role="alert" style={{ color: "#e88400" }}>
               {t("refresh-failed")} <button type="button" onClick={() => setLoadAttempt((n) => n + 1)}>{t("retry")}</button>
             </p>}
             {selected ? (
               <>
-                <button type="button" onClick={() => handlePresent(selected.run_id)}>
+                <button type="button" className="studio-secondary-button" onClick={() => handlePresent(selected.run_id)}>
                   {t("present")}
                 </button>
                 <RoundReplay key={selected.run_id} run={selected} />
                 <AgentPanel run={selected} />
               </>
             ) : selectedId && current?.status !== "error" ? (
-              <p role="status" style={{ color: "#8b93a7" }}>{tCommon("loading")}</p>
+              <p role="status" style={{ color: "#6b7684" }}>{tCommon("loading")}</p>
             ) : null}
           </div>
         </div>

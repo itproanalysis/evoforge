@@ -277,7 +277,7 @@ export default function EvidencePage() {
                   <>
                     <button
                       onClick={() => fetchEvent(l.event_id as string)}
-                      className="bg-transparent border border-border-secondary rounded-md px-2 py-0.5 cursor-pointer text-blue-300 hover:bg-background-secondary max-w-full"
+                      className="bg-transparent border border-border-secondary rounded-md px-2 py-0.5 cursor-pointer text-blue-700 hover:bg-background-secondary max-w-full"
                     >
                       <code className="break-all">{l.event_id}</code>
                     </button>

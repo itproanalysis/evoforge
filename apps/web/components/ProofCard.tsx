@@ -182,7 +182,7 @@ export function ProofCard(props: ProofCardProps) {
                   width: `${Math.max(0, (clamp01(comparison.from.hi) - clamp01(comparison.from.lo)) * 100)}%`,
                   top: 1,
                   bottom: 1,
-                  backgroundColor: "#38bdf8",
+                  backgroundColor: "#3182f6",
                   opacity: 0.85,
                 }}
               />
@@ -195,7 +195,7 @@ export function ProofCard(props: ProofCardProps) {
                   width: `${Math.max(0, (clamp01(comparison.to.hi) - clamp01(comparison.to.lo)) * 100)}%`,
                   top: 1,
                   bottom: 1,
-                  backgroundColor: "#22c55e",
+                  backgroundColor: "#12a66e",
                   opacity: 0.85,
                 }}
               />

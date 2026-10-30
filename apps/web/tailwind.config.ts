@@ -45,7 +45,7 @@ const config: Config = {
         18: "4.5rem",
       },
       borderRadius: {
-        card: "8px",
+        card: "16px",
         badge: "20px",
       },
       fontSize: {
