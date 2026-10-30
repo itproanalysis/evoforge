@@ -105,7 +105,7 @@ export function CommandBar({ onStarted }: Props) {
   };
 
   return (
-    <div className="studio-command-bar">
+    <div className="studio-command-bar" data-placement="fixed-bottom">
       <div className="flex items-center gap-3 flex-wrap">
         <label className="text-xs flex items-center gap-1.5">
           {t("app-label")}
