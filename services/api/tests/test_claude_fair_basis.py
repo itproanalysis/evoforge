@@ -41,4 +41,5 @@ def test_fair_block_excludes_strict_and_oracle_and_states_value():
     assert eq["excluded"] == {"strict_harness": 1, "oracle_feedback": 1}
     assert eq["value"] == {"extra_solved": 2, "extra_cost_cents": 45, "cents_per_extra_solved": 23}
     assert "held-out" in eq["basis"] and "sign test" in eq["basis"]
+    assert eq["latest_win"] in ("f1", "f2")  # a fair win, never the strict or oracle one
     arena.clear()

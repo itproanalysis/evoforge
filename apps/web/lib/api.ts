@@ -872,6 +872,7 @@ export interface ArenaSummary {
     excluded?: { strict_harness: number; oracle_feedback: number };
     value?: { extra_solved: number; extra_cost_cents: number; cents_per_extra_solved: number | null };
     basis?: string;
+    latest_win?: string | null;
   };
   basis: string;
 }

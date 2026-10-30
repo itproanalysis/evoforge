@@ -243,7 +243,18 @@ export default function MissionControl() {
     void getArenaSummary()
       .then((res) => {
         if (cancelled) return;
-        if (res && typeof res === "object") setArenaSummary(res);
+        if (res && typeof res === "object") {
+          setArenaSummary(res);
+          // The newest fair EvoForge win may be older than the 20 runs the list returns: load it directly.
+          const winId = res.equal_tools?.latest_win;
+          if (winId) {
+            void getArena(winId).then((doc) => {
+              if (!cancelled && doc?.arena_id === winId) {
+                setWorkspaceArena((cur) => (cur && cur.verdict?.winner === "evoforge" && cur.status === "succeeded") || cur?.status === "running" ? cur : doc);
+              }
+            }).catch(() => {});
+          }
+        }
       })
       .catch(() => {});
     return () => {
