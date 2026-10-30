@@ -67,6 +67,8 @@ your module, do not touch it — work on a branch.
 
 - 2026-10-29 (Claude): migration 012 (`012_evolutions.sql`, T30) applied with `migrate_once.py`; RLS enable+force verified on
   runtime.api_evolutions and runtime.api_evolution_memory.
+- 2026-10-30 23:45 (agy on behalf of owner, `release/2026-10-30-29` @ `447e0ab7`, image tag `370c329`, api `00049` [lxm], web `00047` [67g], runner `00038` [sjj], storage=postgres):
+  PR #1 merged (inner page light design unification + web CI fix). Web/API/Runner successfully built via Cloud Build (1e6dbbca-893b-483b-b08e-702a314d1a32) and deployed to Cloud Run. All 9 pages (/, /arena, /replay, /evidence, /performance, /lab, /verify/ev_ab527200a91d, /evolution, /leaderboard) verified at 1440px and 390px (light theme palette #f2f4f6/#fff, API proxy panels loading live data). Live mission through the proxy `msn_f1aea6002f1c` ran CREATED→GENERATED→REVIEWED→RAN on Cloud Run Runner (visible 2/2, held-out 3/3; GH_INTEGRITY=PASS, GC_COMPOSITION=PASS, G2_REQUIRED=PASS).
 
 > **Owner, 2026-10-29: we are far from done. Keys/Opus lane and the demo happen at submission time. Until then: make EvoForge
 > itself excellent — pick a row, ship it with tests, keep production green.**
