@@ -1,0 +1,42 @@
+{
+  "checked_at_utc": "2026-10-31T01:35:35.820901+00:00",
+  "evidence_publication": {
+    "url": "https://github.com/itproanalysis/evoforge/releases/tag/submission-evidence-2026-10-31",
+    "tag": "submission-evidence-2026-10-31",
+    "published_at": "2026-10-31T01:34:56Z",
+    "is_prerelease": true,
+    "asset_checks": [
+      {
+        "name": "archive-sha256.txt",
+        "url": "https://github.com/itproanalysis/evoforge/releases/download/submission-evidence-2026-10-31/archive-sha256.txt",
+        "http_status": 200,
+        "bytes": 112
+      },
+      {
+        "name": "captions.en.srt",
+        "url": "https://github.com/itproanalysis/evoforge/releases/download/submission-evidence-2026-10-31/captions.en.srt",
+        "http_status": 200,
+        "bytes": 3535
+      },
+      {
+        "name": "EvoForge_Evidence_Walkthrough.mp4",
+        "url": "https://github.com/itproanalysis/evoforge/releases/download/submission-evidence-2026-10-31/EvoForge_Evidence_Walkthrough.mp4",
+        "http_status": 200,
+        "bytes": 4045856
+      },
+      {
+        "name": "EvoForge_Submission_Materials_2026-10-31.zip",
+        "url": "https://github.com/itproanalysis/evoforge/releases/download/submission-evidence-2026-10-31/EvoForge_Submission_Materials_2026-10-31.zip",
+        "http_status": 200,
+        "bytes": 4120017
+      }
+    ]
+  },
+  "hackathon_submission": {
+    "status": "NOT_SUBMITTED",
+    "receipt": null,
+    "form_url_from_user": "https://cerebralvalley.ai/e/meta-ai-developer-hackathon/",
+    "blocker": "Computer Use stopped because the active browser URL could not be confidently determined for policy enforcement. No further browser input or alternate browser automation attempted.",
+    "remaining": "Open the authenticated project submission form; confirm required fields/video host; submit and retain acknowledgement."
+  }
+}

@@ -36,3 +36,11 @@ https://github.com/itproanalysis/evoforge/releases/tag/submission-evidence-2026-
 
 Video download:
 https://github.com/itproanalysis/evoforge/releases/download/submission-evidence-2026-10-31/EvoForge_Evidence_Walkthrough.mp4
+
+
+## 공개 자료 업로드 확인
+
+GitHub evidence release에 영상·자막·자료ZIP·SHA256을 공개했고4개 첨부의HTTP200을
+확인했다. `docs/validation/2026-10-31-submission-publication.json` 참고.
+이 공개는 대회 접수가 아니며 **NOT_SUBMITTED**를 유지한다.
+사용자가 알려준주소는 공식 행사 홈이다. 로그인된 프로젝트 제출 폼과 접수번호는 아직 없다.
