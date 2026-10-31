@@ -1,0 +1,23 @@
+{
+  "status": "SUBMITTED",
+  "submission_id": "e6c69e57-1455-48aa-9333-566c8922e3d3",
+  "portal": "Cerebral Valley",
+  "event": "Meta Global AI Developer Hackathon",
+  "project": "EvoForge",
+  "track": "Indie Developer Track",
+  "problem_statement": "Push the Frontier",
+  "verified_at_utc": "2026-10-31T14:21:47.196Z",
+  "verified_at_kst": "2026-10-31 23:21:47",
+  "submission_url": "https://cerebralvalley.ai/e/meta-ai-developer-hackathon/hackathon/e6c69e57-1455-48aa-9333-566c8922e3d3/edit?backUrl=%2Fe%2Fmeta-ai-developer-hackathon",
+  "evidence": [
+    "Portal replaced Submit Project with View Submission after one Submit click.",
+    "View Submission reopened the saved Your Submission dialog.",
+    "Saved track, theme, description, source link, demo link and consent were present.",
+    "Update Project button was disabled because no unsaved edits remained."
+  ],
+  "source_url": "https://github.com/itproanalysis/evoforge",
+  "video_url": "https://github.com/itproanalysis/evoforge/releases/download/submission-evidence-2026-10-31/EvoForge_Evidence_Walkthrough.mp4",
+  "submit_click_count": 1,
+  "snapshot_sha256": "6d4bdd36d28bdcdf24419eaa5c4b1f1a865bed534060e978ce1cb17f06db7b2b",
+  "screenshot_sha256": "bb3882c555ff211d9d6809afd2325e1abaf5a0f84e3a361dc91a1ce10f9fd81c"
+}

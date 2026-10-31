@@ -514,3 +514,13 @@ PostgreSQL의 Planner 영수증 두 건은 SETTLED, 원격 Runner HTTP200 요청
 재확인했다. 브라우저 URL 확인 실패로 Computer Use가 중단되어 실제 폼·접수번호는 없다.
 **NOT_SUBMITTED**다. `docs/FINAL_SUBMISSION_STATUS_KO.md`와 `docs/SUBMISSION_FORM_FINAL.md` 참고.
 다른 작업의 main WIP는 보존한다. 새모델 평가·재배포는 하지 않았다.
+
+
+## 2026-10-31 공식 프로젝트 제출 완료
+
+Cerebral Valley에 EvoForge를 Indie Developer / Push the Frontier로 제출했다.
+확인 시각 2026-10-31 23:21:47 KST, 제출 ID `e6c69e57-1455-48aa-9333-566c8922e3d3`.
+최종 Submit을 한 번 실행했고 View Submission→Your Submission 저장 내용을 다시
+확인했다. `docs/SUBMISSION_RECEIPT.md`와 JSON 확인 기록이 현재 상태 정본이다.
+앞선 NOT_SUBMITTED·브라우저 차단 기록은 제출 이전 상태다. 애플리케이션 재배포와
+추가 모델 평가 없이 자료 제출 및 확인만 수행했다.

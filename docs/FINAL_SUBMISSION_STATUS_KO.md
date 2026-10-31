@@ -1,46 +1,31 @@
-# 최종 제출 상태 —2026-10-31
+# 최종 제출 완료 —2026-10-31
 
-**현재 상태: 자료 정리 완료 / 미접수(NOT_SUBMITTED).**
-사용자가 최종 제출까지 승인했다. 브라우저 URL 확인 실패로 Computer Use가 안전 정책상
-중단됐으며, 이후 브라우저 입력이나 우회 자동화를 시도하지 않았다. 실제 제출 폼의
-필드·영상 호스팅 조건·접수 번호를 아직 확보하지 못했다.
+**상태: SUBMITTED.** 기존 미접수·브라우저 차단 기록 이후, 앱 재시작으로 연결을
+복구해 공식 참가자 안내의 제출 링크를 열었고 최종 접수를 완료했다.
 
-## 확인 완료
+- 확인 시각(KST): 2026-10-31 23:21:47
+- 제출 ID: `e6c69e57-1455-48aa-9333-566c8922e3d3`
+- 프로젝트: EvoForge
+- 트랙: Indie Developer Track
+- 문제: Push the Frontier
+- 제출 내역(로그인 필요): https://cerebralvalley.ai/e/meta-ai-developer-hackathon/hackathon/e6c69e57-1455-48aa-9333-566c8922e3d3/edit?backUrl=%2Fe%2Fmeta-ai-developer-hackathon
+- 공개 소스: https://github.com/itproanalysis/evoforge
+- 제출 영상: https://github.com/itproanalysis/evoforge/releases/download/submission-evidence-2026-10-31/EvoForge_Evidence_Walkthrough.mp4
 
-- 공개 운영 사이트·공유·검증·성능·리플레이 등9곳과API8개 HTTP200.
-- 키 없는 기본 네 모델 구성과 저장된 실제 실행13/13 대13/13 확인.
-- 모델 API 사용량26¢; Runner 계산 비용 제외. 추가 모델 호출0건.
-- 인증서 오프라인 검증 성공, 판정 변조 시 실패.
-- 배포본b832086f: API1404 passed/65 skipped, PostgreSQL169, 정본0failure, 웹빌드 통과.
-- 공개 저장소main86a7e80f는 후속 v6·반성재시도 소스를 포함한다. 이번 운영 검증은b832086f에 대한 것이며 최신main이 배포됐다고 주장하지 않는다.
-- PR9는 열려 있다. 병합 또는 검증된 개선으로 추가 계산하지 않는다.
+Submit을 한 번 실행한 뒤 포털의 링크가 View Submission으로 바뀌었다.
+이 링크를 다시 열어 저장된 Your Submission 화면과 프로젝트 내용을 확인했다.
+Update Project는 미수정 상태에서 비활성화되어 있었다. 별도의 숫자 접수 번호는
+화면에 표시되지 않았으며, 위 UUID는 저장된 제출 URL의 프로젝트 ID다.
 
-## 제출물
+필수 의견 두 항목은 사용자가 직접 선택한 답변을 반영했다. 제출자료 사용·공개·
+공유·홍보 권한은 사용자의 명시적 동의를 받은 뒤 체크했다. 선택 설문은 임의로 채우지 않았다.
+원문 의견과 전체 UI 스냅샷은 로컬 증거로 보관하며 공개 저장소에는 게시하지 않는다.
 
-- 영문 입력문: `docs/SUBMISSION_FORM_FINAL.md`
-- 상세 근거: `docs/SUBMISSION.md`, `docs/validation/2026-10-31-judge-live-defaults.json`
-- 로컬 묶음: `C:/Projects/EvoForge/deliverables/2026-10-31-final`
-- 영상: 약2분41초·1920×1080·H.264/AAC·영문 합성 내레이션·자막. 전체 디코드와 장면/자막 배치를 확인했다. 실제 운영 증거를 편집한 영상이며 라이브UI녹화가 아니다.
-
-## 남은 접수 단계
-
-로그인된 참가자 제출 폼 확인→요구 필드 및 영상 링크 확인→최종 Submit→
-확인 화면·시각·접수 번호 보관. 기존 신청 승인 메일은 프로젝트 최종 접수 증거가 아니다.
-사용자에게 실제 제출 폼 주소를 요청했고, 받은 후 해당 경로에서 이어간다.
-영상이 실제UI녹화를 필수로 요구하면 설명 영상을 대체물로 허위 제출하지 않는다.
-마감: 한국시간2026-11-05(목)11:00(공식 페이지 재확인).
+확인 근거: `docs/validation/2026-10-31-submission-receipt.json`.
+로컬 확인 화면: `C:/Projects/EvoForge/deliverables/2026-10-31-final/evidence/submission-confirmed.png`.
+영상은 실제 운영 증거를 편집한 영문 설명 영상이며 라이브 UI 녹화로 표기하지 않았다.
 
 
-Public evidence release (publish/availability checked separately):
-https://github.com/itproanalysis/evoforge/releases/tag/submission-evidence-2026-10-31
-
-Video download:
-https://github.com/itproanalysis/evoforge/releases/download/submission-evidence-2026-10-31/EvoForge_Evidence_Walkthrough.mp4
-
-
-## 공개 자료 업로드 확인
-
-GitHub evidence release에 영상·자막·자료ZIP·SHA256을 공개했고4개 첨부의HTTP200을
-확인했다. `docs/validation/2026-10-31-submission-publication.json` 참고.
-이 공개는 대회 접수가 아니며 **NOT_SUBMITTED**를 유지한다.
-사용자가 알려준주소는 공식 행사 홈이다. 로그인된 프로젝트 제출 폼과 접수번호는 아직 없다.
+기존 준비 ZIP과 그 안의 NOT_SUBMITTED 표기는 실제 제출 전 시점의 보존된 자료다.
+현재 상태의 정본은 이 문서와 `docs/SUBMISSION_RECEIPT.md`다.
+운영 애플리케이션 재배포나 추가 모델 평가 없이 제출만 진행했다.

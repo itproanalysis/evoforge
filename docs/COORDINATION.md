@@ -29,10 +29,14 @@ on `submission/2026-10-31-final`, based on remote main `86a7e80f`. Main WIP is u
 Production remains the gated `b832086f`; newer v6/reflective-retry source is not claimed deployed.
 Final preflight:9 web routes/8 API routes HTTP200; stored four-model run13/13 vs13/13;
 offline Ed25519 original accepted, modified verdict rejected. No new model calls.
-Computer Use stopped because the active browser URL could not be determined confidently
-enough to enforce policy. No further browser inputs or alternate browser automation attempted.
-Authenticated final form/field requirements and receipt remain unavailable: NOT_SUBMITTED.
-Submission copy and160-second edited evidence video are finalized; no extra paid recording.
+Initial browser access was blocked; after owner sign-in and app restart, the in-app browser
+connected normally. The official participant guide linked `/hackathon/submit`.
+**W37 COMPLETE — SUBMITTED** 2026-10-31 23:21:47 KST.
+Submission ID: `e6c69e57-1455-48aa-9333-566c8922e3d3`. One final Submit click;
+View Submission reopened a persisted Your Submission dialog with the saved public project
+fields, selected track/theme and owner-approved required answers/consent. No draft-only
+claim. Receipt: `docs/SUBMISSION_RECEIPT.md`; JSON in `docs/validation/2026-10-31-submission-receipt.json`.
+No new application deploy or model requests in this finalization.
 
 ## 1. Module ownership (exclusive write access)
 

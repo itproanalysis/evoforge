@@ -1,8 +1,10 @@
 # EvoForge — final submission copy
 
-Prepared31 October2026. Owner authorized final submission. **NOT SUBMITTED:** no final form
-or receipt is available; Computer Use stopped on a browser-URL policy check. Field limits,
-required video host and legal attestations must be checked in the actual participant form.
+**SUBMITTED** 2026-10-31 23:21:47 KST.
+Submission ID: `e6c69e57-1455-48aa-9333-566c8922e3d3`.
+The saved Your Submission page was reopened and checked.
+See `docs/SUBMISSION_RECEIPT.md` for the authoritative receipt and as-submitted public fields.
+The text below is the prepared source copy; actual portal wording is recorded separately.
 
 ## Project name
 EvoForge
