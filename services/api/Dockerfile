@@ -24,6 +24,7 @@ COPY evals/sealed_v2/ /app/evals/sealed_v2/
 COPY evals/sealed_v3/ /app/evals/sealed_v3/
 COPY evals/sealed_v4/ /app/evals/sealed_v4/
 COPY evals/sealed_v5/ /app/evals/sealed_v5/
+COPY evals/sealed_v6/ /app/evals/sealed_v6/
 COPY evals/rounds_v1/ /app/evals/rounds_v1/
 
 WORKDIR /app/services/api

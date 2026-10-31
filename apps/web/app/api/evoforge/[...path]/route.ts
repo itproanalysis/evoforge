@@ -139,7 +139,7 @@ async function handle(req: NextRequest, params: { path?: string[] }) {
     ? (req.nextUrl.search ?? "")
     : isAdvance
     ? (req.nextUrl.search ?? "")
-    : req.method === "GET" && apiPath === "/v1/eval/suites" && (suiteVersion === "v0" || suiteVersion === "v1" || suiteVersion === "v2" || suiteVersion === "v3" || suiteVersion === "v4" || suiteVersion === "v5")
+    : req.method === "GET" && apiPath === "/v1/eval/suites" && (suiteVersion === "v0" || suiteVersion === "v1" || suiteVersion === "v2" || suiteVersion === "v3" || suiteVersion === "v4" || suiteVersion === "v5" || suiteVersion === "v6")
       ? `?suite_version=${suiteVersion}`
       : "";
   const target = `${base}${apiPath}${qs}`;
