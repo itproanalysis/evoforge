@@ -1,0 +1,9 @@
+{
+  "certificate_id": "cert_2e3aef56511c",
+  "algorithm": "Ed25519",
+  "original_valid": true,
+  "tampered_verdict_valid": false,
+  "key_matches_public_endpoint": true,
+  "model_calls": 0,
+  "network_calls": 0
+}

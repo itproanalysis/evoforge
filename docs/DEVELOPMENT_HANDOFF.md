@@ -505,3 +505,12 @@ PostgreSQL의 Planner 영수증 두 건은 SETTLED, 원격 Runner HTTP200 요청
 영상은 사용자가 나중에 추가 결제 없이 녹화하기로 했고 최종 제출은 하지 않았다.
 서버 오류 이메일은 과거 GitHub CI 실패·취소 알림이었다. npm11 수정과 이번 Linux 전체 검증은 통과했으며
 과거6시간 hang의 정확한 원인은 확정하지 않았다. 새 CI는 시간 제한·스택·로그 수집을 추가했다.
+
+
+## 2026-10-31 최종 제출 승인 및 접수 차단
+
+최신 사용자가 최종 제출까지 승인했다. W37의 별도 깨끗한 작업 트리에서 영문 제출문과
+최신 네 모델 증거 영상·자료를 정리한다. 운영9페이지·API8개와 오프라인 서명·변조거부를
+재확인했다. 브라우저 URL 확인 실패로 Computer Use가 중단되어 실제 폼·접수번호는 없다.
+**NOT_SUBMITTED**다. `docs/FINAL_SUBMISSION_STATUS_KO.md`와 `docs/SUBMISSION_FORM_FINAL.md` 참고.
+다른 작업의 main WIP는 보존한다. 새모델 평가·재배포는 하지 않았다.

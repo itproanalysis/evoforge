@@ -1,0 +1,129 @@
+{
+  "checked_at_utc": "2026-10-31T01:27:50.572134+00:00",
+  "api": {
+    "defaults": {
+      "status": 200,
+      "bytes": 500
+    },
+    "summary": {
+      "status": 200,
+      "bytes": 1349
+    },
+    "performance": {
+      "status": 200,
+      "bytes": 14918
+    },
+    "outcomes": {
+      "status": 200,
+      "bytes": 437
+    },
+    "limits": {
+      "status": 200,
+      "bytes": 48
+    },
+    "live_arena": {
+      "status": 200,
+      "bytes": 10384
+    },
+    "live_proof": {
+      "status": 200,
+      "bytes": 2157
+    },
+    "key": {
+      "status": 200,
+      "bytes": 83
+    }
+  },
+  "pages": {
+    "/en": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 63636
+    },
+    "/ko": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 67601
+    },
+    "/en/share/job_306819b0b688": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 58198
+    },
+    "/en/verify/job_306819b0b688": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 55898
+    },
+    "/en/share/job_cecd85f043ea": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 58234
+    },
+    "/en/verify/ev_ab527200a91d": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 55894
+    },
+    "/en/performance": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 62497
+    },
+    "/en/replay": {
+      "status": 200,
+      "content_type": "text/html; charset=utf-8",
+      "bytes": 56013
+    },
+    "/en/share/job_cecd85f043ea/opengraph-image": {
+      "status": 200,
+      "content_type": "image/png",
+      "bytes": 47048
+    }
+  },
+  "final_submission_status": "NOT_SUBMITTED",
+  "browser_block": "Computer Use stopped: current browser URL could not be determined confidently enough to enforce policy; no further browser inputs.",
+  "source_repo": {
+    "html_url": "https://github.com/itproanalysis/evoforge",
+    "private": false,
+    "default_branch": "main"
+  },
+  "pr9": {
+    "html_url": "https://github.com/itproanalysis/evoforge-target/pull/9",
+    "state": "open",
+    "merged": false,
+    "merged_at": null,
+    "title": "evoforge mission: In stats.py, fix median(xs) so that for an even…"
+  },
+  "models": [
+    {
+      "role": "builder",
+      "model": "muse-spark-1.3",
+      "provider": "meta",
+      "configured": true
+    },
+    {
+      "role": "planner",
+      "model": "gpt-6.1-sol",
+      "provider": "openai",
+      "configured": true
+    },
+    {
+      "role": "planner",
+      "model": "gemini-4-argon",
+      "provider": "google",
+      "configured": true
+    },
+    {
+      "role": "critic",
+      "model": "claude-opus-5-5",
+      "provider": "anthropic",
+      "configured": true
+    }
+  ],
+  "known_live_run": "job_306819b0b688",
+  "live_model_api_cost_cents": 26,
+  "source_main": "86a7e80f",
+  "deployed_runtime": "b832086f",
+  "new_model_requests": 0
+}

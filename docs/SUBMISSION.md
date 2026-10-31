@@ -1,15 +1,49 @@
 # EvoForge — submission (Meta Global AI Developer Hackathon · Indie · Push the Frontier)
 
-Updated 2026-10-30 (release 26). Every number below is a stored production measurement or ledger entry; IDs are given so a judge can
-re-check them.
+Updated 2026-10-31. Current deployed runtime: `b832086f`; public main also contains
+newer reflective-retry/v6 source which is not claimed as a measured production improvement here.
+Submission is authorized by the owner; no receipt has been obtained yet.
 
 ## One line
 
-**A code-improvement service that only ships what it can prove, and proves it is getting better.** Muse Spark writes the
-patch; an independent Muse Spark Critic writes sealed tests from the spec before it sees the patch; a server-side runner
-executes them; integrity gates block anything unproven; every result carries an Ed25519-signed certificate anyone can
-verify. The service measures its own harness on a sealed benchmark and adopts a change only when the 95% intervals do
-not overlap.
+**A multi-model coding workspace with checkable results and measured self-improvement.**
+
+Muse Spark 1.3 writes code, GPT-6.1 Sol and Gemini 4 Argon provide independent implementation
+plans, and Claude Opus 5.5 acts as the independent specification-first Critic. The Runner executes
+tests, configured gates control promotion, and Ed25519 certificates make stored result bytes
+checkable. A signature is provenance and integrity evidence, not an absolute correctness guarantee.
+
+## Current judging defaults — no API key entry
+
+| Role | Model |
+|---|---|
+| Principal Builder | `muse-spark-1.3` (Meta Model API) |
+| Implementation planners | `gpt-6.1-sol`, `gemini-4-argon` |
+| Independent Critic / acceptance judge | `claude-opus-5-5` |
+| Single-call comparison | `muse-spark-1.3`, one attempt |
+
+Keys remain server-managed; none are supplied by the judge, browser or Runner. The Critic
+receives the original specification, not the planners' advice or the Builder's self-evaluation.
+The comparison is labelled **multi-model system vs single model**, not a same-model ablation.
+There is no silent fallback to another model.
+
+Real keyless production run `job_306819b0b688` exercised all four models and the remote Runner
+with PostgreSQL state and settled Planner reservations. Both lanes passed **13/13 hidden checks**:
+a tie, not evidence of superiority. Model API usage: EvoForge **10¢**, single call **3¢**,
+shared acceptance Judge **13¢**, **26¢ overall**. This excludes Runner compute and has not
+been reconciled to provider invoices.
+
+- Live workspace: https://evoforge-web-230852112787.asia-northeast3.run.app/en
+- Recorded result: https://evoforge-web-230852112787.asia-northeast3.run.app/en/share/job_306819b0b688
+- Verify: https://evoforge-web-230852112787.asia-northeast3.run.app/en/verify/job_306819b0b688
+- Evidence: `docs/validation/2026-10-31-judge-live-defaults.json`
+
+Release gate: 1404 API tests passed / 65 skipped; PostgreSQL kernel169 passed; package0 failures;
+TypeScript, clean Next.js build,147 proxy cases and162 rendered component assertions passed.
+The final preflight rechecked9 web routes and8 read-only API routes with no new model calls.
+
+The historical measurements below describe earlier Spark-based configurations. They are not
+new measurements of the four-model default and must not be combined into a new-model ranking.
 
 ## Proof (production, muse-spark-1.3, Cloud Run + Cloud SQL)
 
@@ -161,7 +195,7 @@ hidden-test scores, costs, the verdict, the fairness disclosure and its certific
 ## Architecture
 
 Next.js web (Cloud Run, same-origin proxy with a path allowlist) → FastAPI API (Cloud Run, private IAM: only the web
-service account may invoke) → Meta Model API (`muse-spark-1.3`) for Builder and Critic, GitHub for PRs, a separate
+service account may invoke) → Meta Model API (`muse-spark-1.3`) for the Builder, native OpenAI/Google planners and Anthropic Critic, GitHub for PRs, a separate
 Runner service (no secrets, no roles) for candidate execution, Cloud SQL PostgreSQL 15 with forced row-level security,
 Secret Manager for every key. Integer cents ledger with reservation before every model call.
 
@@ -180,14 +214,14 @@ onboarding are not.
 - Candidate code (pipeline scoring, Arena lanes, previews) runs in the secret-free Runner since release 18 (T68,
   fail closed); the Runner's metadata-server egress is still open (SEC-02 remainder) — a precondition for public or
   bring-your-own-key use.
-- Prompt Arena: the judge is the same model family as the Builders; since release 21 its hidden tests are kept only if
+- Prompt Arena: the current judge is Claude Opus and the Builder is Spark; since release21 hidden tests are kept only if
   they pass on a judge reference build (T76), and both sides get the interface those tests call (T73). Prompt-Arena
   matches so far are ties or unscorable — no prompt-Arena win is claimed.
 - Paid runs are public within one site-wide daily limit (20 runs, owner decision 2026-10-30); there is no per-user
   account or quota yet, so one visitor can use the whole day's runs.
 - The oracle-strength classifier uses a 20-item human-labelled holdout; the blueprint's M0 bar is 200.
-- One model in production (muse-spark-1.3). The Critic can run on a second Meta open-weight model through any
-  OpenAI-compatible endpoint (T72, env-only, refuses without owner-set prices); it is switched on at submission.
+- Four-model defaults are live. The native Claude Critic is owner-approved. Muse Wonder Full and a second Meta
+  open-weight Critic are not claimed to be active. Legacy Spark-only measurements remain separately labelled.
 - Runner reports are produced in the same process as candidate code. Our Codex agent showed a candidate can forge a passing
   JUnit report (`atexit`); layered defences (diff screen, parent-side cross-checks, fresh interpreter per held-out file)
   are being added, and an independent observer with signed receipts is the long-term boundary. Until then, verification

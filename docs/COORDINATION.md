@@ -13,13 +13,26 @@ Secret Manager versions, API-SA-only per-secret grants, never browser/Runner.
 Only a pristine owned release worktree after all gates may deploy. W36's
 single release actor is Codex; no other ongoing production build was found.
 Public daily-run and POST limits, reservations/receipts, Runner and merge
-authorization remain enforced. Final hackathon Submit remains prohibited.
+authorization remain enforced. Final submission was subsequently authorized by the owner (W37 below).
 
 W36 completed on production `b832086f`: Cloud Build SUCCESS (1404 passed/65 skipped),
 API00052/Web00050/Runner00041 at100%. Keyless real run `job_306819b0b688` used all
 four models, PG settled planner receipts, remote Runner and valid signed proof.
 26 cents model API usage; both lanes13/13 (smoke, no superiority claim).
 Evidence: `docs/validation/2026-10-31-judge-live-defaults.json`.
+
+## W37 — final packaging and submission, owner authorized 2026-10-31
+
+Latest direct owner request: "이제 최종 정리해서 제출까지 진행". This supersedes
+the earlier stop-before-Submit boundary. Codex owns docs and submission-artifact tools only
+on `submission/2026-10-31-final`, based on remote main `86a7e80f`. Main WIP is untouched.
+Production remains the gated `b832086f`; newer v6/reflective-retry source is not claimed deployed.
+Final preflight:9 web routes/8 API routes HTTP200; stored four-model run13/13 vs13/13;
+offline Ed25519 original accepted, modified verdict rejected. No new model calls.
+Computer Use stopped because the active browser URL could not be determined confidently
+enough to enforce policy. No further browser inputs or alternate browser automation attempted.
+Authenticated final form/field requirements and receipt remain unavailable: NOT_SUBMITTED.
+Submission copy and160-second edited evidence video are finalized; no extra paid recording.
 
 ## 1. Module ownership (exclusive write access)
 
