@@ -3,6 +3,25 @@
 // to the client at runtime.
 export const API_BASE = "/api/evoforge";
 
+export interface ModelDefaults {
+  profile: "collaborative" | "legacy";
+  ready: boolean;
+  requires_api_key: false;
+  default_builder: string;
+  default_critic: string;
+  participants: Array<{
+    role: "builder" | "planner" | "critic";
+    provider: "meta" | "openai" | "google" | "anthropic";
+    model: string;
+    configured: boolean;
+  }>;
+  blocked_reason: string | null;
+}
+
+export function getModelDefaults() {
+  return req<ModelDefaults>("/v1/models/defaults", { cache: "no-store" });
+}
+
 export type GateResult = "PASS" | "FAIL" | "INCONCLUSIVE";
 
 export interface GateVerdict {
@@ -688,6 +707,8 @@ export interface ArenaLaneManifest {
 
 export interface ArenaManifest {
   comparison_mode?: string;
+  comparison_scope?: string;
+  collaboration?: ModelDefaults | null;
   suite_version?: string;
   task_id?: string;
   task_spec_hash?: string;
@@ -756,7 +777,7 @@ export interface ArenaDoc {
 
 export function postArena(
   task_id: string,
-  suite_version: "v1" | "v2" | "v3" | "v4" | "v5" = "v2",
+  suite_version: "v1" | "v2" | "v3" | "v4" | "v5" | "v6" = "v2",
   feedback: "heldout" | "critic" = "critic",
   model = "muse-spark-1.3",
   single_apply: "tolerant" | "strict" = "tolerant",

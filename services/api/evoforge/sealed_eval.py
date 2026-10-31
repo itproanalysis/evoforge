@@ -43,7 +43,7 @@ from evoforge import runner_client as _runner_client  # noqa: E402
 
 SUITE_VERSION = "v0"  # default suite
 # v1 keeps v0 held-out tests, files and reference fixes unchanged; only the goals state the contract.
-SUITE_VERSIONS = ("v0", "v1", "v2", "v3", "v4", "v5")
+SUITE_VERSIONS = ("v0", "v1", "v2", "v3", "v4", "v5", "v6")
 BASELINE_MODEL = "muse-spark-1.3"
 BASELINE_COST_CENTS = 120
 ALLOWED_KINDS = frozenset({"compositional", "negative", "boundary"})
@@ -418,7 +418,11 @@ def _heldout_result_passes(result: dict, expected: int) -> bool:
 
 
 def _sandbox_files_for_runner(sandbox: str) -> dict[str, str]:
-    """Read a sandbox tree for Runner execution (skip .git only)."""
+    """Read a sandbox tree for Runner execution (skip .git and non-regular files).
+
+    Only regular files are read: opening a FIFO blocks forever (seen in CI as a 60-minute hang), and a symlink
+    could point outside the sandbox.
+    """
     out: dict[str, str] = {}
     for root, dirs, files in os.walk(sandbox):
         if ".git" in dirs:
@@ -430,6 +434,11 @@ def _sandbox_files_for_runner(sandbox: str) -> dict[str, str]:
             except ValueError:
                 continue
             if rel.split(os.sep)[0] == ".git":
+                continue
+            try:
+                if not stat.S_ISREG(os.lstat(full).st_mode):
+                    continue
+            except OSError:
                 continue
             try:
                 with open(full, "r", encoding="utf-8", newline="") as fh:
@@ -893,6 +902,9 @@ def _pipeline_prices() -> tuple[float, float, float]:
 def _pipeline_usage_cost(usage) -> int | None:
     from evoforge import performance as _perf
 
+    from evoforge import collaboration, platform_models
+    if collaboration.enabled():
+        return platform_models.model_cost_cents(usage, collaboration.BUILDER)
     return _perf.usage_cost_cents(usage)
 
 
@@ -1184,6 +1196,9 @@ def _call_critic_suite(critic_goal: str) -> tuple[str, object, int, bool]:
     the reservation settles at its real value. Not-accepted refunds,
     unknown outcomes are held for reconciliation.
     """
+    from evoforge import collaboration
+    if collaboration.enabled():
+        return collaboration.call_critic_accounted(critic_goal)
     rsv = _ledger.reserve(PIPELINE_PER_ATTEMPT_MAX_CENTS, "default")
     try:
         out = _broker.call_critic(critic_goal, "", "")
@@ -1260,6 +1275,38 @@ def _critic_feedback(goal: str, failures: list[dict],
     return "\n".join(lines)[:4000]
 
 
+# Retry notes. A retry that only restated the failures repeated the same mistake: the CSV probe
+# (job_cd3d388389e1) failed the same Critic tests 0/3 three times, and SV5-AO-01 returned an empty diff
+# three times. The notes carry no test code and no held-out signal, only how to use the feedback.
+REFLECT_NOTE = ("Before writing the patch, re-read the request and check every explicit guarantee it makes "
+                "(round trips, empty and boundary inputs, error types, ordering). Where two requirements "
+                "pull against each other, choose the reading that keeps every stated guarantee true, as a "
+                "well-established library would.")
+REPEAT_NOTE = ("The last two attempts failed the same tests in the same way, so the approach is wrong, not a "
+               "detail: rewrite the affected functions from scratch with a different approach instead of "
+               "editing the previous one.")
+EMPTY_REPEAT_NOTE = ("Two attempts in a row produced no patch. Return a unified diff against the given files "
+                     "now: first the smallest complete implementation of every function the request names, "
+                     "then the edge cases.")
+
+
+def _failure_signature(failures: list[dict]) -> tuple:
+    """Failing tests and messages, without the per-run sandbox paths that make every message unique."""
+    return tuple(sorted((str(f.get("test", "")), re.sub(r"\S*/", "", str(f.get("message", ""))))
+                        for f in (failures or []) if isinstance(f, dict)))
+
+
+def _reflective_feedback(feedback: str, repeated: bool) -> str:
+    """Retry goal: the usual feedback, how to reflect on it, and a change of approach when it repeats."""
+    notes = [REFLECT_NOTE] + ([REPEAT_NOTE] if repeated else [])
+    return feedback + "\n\n" + "\n".join(notes)
+
+
+def _empty_retry_feedback(goal: str, repeated: bool) -> str:
+    text = _critic_empty_feedback(goal)
+    return text + "\n" + EMPTY_REPEAT_NOTE if repeated else text
+
+
 def _critic_empty_feedback(goal: str) -> str:
     return (f"{goal}\n\nPrevious attempt produced an empty diff "
             "(no patch was proposed). Propose a corrected patch.")
@@ -1295,6 +1342,7 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
     decided = False
     last_dest: str | None = None
     last_outcome = "empty_diff"
+    last_sig: tuple | None = None
     for _attempt in range(max_attempts):
         safe = re.sub(r"[^A-Za-z0-9_]+", "_", tid).strip("_") or "task"
         dest = os.path.join(
@@ -1313,9 +1361,9 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
             real = True
         diff = out.get("diff") if isinstance(out, dict) else ""
         if _is_empty_diff(diff):
+            goal = _empty_retry_feedback(task["goal"], last_outcome == "empty_diff" and attempts > 1)
             last_outcome = "empty_diff"
             last_dest = None
-            goal = _critic_empty_feedback(task["goal"])
             continue
         if _candidate_verification_failures(diff):
             last_outcome, last_dest = "verification_inconclusive", None
@@ -1351,12 +1399,14 @@ def _run_critic_attempts(tmpbase: str, fam: str, tid: str, task: dict,
             last_outcome = final_outcome
             decided = True
             break
-        last_outcome = "heldout_failed"
-        goal = _critic_feedback(
+        sig = _failure_signature(c_failures)
+        repeated = last_outcome == "heldout_failed" and sig == last_sig
+        last_outcome, last_sig = "heldout_failed", sig
+        goal = _reflective_feedback(_critic_feedback(
             task["goal"],
             c_failures or [{"test": "critic",
                             "message": "assertion failed"}],
-            len(critic_suite), 0)
+            len(critic_suite), 0), repeated)
     if not decided:
         if last_dest is not None:
             h_score, h_failures = _run_heldout_local_detail(

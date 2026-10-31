@@ -1,0 +1,380 @@
+{
+  "checked_at_utc": "2026-10-30T22:27:39.257162+00:00",
+  "runtime_commit": "b832086f",
+  "cloud_build": {
+    "id": "1c5aba8d-923e-4b1c-aea9-57858af1dd8a",
+    "project": "evoforge-prod-4ff3",
+    "status": "SUCCESS",
+    "api_tests": {
+      "passed": 1404,
+      "skipped": 65,
+      "seconds": 435.55
+    },
+    "images": [
+      "api",
+      "web",
+      "runner"
+    ]
+  },
+  "profile": {
+    "profile": "collaborative",
+    "ready": true,
+    "requires_api_key": false,
+    "default_builder": "muse-spark-1.3",
+    "default_critic": "claude-opus-5-5",
+    "participants": [
+      {
+        "role": "builder",
+        "model": "muse-spark-1.3",
+        "provider": "meta",
+        "configured": true
+      },
+      {
+        "role": "planner",
+        "model": "gpt-6.1-sol",
+        "provider": "openai",
+        "configured": true
+      },
+      {
+        "role": "planner",
+        "model": "gemini-4-argon",
+        "provider": "google",
+        "configured": true
+      },
+      {
+        "role": "critic",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "configured": true
+      }
+    ],
+    "blocked_reason": null
+  },
+  "revisions": [
+    {
+      "service": "evoforge-api",
+      "ready_revision": "evoforge-api-00052-qlh",
+      "traffic": [
+        {
+          "latestRevision": true,
+          "percent": 100,
+          "revisionName": "evoforge-api-00052-qlh"
+        }
+      ],
+      "provider_secret_references": {
+        "OPENAI_API_KEY": {
+          "key": "1",
+          "name": "OPENAI_API_KEY"
+        },
+        "ANTHROPIC_API_KEY": {
+          "key": "1",
+          "name": "ANTHROPIC_API_KEY"
+        },
+        "GEMINI_API_KEY": {
+          "key": "1",
+          "name": "GEMINI_API_KEY"
+        }
+      }
+    },
+    {
+      "service": "evoforge-web",
+      "ready_revision": "evoforge-web-00050-rhw",
+      "traffic": [
+        {
+          "revisionName": "evoforge-web-00003-hpf",
+          "tag": "rev3",
+          "url": "https://rev3---evoforge-web-n7pvt7dk6q-du.a.run.app"
+        },
+        {
+          "latestRevision": true,
+          "percent": 100,
+          "revisionName": "evoforge-web-00050-rhw"
+        }
+      ],
+      "provider_secret_references": {}
+    },
+    {
+      "service": "evoforge-runner",
+      "ready_revision": "evoforge-runner-00041-pcc",
+      "traffic": [
+        {
+          "latestRevision": true,
+          "percent": 100,
+          "revisionName": "evoforge-runner-00041-pcc"
+        }
+      ],
+      "provider_secret_references": {}
+    }
+  ],
+  "keyless_request": {
+    "api_key_sent": false,
+    "login_cookie_sent": false,
+    "post_status": 202
+  },
+  "run": {
+    "arena_id": "job_306819b0b688",
+    "status": "succeeded",
+    "lanes": {
+      "single": {
+        "status": "succeeded",
+        "outcome": "passed",
+        "heldout": {
+          "passed": 13,
+          "n": 13
+        },
+        "cost_cents": 3,
+        "attempts": 1,
+        "cost_status": "usage_reported",
+        "preview_source": "candidate"
+      },
+      "evoforge": {
+        "status": "succeeded",
+        "outcome": "passed",
+        "heldout": {
+          "passed": 13,
+          "n": 13
+        },
+        "cost_cents": 10,
+        "attempts": 1,
+        "cost_status": "usage_reported",
+        "preview_source": "candidate"
+      }
+    },
+    "judge_cost_cents": 13,
+    "total_model_api_cost_cents": 26,
+    "runner_cost": "not_measured",
+    "comparison_scope": "multi_model_system_vs_single_model",
+    "verdict": {
+      "winner": "tie",
+      "reason": "tie 13-13 on held-out"
+    }
+  },
+  "collaboration": {
+    "cost_cents": 2,
+    "usage_missing": false,
+    "provider_calls": [
+      {
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "requested_model": "gpt-6.1-sol",
+        "response_model": "gpt-6.1-sol",
+        "response_model_matches": true,
+        "phase": "implementation_plan",
+        "finish_reason": "stop",
+        "provider_request_id": "req_92811e9c6bfe4ced8033507f81b2cd1e",
+        "provider_response_id": "resp_0ef8352856f5d0ec016ae519364dc887d0813bc9e4cae8f5c4",
+        "usage": {
+          "prompt_tokens": 280,
+          "completion_tokens": 364,
+          "total_tokens": 644,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 78
+          },
+          "completion_includes_reasoning": true,
+          "cache_creation_5m_tokens": 0,
+          "cache_creation_1h_tokens": 0
+        },
+        "billing_verified": false,
+        "price_table_version": "first-party-standard-2026-10-31"
+      },
+      {
+        "provider": "google",
+        "model": "gemini-4-argon",
+        "requested_model": "gemini-4-argon",
+        "response_model": "gemini-4-argon",
+        "response_model_matches": true,
+        "phase": "implementation_plan",
+        "finish_reason": "stop",
+        "provider_request_id": null,
+        "provider_response_id": "QRnlapv4Fuqw1e8Pk_zRgQM",
+        "usage": {
+          "prompt_tokens": 390,
+          "completion_tokens": 452,
+          "total_tokens": 842,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "completion_includes_reasoning": true,
+          "cache_creation_5m_tokens": 0,
+          "cache_creation_1h_tokens": 0
+        },
+        "billing_verified": false,
+        "price_table_version": "first-party-standard-2026-10-31"
+      }
+    ],
+    "reservation_ids": [
+      "rsv_ca91ddda8e8e",
+      "rsv_7c032ad6a67b"
+    ],
+    "evidence_ids": [
+      "ev_176b215d8da3",
+      "ev_7aee12ec5085"
+    ],
+    "participants": [
+      {
+        "role": "builder",
+        "model": "muse-spark-1.3",
+        "provider": "meta",
+        "configured": true
+      },
+      {
+        "role": "planner",
+        "model": "gpt-6.1-sol",
+        "provider": "openai",
+        "configured": true
+      },
+      {
+        "role": "planner",
+        "model": "gemini-4-argon",
+        "provider": "google",
+        "configured": true
+      },
+      {
+        "role": "critic",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "configured": true
+      }
+    ]
+  },
+  "persisted_planner_receipts": [
+    {
+      "id": "ev_176b215d8da3",
+      "kind": "provider_call",
+      "phase": "implementation_plan",
+      "reservation": {
+        "id": "rsv_ca91ddda8e8e",
+        "ts": 1793399092.6567376,
+        "state": "SETTLED",
+        "reason": "",
+        "project": "default",
+        "cost_cents": 120
+      },
+      "model": "gpt-6.1-sol",
+      "response_model_matches": true
+    },
+    {
+      "id": "ev_7aee12ec5085",
+      "kind": "provider_call",
+      "phase": "implementation_plan",
+      "reservation": {
+        "id": "rsv_7c032ad6a67b",
+        "ts": 1793399105.0566602,
+        "state": "SETTLED",
+        "reason": "",
+        "project": "default",
+        "cost_cents": 120
+      },
+      "model": "gemini-4-argon",
+      "response_model_matches": true
+    }
+  ],
+  "postgres_storage": "postgres",
+  "runtime_guards": {
+    "state_backend": "postgres",
+    "remote_runner_configured": true,
+    "principal_model_key_configured": true
+  },
+  "runner_requests_during_run": [
+    {
+      "timestamp": "2026-10-30T22:25:34.429Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:25:33.465693Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:25:32.509767Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:56.272363Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:55.308575Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:30.847707Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:29.924430Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:29.009463Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:28.149314Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:09.275890Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:08.322185Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:07.367215Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    },
+    {
+      "timestamp": "2026-10-30T22:24:06.071978Z",
+      "status": 200,
+      "revision": "evoforge-runner-00041-pcc"
+    }
+  ],
+  "signed_proof": {
+    "certificate_id": "cert_2e3aef56511c",
+    "algorithm": "Ed25519",
+    "verify": {
+      "ok": true,
+      "reason": "Ed25519 signature valid over certificate body"
+    }
+  },
+  "share_url": "https://evoforge-web-230852112787.asia-northeast3.run.app/ko/share/job_306819b0b688",
+  "verify_url": "https://evoforge-web-230852112787.asia-northeast3.run.app/ko/verify/job_306819b0b688",
+  "share_http_status": 200,
+  "verify_http_status": 200,
+  "limits_before": {
+    "daily_limit": 20,
+    "used_today": 14,
+    "remaining": 6
+  },
+  "limits_after": {
+    "daily_limit": 20,
+    "used_today": 15,
+    "remaining": 5
+  },
+  "limitations": [
+    "Single smoke run establishes operation, not statistical superiority or intelligence ranking.",
+    "Reported costs use provider usage and configured prices, not reconciled supplier invoices; Runner compute excluded.",
+    "No browser visual/interaction QA in this run; SSR162, proxy147, TypeScript and Next build passed.",
+    "Existing Critic progress event denominator counts snippet groups (11/4); this is not a test pass fraction. Actual final held-out result is13/13.",
+    "Reference proposal SEC02 hardening, per-visitor quotas, third-party OSS PR and video are separate unfinished work; no final submission performed."
+  ]
+}

@@ -1,5 +1,24 @@
 import type { ArenaDoc } from "./api";
 
+export function shareComparison(doc: ArenaDoc | null | undefined): {
+  kind: 'multi_model' | 'same_builder' | 'unconfirmed'; model: string | null;
+} {
+  const manifest = doc?.manifest;
+  if (manifest?.comparison_scope === 'multi_model_system_vs_single_model' ||
+      manifest?.collaboration?.profile === 'collaborative') {
+    return {kind: 'multi_model', model: null};
+  }
+  const single = manifest?.lanes?.single?.model;
+  const evoforge = manifest?.lanes?.evoforge?.model;
+  if (typeof single === 'string' && single && typeof evoforge === 'string' && evoforge) {
+    return single === evoforge ? {kind: 'same_builder', model: single} : {kind: 'unconfirmed', model: null};
+  }
+  // Historical records have the common Builder model at the document root.
+  return typeof doc?.model === 'string' && doc.model
+    ? {kind: 'same_builder', model: doc.model}
+    : {kind: 'unconfirmed', model: null};
+}
+
 export function shareUrl(origin: string, locale: string, arenaId: string): string {
   const base = (origin ?? "").replace(/\/+$/, "");
   const prefix = locale === "ko" ? "/ko" : "";

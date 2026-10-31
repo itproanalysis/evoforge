@@ -31,11 +31,12 @@ def test_v5_tasks_listed_with_real_ids():
     assert len(want) == 12 and sorted(ids) == sorted(want)
 
 
-def test_v5_is_selectable_and_the_default():
+def test_v5_is_selectable_after_v6_the_default():
     src = PAGE.read_text(encoding="utf-8")
     assert re.search(r'<option value="v5">', src)
-    assert re.search(r'useState<[^>]*"v5"[^>]*>\(\s*"v5"\s*\)', src), "the Arena page should open on sealed v5"
-    assert src.index('<option value="v5">') < src.index('<option value="v4">')  # listed first
+    # v6 keeps v5's tasks with finer held-out tests and is now where the Arena opens.
+    assert re.search(r'useState<[^>]*"v6"[^>]*>\(\s*"v6"\s*\)', src), "the Arena page should open on sealed v6"
+    assert src.index('<option value="v6">') < src.index('<option value="v5">') < src.index('<option value="v4">')
 
 
 def test_goals_are_short_plain_summaries_of_the_real_goal():

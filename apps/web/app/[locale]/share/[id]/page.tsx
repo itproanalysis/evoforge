@@ -5,6 +5,7 @@ import { getArena, getArenaProof, type ArenaDoc, type ArenaLane } from "../../..
 import { manifestView, previewView } from "../../../../lib/arenaStatus";
 import { shareText } from "../../../../lib/share";
 import { SandboxedPreview } from "../../../../components/SandboxedPreview";
+import { ShareComparisonBadge } from "../../../../components/ShareComparisonBadge";
 
 type Side = "evoforge" | "single";
 
@@ -79,7 +80,7 @@ function ShareDetails({ doc, certificateId }: { doc: ArenaDoc; certificateId: st
           <LaneScore side="single" lane={singleLane} leading={winner === "single"} />
         </div>
         <ul className="share-trust">
-          <li>{t("same-model", { model: doc.model || "—" })}</li>
+          <ShareComparisonBadge doc={doc}/>
           <li>{t("same-tests")}</li>
           {certificateId && <li>{t("signed")}</li>}
         </ul>

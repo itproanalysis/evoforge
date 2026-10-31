@@ -1,5 +1,21 @@
 [
   {
+    "expected": "/v1/models/defaults",
+    "path_segments": ["v1", "models", "defaults"]
+  },
+  {
+    "expected": null,
+    "path_segments": ["v1", "models", "keys"]
+  },
+  {
+    "expected": null,
+    "path_segments": ["v1", "models", "defaults", "keys"]
+  },
+  {
+    "expected": null,
+    "path_segments": ["v1", "models", "..", "kernel"]
+  },
+  {
     "expected": "/v1/participants",
     "path_segments": [
       "v1",

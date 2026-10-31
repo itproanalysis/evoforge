@@ -1,0 +1,126 @@
+{
+  "family": "simple_sequential",
+  "suite_version": "v6",
+  "tasks": [
+    {
+      "id": "SV6-SS-01",
+      "goal": "In duration.py, parse(text) returns a duration in whole seconds and format(seconds) writes one. parse ignores all whitespace and accepts three forms: unit form with parts d, h, m, s, each at most once and in that order (case insensitive: '1h30m', '1h 30m', '90M', '2d', '45s'); clock form 'M:SS' or 'H:MM:SS' where SS must be below 60 and, in H:MM:SS, MM must be below 60 ('30:15', '1:30:00'); ISO 8601 'P[nD][T[nH][nM][nS]]' (case insensitive, 'PT1H30M', 'P1DT2H', 'P2D'). Anything else raises ValueError: an empty string, parts out of order or repeated ('1m1h'), unknown units, signs ('-5m'), decimals, 'P' or 'PT' with nothing after, hours in the ISO date part ('P1H'), '1:60'. format(seconds) takes a non-negative int (else ValueError) and returns the non-zero parts as '1d 2h 3m 4s' separated by single spaces, or '0s' for zero.",
+      "files": {
+        "duration.py": "def parse(text):\n    text = text.strip()\n    if text.endswith(\"m\"):\n        return int(text[:-1]) * 60\n    if text.endswith(\"s\"):\n        return int(text[:-1])\n    return int(text)\n\n\ndef format(seconds):\n    return f\"{seconds}s\"\n"
+      },
+      "reference_fix": "--- a/duration.py\n+++ b/duration.py\n@@ -1,11 +1,44 @@\n+import re\n+\n+UNITS = ((\"d\", 86400), (\"h\", 3600), (\"m\", 60), (\"s\", 1))\n+_PARTS = re.compile(r\"^(?:(\\d+)d)?(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?$\")\n+_ISO = re.compile(r\"^P(?:(\\d+)D)?(?:T(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?)?$\")\n+_CLOCK = re.compile(r\"^(?:(\\d+):)?(\\d+):(\\d{2})$\")\n+\n+\n def parse(text):\n-    text = text.strip()\n-    if text.endswith(\"m\"):\n-        return int(text[:-1]) * 60\n-    if text.endswith(\"s\"):\n-        return int(text[:-1])\n-    return int(text)\n+    if not isinstance(text, str):\n+        raise ValueError(\"duration must be a string\")\n+    s = \"\".join(text.split())\n+    if not s:\n+        raise ValueError(\"empty duration\")\n+    m = _CLOCK.match(s)\n+    if m:\n+        h, mi, se = int(m.group(1) or 0), int(m.group(2)), int(m.group(3))\n+        if se >= 60 or (m.group(1) is not None and mi >= 60):\n+            raise ValueError(f\"bad clock duration: {text!r}\")\n+        return h * 3600 + mi * 60 + se\n+    up = s.upper()\n+    if up.startswith(\"P\"):\n+        m = _ISO.match(up)\n+        if not m or not any(m.groups()) or up.endswith(\"T\"):\n+            raise ValueError(f\"bad ISO duration: {text!r}\")\n+        d, h, mi, se = (int(g or 0) for g in m.groups())\n+        return d * 86400 + h * 3600 + mi * 60 + se\n+    m = _PARTS.match(s.lower())\n+    if not m or not any(m.groups()):\n+        raise ValueError(f\"bad duration: {text!r}\")\n+    return sum(int(g or 0) * mult for g, (_u, mult) in zip(m.groups(), UNITS))\n \n \n def format(seconds):\n-    return f\"{seconds}s\"\n+    if not isinstance(seconds, int) or isinstance(seconds, bool) or seconds < 0:\n+        raise ValueError(\"seconds must be a non-negative int\")\n+    if seconds == 0:\n+        return \"0s\"\n+    parts = []\n+    for unit, mult in UNITS:\n+        q, seconds = divmod(seconds, mult)\n+        if q:\n+            parts.append(f\"{q}{unit}\")\n+    return \" \".join(parts)\n",
+      "heldout": [
+        {
+          "id": "SV6-SS-01-01",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_compositional_01():\n    p = duration.parse\n    assert p('1h30m') == p('1h 30m') == p('90M') == p('1:30:00') == p('PT1H30M') == p('pt90m') == 5400\n"
+        },
+        {
+          "id": "SV6-SS-01-02",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_compositional_02():\n    p = duration.parse\n    assert p('2d') == p('P2D') == 172800 and p('P1DT2H') == 93600 and p('30:15') == 1815 and p(' 45 s ') == 45\n"
+        },
+        {
+          "id": "SV6-SS-01-03",
+          "kind": "negative",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_negative_03():\n    for bad in ('', '   ', '1m1h', '1h1h', '5x', '-5m', 'P', 'PT', '1:60', '1:60:00', 'P1H', '1.5h'):\n        with pytest.raises(ValueError):\n            duration.parse(bad)\n"
+        },
+        {
+          "id": "SV6-SS-01-04",
+          "kind": "negative",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_negative_04():\n    for bad in (-1, 1.5, '60'):\n        with pytest.raises(ValueError):\n            duration.format(bad)\n"
+        },
+        {
+          "id": "SV6-SS-01-05",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_boundary_05():\n    f = duration.format\n    assert f(0) == '0s' and f(90061) == '1d 1h 1m 1s' and f(3600) == '1h' and f(59) == '59s' and f(86400 + 5) == '1d 5s'\n"
+        },
+        {
+          "id": "SV6-SS-01-07",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_compositional_07():\n    p = duration.parse\n    assert p('1:00') == 60 and p('0:59') == 59 and p('1D') == 86400\n"
+        },
+        {
+          "id": "SV6-SS-01-08",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_compositional_08():\n    assert duration.parse('P1D T2H') == 93600 and duration.parse('PT0S') == 0\n"
+        },
+        {
+          "id": "SV6-SS-01-09",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_boundary_09():\n    f = duration.format\n    assert f(61) == '1m 1s' and f(3660) == '1h 1m' and f(86400) == '1d'\n"
+        },
+        {
+          "id": "SV6-SS-01-11",
+          "kind": "negative",
+          "code": "import pytest\n\nimport duration\n\n\ndef test_sv5ss01_negative_11():\n    with pytest.raises(ValueError):\n        duration.format(True)\n"
+        }
+      ]
+    },
+    {
+      "id": "SV6-SS-02",
+      "goal": "In slugify.py, slugify(text, max_len=50, taken=()) makes a URL slug. Steps: NFKD-normalise and drop non-ASCII characters (so 'Café' -> 'cafe'), lowercase, replace every run of characters other than a-z and 0-9 with a single '-', strip leading and trailing '-'; an empty result becomes 'item'. If longer than max_len, cut to max_len and, unless the cut falls exactly before a '-', drop the trailing partial word (cut back to the last '-' inside the limit, if any); strip '-' again. A reserved slug (admin, api, new, edit, login) gets '-1' appended. If the slug is in taken, append '-2', '-3', ... (the first free one), shortening the stem so the whole slug still fits max_len (strip '-' from the stem end). max_len below 3 raises ValueError.",
+      "files": {
+        "slugify.py": "def slugify(text, max_len=50, taken=()):\n    return text.lower().replace(\" \", \"-\")\n"
+      },
+      "reference_fix": "--- a/slugify.py\n+++ b/slugify.py\n@@ -1,2 +1,30 @@\n+import re\n+import unicodedata\n+\n+RESERVED = {\"admin\", \"api\", \"new\", \"edit\", \"login\"}\n+\n+\n def slugify(text, max_len=50, taken=()):\n-    return text.lower().replace(\" \", \"-\")\n+    if max_len < 3:\n+        raise ValueError(\"max_len must be at least 3\")\n+    s = unicodedata.normalize(\"NFKD\", text).encode(\"ascii\", \"ignore\").decode(\"ascii\").lower()\n+    s = re.sub(r\"[^a-z0-9]+\", \"-\", s).strip(\"-\")\n+    if not s:\n+        s = \"item\"\n+    if len(s) > max_len:\n+        cut = s[:max_len]\n+        if s[max_len] != \"-\" and \"-\" in cut:\n+            cut = cut[:cut.rindex(\"-\")]\n+        s = cut.strip(\"-\")\n+    if s in RESERVED:\n+        s = f\"{s}-1\"\n+    taken = set(taken)\n+    if s not in taken:\n+        return s\n+    n = 2\n+    while True:\n+        suffix = f\"-{n}\"\n+        stem = s[:max_len - len(suffix)].rstrip(\"-\")\n+        if stem + suffix not in taken:\n+            return stem + suffix\n+        n += 1\n",
+      "heldout": [
+        {
+          "id": "SV6-SS-02-01",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_compositional_01():\n    s = slugify.slugify\n    assert s('Hello, World!') == 'hello-world' and s('  Café   au lait ') == 'cafe-au-lait' and s('C++ & Rust') == 'c-rust'\n"
+        },
+        {
+          "id": "SV6-SS-02-02",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_compositional_02():\n    s = slugify.slugify\n    assert s('The quick brown fox jumps', max_len=14) == 'the-quick' and s('abcdef ghij', max_len=6) == 'abcdef'\n"
+        },
+        {
+          "id": "SV6-SS-02-03",
+          "kind": "negative",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_negative_03():\n    s = slugify.slugify\n    assert s('Admin') == 'admin-1' and s('!!!') == 'item' and s('日本') == 'item'\n"
+        },
+        {
+          "id": "SV6-SS-02-04",
+          "kind": "negative",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_negative_04():\n    s = slugify.slugify\n    with pytest.raises(ValueError):\n        s('abc', max_len=2)\n"
+        },
+        {
+          "id": "SV6-SS-02-05",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_boundary_05():\n    s = slugify.slugify\n    assert s('Report', taken={'report'}) == 'report-2' and s('Report', taken={'report', 'report-2'}) == 'report-3'\n"
+        },
+        {
+          "id": "SV6-SS-02-06",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_boundary_06():\n    s = slugify.slugify\n    assert s('abcdefghij', max_len=10, taken={'abcdefghij'}) == 'abcdefgh-2'\n"
+        },
+        {
+          "id": "SV6-SS-02-07",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_boundary_07():\n    s = slugify.slugify\n    assert s('ab-cdefgh', max_len=5) == 'ab' and s('x' * 60) == 'x' * 50\n"
+        },
+        {
+          "id": "SV6-SS-02-08",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_compositional_08():\n    s = slugify.slugify\n    assert s('Ünïcödé Text') == 'unicode-text' and s('a_b.c') == 'a-b-c'\n"
+        },
+        {
+          "id": "SV6-SS-02-09",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_compositional_09():\n    assert slugify.slugify('New') == 'new-1' and slugify.slugify('login') == 'login-1'\n"
+        },
+        {
+          "id": "SV6-SS-02-10",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_boundary_10():\n    assert slugify.slugify('a b', taken={'a-b'}) == 'a-b-2' and slugify.slugify('---') == 'item'\n"
+        },
+        {
+          "id": "SV6-SS-02-11",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport slugify\n\n\ndef test_sv5ss02_boundary_11():\n    assert slugify.slugify('abc def', max_len=3) == 'abc'\n"
+        }
+      ]
+    }
+  ]
+}

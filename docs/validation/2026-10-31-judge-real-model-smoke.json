@@ -1,0 +1,421 @@
+{
+  "profile": {
+    "profile": "collaborative",
+    "ready": true,
+    "requires_api_key": false,
+    "default_builder": "muse-spark-1.3",
+    "default_critic": "claude-opus-5-5",
+    "participants": [
+      {
+        "role": "builder",
+        "model": "muse-spark-1.3",
+        "provider": "meta",
+        "configured": true
+      },
+      {
+        "role": "planner",
+        "model": "gpt-6.1-sol",
+        "provider": "openai",
+        "configured": true
+      },
+      {
+        "role": "planner",
+        "model": "gemini-4-argon",
+        "provider": "google",
+        "configured": true
+      },
+      {
+        "role": "critic",
+        "model": "claude-opus-5-5",
+        "provider": "anthropic",
+        "configured": true
+      }
+    ],
+    "blocked_reason": null
+  },
+  "lane": {
+    "status": "succeeded",
+    "attempts": 1,
+    "heldout": {
+      "passed": 3,
+      "n": 3
+    },
+    "outcome": "passed",
+    "cost_cents": 8,
+    "usage_missing": false,
+    "cost_status": "usage_reported",
+    "elapsed_ms": 42500,
+    "diff": "--- a/app.py\n+++ b/app.py\n@@ -1,2 +1,4 @@\n def inc(x):\n-    return x\n+    if isinstance(x, bool) or not isinstance(x, int):\n+        raise ValueError(\"x must be an int\")\n+    return x + 1\n",
+    "events": [
+      {
+        "seq": 1,
+        "ts": 1793377730.6495843,
+        "role": "critic",
+        "message": "Critic wrote 3 tests"
+      },
+      {
+        "seq": 2,
+        "ts": 1793377730.6495843,
+        "role": "builder",
+        "message": "gpt-6.1-sol: preparing implementation advice"
+      },
+      {
+        "seq": 3,
+        "ts": 1793377738.975715,
+        "role": "builder",
+        "message": "gpt-6.1-sol: implementation advice received"
+      },
+      {
+        "seq": 4,
+        "ts": 1793377738.975715,
+        "role": "builder",
+        "message": "gemini-4-argon: preparing implementation advice"
+      },
+      {
+        "seq": 5,
+        "ts": 1793377746.9549072,
+        "role": "builder",
+        "message": "gemini-4-argon: implementation advice received"
+      },
+      {
+        "seq": 6,
+        "ts": 1793377748.3938615,
+        "role": "builder",
+        "message": "evoforge: Builder attempt 1/2"
+      },
+      {
+        "seq": 7,
+        "ts": 1793377755.3428857,
+        "role": "critic",
+        "message": "attempt 1: Critic 13/3 passed"
+      },
+      {
+        "seq": 8,
+        "ts": 1793377755.3428857,
+        "role": "runner",
+        "message": "evoforge: attempt 1 critic 13/3 passed"
+      },
+      {
+        "seq": 9,
+        "ts": 1793377755.6566062,
+        "role": "runner",
+        "message": "evoforge: attempt 1 held-out 3/3 passed"
+      },
+      {
+        "seq": 10,
+        "ts": 1793377755.6566062,
+        "role": "gate",
+        "message": "evoforge: passed after 1 attempt(s)"
+      }
+    ],
+    "collaboration": {
+      "cost_cents": 2,
+      "usage_missing": false,
+      "provider_calls": [
+        {
+          "provider": "openai",
+          "model": "gpt-6.1-sol",
+          "requested_model": "gpt-6.1-sol",
+          "response_model": "gpt-6.1-sol",
+          "response_model_matches": true,
+          "phase": "implementation_plan",
+          "finish_reason": "stop",
+          "provider_request_id": "req_4b78c9b6aa5c4b5fae2ca5fe7f27c1a7",
+          "provider_response_id": "resp_081235ec91a3e517016ae4c5c5743487d291547d509e5013f1",
+          "usage": {
+            "prompt_tokens": 153,
+            "completion_tokens": 143,
+            "total_tokens": 296,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 54
+            },
+            "completion_includes_reasoning": true,
+            "cache_creation_5m_tokens": 0,
+            "cache_creation_1h_tokens": 0
+          },
+          "billing_verified": false,
+          "price_table_version": "first-party-standard-2026-10-31"
+        },
+        {
+          "provider": "google",
+          "model": "gemini-4-argon",
+          "requested_model": "gemini-4-argon",
+          "response_model": "gemini-4-argon",
+          "response_model_matches": true,
+          "phase": "implementation_plan",
+          "finish_reason": "stop",
+          "provider_request_id": null,
+          "provider_response_id": "zMXkatvDO7zr2roPxbGMsAY",
+          "usage": {
+            "prompt_tokens": 251,
+            "completion_tokens": 204,
+            "total_tokens": 455,
+            "prompt_tokens_details": {
+              "cached_tokens": 0
+            },
+            "completion_tokens_details": {
+              "reasoning_tokens": 0
+            },
+            "completion_includes_reasoning": true,
+            "cache_creation_5m_tokens": 0,
+            "cache_creation_1h_tokens": 0
+          },
+          "billing_verified": false,
+          "price_table_version": "first-party-standard-2026-10-31"
+        }
+      ],
+      "reservation_ids": [
+        "rsv_96db15d6147a",
+        "rsv_a54e300978ea"
+      ],
+      "evidence_ids": [
+        "ev_3271670a46c7",
+        "ev_389d2280e232"
+      ],
+      "participants": [
+        {
+          "role": "builder",
+          "model": "muse-spark-1.3",
+          "provider": "meta",
+          "configured": true
+        },
+        {
+          "role": "planner",
+          "model": "gpt-6.1-sol",
+          "provider": "openai",
+          "configured": true
+        },
+        {
+          "role": "planner",
+          "model": "gemini-4-argon",
+          "provider": "google",
+          "configured": true
+        },
+        {
+          "role": "critic",
+          "model": "claude-opus-5-5",
+          "provider": "anthropic",
+          "configured": true
+        }
+      ]
+    },
+    "base_tree_sha": "23affda50717fafebc6c303d045dec05ff298526",
+    "preview_source": "none"
+  },
+  "builder_calls": [
+    {
+      "provider": "meta",
+      "model": "muse-spark-1.3",
+      "phase": "builder",
+      "provider_request_id": "71137edb-fad8-4afa-b3c8-8991dc4738e8",
+      "provider_response_id": "chatcmpl-01a18da4-e4b6-722d-bf94-0d226c83a7bd",
+      "usage": {
+        "completion_tokens": 1210,
+        "prompt_tokens": 555,
+        "total_tokens": 1765,
+        "completion_tokens_details": {
+          "accepted_prediction_tokens": null,
+          "audio_tokens": null,
+          "reasoning_tokens": 785,
+          "rejected_prediction_tokens": null
+        },
+        "prompt_tokens_details": {
+          "audio_tokens": null,
+          "cached_tokens": 0
+        }
+      },
+      "billing_verified": false
+    }
+  ],
+  "provider_records": [
+    {
+      "id": "ev_7bef99e83c6a",
+      "ts": 1793377723.3774364,
+      "kind": "provider_call",
+      "phase": "critic_spec",
+      "reservation": {
+        "id": "rsv_52d5a8caf286",
+        "project": "default",
+        "cost_cents": 120,
+        "state": "SETTLED",
+        "ts": 1793377714.1567128,
+        "reason": ""
+      },
+      "metadata": {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "requested_model": "claude-opus-5-5",
+        "response_model": "claude-opus-5-5",
+        "response_model_matches": true,
+        "phase": "critic_spec",
+        "finish_reason": "stop",
+        "provider_request_id": "req_011CgYjj87uAKe1XexsovVHV",
+        "provider_response_id": "msg_011CgYjj9FcRuxiP2e99h8zp",
+        "usage": {
+          "prompt_tokens": 367,
+          "completion_tokens": 878,
+          "total_tokens": 1245,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 173
+          },
+          "completion_includes_reasoning": true,
+          "cache_creation_5m_tokens": 0,
+          "cache_creation_1h_tokens": 0
+        },
+        "billing_verified": false,
+        "price_table_version": "first-party-standard-2026-10-31"
+      },
+      "response_sha256": "452a29b0ca48ac5bc6de5645c75fc9ec7d58ccf709eff965855d23da10e9efb3",
+      "error_kind": null
+    },
+    {
+      "id": "ev_737eb940b61f",
+      "ts": 1793377730.6485834,
+      "kind": "provider_call",
+      "phase": "critic_review",
+      "reservation": {
+        "id": "rsv_3b3deadceedd",
+        "project": "default",
+        "cost_cents": 120,
+        "state": "SETTLED",
+        "ts": 1793377723.3774364,
+        "reason": ""
+      },
+      "metadata": {
+        "provider": "anthropic",
+        "model": "claude-opus-5-5",
+        "requested_model": "claude-opus-5-5",
+        "response_model": "claude-opus-5-5",
+        "response_model_matches": true,
+        "phase": "critic_review",
+        "finish_reason": "stop",
+        "provider_request_id": "req_011CgYjjoNZbQoVu93DxnGBU",
+        "provider_response_id": "msg_011CgYjjorKsDzzdEVaN3CQq",
+        "usage": {
+          "prompt_tokens": 882,
+          "completion_tokens": 860,
+          "total_tokens": 1742,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 77
+          },
+          "completion_includes_reasoning": true,
+          "cache_creation_5m_tokens": 0,
+          "cache_creation_1h_tokens": 0
+        },
+        "billing_verified": false,
+        "price_table_version": "first-party-standard-2026-10-31"
+      },
+      "response_sha256": "ecf5269a71008be80f1e5afc2c4bef6435aae7d8c21ce88c27d1542902613071",
+      "error_kind": null
+    },
+    {
+      "id": "ev_3271670a46c7",
+      "ts": 1793377738.975715,
+      "kind": "provider_call",
+      "phase": "implementation_plan",
+      "reservation": {
+        "id": "rsv_96db15d6147a",
+        "project": "default",
+        "cost_cents": 120,
+        "state": "SETTLED",
+        "ts": 1793377730.6495843,
+        "reason": ""
+      },
+      "metadata": {
+        "provider": "openai",
+        "model": "gpt-6.1-sol",
+        "requested_model": "gpt-6.1-sol",
+        "response_model": "gpt-6.1-sol",
+        "response_model_matches": true,
+        "phase": "implementation_plan",
+        "finish_reason": "stop",
+        "provider_request_id": "req_4b78c9b6aa5c4b5fae2ca5fe7f27c1a7",
+        "provider_response_id": "resp_081235ec91a3e517016ae4c5c5743487d291547d509e5013f1",
+        "usage": {
+          "prompt_tokens": 153,
+          "completion_tokens": 143,
+          "total_tokens": 296,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 54
+          },
+          "completion_includes_reasoning": true,
+          "cache_creation_5m_tokens": 0,
+          "cache_creation_1h_tokens": 0
+        },
+        "billing_verified": false,
+        "price_table_version": "first-party-standard-2026-10-31"
+      },
+      "response_sha256": "24d99333add3d7e38fe78740341abf7b861e6e4002f2f313302a6b0a8cfbd30a",
+      "error_kind": null
+    },
+    {
+      "id": "ev_389d2280e232",
+      "ts": 1793377746.9549072,
+      "kind": "provider_call",
+      "phase": "implementation_plan",
+      "reservation": {
+        "id": "rsv_a54e300978ea",
+        "project": "default",
+        "cost_cents": 120,
+        "state": "SETTLED",
+        "ts": 1793377738.9767156,
+        "reason": ""
+      },
+      "metadata": {
+        "provider": "google",
+        "model": "gemini-4-argon",
+        "requested_model": "gemini-4-argon",
+        "response_model": "gemini-4-argon",
+        "response_model_matches": true,
+        "phase": "implementation_plan",
+        "finish_reason": "stop",
+        "provider_request_id": null,
+        "provider_response_id": "zMXkatvDO7zr2roPxbGMsAY",
+        "usage": {
+          "prompt_tokens": 251,
+          "completion_tokens": 204,
+          "total_tokens": 455,
+          "prompt_tokens_details": {
+            "cached_tokens": 0
+          },
+          "completion_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "completion_includes_reasoning": true,
+          "cache_creation_5m_tokens": 0,
+          "cache_creation_1h_tokens": 0
+        },
+        "billing_verified": false,
+        "price_table_version": "first-party-standard-2026-10-31"
+      },
+      "response_sha256": "d89eb19e93b99dd50651b577ae13334fdf402496e5f86d4dcea2ef2ca6b51033",
+      "error_kind": null
+    }
+  ],
+  "observed_models": [
+    "claude-opus-5-5",
+    "gemini-4-argon",
+    "gpt-6.1-sol",
+    "muse-spark-1.3"
+  ],
+  "ledger": {
+    "project": "default",
+    "spent_cents": 8,
+    "reserved_cents": 0,
+    "overruns": [],
+    "unknown_reservations": []
+  },
+  "execution": "real native APIs + real local release Runner; not Cloud Run/PostgreSQL proof"
+}

@@ -35,12 +35,32 @@ jobs:
           EVO_TEST_DATABASE_URL: postgresql://postgres:evoforge-ci-only@localhost:5432/postgres
   api:
     runs-on: ubuntu-latest
+    # Leave time to upload diagnostics after the bounded test step fails.
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - run: pip install -r services/api/requirements.txt
-      - run: pytest -q services/api/tests
+      - name: API regression tests
+        timeout-minutes: 60
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          python -u -m pytest services/api/tests -vv --durations=25 \
+            -o faulthandler_timeout=120 --junitxml=artifacts/api-junit.xml \
+            2>&1 | tee artifacts/api-pytest.log
+      - name: Save API test diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-test-diagnostics
+          path: |
+            artifacts/api-pytest.log
+            artifacts/api-junit.xml
+          if-no-files-found: warn
+          retention-days: 7
       - run: python -c "from main import app; from fastapi.testclient import TestClient; c=TestClient(app); assert c.get('/healthz').status_code==200"
         working-directory: services/api
   web:

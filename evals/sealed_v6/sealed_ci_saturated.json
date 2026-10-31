@@ -1,0 +1,131 @@
+{
+  "family": "ci_saturated",
+  "suite_version": "v6",
+  "tasks": [
+    {
+      "id": "SV6-CI-01",
+      "goal": "In shard_plan.py, plan(tests, shards, pinned=None, max_per_shard=None) splits CI tests across shards. tests maps test name -> duration in seconds. shards must be an int >= 1, else ValueError. pinned maps test name -> shard index (0-based); a pinned name that is not in tests, or an index outside 0..shards-1, raises ValueError. Pinned tests are placed first. Every other test is then placed greedily in order of duration descending, ties by name ascending, onto the shard with the smallest current total, ties going to the lowest index; with max_per_shard set, a shard holding that many tests is skipped, and if a test fits nowhere (or a pin overfills a shard) raise ValueError. Return one dict per shard in index order: {\"tests\": sorted names, \"total\": total duration rounded to 3 decimals}.",
+      "files": {
+        "shard_plan.py": "def plan(tests, shards, pinned=None, max_per_shard=None):\n    out = [{\"tests\": [], \"total\": 0} for _ in range(shards)]\n    for i, (name, dur) in enumerate(tests.items()):\n        s = out[i % shards]\n        s[\"tests\"].append(name)\n        s[\"total\"] += dur\n    return out\n"
+      },
+      "reference_fix": "--- a/shard_plan.py\n+++ b/shard_plan.py\n@@ -1,7 +1,28 @@\n def plan(tests, shards, pinned=None, max_per_shard=None):\n-    out = [{\"tests\": [], \"total\": 0} for _ in range(shards)]\n-    for i, (name, dur) in enumerate(tests.items()):\n-        s = out[i % shards]\n-        s[\"tests\"].append(name)\n-        s[\"total\"] += dur\n-    return out\n+    if not isinstance(shards, int) or shards < 1:\n+        raise ValueError(\"shards must be a positive integer\")\n+    pinned = dict(pinned or {})\n+    for name, idx in pinned.items():\n+        if name not in tests:\n+            raise ValueError(f\"unknown pinned test: {name!r}\")\n+        if not isinstance(idx, int) or not 0 <= idx < shards:\n+            raise ValueError(f\"pinned shard out of range: {idx!r}\")\n+    bins = [{\"tests\": [], \"total\": 0.0} for _ in range(shards)]\n+\n+    def put(i, name):\n+        if max_per_shard is not None and len(bins[i][\"tests\"]) >= max_per_shard:\n+            raise ValueError(\"shard over capacity\")\n+        bins[i][\"tests\"].append(name)\n+        bins[i][\"total\"] += tests[name]\n+\n+    for name in sorted(pinned):\n+        put(pinned[name], name)\n+    rest = sorted((n for n in tests if n not in pinned), key=lambda n: (-tests[n], n))\n+    for name in rest:\n+        open_bins = [i for i in range(shards)\n+                     if max_per_shard is None or len(bins[i][\"tests\"]) < max_per_shard]\n+        if not open_bins:\n+            raise ValueError(\"not enough capacity\")\n+        i = min(open_bins, key=lambda k: (bins[k][\"total\"], k))\n+        put(i, name)\n+    return [{\"tests\": sorted(b[\"tests\"]), \"total\": round(b[\"total\"], 3)} for b in bins]\n",
+      "heldout": [
+        {
+          "id": "SV6-CI-01-01",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport shard_plan\n\n\ndef test_sv5ci01_compositional_01():\n    r = shard_plan.plan({'a': 5, 'b': 4, 'c': 3, 'd': 3, 'e': 1}, 2)\n    assert r == [{'tests': ['a', 'd'], 'total': 8}, {'tests': ['b', 'c', 'e'], 'total': 8}]\n"
+        },
+        {
+          "id": "SV6-CI-01-02",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport shard_plan\n\n\ndef test_sv5ci01_compositional_02():\n    r = shard_plan.plan({'a': 5, 'b': 4, 'c': 3, 'd': 3, 'e': 1}, 2)\n    r = shard_plan.plan({'a': 5, 'b': 4, 'c': 3, 'd': 3, 'e': 1}, 2, pinned={'e': 0})\n    assert r == [{'tests': ['b', 'c', 'e'], 'total': 8}, {'tests': ['a', 'd'], 'total': 8}]\n"
+        },
+        {
+          "id": "SV6-CI-01-03",
+          "kind": "negative",
+          "code": "import pytest\n\nimport shard_plan\n\n\ndef test_sv5ci01_negative_03():\n    for kwargs in ({'shards': 0}, {'shards': 2, 'pinned': {'zz': 0}}, {'shards': 2, 'pinned': {'a': 2}}, {'shards': 2, 'max_per_shard': 1}):\n        with pytest.raises(ValueError):\n            shard_plan.plan({'a': 1, 'b': 1, 'c': 1}, **kwargs)\n"
+        },
+        {
+          "id": "SV6-CI-01-04",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport shard_plan\n\n\ndef test_sv5ci01_boundary_04():\n    assert shard_plan.plan({'x': 0.1, 'y': 0.2}, 1) == [{'tests': ['x', 'y'], 'total': 0.3}]\n"
+        },
+        {
+          "id": "SV6-CI-01-05",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport shard_plan\n\n\ndef test_sv5ci01_boundary_05():\n    r = shard_plan.plan({'a': 9, 'b': 1, 'c': 1, 'd': 1}, 2, max_per_shard=2)\n    assert r == [{'tests': ['a', 'd'], 'total': 10}, {'tests': ['b', 'c'], 'total': 2}]\n"
+        },
+        {
+          "id": "SV6-CI-01-07",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport shard_plan\n\n\ndef test_sv5ci01_compositional_07():\n    assert shard_plan.plan({'b': 2, 'a': 2}, 2) == [{'tests': ['a'], 'total': 2}, {'tests': ['b'], 'total': 2}]\n"
+        },
+        {
+          "id": "SV6-CI-01-09",
+          "kind": "negative",
+          "code": "import pytest\n\nimport shard_plan\n\n\ndef test_sv5ci01_negative_09():\n    with pytest.raises(ValueError):\n        shard_plan.plan({'a': 1, 'b': 1}, 2, pinned={'a': 0, 'b': 0}, max_per_shard=1)\n"
+        },
+        {
+          "id": "SV6-CI-01-10",
+          "kind": "negative",
+          "code": "import pytest\n\nimport shard_plan\n\n\ndef test_sv5ci01_negative_10():\n    with pytest.raises(ValueError):\n        shard_plan.plan({'a': 1}, 1.5)\n"
+        }
+      ]
+    },
+    {
+      "id": "SV6-CI-02",
+      "goal": "In junit_merge.py, merge(runs) combines CI attempts of the same suite: runs is a list (attempt 1, 2, ...) of lists of cases {name, status, optional time}; status is one of passed, failed, error, skipped (anything else raises ValueError). For each test name (sorted ascending in the result) look at its statuses in attempt order: if the last one is passed and an earlier one was failed or error the verdict is 'flaky'; if the last one is skipped but an earlier attempt passed the verdict is 'passed'; otherwise the verdict is the last status. A test missing from a later attempt keeps its earlier results. Return {\"tests\": {name: {\"verdict\", \"attempts\" (how many attempts reported it), \"time\" (sum, rounded to 3 decimals)}}, \"summary\": counts for passed, flaky, failed, error and skipped (all five keys always present), \"time\": total of all times rounded to 3 decimals}.",
+      "files": {
+        "junit_merge.py": "def merge(runs):\n    out = {}\n    for run in runs:\n        for case in run:\n            out[case[\"name\"]] = case[\"status\"]\n    return out\n"
+      },
+      "reference_fix": "--- a/junit_merge.py\n+++ b/junit_merge.py\n@@ -1,6 +1,29 @@\n+ORDER = (\"passed\", \"failed\", \"error\", \"skipped\")\n+\n+\n def merge(runs):\n-    out = {}\n-    for run in runs:\n+    seen = {}\n+    for attempt, run in enumerate(runs, 1):\n         for case in run:\n-            out[case[\"name\"]] = case[\"status\"]\n-    return out\n+            name, status, secs = case[\"name\"], case[\"status\"], case.get(\"time\", 0)\n+            if status not in ORDER:\n+                raise ValueError(f\"unknown status: {status!r}\")\n+            seen.setdefault(name, []).append((attempt, status, secs))\n+    result = {\"tests\": {}, \"summary\": {\"passed\": 0, \"flaky\": 0, \"failed\": 0, \"error\": 0, \"skipped\": 0},\n+              \"time\": 0}\n+    for name in sorted(seen):\n+        hist = seen[name]\n+        statuses = [s for _a, s, _t in hist]\n+        final = statuses[-1]\n+        if final == \"passed\" and any(s in (\"failed\", \"error\") for s in statuses[:-1]):\n+            verdict = \"flaky\"\n+        elif final == \"skipped\" and \"passed\" in statuses:\n+            verdict = \"passed\"\n+        else:\n+            verdict = final\n+        secs = sum(t for _a, _s, t in hist)\n+        result[\"tests\"][name] = {\"verdict\": verdict, \"attempts\": len(hist), \"time\": round(secs, 3)}\n+        result[\"summary\"][verdict] += 1\n+        result[\"time\"] += secs\n+    result[\"time\"] = round(result[\"time\"], 3)\n+    return result\n",
+      "heldout": [
+        {
+          "id": "SV6-CI-02-01",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_compositional_01():\n    r = junit_merge.merge([[{'name': 'b', 'status': 'failed', 'time': 1.5}, {'name': 'a', 'status': 'passed', 'time': 0.25}], [{'name': 'b', 'status': 'passed', 'time': 1.25}]])\n    assert list(r['tests']) == ['a', 'b']\n"
+        },
+        {
+          "id": "SV6-CI-02-02",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_compositional_02():\n    r = junit_merge.merge([[{'name': 'b', 'status': 'failed', 'time': 1.5}, {'name': 'a', 'status': 'passed', 'time': 0.25}], [{'name': 'b', 'status': 'passed', 'time': 1.25}]])\n    assert r['tests']['b'] == {'verdict': 'flaky', 'attempts': 2, 'time': 2.75} and r['tests']['a'] == {'verdict': 'passed', 'attempts': 1, 'time': 0.25}\n"
+        },
+        {
+          "id": "SV6-CI-02-03",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_compositional_03():\n    r = junit_merge.merge([[{'name': 'b', 'status': 'failed', 'time': 1.5}, {'name': 'a', 'status': 'passed', 'time': 0.25}], [{'name': 'b', 'status': 'passed', 'time': 1.25}]])\n    assert r['summary'] == {'passed': 1, 'flaky': 1, 'failed': 0, 'error': 0, 'skipped': 0} and r['time'] == 3.0\n"
+        },
+        {
+          "id": "SV6-CI-02-04",
+          "kind": "negative",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_negative_04():\n    with pytest.raises(ValueError):\n        junit_merge.merge([[{'name': 'x', 'status': 'xfail'}]])\n"
+        },
+        {
+          "id": "SV6-CI-02-05",
+          "kind": "negative",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_negative_05():\n    r = junit_merge.merge([[{'name': 'x', 'status': 'passed'}], [{'name': 'x', 'status': 'failed'}]])\n    assert r['tests']['x']['verdict'] == 'failed' and r['summary']['failed'] == 1\n"
+        },
+        {
+          "id": "SV6-CI-02-06",
+          "kind": "negative",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_negative_06():\n    r = junit_merge.merge([[{'name': 'x', 'status': 'passed'}], [{'name': 'x', 'status': 'failed'}]])\n    r = junit_merge.merge([[{'name': 'e', 'status': 'error'}], [{'name': 'e', 'status': 'error'}]])\n    assert r['tests']['e'] == {'verdict': 'error', 'attempts': 2, 'time': 0}\n"
+        },
+        {
+          "id": "SV6-CI-02-07",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_boundary_07():\n    r = junit_merge.merge([[{'name': 's', 'status': 'passed', 'time': 0.1}], [{'name': 's', 'status': 'skipped', 'time': 0.2}]])\n    assert r['tests']['s']['verdict'] == 'passed' and r['time'] == 0.3\n"
+        },
+        {
+          "id": "SV6-CI-02-08",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_boundary_08():\n    r = junit_merge.merge([[{'name': 's', 'status': 'passed', 'time': 0.1}], [{'name': 's', 'status': 'skipped', 'time': 0.2}]])\n    assert junit_merge.merge([]) == {'tests': {}, 'summary': {'passed': 0, 'flaky': 0, 'failed': 0, 'error': 0, 'skipped': 0}, 'time': 0}\n"
+        },
+        {
+          "id": "SV6-CI-02-09",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_boundary_09():\n    r = junit_merge.merge([[{'name': 's', 'status': 'passed', 'time': 0.1}], [{'name': 's', 'status': 'skipped', 'time': 0.2}]])\n    assert junit_merge.merge([[{'name': 'k', 'status': 'skipped'}]])['tests']['k']['verdict'] == 'skipped'\n"
+        },
+        {
+          "id": "SV6-CI-02-10",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_compositional_10():\n    r = junit_merge.merge([[{'name': 'a', 'status': 'passed'}], [{'name': 'b', 'status': 'failed'}]])\n    assert r['tests']['a'] == {'verdict': 'passed', 'attempts': 1, 'time': 0} and r['tests']['b']['verdict'] == 'failed'\n"
+        },
+        {
+          "id": "SV6-CI-02-11",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_boundary_11():\n    r = junit_merge.merge([[{'name': 'z', 'status': 'error'}], [{'name': 'z', 'status': 'passed'}]])\n    assert r['tests']['z']['verdict'] == 'flaky' and r['summary']['flaky'] == 1\n"
+        },
+        {
+          "id": "SV6-CI-02-12",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_boundary_12():\n    r = junit_merge.merge([[{'name': 'q', 'status': 'skipped'}], [{'name': 'q', 'status': 'skipped'}]])\n    assert r['tests']['q']['verdict'] == 'skipped' and r['summary']['skipped'] == 1\n"
+        },
+        {
+          "id": "SV6-CI-02-13",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport junit_merge\n\n\ndef test_sv5ci02_boundary_13():\n    r = junit_merge.merge([[{'name': 't', 'status': 'passed', 'time': 0.1234}, {'name': 'u', 'status': 'passed', 'time': 0.0004}]])\n    assert r['tests']['t']['time'] == 0.123 and r['time'] == 0.124\n"
+        }
+      ]
+    }
+  ]
+}

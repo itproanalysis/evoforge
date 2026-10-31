@@ -7,6 +7,7 @@ import { shareText, shareUrl } from '../lib/share';
 import { laneView, manifestView, type ArenaAgentRow, type PreviewSource } from '../lib/arenaStatus';
 import { StudioIcon } from './StudioIcon';
 import { StudioHistory, StudioPeople } from './StudioViews';
+import { DefaultModelsCard } from './DefaultModelsCard';
 
 // Usage not reported -> priced at the reservation cap; the label says so in words (no "estimate").
 const costKey = (state: string) => state === 'estimated' ? 'cost-reservation-cap' : `cost-${state}`;
@@ -177,7 +178,7 @@ export function CanvasWorkspace(props: Props) {
         </>}
         {panel === 'history' && <StudioHistory records={props.history ?? []} available={props.history !== null} loading={props.loading}/>}
         {panel === 'metrics' && <>{props.overview}<section className="canvas-conditions"><h3>{t('conditions')}</h3><p>{props.doc?.prompt || props.doc?.goal || '—'}</p><code>{props.doc?.arena_id ?? '—'}</code>{manifest && <><dl><dt>{t('spec')}</dt><dd>{manifest.spec ?? '—'}</dd><dt>{t('base')}</dt><dd>{manifest.baseTree ?? '—'}</dd></dl><p>{manifest.disclosure ?? '—'}</p></>}{(['evoforge', 'single'] as const).map(side => <p key={side}>{side === 'evoforge' ? 'EvoForge' : t('single')} · {ts(costKey(laneView(props.doc?.lanes?.[side]).costState))}</p>)}</section></>}
-        {panel === 'admin' && props.management}
+        {panel === 'admin' && <><DefaultModelsCard/>{props.management}</>}
       </div>
     </dialog>
   </main>;

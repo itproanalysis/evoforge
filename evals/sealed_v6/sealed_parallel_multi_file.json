@@ -1,0 +1,158 @@
+{
+  "family": "parallel_multi_file",
+  "suite_version": "v6",
+  "tasks": [
+    {
+      "id": "SV6-PM-01",
+      "goal": "Two files. In tokens.py, tokenize(text) returns (kind, value, pos) tuples: NUM for integers and decimals such as '12', '3.25' or '.5' (a number with two dots raises CalcError), OP for + - * / % ^, LP for '(' and RP for ')'; whitespace is skipped; any other character raises CalcError. CalcError(message, pos) is a ValueError subclass with a .pos attribute giving the 0-based character position. In calc.py, evaluate(text) computes the expression exactly with decimal.Decimal and returns a string: precedence from high to low is ^ (right-associative), unary - and + (so -2^2 is -4 and 2^-1 is 0.5), then * / % (left-associative), then + - (left-associative); parentheses group. Division or modulo by zero raises CalcError at the operator's position; a non-integer exponent raises CalcError at the ^; a missing ')' raises CalcError at the matching '('; an extra token raises CalcError at that token; an empty expression raises CalcError at 0. Results that are whole numbers are written without a decimal point ('6', not '6.0'); others in plain notation without trailing zeros ('0.5', '2.25'); negative zero is '0'.",
+      "files": {
+        "tokens.py": "def tokenize(text):\n    out = []\n    for i, ch in enumerate(text):\n        if ch.isdigit():\n            out.append((\"NUM\", ch, i))\n        elif ch in \"+-*/\":\n            out.append((\"OP\", ch, i))\n    return out\n",
+        "calc.py": "import tokens\n\n\ndef evaluate(text):\n    toks = tokens.tokenize(text)\n    total = 0\n    sign = 1\n    for kind, value, _pos in toks:\n        if kind == \"NUM\":\n            total += sign * int(value)\n        elif value == \"-\":\n            sign = -1\n        else:\n            sign = 1\n    return str(total)\n"
+      },
+      "reference_fix": "--- a/calc.py\n+++ b/calc.py\n@@ -1,15 +1,82 @@\n+from decimal import Decimal, getcontext\n+\n import tokens\n+from tokens import CalcError\n+\n+getcontext().prec = 28\n+BIN = {\"+\": (1, \"L\"), \"-\": (1, \"L\"), \"*\": (2, \"L\"), \"/\": (2, \"L\"), \"%\": (2, \"L\"), \"^\": (4, \"R\")}\n+UNARY = 3\n+\n+\n+def _fmt(d):\n+    if d == d.to_integral_value():\n+        return str(int(d))\n+    s = format(d.normalize(), \"f\")\n+    return s\n \n \n def evaluate(text):\n     toks = tokens.tokenize(text)\n-    total = 0\n-    sign = 1\n-    for kind, value, _pos in toks:\n+    if not toks:\n+        raise CalcError(\"empty expression\", 0)\n+    pos = [0]\n+\n+    def peek():\n+        return toks[pos[0]] if pos[0] < len(toks) else None\n+\n+    def atom():\n+        t = peek()\n+        if t is None:\n+            raise CalcError(\"unexpected end\", len(text))\n+        kind, value, p = t\n         if kind == \"NUM\":\n-            total += sign * int(value)\n-        elif value == \"-\":\n-            sign = -1\n-        else:\n-            sign = 1\n-    return str(total)\n+            pos[0] += 1\n+            return Decimal(value)\n+        if kind == \"LP\":\n+            pos[0] += 1\n+            v = expr(0)\n+            t2 = peek()\n+            if t2 is None or t2[0] != \"RP\":\n+                raise CalcError(\"missing closing parenthesis\", p)\n+            pos[0] += 1\n+            return v\n+        if kind == \"OP\" and value == \"-\":\n+            pos[0] += 1\n+            return -expr(UNARY)\n+        if kind == \"OP\" and value == \"+\":\n+            pos[0] += 1\n+            return expr(UNARY)\n+        raise CalcError(\"unexpected token\", p)\n+\n+    def expr(min_prec):\n+        left = atom()\n+        while True:\n+            t = peek()\n+            if t is None or t[0] != \"OP\" or BIN[t[1]][0] < min_prec:\n+                return left\n+            _k, op, p = t\n+            prec, assoc = BIN[op]\n+            pos[0] += 1\n+            right = expr(prec + 1 if assoc == \"L\" else prec)\n+            if op == \"+\":\n+                left = left + right\n+            elif op == \"-\":\n+                left = left - right\n+            elif op == \"*\":\n+                left = left * right\n+            elif op in \"/%\":\n+                if right == 0:\n+                    raise CalcError(\"division by zero\", p)\n+                left = left / right if op == \"/\" else left % right\n+            else:\n+                if right != right.to_integral_value():\n+                    raise CalcError(\"non-integer exponent\", p)\n+                left = left ** int(right)\n+\n+    value = expr(0)\n+    t = peek()\n+    if t is not None:\n+        raise CalcError(\"unexpected token\", t[2])\n+    if value == 0:\n+        value = Decimal(0)\n+    return _fmt(value)\n--- a/tokens.py\n+++ b/tokens.py\n@@ -1,8 +1,35 @@\n+class CalcError(ValueError):\n+    def __init__(self, message, pos):\n+        super().__init__(f\"{message} at {pos}\")\n+        self.pos = pos\n+\n+\n def tokenize(text):\n     out = []\n-    for i, ch in enumerate(text):\n-        if ch.isdigit():\n-            out.append((\"NUM\", ch, i))\n-        elif ch in \"+-*/\":\n+    i = 0\n+    while i < len(text):\n+        ch = text[i]\n+        if ch.isspace():\n+            i += 1\n+            continue\n+        if ch.isdigit() or (ch == \".\" and i + 1 < len(text) and text[i + 1].isdigit()):\n+            j = i\n+            dots = 0\n+            while j < len(text) and (text[j].isdigit() or text[j] == \".\"):\n+                dots += text[j] == \".\"\n+                j += 1\n+            if dots > 1:\n+                raise CalcError(\"bad number\", i)\n+            out.append((\"NUM\", text[i:j], i))\n+            i = j\n+            continue\n+        if ch in \"+-*/%^\":\n             out.append((\"OP\", ch, i))\n+        elif ch == \"(\":\n+            out.append((\"LP\", ch, i))\n+        elif ch == \")\":\n+            out.append((\"RP\", ch, i))\n+        else:\n+            raise CalcError(\"unexpected character\", i)\n+        i += 1\n     return out\n",
+      "heldout": [
+        {
+          "id": "SV6-PM-01-01",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_compositional_01():\n    e = calc.evaluate\n    assert e('1 + 2 * 3') == '7' and e('(1 + 2) * 3') == '9' and e('2 ^ 3 ^ 2') == '512'\n"
+        },
+        {
+          "id": "SV6-PM-01-02",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_compositional_02():\n    e = calc.evaluate\n    assert e('-2 ^ 2') == '-4' and e('2 ^ -1') == '0.5' and e('10 - 4 - 3') == '3' and e('7 % 4 * 2') == '6'\n"
+        },
+        {
+          "id": "SV6-PM-01-03",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_compositional_03():\n    e = calc.evaluate\n    assert e('0.1 + 0.2') == '0.3' and e('.5 * 4') == '2' and e('1 / 4 + 2') == '2.25'\n"
+        },
+        {
+          "id": "SV6-PM-01-04",
+          "kind": "negative",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_negative_04():\n    e = calc.evaluate\n    for text, pos in (('1 / (2 - 2)', 2), ('(1 + 2', 0), ('1 + 2)', 5), ('2 ^ 0.5', 2), ('', 0), ('3 $ 4', 2)):\n        with pytest.raises(tokens.CalcError) as err:\n            e(text)\n        assert err.value.pos == pos, (text, err.value.pos)\n"
+        },
+        {
+          "id": "SV6-PM-01-05",
+          "kind": "negative",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_negative_05():\n    e = calc.evaluate\n    with pytest.raises(tokens.CalcError):\n        tokens.tokenize('1.2.3')\n"
+        },
+        {
+          "id": "SV6-PM-01-06",
+          "kind": "negative",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_negative_06():\n    e = calc.evaluate\n    assert issubclass(tokens.CalcError, ValueError)\n"
+        },
+        {
+          "id": "SV6-PM-01-07",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_boundary_07():\n    assert tokens.tokenize(' 12+(3.5)') == [('NUM', '12', 1), ('OP', '+', 3), ('LP', '(', 4), ('NUM', '3.5', 5), ('RP', ')', 8)]\n"
+        },
+        {
+          "id": "SV6-PM-01-08",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_boundary_08():\n    e = calc.evaluate\n    assert e('-0') == '0' and e('0 * -5') == '0' and e('- - 3') == '3' and e('2 * (3 + 4) ^ 2') == '98'\n"
+        },
+        {
+          "id": "SV6-PM-01-09",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_boundary_09():\n    e = calc.evaluate\n    assert e('100 / 8') == '12.5' and e('1.50 + 1.50') == '3'\n"
+        },
+        {
+          "id": "SV6-PM-01-10",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_compositional_10():\n    e = calc.evaluate\n    assert e('1 - -1') == '2' and e('-(3)') == '-3' and e('(2)') == '2'\n"
+        },
+        {
+          "id": "SV6-PM-01-11",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_compositional_11():\n    e = calc.evaluate\n    assert e('6 / 4') == '1.5' and e('5 % 3') == '2' and e('2 ^ 10') == '1024'\n"
+        },
+        {
+          "id": "SV6-PM-01-12",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_boundary_12():\n    assert tokens.tokenize('.5') == [('NUM', '.5', 0)]\n"
+        },
+        {
+          "id": "SV6-PM-01-13",
+          "kind": "negative",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_negative_13():\n    with pytest.raises(tokens.CalcError) as err:\n        calc.evaluate('4 % 0')\n    assert err.value.pos == 2\n"
+        },
+        {
+          "id": "SV6-PM-01-14",
+          "kind": "negative",
+          "code": "import pytest\n\nimport calc\nimport tokens\n\n\ndef test_sv5pm01_negative_14():\n    with pytest.raises(tokens.CalcError) as err:\n        calc.evaluate('1 2')\n    assert err.value.pos == 2\n"
+        }
+      ]
+    },
+    {
+      "id": "SV6-PM-02",
+      "goal": "Two files. In money.py, to_dec(x) converts an int or str to decimal.Decimal and raises TypeError for a float; round_cents(amount) rounds to 2 decimal places with banker's rounding (ROUND_HALF_EVEN). In invoice.py, total(lines, tax_rate='0', inclusive=False) prices invoice lines {qty, price, optional discount} using only money.to_dec / money.round_cents: each line's net = round_cents(qty * price), then its discounted amount = round_cents(net * (1 - discount)); qty <= 0, a discount outside 0..1 or a negative tax rate raises ValueError. subtotal = sum of the discounted line amounts. Exclusive tax (default): tax = round_cents(subtotal * rate), total = subtotal + tax. Inclusive tax: the prices already contain tax, so total = the summed amounts, tax = round_cents(total - total / (1 + rate)), subtotal = total - tax. Return {subtotal, tax, total} as strings with exactly two decimals.",
+      "files": {
+        "money.py": "def round_cents(amount):\n    return round(amount, 2)\n",
+        "invoice.py": "import money\n\n\ndef total(lines, tax_rate=0, inclusive=False):\n    s = sum(l[\"qty\"] * l[\"price\"] for l in lines)\n    return {\"subtotal\": s, \"tax\": s * tax_rate, \"total\": s + s * tax_rate}\n"
+      },
+      "reference_fix": "--- a/invoice.py\n+++ b/invoice.py\n@@ -1,6 +1,25 @@\n+from decimal import Decimal\n+\n import money\n \n \n-def total(lines, tax_rate=0, inclusive=False):\n-    s = sum(l[\"qty\"] * l[\"price\"] for l in lines)\n-    return {\"subtotal\": s, \"tax\": s * tax_rate, \"total\": s + s * tax_rate}\n+def total(lines, tax_rate=\"0\", inclusive=False):\n+    rate = money.to_dec(tax_rate)\n+    if rate < 0:\n+        raise ValueError(\"negative tax rate\")\n+    subtotal = Decimal(\"0\")\n+    for line in lines:\n+        qty = money.to_dec(line[\"qty\"])\n+        if qty <= 0:\n+            raise ValueError(\"quantity must be positive\")\n+        net = money.round_cents(qty * money.to_dec(line[\"price\"]))\n+        disc = money.to_dec(line.get(\"discount\", \"0\"))\n+        if not Decimal(\"0\") <= disc <= Decimal(\"1\"):\n+            raise ValueError(\"discount must be between 0 and 1\")\n+        subtotal += money.round_cents(net * (1 - disc))\n+    q = money.round_cents\n+    if inclusive:\n+        tax = q(subtotal - subtotal / (1 + rate))\n+        return {\"subtotal\": str(q(subtotal - tax)), \"tax\": str(tax), \"total\": str(q(subtotal))}\n+    tax = q(subtotal * rate)\n+    return {\"subtotal\": str(q(subtotal)), \"tax\": str(tax), \"total\": str(q(subtotal + tax))}\n--- a/money.py\n+++ b/money.py\n@@ -1,2 +1,11 @@\n+from decimal import ROUND_HALF_EVEN, Decimal\n+\n+\n+def to_dec(x):\n+    if isinstance(x, float):\n+        raise TypeError(\"use str or int, not float\")\n+    return Decimal(str(x))\n+\n+\n def round_cents(amount):\n-    return round(amount, 2)\n+    return to_dec(amount).quantize(Decimal(\"0.01\"), rounding=ROUND_HALF_EVEN)\n",
+      "heldout": [
+        {
+          "id": "SV6-PM-02-01",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_compositional_01():\n    r = invoice.total([{'qty': 3, 'price': '19.99'}, {'qty': 1, 'price': '5', 'discount': '0.1'}], tax_rate='0.08')\n    assert r == {'subtotal': '64.47', 'tax': '5.16', 'total': '69.63'}\n"
+        },
+        {
+          "id": "SV6-PM-02-02",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_compositional_02():\n    r = invoice.total([{'qty': 3, 'price': '19.99'}, {'qty': 1, 'price': '5', 'discount': '0.1'}], tax_rate='0.08')\n    assert invoice.total([{'qty': 1, 'price': '108'}], tax_rate='0.08', inclusive=True) == {'subtotal': '100.00', 'tax': '8.00', 'total': '108.00'}\n"
+        },
+        {
+          "id": "SV6-PM-02-03",
+          "kind": "negative",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_negative_03():\n    for kw in ({'lines': [{'qty': 0, 'price': '1'}]}, {'lines': [{'qty': 1, 'price': '1', 'discount': '1.5'}]}, {'lines': [{'qty': 1, 'price': '1'}], 'tax_rate': '-0.1'}):\n        with pytest.raises(ValueError):\n            invoice.total(**kw)\n"
+        },
+        {
+          "id": "SV6-PM-02-04",
+          "kind": "negative",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_negative_04():\n    with pytest.raises(TypeError):\n        money.to_dec(0.1)\n"
+        },
+        {
+          "id": "SV6-PM-02-05",
+          "kind": "negative",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_negative_05():\n    with pytest.raises(TypeError):\n        invoice.total([{'qty': 1, 'price': 0.5}])\n"
+        },
+        {
+          "id": "SV6-PM-02-06",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_boundary_06():\n    assert str(money.round_cents('0.125')) == '0.12' and str(money.round_cents('0.135')) == '0.14' and str(money.round_cents(2)) == '2.00'\n"
+        },
+        {
+          "id": "SV6-PM-02-07",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_boundary_07():\n    assert invoice.total([{'qty': '2', 'price': '0.005'}, {'qty': 1, 'price': '0.015'}]) == {'subtotal': '0.03', 'tax': '0.00', 'total': '0.03'}\n"
+        },
+        {
+          "id": "SV6-PM-02-08",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_boundary_08():\n    assert invoice.total([]) == {'subtotal': '0.00', 'tax': '0.00', 'total': '0.00'}\n"
+        },
+        {
+          "id": "SV6-PM-02-09",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_compositional_09():\n    assert invoice.total([{'qty': 2, 'price': '10', 'discount': '0.25'}], tax_rate='0.1') == {'subtotal': '15.00', 'tax': '1.50', 'total': '16.50'}\n"
+        },
+        {
+          "id": "SV6-PM-02-10",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_boundary_10():\n    assert str(money.round_cents('2.675')) == '2.68' and str(money.round_cents('-0.125')) == '-0.12'\n"
+        },
+        {
+          "id": "SV6-PM-02-11",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_boundary_11():\n    r = invoice.total([{'qty': 1, 'price': '110', 'discount': '0'}], tax_rate='0.1', inclusive=True)\n    assert r == {'subtotal': '100.00', 'tax': '10.00', 'total': '110.00'}\n"
+        },
+        {
+          "id": "SV6-PM-02-12",
+          "kind": "negative",
+          "code": "import pytest\n\nimport invoice\nimport money\n\n\ndef test_sv5pm02_negative_12():\n    with pytest.raises(ValueError):\n        invoice.total([{'qty': 1, 'price': '1', 'discount': '-0.1'}])\n"
+        }
+      ]
+    }
+  ]
+}

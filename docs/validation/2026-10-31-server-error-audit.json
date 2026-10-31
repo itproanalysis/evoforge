@@ -1,0 +1,18 @@
+{
+  "mail": "GitHub Actions evoforge-ci failures; not an outage notification",
+  "runs": [
+    41066568420,
+    41064075561
+  ],
+  "web_error": "npm10 lock resolution EUSAGE missing @swc/helpers0.5.23; npm11.12.1 fix already in deployed PR1",
+  "api_error": "past job cancelled after six hours; last output at67%; prior CommandBar assertion fixed release29, hang cause unconfirmed",
+  "production_readchecks": {
+    "dashboard": 200,
+    "share": 200,
+    "verify": 200,
+    "limits": 200
+  },
+  "cloud_run_error_logs": "no ERROR entries in queried24h",
+  "separate_sql_alerts": "external PostgreSQL authentication / nonencrypted connections rejected; no successful access inferred",
+  "queries": "read only; no mail sent or notification setting changed"
+}

@@ -84,6 +84,11 @@ def usage_cost_cents(usage, model=None) -> int | None:
     Critic provider's CRITIC_PRICE_* prices, with cache-read tokens at the
     input price; every other call keeps today's EVO_PRICE_* prices.
     """
+    from evoforge import collaboration, platform_models
+    if collaboration.enabled():
+        target = model or collaboration.BUILDER
+        if platform_models.is_platform_model(target):
+            return platform_models.model_cost_cents(usage, target)
     tokens = tokens_from_usage(usage)
     if tokens is None:
         return None
@@ -162,6 +167,11 @@ def output_cost_cents(out) -> int | None:
     """
     if not isinstance(out, dict):
         return None
+    from evoforge import collaboration, platform_models
+    if collaboration.enabled() and isinstance(out.get("provider_calls"), list) and out["provider_calls"]:
+        costs = [platform_models.model_cost_cents(c.get("usage"), c.get("model"))
+                 for c in out["provider_calls"] if isinstance(c, dict)]
+        return None if not costs or any(c is None for c in costs) else sum(costs)
     return usage_cost_cents(usage_from_output(out), model=out.get("model"))
 
 

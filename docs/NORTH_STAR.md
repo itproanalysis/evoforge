@@ -1,5 +1,15 @@
 # EvoForge north star — owner's direction (2026-10-29)
 
+**Owner update 2026-10-31:** Judges must not enter API keys. The owner explicitly
+selected GPT, Gemini and Claude in the default collaboration path, using
+server-managed platform credentials. Muse Spark 1.3 remains principal Builder;
+GPT-6.1 Sol and Gemini 4 Argon supply independent implementation advice;
+Claude Opus 5.5 is the independent spec-first Critic. This supersedes the old
+same-Spark Critic/BYOK-first judging default below. Keep the single lane a
+single Spark call, label the comparison as multi-model system vs single model,
+show actual costs, preserve public limits and never silently substitute models.
+This does not approve an unrestricted external BYOK launch or final submission.
+
 > One screen, two lanes: the same task goes to **EvoForge** (left) and to a **single AI** (right). You watch both work in
 > real time, then see who actually passed the hidden tests and what each cost. Anyone can run it with their own API key,
 > in their own isolated session. Today is the preparation stage for AIs collaborating at a level that surprises people.

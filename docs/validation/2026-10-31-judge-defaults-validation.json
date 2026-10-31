@@ -1,0 +1,61 @@
+{
+  "web": {
+    "scope": "release31-2 CSS merge preservation and comparison truth labels",
+    "source": "MERGE_HEAD release/2026-10-31-2 into 08830169, merge not committed by UI agent",
+    "checks": {
+      "proxy": "147 cases + readiness/method/redaction checks passed",
+      "SSR": "162 actual-component ko/en assertions passed",
+      "tsc": "passed",
+      "build": "Next build passed, 14/14 static pages plus dynamic share OG route",
+      "git_diff": "clean"
+    },
+    "css": "preserved default model card and all latest welcome/quick-start styles; staged CSS only",
+    "paid_model_calls": 0,
+    "browser_qa": "not performed",
+    "sha256": {
+      "apps/web/styles/canvas.css": "f73e9813528ba00c95ea8757549724c8755c61962e5dee87c8f6c21d597fa246",
+      "apps/web/app/[locale]/share/[id]/page.tsx": "d83c83857e0ce13c2d501737cc1564b02ad6bec07e3eda2d2cef2c45d85eb74f",
+      "apps/web/components/ShareComparisonBadge.tsx": "631999f83cde2e8482ee6c1ce812cffc5d1239198e82b90df9a8a7e5c94b48b8",
+      "apps/web/lib/share.ts": "2f9718df2c8ce2f4e6270d79f86c7158ef7a0e84f720157fa1a697a969b40300",
+      "apps/web/lib/api.ts": "185196f302e5f2d97da68f6e0e34682a51868f948be75502c7c03adc1a973bdc",
+      "apps/web/messages/en.json": "0247b99b3f7272f9b4d3203e1bc10d8ef1da053acbccc7382c9f09324fa1bb03",
+      "apps/web/messages/ko.json": "7e782feddcb4fd2cb794689d8604830d86ec08977ff535bfb4c99efeb11c94cb",
+      "apps/web/scripts/check-studio-render.mjs": "c2a064180d5f204362f5ee051bf86675462512b8528ad320a805165ad3bb392c"
+    }
+  },
+  "native_and_acceptance": "99 passed (52 native adapters,24 collaboration,23 provider accounting)",
+  "actual_pg_kernel": "169 passed",
+  "package": "0 failures; 96 SQL + 112 reference checks",
+  "real_models": "all four observed, Runner passed, 8 cents settled, 0 reserved",
+  "full_api": "Final exact-source Linux Cloud Build SUCCESS:1404 passed,65 skipped,435.55s",
+  "secret_provisioning": {
+    "project": "evoforge-prod-4ff3",
+    "secrets": [
+      {
+        "secret": "OPENAI_API_KEY",
+        "version": "1",
+        "api_only_binding_added": true,
+        "value_printed": false
+      },
+      {
+        "secret": "ANTHROPIC_API_KEY",
+        "version": "1",
+        "api_only_binding_added": true,
+        "value_printed": false
+      },
+      {
+        "secret": "GEMINI_API_KEY",
+        "version": "1",
+        "api_only_binding_added": true,
+        "value_printed": false
+      }
+    ]
+  },
+  "production_deploy": "Completed: API00052-qlh,Web00050-rhw,Runner00041-pcc; each100%",
+  "legacy_critic_regressions": "30 passed",
+  "production_base": "release/2026-10-31-2 bad33e24; PR1-4 UI preserved by merge",
+  "ci_diagnostics": "all checks retained; API names/durations/120s stacks +75minjob/60mintest bound, 7day artifacts; Cloud Build3600s bound",
+  "runtime_commit": "b832086f",
+  "real_cloud_run": "job_306819b0b688 keyless POST202; four models participated; both lanes13/13; PG planner reservations SETTLED; remote Runner13 HTTP200; Ed25519valid;26 cents model API usage",
+  "live_evidence": "docs/validation/2026-10-31-judge-live-defaults.json"
+}

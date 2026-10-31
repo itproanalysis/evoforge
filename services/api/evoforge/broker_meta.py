@@ -108,6 +108,9 @@ def call_metadata(response, model: str, phase: str) -> dict:
     This is not a billed receipt: no currency amount or pricing is inferred.
     Completion IDs remain distinct from the transport's request ID.
     """
+    from evoforge import platform_models
+    if platform_models.is_platform_model(model) and model != "muse-spark-1.3":
+        return platform_models.response_metadata(response, model, phase)
     usage = getattr(response, "usage", None)
     return {
         "provider": "meta", "model": model, "phase": phase,
