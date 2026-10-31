@@ -777,7 +777,7 @@ export interface ArenaDoc {
 
 export function postArena(
   task_id: string,
-  suite_version: "v1" | "v2" | "v3" | "v4" | "v5" = "v2",
+  suite_version: "v1" | "v2" | "v3" | "v4" | "v5" | "v6" = "v2",
   feedback: "heldout" | "critic" = "critic",
   model = "muse-spark-1.3",
   single_apply: "tolerant" | "strict" = "tolerant",

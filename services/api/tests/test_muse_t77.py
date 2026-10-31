@@ -46,18 +46,19 @@ def test_v5_suite_present_with_all_12_tasks():
         assert any(fn in goal for fn in files[tid]), (tid, goal, files[tid])
 
 
-def test_v5_listed_first_and_default():
+def test_v5_listed_right_after_v6_which_is_the_default():
+    # v6 (same 12 tasks, 129 single-assertion held-out tests) supersedes v5 as the Arena default.
     src = PAGE.read_text(encoding="utf-8")
     assert "Sealed v5 (12 hard tasks)" in src
     opts = [m.group(0) for m in re.finditer(r"Sealed v[0-9][^<]*", src)]
-    assert opts[0] == "Sealed v5 (12 hard tasks)", opts
+    assert opts[0].startswith("Sealed v6") and opts[1] == "Sealed v5 (12 hard tasks)", opts
     assert '"v5"' in src
-    assert '("v5")' in src
+    assert '("v6")' in src
     m = re.search(r'useState<string>\("([^"]+)"\)', src)
-    assert m and m.group(1).startswith("SV5-")
+    assert m and m.group(1).startswith("SV6-")
     pairs = re.findall(r'\{ id: "([^"]+)", goal: "([^"]+)" \}', src)
-    v5_ids = [i for i, _ in pairs if i.startswith("SV5-")]
-    assert m.group(1) == v5_ids[0]
+    v6_ids = [i for i, _ in pairs if i.startswith("SV6-")]
+    assert m.group(1) == v6_ids[0]
 
 
 def test_v1_v4_still_present():

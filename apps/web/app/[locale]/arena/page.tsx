@@ -19,7 +19,21 @@ import { SandboxedPreview } from "../../../components/SandboxedPreview";
 import { PromptBar } from "../../../components/PromptBar";
 import { shareUrl } from "../../../lib/share";
 
-const BENCHMARK_TASKS: Record<"v1" | "v2" | "v3" | "v4" | "v5", { id: string; goal: string }[]> = {
+const BENCHMARK_TASKS: Record<"v1" | "v2" | "v3" | "v4" | "v5" | "v6", { id: string; goal: string }[]> = {
+  v6: [
+    { id: "SV6-AO-01", goal: "In semver_range.py, check if a version satisfies an npm-style range" },
+    { id: "SV6-AO-02", goal: "In intervals.py, merge labelled half-open intervals by priority" },
+    { id: "SV6-CD-01", goal: "In reassemble.py, rebuild chat messages from out-of-order chunks" },
+    { id: "SV6-CD-02", goal: "In retry.py, compute backoff waits with cap, jitter and budget" },
+    { id: "SV6-CI-01", goal: "In shard_plan.py, split CI tests across shards with pinning" },
+    { id: "SV6-CI-02", goal: "In junit_merge.py, merge CI attempts into final suite results" },
+    { id: "SV6-PM-01", goal: "In tokens.py and calc.py, tokenize and evaluate expressions" },
+    { id: "SV6-PM-02", goal: "In money.py and invoice.py, price invoice lines with tax" },
+    { id: "SV6-SEC-01", goal: "In path_guard.py, join user paths safely under a root" },
+    { id: "SV6-SEC-02", goal: "In jwt_lite.py, verify HS256 JWTs and return payload" },
+    { id: "SV6-SS-01", goal: "In duration.py, parse and format durations like 1h30m" },
+    { id: "SV6-SS-02", goal: "In slugify.py, make URL slugs like cafe-au-lait" },
+  ],
   v5: [
     { id: "SV5-AO-01", goal: "In semver_range.py, check if a version satisfies an npm-style range" },
     { id: "SV5-AO-02", goal: "In intervals.py, merge labelled half-open intervals by priority" },
@@ -102,8 +116,8 @@ export default function ArenaPage() {
   const t = useTranslations("arena");
   const locale = useLocale();
   const tp = useTranslations("plan");
-  const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2" | "v3" | "v4" | "v5">("v5");
-  const [selectedTaskId, setSelectedTaskId] = useState<string>("SV5-AO-01");
+  const [suiteVersion, setSuiteVersion] = useState<"v1" | "v2" | "v3" | "v4" | "v5" | "v6">("v6");
+  const [selectedTaskId, setSelectedTaskId] = useState<string>("SV6-AO-01");
   const [customTaskId, setCustomTaskId] = useState<string>("");
   const [feedback, setFeedback] = useState<"heldout" | "critic">("critic");
   const [starting, setStarting] = useState(false);
@@ -383,13 +397,14 @@ export default function ArenaPage() {
             <select
               value={suiteVersion}
               onChange={(e) => {
-                const sv = e.target.value as "v1" | "v2" | "v3" | "v4" | "v5";
+                const sv = e.target.value as "v1" | "v2" | "v3" | "v4" | "v5" | "v6";
                 setSuiteVersion(sv);
                 setSelectedTaskId(BENCHMARK_TASKS[sv]?.[0]?.id || "");
               }}
               className="bg-background-tertiary border border-border text-xs rounded px-2 py-1 text-text-primary flex-1 min-w-0 sm:flex-none"
               disabled={running}
             >
+              <option value="v6">Sealed v6 (12 hard tasks, 129 hidden tests)</option>
               <option value="v5">Sealed v5 (12 hard tasks)</option>
               <option value="v4">Sealed v4 (12 tasks)</option>
               <option value="v3">Sealed v3 (48 tasks)</option>

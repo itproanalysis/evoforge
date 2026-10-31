@@ -1,0 +1,121 @@
+{
+  "family": "security_sensitive",
+  "suite_version": "v6",
+  "tasks": [
+    {
+      "id": "SV6-SEC-01",
+      "goal": "In path_guard.py, safe_join(root, user_path) joins a user-supplied relative path under a POSIX root and raises UnsafePath (a ValueError subclass you define) when the path could escape or is unsafe. First percent-decode the path once (urllib.parse.unquote), then treat backslashes as '/'. Raise UnsafePath for: any character below 0x20 (including NUL) after decoding; an absolute path (leading '/') or a Windows drive prefix such as 'C:'; any '..' segment; a segment longer than 255 characters; a Windows reserved device name (CON, PRN, AUX, NUL, COM1-COM9, LPT1-LPT9, any case, with or without an extension such as 'con.txt'); a segment ending in a dot or a space. Empty and '.' segments are dropped. The result is root without trailing slashes plus '/' plus the remaining segments joined by '/'; with no segments it is the root itself (a root of '/' stays '/', and '/' + 'a' is '/a').",
+      "files": {
+        "path_guard.py": "def safe_join(root, user_path):\n    if user_path.startswith(\"/\"):\n        raise ValueError(\"absolute path\")\n    return root.rstrip(\"/\") + \"/\" + user_path\n"
+      },
+      "reference_fix": "--- a/path_guard.py\n+++ b/path_guard.py\n@@ -1,4 +1,34 @@\n+import re\n+from urllib.parse import unquote\n+\n+RESERVED = {\"CON\", \"PRN\", \"AUX\", \"NUL\"} | {f\"COM{i}\" for i in range(1, 10)} | {f\"LPT{i}\" for i in range(1, 10)}\n+\n+\n+class UnsafePath(ValueError):\n+    pass\n+\n+\n def safe_join(root, user_path):\n-    if user_path.startswith(\"/\"):\n-        raise ValueError(\"absolute path\")\n-    return root.rstrip(\"/\") + \"/\" + user_path\n+    decoded = unquote(user_path)\n+    if any(ord(ch) < 0x20 for ch in decoded):\n+        raise UnsafePath(\"control character\")\n+    path = decoded.replace(\"\\\\\", \"/\")\n+    if path.startswith(\"/\") or re.match(r\"^[A-Za-z]:\", path):\n+        raise UnsafePath(\"absolute path\")\n+    segments = []\n+    for seg in path.split(\"/\"):\n+        if seg in (\"\", \".\"):\n+            continue\n+        if seg == \"..\":\n+            raise UnsafePath(\"parent segment\")\n+        if len(seg) > 255:\n+            raise UnsafePath(\"segment too long\")\n+        if seg.split(\".\")[0].upper() in RESERVED:\n+            raise UnsafePath(\"reserved name\")\n+        if seg.endswith((\" \", \".\")):\n+            raise UnsafePath(\"trailing dot or space\")\n+        segments.append(seg)\n+    base = root.rstrip(\"/\") or \"/\"\n+    if not segments:\n+        return base\n+    return (base if base != \"/\" else \"\") + \"/\" + \"/\".join(segments)\n",
+      "heldout": [
+        {
+          "id": "SV6-SEC-01-01",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_compositional_01():\n    j = path_guard.safe_join\n    assert j('/srv/app', 'a/b.txt') == '/srv/app/a/b.txt' and j('/srv/app/', './a//b/') == '/srv/app/a/b'\n"
+        },
+        {
+          "id": "SV6-SEC-01-02",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_compositional_02():\n    j = path_guard.safe_join\n    assert j('/srv/app', 'docs\\\\guide.md') == '/srv/app/docs/guide.md' and j('/srv/app', 'my%20file.txt') == '/srv/app/my file.txt'\n"
+        },
+        {
+          "id": "SV6-SEC-01-03",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_compositional_03():\n    j = path_guard.safe_join\n    assert j('/', 'a') == '/a' and j('/srv/app', '') == '/srv/app' and j('/', '.') == '/'\n"
+        },
+        {
+          "id": "SV6-SEC-01-04",
+          "kind": "negative",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_negative_04():\n    j = path_guard.safe_join\n    for bad in ('../etc/passwd', 'a/../../b', '%2e%2e/secret', '%2E%2e%2fsecret', '..\\\\win.ini', '/etc/passwd', 'C:\\\\boot.ini', 'c:x', 'a\\x00b', 'a%00b', 'x%0Ay'):\n        with pytest.raises(path_guard.UnsafePath):\n            j('/srv/app', bad)\n"
+        },
+        {
+          "id": "SV6-SEC-01-05",
+          "kind": "negative",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_negative_05():\n    j = path_guard.safe_join\n    assert issubclass(path_guard.UnsafePath, ValueError)\n"
+        },
+        {
+          "id": "SV6-SEC-01-06",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_boundary_06():\n    j = path_guard.safe_join\n    for bad in ('CON', 'logs/con.txt', 'Lpt9.log', 'aux', 'a/b.', 'a/b ', 'x' * 256):\n        with pytest.raises(path_guard.UnsafePath):\n            j('/srv/app', bad)\n"
+        },
+        {
+          "id": "SV6-SEC-01-09",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_compositional_09():\n    assert path_guard.safe_join('/srv/app', 'a/./b') == '/srv/app/a/b'\n"
+        },
+        {
+          "id": "SV6-SEC-01-10",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_boundary_10():\n    assert path_guard.safe_join('/srv/app', '%252e%252e') == '/srv/app/%2e%2e'\n"
+        },
+        {
+          "id": "SV6-SEC-01-11",
+          "kind": "negative",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_negative_11():\n    for bad in ('COM1.txt', 'nul', 'a\\\\..\\\\b', 'D:/x'):\n        with pytest.raises(path_guard.UnsafePath):\n            path_guard.safe_join('/srv/app', bad)\n"
+        },
+        {
+          "id": "SV6-SEC-01-12",
+          "kind": "negative",
+          "code": "import pytest\n\nimport path_guard\n\n\ndef test_sv5sec01_negative_12():\n    with pytest.raises(path_guard.UnsafePath):\n        path_guard.safe_join('/srv/app', 'a\\x1fb')\n"
+        }
+      ]
+    },
+    {
+      "id": "SV6-SEC-02",
+      "goal": "In jwt_lite.py, verify(token, keys, now, leeway=0, audience=None) verifies a compact HS256 JWT and returns its payload dict, raising InvalidToken (a ValueError subclass) on any problem. The token is three base64url segments without '=' padding joined by '.' (any other shape, bad base64url, padding, JSON that does not decode to an object -> InvalidToken). The header alg must be exactly 'HS256' (reject 'none', 'hs256', 'HS512', missing). Key choice: keys maps kid -> secret (str or bytes); a header kid selects that key (unknown kid -> InvalidToken); without kid exactly one key must be configured, else InvalidToken. The signature is HMAC-SHA256 over '<header segment>.<payload segment>' and must be compared in constant time (hmac.compare_digest). Claims: when exp is present the token is valid only while now < exp + leeway; when nbf is present only when nbf - leeway <= now; when audience is given, aud must equal it or be a list containing it.",
+      "files": {
+        "jwt_lite.py": "import base64\nimport json\n\n\nclass InvalidToken(ValueError):\n    pass\n\n\ndef verify(token, keys, now, leeway=0, audience=None):\n    header, payload, sig = token.split(\".\")\n    return json.loads(base64.urlsafe_b64decode(payload + \"==\"))\n"
+      },
+      "reference_fix": "--- a/jwt_lite.py\n+++ b/jwt_lite.py\n@@ -1,4 +1,7 @@\n import base64\n+import binascii\n+import hashlib\n+import hmac\n import json\n \n \n@@ -6,6 +9,53 @@\n     pass\n \n \n+def _b64(seg):\n+    if not seg or \"=\" in seg:\n+        raise InvalidToken(\"bad base64url\")\n+    try:\n+        return base64.urlsafe_b64decode(seg + \"=\" * (-len(seg) % 4))\n+    except (ValueError, binascii.Error):\n+        raise InvalidToken(\"bad base64url\")\n+\n+\n+def _json(raw):\n+    try:\n+        obj = json.loads(raw)\n+    except ValueError:\n+        raise InvalidToken(\"bad json\")\n+    if not isinstance(obj, dict):\n+        raise InvalidToken(\"not an object\")\n+    return obj\n+\n+\n def verify(token, keys, now, leeway=0, audience=None):\n-    header, payload, sig = token.split(\".\")\n-    return json.loads(base64.urlsafe_b64decode(payload + \"==\"))\n+    if not isinstance(token, str) or token.count(\".\") != 2:\n+        raise InvalidToken(\"malformed token\")\n+    h_seg, p_seg, s_seg = token.split(\".\")\n+    header = _json(_b64(h_seg))\n+    payload = _json(_b64(p_seg))\n+    sig = _b64(s_seg)\n+    if header.get(\"alg\") != \"HS256\":\n+        raise InvalidToken(\"unsupported alg\")\n+    kid = header.get(\"kid\")\n+    if kid is not None:\n+        if kid not in keys:\n+            raise InvalidToken(\"unknown kid\")\n+        key = keys[kid]\n+    elif len(keys) == 1:\n+        key = next(iter(keys.values()))\n+    else:\n+        raise InvalidToken(\"kid required\")\n+    key = key.encode() if isinstance(key, str) else key\n+    expected = hmac.new(key, f\"{h_seg}.{p_seg}\".encode(), hashlib.sha256).digest()\n+    if not hmac.compare_digest(expected, sig):\n+        raise InvalidToken(\"bad signature\")\n+    if \"exp\" in payload and not now < payload[\"exp\"] + leeway:\n+        raise InvalidToken(\"expired\")\n+    if \"nbf\" in payload and not payload[\"nbf\"] - leeway <= now:\n+        raise InvalidToken(\"not yet valid\")\n+    if audience is not None:\n+        aud = payload.get(\"aud\")\n+        if not (aud == audience or (isinstance(aud, list) and audience in aud)):\n+            raise InvalidToken(\"audience mismatch\")\n+    return payload\n",
+      "heldout": [
+        {
+          "id": "SV6-SEC-02-03",
+          "kind": "negative",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_negative_03():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    v = jwt_lite.verify\n    good = mk({'alg': 'HS256'}, {'n': 1}, b's')\n    bad = [mk({'alg': 'none'}, {'n': 1}, b's'), mk({'alg': 'hs256'}, {'n': 1}, b's'), mk({'alg': 'HS256'}, {'n': 1}, b'wrong'),\n           mk({'alg': 'HS256', 'kid': 'nope'}, {'n': 1}, b's'), good + '=', good.rsplit('.', 1)[0], 'a.b.c.d', b({'alg': 'HS256'}) + '.' + b([1]) + '.x']\n    for tok in bad:\n        with pytest.raises(jwt_lite.InvalidToken):\n            v(tok, {'k': b's'}, now=0)\n"
+        },
+        {
+          "id": "SV6-SEC-02-04",
+          "kind": "negative",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_negative_04():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    v = jwt_lite.verify\n    good = mk({'alg': 'HS256'}, {'n': 1}, b's')\n    bad = [mk({'alg': 'none'}, {'n': 1}, b's'), mk({'alg': 'hs256'}, {'n': 1}, b's'), mk({'alg': 'HS256'}, {'n': 1}, b'wrong'),\n           mk({'alg': 'HS256', 'kid': 'nope'}, {'n': 1}, b's'), good + '=', good.rsplit('.', 1)[0], 'a.b.c.d', b({'alg': 'HS256'}) + '.' + b([1]) + '.x']\n    with pytest.raises(jwt_lite.InvalidToken):\n        v(good, {'a': b's', 'b': b's'}, now=0)\n"
+        },
+        {
+          "id": "SV6-SEC-02-06",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_boundary_06():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    v = jwt_lite.verify\n    t = mk({'alg': 'HS256'}, {'exp': 100, 'nbf': 50}, b's')\n    for now in (100, 49):\n        with pytest.raises(jwt_lite.InvalidToken):\n            v(t, {'k': b's'}, now=now)\n"
+        },
+        {
+          "id": "SV6-SEC-02-08",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_boundary_08():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    v = jwt_lite.verify\n    t = mk({'alg': 'HS256'}, {'exp': 100, 'nbf': 50}, b's')\n    with pytest.raises(jwt_lite.InvalidToken):\n        v(mk({'alg': 'HS256'}, {'aud': 'web'}, b's'), {'k': b's'}, now=0, audience='api')\n"
+        },
+        {
+          "id": "SV6-SEC-02-09",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_compositional_09():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    t = mk({'alg': 'HS256', 'kid': 'k2'}, {'sub': 'ann'}, b'two')\n    assert jwt_lite.verify(t, {'k1': 'one', 'k2': 'two'}, now=0) == {'sub': 'ann'}\n    with pytest.raises(jwt_lite.InvalidToken):\n        jwt_lite.verify(t, {'k1': 'one', 'k2': 'zzz'}, now=0)\n"
+        },
+        {
+          "id": "SV6-SEC-02-10",
+          "kind": "compositional",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_compositional_10():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    t = mk({'alg': 'HS256'}, {'exp': 100, 'aud': ['web', 'api']}, b'k')\n    assert jwt_lite.verify(t, {'x': b'k'}, now=99, audience='api')['exp'] == 100\n    with pytest.raises(jwt_lite.InvalidToken):\n        jwt_lite.verify(t, {'x': b'k'}, now=100, audience='api')\n"
+        },
+        {
+          "id": "SV6-SEC-02-12",
+          "kind": "negative",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_negative_12():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    with pytest.raises(jwt_lite.InvalidToken):\n        jwt_lite.verify(mk({'kid': 'x'}, {'n': 1}, b'k'), {'x': b'k'}, now=0)\n"
+        },
+        {
+          "id": "SV6-SEC-02-13",
+          "kind": "negative",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_negative_13():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    with pytest.raises(jwt_lite.InvalidToken):\n        jwt_lite.verify(mk({'alg': 'HS256'}, {'aud': ['web']}, b'k'), {'x': b'k'}, now=0, audience='api')\n"
+        },
+        {
+          "id": "SV6-SEC-02-14",
+          "kind": "boundary",
+          "code": "import pytest\n\nimport jwt_lite\n\n\ndef test_sv5sec02_boundary_14():\n    import base64, hashlib, hmac, json\n    b = lambda o: base64.urlsafe_b64encode(json.dumps(o).encode()).rstrip(b'=').decode()\n    mk = lambda h, p, key: b(h) + '.' + b(p) + '.' + base64.urlsafe_b64encode(hmac.new(key, (b(h) + '.' + b(p)).encode(), hashlib.sha256).digest()).rstrip(b'=').decode()\n    t = mk({'alg': 'HS256'}, {'exp': 10}, b'k')\n    assert jwt_lite.verify(t, {'x': 'k'}, now=9)\n    with pytest.raises(jwt_lite.InvalidToken):\n        jwt_lite.verify(t, {'x': 'k'}, now=10)\n"
+        }
+      ]
+    }
+  ]
+}

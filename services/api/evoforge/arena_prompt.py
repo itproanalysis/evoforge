@@ -31,9 +31,11 @@ TEMPLATE = ("def render(state=None):\n"
             "def preview():\n"
             "    return render()\n")
 
-JUDGE_INSTRUCTION = ("Write pytest acceptance tests for app.render(), which returns "
-                     "one well-formed XHTML element for this request; tests import app "
-                     "and parse app.render() with xml.etree.ElementTree; "
+JUDGE_INSTRUCTION = ("Write pytest acceptance tests for this request; tests import app. "
+                     "Call every function the request names in app.py directly and "
+                     "check the behaviour and edge cases the request states. "
+                     "app.render() returns one well-formed XHTML element for this request; "
+                     "tests parse app.render() with xml.etree.ElementTree; "
                      "when the result depends on user input, tests call "
                      "app.render(state) with a dict of input values; "
                      "standard library + pytest only.")
@@ -50,12 +52,39 @@ COMPARISON_MODE = "user_prompt_same_template"
 REFERENCE_MARKER = "Judge reference build"
 
 
+# A file name in the request, such as "In csvlite.py provide parse()". Both lanes and the judge share one
+# file, app.py; a judge test importing csvlite was dropped as a non-sandbox import, which left 0 tests and
+# an unscorable match (job_34f00ed1825d).
+_MODULE_FILE = re.compile(r"(?<![\w./\\-])([A-Za-z_][A-Za-z0-9_]*)\.py\b")
+
+
+def normalize_modules(prompt: str) -> tuple[str, list[str]]:
+    """Point every Python file the request names at app.py; return (text, renamed stems)."""
+    renamed: list[str] = []
+
+    def _sub(m: re.Match) -> str:
+        stem = m.group(1)
+        if stem == "app":
+            return m.group(0)
+        if stem not in renamed:
+            renamed.append(stem)
+        return "app.py"
+
+    text = _MODULE_FILE.sub(_sub, prompt or "")
+    for stem in renamed:
+        text = re.sub(rf"\b(import|from)\s+{re.escape(stem)}\b", r"\1 app", text)
+    if renamed:
+        names = ", ".join(f"{stem}.py" for stem in renamed)
+        text += f"\n\n(All code lives in app.py; the request's {names} means app.py.)"
+    return text, renamed
+
+
 def build_reference_goal(lane_goal: str) -> str:
     return f"{REFERENCE_MARKER}\n\n{lane_goal}"
 
 
 def build_judge_goal(prompt: str) -> str:
-    return f"{prompt}\n\n{JUDGE_INSTRUCTION}"
+    return f"{normalize_modules(prompt)[0]}\n\n{JUDGE_INSTRUCTION}"
 
 
 PRIVATE_KIND = "arena_private"
@@ -106,18 +135,18 @@ def build_followup_task_goal(parent_prompts: list[str], followup: str) -> str:
     pals = [p for p in (parent_prompts or []) if isinstance(p, str) and p]
     if not pals:
         return build_task_goal(followup)
-    ctx = "\n".join(f"Earlier request {i + 1}: {p}"
+    ctx = "\n".join(f"Earlier request {i + 1}: {normalize_modules(p)[0]}"
                     for i, p in enumerate(pals))
-    return f"{ctx}\n\nNew request: {followup}\n\n{TASK_INSTRUCTION}"
+    return f"{ctx}\n\nNew request: {normalize_modules(followup)[0]}\n\n{TASK_INSTRUCTION}"
 
 
 def build_followup_judge_goal(parent_prompts: list[str], followup: str) -> str:
     pals = [p for p in (parent_prompts or []) if isinstance(p, str) and p]
     if not pals:
         return build_judge_goal(followup)
-    ctx = "\n".join(f"Earlier request {i + 1}: {p}"
+    ctx = "\n".join(f"Earlier request {i + 1}: {normalize_modules(p)[0]}"
                     for i, p in enumerate(pals))
-    return f"{ctx}\n\nNew request: {followup}\n\n{JUDGE_INSTRUCTION}"
+    return f"{ctx}\n\nNew request: {normalize_modules(followup)[0]}\n\n{JUDGE_INSTRUCTION}"
 
 
 def chain_prompts(parent_doc: dict) -> list[str]:
@@ -144,7 +173,7 @@ def chain_prompts(parent_doc: dict) -> list[str]:
 
 
 def build_task_goal(prompt: str) -> str:
-    return f"{prompt}\n\n{TASK_INSTRUCTION}"
+    return f"{normalize_modules(prompt)[0]}\n\n{TASK_INSTRUCTION}"
 
 
 def prompt_hash(prompt: str) -> str:
@@ -319,7 +348,9 @@ def build_manifest(prompt: str, feedback: str, single_apply: str,
     single_harness = ("api-sealed-eval/2" if single_apply == "tolerant"
                       else "api-sealed-eval/1")
     critic_model, critic_provider = _critic_fairness()
+    renamed = normalize_modules(prompt)[1]
     return {
+        **({"modules_renamed": renamed} if renamed else {}),
         **({"collaboration": _collaboration.public_defaults(),
             "comparison_scope": "multi_model_system_vs_single_model"} if _collaboration.enabled() else {}),
         "comparison_mode": COMPARISON_MODE,

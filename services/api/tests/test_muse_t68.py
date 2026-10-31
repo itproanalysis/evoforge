@@ -197,5 +197,20 @@ def test_runner_error_fails_closed(tmp_path, monkeypatch):
     def _boom(*a, **k):
         raise rc.RunnerClientError("down")
     monkeypatch.setattr("evoforge.runner_client.run_files", _boom)
+    sandbox = tmp_path / "sb"
+    sandbox.mkdir()
+    (sandbox / "calc.py").write_text("x=1\n", encoding="utf-8")
     with pytest.raises(se.SealedEvalError):
-        se._run_heldout_local_detail("/tmp", [{"code": "def test_a():\n    assert 1\n"}], 5, str(tmp_path))
+        se._run_heldout_local_detail(str(sandbox), [{"code": "def test_a():\n    assert 1\n"}], 5, str(tmp_path))
+
+
+def test_sandbox_walk_skips_fifos_and_symlinks(tmp_path):
+    from evoforge import sealed_eval as se
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("no FIFOs on this platform")
+    (tmp_path / "calc.py").write_text("x=1\n", encoding="utf-8")
+    os.mkfifo(tmp_path / "pipe")
+    outside = tmp_path.parent / "outside-secret.txt"
+    outside.write_text("secret\n", encoding="utf-8")
+    (tmp_path / "link.txt").symlink_to(outside)
+    assert se._sandbox_files_for_runner(str(tmp_path)) == {"calc.py": "x=1\n"}

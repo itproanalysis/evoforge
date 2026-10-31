@@ -48,7 +48,7 @@ DISCLOSURE_CRITIC = ("The EvoForge lane gets no held-out signal; it retries usin
                      "and reported costs cover only model API usage, not Runner compute.")
 
 KIND = "arena"
-SUITE_VERSIONS = ("v1", "v2", "v3", "v4", "v5")
+SUITE_VERSIONS = ("v1", "v2", "v3", "v4", "v5", "v6")
 BASELINE_MODEL = "muse-spark-1.3"
 LIST_LIMIT = 20
 PREVIEW_TIMEOUT_S = 10
@@ -1452,6 +1452,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
         last_dest: str | None = None
         last_diff = ""
         last_outcome = "empty_diff"
+        last_sig: tuple | None = None
         for _attempt in range(max_attempts):
             dest = os.path.join(
                 tmpbase, f"sandbox-evo-critic-{secrets.token_hex(4)}")
@@ -1473,6 +1474,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
             cand = out.get("diff") if isinstance(out, dict) else ""
             diff = cand if isinstance(cand, str) else ""
             if _sealed._is_empty_diff(diff):
+                empty_before = last_outcome == "empty_diff" and attempts > 1
                 applied = False
                 passed, n = 0, n_total
                 failing = []
@@ -1481,7 +1483,7 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                 last_diff = diff
                 _emit(events, "runner",
                       f"evoforge: attempt {attempts} empty diff")
-                goal = _sealed._critic_empty_feedback(base_goal)
+                goal = _sealed._empty_retry_feedback(base_goal, empty_before)
                 continue
             if _sealed._candidate_verification_failures(diff):
                 applied = False
@@ -1506,11 +1508,13 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                     dest, critic_suite, timeout_s, tmpbase)
             else:
                 c_passed, c_n, c_failures = 0, 0, []
+            # c_passed and c_n count test functions; total counts the Critic's test files ("Critic 20/3").
+            c_shown = c_n if c_n else total
             _emit(events, "critic",
-                  f"attempt {attempts}: Critic {c_passed}/{total} passed")
+                  f"attempt {attempts}: Critic {c_passed}/{c_shown} passed")
             _emit(events, "runner",
                   f"evoforge: attempt {attempts} critic "
-                  f"{c_passed}/{total} passed")
+                  f"{c_passed}/{c_shown} passed")
             if _sealed._failed_run_outcome(c_failures) == "verification_inconclusive":
                 passed, n = 0, n_total
                 failing, last_dest, last_diff = [], None, diff
@@ -1542,16 +1546,22 @@ def _run_evoforge_lane_critic(task: dict, model: str, timeout_s: int,
                 break
             last_dest = dest
             last_diff = diff
+            sig = _sealed._failure_signature(c_failures)
+            repeated = last_outcome == "heldout_failed" and sig == last_sig
+            last_sig = sig
             last_outcome = "heldout_failed"
             outcome = "heldout_failed"
             applied = False
             passed, n = 0, n_total
             failing = []
-            goal = _sealed._critic_feedback(
+            if repeated:
+                _emit(events, "builder",
+                      f"evoforge: attempt {attempts} repeated the previous failure; changing approach")
+            goal = _sealed._reflective_feedback(_sealed._critic_feedback(
                 base_goal,
                 c_failures or [{"test": "critic",
                                 "message": "assertion failed"}],
-                total, int(c_passed))
+                total, int(c_passed)), repeated)
         if not judged:
             if last_dest is not None:
                 h_passed, h_n, h_failures = _score_heldout_counted(
